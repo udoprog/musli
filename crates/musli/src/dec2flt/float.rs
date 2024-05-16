@@ -96,10 +96,12 @@ pub trait RawFloat:
 
     /// Returns the category that this number falls into.
     #[cfg(test)]
+    #[allow(dead_code)]
     fn classify(self) -> FpCategory;
 
     /// Returns the mantissa, exponent and sign as integers.
     #[cfg(test)]
+    #[allow(dead_code)]
     fn integer_decode(self) -> (u64, i16, i8);
 }
 

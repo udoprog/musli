@@ -85,6 +85,14 @@ impl<T> Builder<T> {
 }
 
 #[cfg(feature = "alloc")]
+impl<T> Default for Builder<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "alloc")]
 impl<T, F: Flavor> Builder<T, F> {
     /// Construct a new empty trie builder with a custom [`Flavor`].
     pub const fn with_flavor() -> Self {

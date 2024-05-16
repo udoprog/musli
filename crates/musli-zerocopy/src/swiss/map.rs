@@ -172,9 +172,9 @@ where
         Ok(entry.is_some())
     }
 
-    fn hash<H: ?Sized>(&self, value: &H) -> u64
+    fn hash<H>(&self, value: &H) -> u64
     where
-        H: Hash,
+        H: ?Sized + Hash,
     {
         let mut hasher = SipHasher13::new_with_keys(0, self.key);
         value.hash(&mut hasher);
@@ -366,9 +366,9 @@ where
     }
 
     #[inline]
-    fn hash<H: ?Sized>(&self, value: &H) -> u64
+    fn hash<H>(&self, value: &H) -> u64
     where
-        H: Hash,
+        H: ?Sized + Hash,
     {
         let mut hasher = SipHasher13::new_with_keys(0, self.key.to_ne());
         value.hash(&mut hasher);

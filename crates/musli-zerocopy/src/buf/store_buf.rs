@@ -36,9 +36,9 @@ pub trait StoreBuf: self::sealed::Sealed {
 
     /// Store an unsigned value.
     #[doc(hidden)]
-    fn store_unsized<T: ?Sized>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
+    fn store_unsized<T>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
     where
-        T: UnsizedZeroCopy;
+        T: ?Sized + UnsizedZeroCopy;
 
     /// Store a [`ZeroCopy`] value.
     #[doc(hidden)]

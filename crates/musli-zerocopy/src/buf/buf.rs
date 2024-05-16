@@ -703,12 +703,11 @@ impl Buf {
 
     /// Load an unsized reference.
     #[inline]
-    pub(crate) fn load_unsized<T: ?Sized, O: Size, E: ByteOrder>(
-        &self,
-        unsize: Ref<T, E, O>,
-    ) -> Result<&T, Error>
+    pub(crate) fn load_unsized<T, O, E>(&self, unsize: Ref<T, E, O>) -> Result<&T, Error>
     where
-        T: UnsizedZeroCopy,
+        T: ?Sized + UnsizedZeroCopy,
+        O: Size,
+        E: ByteOrder,
     {
         let start = unsize.offset();
         let metadata = unsize.metadata();
@@ -724,12 +723,14 @@ impl Buf {
 
     /// Load an unsized mutable reference.
     #[inline]
-    pub(crate) fn load_unsized_mut<T: ?Sized, O: Size, E: ByteOrder>(
+    pub(crate) fn load_unsized_mut<T, O, E>(
         &mut self,
         unsize: Ref<T, E, O>,
     ) -> Result<&mut T, Error>
     where
-        T: UnsizedZeroCopy,
+        T: ?Sized + UnsizedZeroCopy,
+        O: Size,
+        E: ByteOrder,
     {
         let start = unsize.offset();
         let metadata = unsize.metadata();

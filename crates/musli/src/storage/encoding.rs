@@ -99,6 +99,13 @@ pub struct Encoding<const OPT: Options = OPTIONS, M = Binary> {
     _marker: marker::PhantomData<M>,
 }
 
+impl Default for Encoding<OPTIONS, Binary> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Encoding<OPTIONS, Binary> {
     /// Construct a new [`Encoding`] instance which uses [`OPTIONS`].
     ///

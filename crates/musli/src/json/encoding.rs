@@ -114,6 +114,13 @@ pub struct Encoding<M = Text> {
     _marker: marker::PhantomData<M>,
 }
 
+impl Default for Encoding<Text> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Encoding<Text> {
     /// Construct a new [`Encoding`].
     ///

@@ -43,9 +43,11 @@ use crate::ZeroCopy;
 #[derive(ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate, swap_bytes, bounds = {<T::Metadata as Packable>::Packed<O>: ZeroCopy})]
-pub struct Ref<T: ?Sized, E: ByteOrder = Native, O: Size = DefaultSize>
+pub struct Ref<T, E = Native, O = DefaultSize>
 where
-    T: Pointee,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Size,
 {
     offset: O,
     metadata: <T::Metadata as Packable>::Packed<O>,
@@ -53,9 +55,11 @@ where
     _marker: PhantomData<(E, T)>,
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
+impl<T, E, O> Ref<T, E, O>
 where
-    T: Pointee,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Size,
 {
     /// Convert this reference into a [`Big`]-endian [`ByteOrder`].
     ///
@@ -146,9 +150,11 @@ where
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
+impl<T, E, O> Ref<T, E, O>
 where
-    T: Pointee,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Size,
 {
     /// Construct a reference with custom metadata.
     ///
@@ -270,9 +276,11 @@ where
     }
 }
 
-impl<T, E: ByteOrder, O: Size> Ref<[T], E, O>
+impl<T, E, O> Ref<[T], E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     /// Return the number of elements in the slice `[T]`.
     ///
@@ -454,7 +462,11 @@ where
     }
 }
 
-impl<E: ByteOrder, O: Size> Ref<str, E, O> {
+impl<E, O> Ref<str, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     /// Return the length of the string.
     ///
     /// # Examples
@@ -498,7 +510,12 @@ pub struct Iter<T, E, O> {
     _marker: PhantomData<(T, E, O)>,
 }
 
-impl<T: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<T, E, O> {
+impl<T, E, O> Iterator for Iter<T, E, O>
+where
+    T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
+{
     type Item = Ref<T, E, O>;
 
     #[inline]
@@ -513,7 +530,12 @@ impl<T: ZeroCopy, E: ByteOrder, O: Size> Iterator for Iter<T, E, O> {
     }
 }
 
-impl<T: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<T, E, O> {
+impl<T, E, O> DoubleEndedIterator for Iter<T, E, O>
+where
+    T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
+{
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.start == self.end {
@@ -525,9 +547,11 @@ impl<T: ZeroCopy, E: ByteOrder, O: Size> DoubleEndedIterator for Iter<T, E, O> {
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
+impl<T, E, O> Ref<T, E, O>
 where
-    T: Pointee,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Size,
 {
     /// The number of elements in the slice.
     ///
@@ -545,9 +569,11 @@ where
     }
 }
 
-impl<T, E: ByteOrder, O: Size> Ref<T, E, O>
+impl<T, E, O> Ref<T, E, O>
 where
     T: Pointee<Metadata = ()>,
+    E: ByteOrder,
+    O: Size,
 {
     /// Construct a reference at the given offset.
     ///
@@ -611,9 +637,11 @@ where
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Ref<T, E, O>
+impl<T, E, O> Ref<T, E, O>
 where
-    T: Pointee,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Size,
 {
     /// Get the offset the reference points to.
     ///
@@ -645,10 +673,10 @@ where
     /// variant of this method.
     ///
     /// [`try_coerce()`]: Self::try_coerce
-    pub fn coerce<U: ?Sized>(self) -> Ref<U, E, O>
+    pub fn coerce<U>(self) -> Ref<U, E, O>
     where
         T: Coerce<U>,
-        U: Pointee,
+        U: ?Sized + Pointee,
     {
         Ref {
             offset: self.offset,
@@ -717,10 +745,10 @@ where
     ///
     /// Coercion of non-zero types are supported, but do not guarantee that the
     /// destination data is valid.
-    pub fn try_coerce<U: ?Sized>(self) -> Option<Ref<U, E, O>>
+    pub fn try_coerce<U>(self) -> Option<Ref<U, E, O>>
     where
         T: Coerce<U>,
-        U: Pointee,
+        U: ?Sized + Pointee,
     {
         Some(Ref {
             offset: self.offset,
@@ -742,9 +770,11 @@ where
     }
 }
 
-impl<T, const N: usize, E: ByteOrder, O: Size> Ref<[T; N], E, O>
+impl<T, const N: usize, E, O> Ref<[T; N], E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     /// Coerce a reference to an array into a slice.
     ///
@@ -767,9 +797,11 @@ where
     }
 }
 
-impl<T, E: ByteOrder, O: Size> Ref<MaybeUninit<T>, E, O>
+impl<T, E, O> Ref<MaybeUninit<T>, E, O>
 where
     T: Pointee,
+    E: ByteOrder,
+    O: Size,
 {
     /// Assume that the reference is initialized.
     ///
@@ -785,11 +817,12 @@ where
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> fmt::Debug for Ref<T, E, O>
+impl<T, E, O> fmt::Debug for Ref<T, E, O>
 where
-    T: Pointee,
+    T: ?Sized + Pointee,
     <T::Metadata as Packable>::Packed<O>: fmt::Debug,
-    O: fmt::Debug,
+    E: ByteOrder,
+    O: Size + fmt::Debug,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
