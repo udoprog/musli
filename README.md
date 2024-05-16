@@ -161,7 +161,7 @@ that one model can add fields that an older version of the model should be
 capable of ignoring.
 
 Partial upgrade stability can still be useful as is the case of the
-*musli-storage* format below, because reading from storage only requires
+[`musli::storage`] format below, because reading from storage only requires
 decoding to be upgrade stable. So if correctly managed with
 `#[musli(default)]` this will never result in any readers seeing unknown
 fields.
@@ -196,7 +196,7 @@ types.
 `self` determines if the format is self-descriptive. Allowing the structure
 of the data to be fully reconstructed from its serialized state. These
 formats do not require models to decode and can be converted to and from
-dynamic containers such as [`musli-value`] for introspection. Such formats
+dynamic containers such as [`musli::value`] for introspection. Such formats
 also allows for type-coercions to be performed, so that a signed number can
 be correctly read as an unsigned number if it fits in the destination type.
 
@@ -359,11 +359,11 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [`derives`]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
 [`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
 [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
-[`musli-value`]: <https://docs.rs/musli/latest/musli/value/index.html>
 [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/index.html>
 [`musli::json`]: <https://docs.rs/musli/latest/musli/json/index.html>
 [`musli::serde`]: <https://docs.rs/musli/latest/musli/serde/index.html>
 [`musli::storage`]: <https://docs.rs/musli/latest/musli/storage/index.html>
+[`musli::value`]: <https://docs.rs/musli/latest/musli/value/index.html>
 [`musli::wire`]: <https://docs.rs/musli/latest/musli/wire/index.html>
 [`protobuf`]: <https://developers.google.com/protocol-buffers>
 [`serde`]: <https://serde.rs>
