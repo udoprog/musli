@@ -584,7 +584,7 @@ pub mod buf;
 
 pub mod reader;
 #[doc(inline)]
-pub use self::reader::Reader;
+pub use self::reader::{IntoReader, Reader};
 
 pub mod wrap;
 

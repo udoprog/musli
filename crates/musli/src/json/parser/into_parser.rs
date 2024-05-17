@@ -2,8 +2,16 @@ use core::mem::transmute;
 
 use super::{MutSliceParser, Parser, SliceParser};
 
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for &[u8] {}
+    impl Sealed for &str {}
+    impl Sealed for &mut &[u8] {}
+    impl Sealed for &mut &str {}
+}
+
 /// Trait for types which can be converted into a [`Parser`].
-pub trait IntoParser<'de> {
+pub trait IntoParser<'de>: self::sealed::Sealed {
     /// The parser type being converted into.
     type Parser: Parser<'de>;
 

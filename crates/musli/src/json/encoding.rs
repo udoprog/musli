@@ -9,10 +9,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::allocator;
-use crate::de::{Decode, Decoder};
-use crate::en::{Encode, Encoder};
 use crate::mode::Text;
-use crate::{Context, Writer};
+use crate::{Context, Decode, Encode};
 
 use super::de::JsonDecoder;
 use super::en::JsonEncoder;
@@ -165,23 +163,42 @@ impl<M> Encoding<M> {
         }
     }
 
-    /// Encode the given value to the given [`Writer`] using the current
-    /// configuration.
-    ///
-    /// This is the same as [`Encoding::encode`] but allows for using a
-    /// configurable [`Context`].
-    #[inline]
-    pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context<Mode = M>,
-        W: Writer,
-        T: ?Sized + Encode<M>,
-    {
-        cx.clear();
-        JsonEncoder::new(cx, writer).encode(value)
-    }
+    crate::macros::encoding_impls!(
+        M,
+        json,
+        JsonEncoder::new,
+        JsonDecoder::new,
+        IntoParser::into_parser
+    );
 
-    /// Encode the given value to a [`String`] using the current configuration.
+    /// Encode the given value to the given value to a [`String`] using the
+    /// current [`Encoding`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Decode, Encode};
+    /// use musli::json;
+    /// # use musli::json::Error;
+    ///
+    /// const ENCODING: json::Encoding = json::Encoding::new();
+    ///
+    /// #[derive(Decode, Encode)]
+    /// struct Person {
+    ///     name: String,
+    ///     age: u32,
+    /// }
+    ///
+    /// let mut data = ENCODING.to_string(&Person {
+    ///     name: "Aristotle".to_string(),
+    ///     age: 62,
+    /// })?;
+    ///
+    /// let person: Person = ENCODING.from_str(&data[..])?;
+    /// assert_eq!(person.name, "Aristotle");
+    /// assert_eq!(person.age, 62);
+    /// # Ok::<(), Error>(())
+    /// ```
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_string<T>(self, value: &T) -> Result<String, Error>
@@ -207,95 +224,10 @@ impl<M> Encoding<M> {
     {
         cx.clear();
         let mut data = Vec::with_capacity(128);
-        JsonEncoder::new(cx, &mut data).encode(value)?;
+        T::encode(value, cx, JsonEncoder::new(cx, &mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data) })
     }
-
-    /// Decode the given type `T` from the given [`Parser`] using the current
-    /// configuration.
-    #[inline]
-    pub fn decode<'de, P, T>(self, parser: P) -> Result<T, Error>
-    where
-        P: IntoParser<'de>,
-        T: Decode<'de, M>,
-    {
-        allocator::default!(|alloc| {
-            let cx = crate::context::Same::new(alloc);
-            self.decode_with(&cx, parser)
-        })
-    }
-
-    /// Decode the given type `T` from the given [`Parser`] using the current
-    /// configuration.
-    ///
-    /// This is the same as [`Encoding::decode`] but allows for using a
-    /// configurable [`Context`].
-    #[inline]
-    pub fn decode_with<'de, C, P, T>(self, cx: &C, parser: P) -> Result<T, C::Error>
-    where
-        C: ?Sized + Context<Mode = M>,
-        P: IntoParser<'de>,
-        T: Decode<'de, M>,
-    {
-        cx.clear();
-        let parser = parser.into_parser();
-        JsonDecoder::new(cx, parser).decode()
-    }
-
-    /// Decode the given type `T` from the given string using the current
-    /// configuration.
-    #[inline]
-    pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, Error>
-    where
-        T: Decode<'de, M>,
-    {
-        self.from_slice(string.as_bytes())
-    }
-
-    /// Decode the given type `T` from the given string using the current
-    /// configuration.
-    ///
-    /// This is the same as [`Encoding::from_str`] but allows for using a
-    /// configurable [`Context`].
-    #[inline]
-    pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
-    where
-        C: ?Sized + Context<Mode = M>,
-        T: Decode<'de, M>,
-    {
-        self.from_slice_with(cx, string.as_bytes())
-    }
-
-    /// Decode the given type `T` from the given slice using the current
-    /// configuration.
-    #[inline]
-    pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
-    where
-        T: Decode<'de, M>,
-    {
-        allocator::default!(|alloc| {
-            let cx = crate::context::Same::<_, M, _>::new(alloc);
-            self.from_slice_with(&cx, bytes)
-        })
-    }
-
-    /// Decode the given type `T` from the given slice using the current
-    /// configuration.
-    ///
-    /// This is the same as [`Encoding::from_slice`] but allows for using a
-    /// configurable [`Context`].
-    #[inline]
-    pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
-    where
-        C: ?Sized + Context<Mode = M>,
-        T: Decode<'de, M>,
-    {
-        cx.clear();
-        JsonDecoder::new(cx, bytes.into_parser()).decode()
-    }
-
-    crate::macros::encode_with_extensions!(M, json);
 }
 
 impl<M> Clone for Encoding<M> {

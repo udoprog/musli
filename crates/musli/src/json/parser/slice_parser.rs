@@ -1,5 +1,6 @@
 use crate::json::error::ErrorMessage;
 use crate::json::parser::{Parser, StringReference, Token};
+use crate::reader::SliceUnderflow;
 use crate::{Buf, Context};
 
 use super::string::SliceAccess;
@@ -72,7 +73,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         let outcome = self.index.wrapping_add(n);
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.message("Buffer underflow"));
+            return Err(cx.custom(SliceUnderflow::new(n, self.slice.len() - self.index)));
         }
 
         self.index = outcome;
@@ -88,7 +89,10 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         let outcome = self.index.wrapping_add(buf.len());
 
         if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.message("Buffer underflow"));
+            return Err(cx.custom(SliceUnderflow::new(
+                buf.len(),
+                self.slice.len() - self.index,
+            )));
         }
 
         buf.copy_from_slice(&self.slice[self.index..outcome]);

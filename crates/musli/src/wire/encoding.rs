@@ -5,7 +5,7 @@ use core::marker;
 
 use crate::mode::Binary;
 use crate::options;
-use crate::{Options, Reader};
+use crate::{IntoReader, Options};
 
 use super::de::WireDecoder;
 use super::en::WireEncoder;
@@ -25,7 +25,7 @@ pub const OPTIONS: options::Options = options::new().build();
 /// [`variable length`]: https://en.wikipedia.org/wiki/Variable-length_quantity
 pub const DEFAULT: Encoding = Encoding::new();
 
-crate::macros::bare_encoding!(Binary, DEFAULT, wire, Reader);
+crate::macros::bare_encoding!(Binary, DEFAULT, wire, IntoReader);
 
 /// Setting up encoding with parameters.
 pub struct Encoding<const OPT: Options = OPTIONS, M = Binary> {
@@ -119,7 +119,8 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
         M,
         wire,
         WireEncoder::<_, OPT, _>::new,
-        WireDecoder::<_, OPT, _>::new
+        WireDecoder::<_, OPT, _>::new,
+        IntoReader::into_reader,
     );
 }
 
