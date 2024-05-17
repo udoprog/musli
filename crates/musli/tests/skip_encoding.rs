@@ -25,7 +25,7 @@ struct Unpacked(u32, u32);
 
 #[test]
 fn skip_serialize() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         SkipSerializeUntagged {
             before: 1,
@@ -35,7 +35,7 @@ fn skip_serialize() {
         json = r#"[1,2,3]"#,
     );
 
-    musli::assert_decode_eq! {
+    musli::macros::assert_decode_eq! {
         full,
         SkipSerializeUntagged {
             before: 1,

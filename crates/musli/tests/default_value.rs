@@ -71,7 +71,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
     static NAME: &str = "Aristotle";
     static COUNTRY: &str = "Greece";
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         StructDefault {
             name: NAME,
@@ -86,7 +86,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
         json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         StructWithOption {
             name: NAME,
@@ -101,7 +101,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
         json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         StructWithOption {
             name: NAME,
@@ -116,7 +116,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
         json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         StructDefaultValue {
             name: NAME,
@@ -131,7 +131,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
         json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         StructDefaultValue {
             name: NAME,
@@ -146,7 +146,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
         json = format!(r#"{{"name":{NAME:?},"age":170,"country":{COUNTRY:?}}}"#),
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         StructSkip {
             name: NAME,
@@ -161,7 +161,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
         json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         StructSkipDefault {
             name: NAME,
@@ -176,7 +176,7 @@ fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
         json = format!(r#"{{"name":{NAME:?},"country":{COUNTRY:?}}}"#),
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         StructSkip {
             name: NAME,

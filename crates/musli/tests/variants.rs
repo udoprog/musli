@@ -10,9 +10,9 @@ enum EmptyVariants {
 
 #[test]
 fn enum_with_empty_variant() {
-    musli::rt!(full, EmptyVariants::Empty, json = r#"{"Empty":{}}"#);
-    musli::rt!(full, EmptyVariants::Tuple(), json = r#"{"Tuple":{}}"#);
-    musli::rt!(full, EmptyVariants::Struct {}, json = r#"{"Struct":{}}"#);
+    musli::macros::assert_roundtrip_eq!(full, EmptyVariants::Empty, json = r#"{"Empty":{}}"#);
+    musli::macros::assert_roundtrip_eq!(full, EmptyVariants::Tuple(), json = r#"{"Tuple":{}}"#);
+    musli::macros::assert_roundtrip_eq!(full, EmptyVariants::Struct {}, json = r#"{"Struct":{}}"#);
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -26,13 +26,13 @@ enum NamedVariants {
 
 #[test]
 fn multiple_named_variants() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         NamedVariants::Variant1 { field: 1 },
         json = r#"{"Variant1":{"0":1}}"#
     );
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         NamedVariants::Variant2 { field: 2 },
         json = r#"{"Variant2":{"0":2}}"#
@@ -52,13 +52,13 @@ pub enum UntaggedVariants {
 /// Enums may contain packed variants.
 #[test]
 fn untagged_variants() {
-    musli::rt!(full, UntaggedVariants::Empty, json = r#"{"Empty":[]}"#);
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(full, UntaggedVariants::Empty, json = r#"{"Empty":[]}"#);
+    musli::macros::assert_roundtrip_eq!(
         full,
         UntaggedVariants::Tuple(42, 84),
         json = r#"{"Tuple":[42,84]}"#
     );
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         UntaggedVariants::Struct { a: 42, b: 84 },
         json = r#"{"Struct":[42,84]}"#
@@ -77,7 +77,10 @@ enum UntaggedSingleFields {
 
 #[test]
 fn untagged_single_field_variant() {
-    musli::rt!(full, UntaggedSingleFields::Variant1(String::from("hello")));
-    musli::rt!(full, UntaggedSingleFields::Variant2(1.0));
-    musli::rt!(full, UntaggedSingleFields::Variant3(42));
+    musli::macros::assert_roundtrip_eq!(
+        full,
+        UntaggedSingleFields::Variant1(String::from("hello"))
+    );
+    musli::macros::assert_roundtrip_eq!(full, UntaggedSingleFields::Variant2(1.0));
+    musli::macros::assert_roundtrip_eq!(full, UntaggedSingleFields::Variant3(42));
 }

@@ -29,7 +29,7 @@ pub struct Primitives {
 
 #[test]
 fn primitives() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Primitives {
             bool_field: true,
@@ -52,7 +52,7 @@ fn primitives() {
         }
     );
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Primitives {
             bool_field: false,
@@ -84,7 +84,7 @@ pub struct Arrays {
 
 #[test]
 fn arrays() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Arrays {
             empty_array_field: [],
@@ -92,7 +92,7 @@ fn arrays() {
         }
     );
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Arrays {
             empty_array_field: [],
@@ -108,14 +108,14 @@ pub struct Sequences {
 
 #[test]
 fn sequences() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Sequences {
             empty_sequence: Sequence(()),
         }
     );
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Sequences {
             empty_sequence: Sequence(()),

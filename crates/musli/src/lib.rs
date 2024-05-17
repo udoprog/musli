@@ -404,7 +404,6 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[doc(hidden)]
 pub mod macros;
 
 #[cfg(test)]

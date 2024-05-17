@@ -26,4 +26,4 @@ impl<const N: usize> Typed<N> {
     }
 }
 
-crate::test_fns!("wire", crate::mode::Binary);
+crate::macros::test_fns!("wire", crate::mode::Binary);

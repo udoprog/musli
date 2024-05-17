@@ -11,7 +11,7 @@ fn named() {
         Variant2 { string: String },
     }
 
-    musli::rt! {
+    musli::macros::assert_roundtrip_eq! {
         descriptive,
         Named::Variant1 {
             string: String::from("Hello"),
@@ -20,7 +20,7 @@ fn named() {
         json = r#"{"type":"Variant1","content":{"string":"Hello","number":42}}"#
     };
 
-    musli::rt! {
+    musli::macros::assert_roundtrip_eq! {
         descriptive,
         Named::Variant2 {
             string: String::from("Hello")
@@ -28,7 +28,7 @@ fn named() {
         json = r#"{"type":"variant2","content":{"string":"Hello"}}"#
     };
 
-    musli::rt! {
+    musli::macros::assert_roundtrip_eq! {
         descriptive,
         Named::Variant2 {
             string: String::from("\"\u{0000}")
@@ -50,13 +50,13 @@ fn indexed() {
                 Variant2 { variant2: u32 },
             }
 
-            musli::rt! {
+            musli::macros::assert_roundtrip_eq! {
                 descriptive,
                 Indexed::Variant1 { variant1: 10 },
                 json = r#"{"11":33,"22":{"variant1":10}}"#
             };
 
-            musli::rt! {
+            musli::macros::assert_roundtrip_eq! {
                 descriptive,
                 Indexed::Variant2 { variant2: 20 },
                 json = r#"{"11":44,"22":{"variant2":20}}"#
@@ -71,13 +71,13 @@ fn indexed() {
                 Variant2 { variant2: u32 },
             }
 
-            musli::rt! {
+            musli::macros::assert_roundtrip_eq! {
                 descriptive,
                 IndexedBounds::Variant1 { variant1: 10 },
                 json = format!(r#"{{"11":{},"22":{{"variant1":10}}}}"#, <$ty>::MAX)
             };
 
-            musli::rt! {
+            musli::macros::assert_roundtrip_eq! {
                 descriptive,
                 IndexedBounds::Variant2 { variant2: 20 },
                 json = format!(r#"{{"11":{},"22":{{"variant2":20}}}}"#, <$ty>::MIN)
@@ -116,14 +116,14 @@ pub enum NamedWithSkip {
 
 #[test]
 fn named_with_skip() {
-    musli::assert_decode_eq! {
+    musli::macros::assert_decode_eq! {
         descriptive,
         NamedWithSkip::Empty,
         NamedWithSkip::Empty,
         json = r#"{"type":"Empty","content":{}}"#
     };
 
-    musli::assert_decode_eq! {
+    musli::macros::assert_decode_eq! {
         descriptive,
         NamedWithSkip::Struct {
             string: String::from("Hello World"),

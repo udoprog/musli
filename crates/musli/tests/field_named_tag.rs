@@ -9,5 +9,5 @@ struct TestStruct {
 /// It should not be confused with an actual field named `tag`.
 #[test]
 fn struct_with_field_named_tag() {
-    musli::rt!(full, TestStruct { tag: 42 });
+    musli::macros::assert_roundtrip_eq!(full, TestStruct { tag: 42 });
 }

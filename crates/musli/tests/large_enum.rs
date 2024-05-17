@@ -60,16 +60,19 @@ fn large_enum_string_variants() {
     const IPV6: IpAddr = IpAddr::V6(Ipv6Addr::new(1, 2, 3, 4, 5, 6, 7, 8));
 
     // TODO: Fix this for JSON.
-    musli::rt!(no_json, LargeEnumStringVariants::A(A { id: ID, ip: IP }));
-    musli::rt!(no_json, LargeEnumStringVariants::A(A { id: ID, ip: IPV6 }));
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(no_json, LargeEnumStringVariants::A(A { id: ID, ip: IP }));
+    musli::macros::assert_roundtrip_eq!(
+        no_json,
+        LargeEnumStringVariants::A(A { id: ID, ip: IPV6 })
+    );
+    musli::macros::assert_roundtrip_eq!(
         no_json,
         LargeEnumStringVariants::B(B {
             id: ID,
             user_id: USER_ID
         })
     );
-    musli::rt!(no_json, LargeEnumStringVariants::C(C { id: ID }));
-    musli::rt!(no_json, LargeEnumStringVariants::D(D { id: ID }));
-    musli::rt!(no_json, LargeEnumStringVariants::E(E { id: ID }));
+    musli::macros::assert_roundtrip_eq!(no_json, LargeEnumStringVariants::C(C { id: ID }));
+    musli::macros::assert_roundtrip_eq!(no_json, LargeEnumStringVariants::D(D { id: ID }));
+    musli::macros::assert_roundtrip_eq!(no_json, LargeEnumStringVariants::E(E { id: ID }));
 }

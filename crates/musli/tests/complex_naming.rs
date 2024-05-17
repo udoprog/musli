@@ -42,12 +42,12 @@ pub struct StructCustomFieldAsStruct {
 
 #[test]
 fn bytes_tag_vec() {
-    musli::rt!(full, CustomBytesVec(b"hello world".to_vec()));
+    musli::macros::assert_roundtrip_eq!(full, CustomBytesVec(b"hello world".to_vec()));
 }
 
 #[test]
 fn custom_struct_tag() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         no_json,
         StructCustomFieldAsStruct {
             field1: 42,
@@ -67,7 +67,7 @@ pub struct BytesName {
 
 #[test]
 fn bytes_name() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         no_json,
         BytesName {
             field1: 42,
@@ -129,7 +129,7 @@ pub struct StructUnsizedBytes {
 
 #[test]
 fn struct_unsized_bytes() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         no_json,
         StructUnsizedBytes {
             field1: 42,
@@ -149,8 +149,8 @@ pub enum EnumUnsizedBytes {
 
 #[test]
 fn enum_unsized_bytes() {
-    musli::rt!(no_json, EnumUnsizedBytes::Variant1 { field1: 42 });
-    musli::rt!(no_json, EnumUnsizedBytes::Variant2 { field2: 84 });
+    musli::macros::assert_roundtrip_eq!(no_json, EnumUnsizedBytes::Variant1 { field1: 42 });
+    musli::macros::assert_roundtrip_eq!(no_json, EnumUnsizedBytes::Variant2 { field2: 84 });
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
@@ -172,7 +172,7 @@ struct StructWithCustomBytes {
 
 #[test]
 fn struct_with_bytes_name() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         no_json,
         StructWithCustomBytes {
             string: String::from("Some String"),
@@ -194,14 +194,14 @@ enum EnumWithCustomBytes {
 
 #[test]
 fn bytes_tag_in_enum() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         no_json,
         EnumWithCustomBytes::Variant1 {
             string: String::from("st"),
         }
     );
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         no_json,
         EnumWithCustomBytes::Variant2 {
             string: String::from("st"),

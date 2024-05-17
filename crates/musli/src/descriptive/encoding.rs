@@ -32,69 +32,7 @@ pub const OPTIONS: options::Options = options::new().build();
 /// [`variable length`]: https://en.wikipedia.org/wiki/Variable-length_quantity
 pub const DEFAULT: Encoding = Encoding::new();
 
-/// Encode the given value to the given [`Writer`] using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
-where
-    W: Writer,
-    T: ?Sized + Encode<Binary>,
-{
-    DEFAULT.encode(writer, value)
-}
-
-/// Encode the given value to the given [Write][io::Write] using the [`DEFAULT`]
-/// configuration.
-#[cfg(feature = "std")]
-#[inline]
-pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
-where
-    W: io::Write,
-    T: ?Sized + Encode<Binary>,
-{
-    DEFAULT.to_writer(writer, value)
-}
-
-/// Encode the given value to a [Vec] using the [`DEFAULT`] configuration.
-#[cfg(feature = "alloc")]
-#[inline]
-pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
-where
-    T: ?Sized + Encode<Binary>,
-{
-    DEFAULT.to_vec(value)
-}
-
-/// Encode the given value to a fixed-size bytes using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, Error>
-where
-    T: ?Sized + Encode<Binary>,
-{
-    DEFAULT.to_fixed_bytes::<N, _>(value)
-}
-
-/// Decode the given type `T` from the given [`Reader`] using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
-where
-    R: Reader<'de>,
-    T: Decode<'de, Binary>,
-{
-    DEFAULT.decode(reader)
-}
-
-/// Decode the given type `T` from the given slice using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
-where
-    T: Decode<'de, Binary>,
-{
-    DEFAULT.from_slice(bytes)
-}
+crate::macros::bare_encoding!(DEFAULT, descriptive);
 
 /// Setting up encoding with parameters.
 pub struct Encoding<const OPT: Options = OPTIONS, M = Binary> {
@@ -179,7 +117,7 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
         }
     }
 
-    crate::encoding_impls!(
+    crate::macros::encoding_impls!(
         M,
         descriptive,
         SelfEncoder::<_, OPT, _>::new,

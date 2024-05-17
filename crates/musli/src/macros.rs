@@ -1,6 +1,6 @@
+//! Helper macros for use with Musli.
+
 /// Generate extensions assuming an encoding has implemented encode_with.
-#[doc(hidden)]
-#[macro_export]
 macro_rules! encode_with_extensions {
     ($mode:ident, $what:ident) => {
         /// Encode the given value to the given [`Writer`] using the current
@@ -295,9 +295,81 @@ macro_rules! encode_with_extensions {
     };
 }
 
+pub(crate) use encode_with_extensions;
+
+macro_rules! bare_encoding {
+    ($default:ident, $what:ident) => {
+        /// Encode the given value to the given [`Writer`] using the [`DEFAULT`]
+        /// configuration.
+        #[inline]
+        pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
+        where
+            W: $crate::Writer,
+            T: ?Sized + $crate::Encode<Binary>,
+        {
+            $default.encode(writer, value)
+        }
+
+        /// Encode the given value to a fixed-size bytes using the [`DEFAULT`]
+        /// configuration.
+        #[inline]
+        pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<$crate::FixedBytes<N>, Error>
+        where
+            T: ?Sized + $crate::Encode<Binary>,
+        {
+            $default.to_fixed_bytes::<N, _>(value)
+        }
+
+        /// Decode the given type `T` from the given [`Reader`] using the [`DEFAULT`]
+        /// configuration.
+        #[inline]
+        pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
+        where
+            R: $crate::Reader<'de>,
+            T: $crate::Decode<'de, Binary>,
+        {
+            $default.decode(reader)
+        }
+
+        /// Decode the given type `T` from the given slice using the [`DEFAULT`]
+        /// configuration.
+        #[inline]
+        pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
+        where
+            T: $crate::Decode<'de, Binary>,
+        {
+            $default.from_slice(bytes)
+        }
+
+        /// Encode the given value to the given [Write][io::Write] using the [`DEFAULT`]
+        /// configuration.
+        #[cfg(feature = "std")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
+        #[inline]
+        pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
+        where
+            W: std::io::Write,
+            T: ?Sized + $crate::Encode<Binary>,
+        {
+            $default.to_writer(writer, value)
+        }
+
+        /// Encode the given value to a [Vec] using the [`DEFAULT`] configuration.
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+        #[inline]
+        pub fn to_vec<T>(value: &T) -> Result<alloc::vec::Vec<u8>, Error>
+        where
+            T: ?Sized + $crate::Encode<Binary>,
+        {
+            $default.to_vec(value)
+        }
+    };
+}
+
+pub(crate) use bare_encoding;
+
 /// Generate all public encoding helpers.
-#[doc(hidden)]
-#[macro_export]
 macro_rules! encoding_impls {
     ($mode:ident, $what:ident, $encoder_new:path, $decoder_new:path) => {
         /// Encode the given value to the given [`Writer`] using the current
@@ -538,20 +610,20 @@ macro_rules! encoding_impls {
             self.from_slice_with(cx, string.as_bytes())
         }
 
-        $crate::encode_with_extensions!($mode, $what);
+        $crate::macros::encode_with_extensions!($mode, $what);
     };
 }
 
-#[doc(hidden)]
-#[macro_export]
+pub(crate) use encoding_impls;
+
 macro_rules! test_include_if {
     (#[musli_value] => $($rest:tt)*) => { $($rest)* };
     (=> $($_:tt)*) => {};
 }
 
+pub(crate) use test_include_if;
+
 /// Generate test functions which provides rich diagnostics when they fail.
-#[doc(hidden)]
-#[macro_export]
 macro_rules! test_fns {
     ($what:expr, $mode:ty $(, $(#[$option:ident])*)?) => {
         /// Roundtrip encode the given value.
@@ -610,7 +682,7 @@ macro_rules! test_fns {
 
                 assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match\nValue: {value:?}", type_name::<T>());
 
-                $crate::test_include_if! {
+                $crate::macros::test_include_if! {
                     $($(#[$option])*)* =>
                     let value_decode: $crate::value::Value = match ENCODING.from_slice_with(&cx, out.as_slice()) {
                         Ok(decoded) => decoded,
@@ -735,39 +807,16 @@ macro_rules! test_fns {
     }
 }
 
-#[cfg(all(feature = "test", feature = "alloc"))]
-#[doc(hidden)]
-pub mod support {
-    use crate::mode::Binary;
-    use crate::value::{self, Value};
-    use crate::{Decode, Encode};
+pub(crate) use test_fns;
 
-    pub use alloc::vec::Vec;
-
-    #[track_caller]
-    pub fn musli_value_rt<T>(expected: T)
-    where
-        T: Encode<Binary> + for<'de> Decode<'de, Binary>,
-        T: PartialEq + core::fmt::Debug,
-    {
-        let value: Value = value::encode(&expected).expect("value: Encoding should succeed");
-        let actual: T = value::decode(&value).expect("value: Decoding should succeed");
-        assert_eq!(
-            actual, expected,
-            "value: roundtripped value does not match expected"
-        );
-    }
-}
-
-/// Roundtrip the given expression through all supported formats.
 #[cfg(feature = "test")]
 #[macro_export]
 #[doc(hidden)]
-macro_rules! rt {
-    ($what:ident, $expr:expr $(, $($extra:tt)*)?) => {{
+macro_rules! __assert_roundtrip_eq {
+    ($support:ident, $expr:expr $(, $($extra:tt)*)?) => {{
         let expected = $expr;
 
-        macro_rules! rt {
+        macro_rules! inner {
             ($name:ident) => {{
                 assert_eq!(
                     $crate::$name::test::rt($expr), expected,
@@ -777,20 +826,69 @@ macro_rules! rt {
             }}
         }
 
-        $crate::test_matrix!($what, rt);
+        $crate::macros::test_matrix!($support, inner);
         $crate::macros::support::musli_value_rt($expr);
-        $crate::extra!($expr $(, $($extra)*)*);
+        $crate::macros::extra!($expr $(, $($extra)*)*);
         expected
     }};
 }
 
-/// This is used to test when there is a decode assymmetry, such as the decoded
-/// value does not match the encoded one due to things such as skipped fields.
 #[cfg(feature = "test")]
-#[doc(hidden)]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
+#[doc(inline)]
+/// Assert that expression `$expr` can be roundtrip encoded using the encodings
+/// specified by `$support`.
+///
+/// This demands that encoding and subsequently decoding `$expr` through any
+/// formats results in a value that can be compared using [`PartialEq`] to
+/// `$expr`.
+///
+/// This can be used to test upgrade stable formats.
+///
+/// The `$support` parameter is one of:
+/// * `full` - All formats are tested.
+/// * `no_json` - All formats except JSON are tested.
+/// * `descriptive` - All fully self-descriptive formats are tested.
+/// * `json` - Only JSON is tested.
+/// * `upgrade_stable` - Only upgrade-stable formats are tested.
+///
+/// Extra tests can be specified using the `$extra` parameter:
+/// * `json = <expected>` - Assert that the JSON encoding of `$expr` matched
+///   exactly `$expected`.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Decode, Encode};
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Version1 {
+///     name: String,
+/// }
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person {
+///     name: String,
+///     #[musli(default)]
+///     age: Option<u32>,
+/// }
+///
+/// musli::macros::assert_roundtrip_eq! {
+///     full,
+///     Person {
+///         name: String::from("Aristotle"),
+///         age: Some(62),
+///     },
+///     json = r#"{"name":"Aristotle","age":62}"#,
+/// };
+/// ```
+pub use __assert_roundtrip_eq as assert_roundtrip_eq;
+
+#[cfg(feature = "test")]
 #[macro_export]
-macro_rules! assert_decode_eq {
-    ($what:ident, $expr:expr, $expected:expr $(, $($extra:tt)*)?) => {{
+#[doc(hidden)]
+macro_rules! __assert_decode_eq {
+    ($support:ident, $expr:expr, $expected:expr $(, $($extra:tt)*)?) => {{
         let mut bytes = $crate::macros::support::Vec::<u8>::new();
 
         macro_rules! decode {
@@ -799,18 +897,83 @@ macro_rules! assert_decode_eq {
             }}
         }
 
-        $crate::test_matrix!($what, decode);
-        $crate::extra!($expr $(, $($extra)*)*);
+        $crate::macros::test_matrix!($support, decode);
+        $crate::macros::extra!($expr $(, $($extra)*)*);
     }};
 }
 
 #[cfg(feature = "test")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
+#[doc(inline)]
+/// Assert that expression `$expr` can decode to expression `$expected` using
+/// the encodings specified by `$support`.
+///
+/// This can be used to test upgrade stable formats.
+///
+/// The `$support` parameter is one of:
+/// * `full` - All formats are tested.
+/// * `no_json` - All formats except JSON are tested.
+/// * `descriptive` - All fully self-descriptive formats are tested.
+/// * `json` - Only JSON is tested.
+/// * `upgrade_stable` - Only upgrade-stable formats are tested.
+///
+/// Extra tests can be specified using the `$extra` parameter:
+/// * `json = <expected>` - Assert that the JSON encoding of `$expr` matched
+///   exactly `$expected`.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Decode, Encode};
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Version1 {
+///     name: String,
+/// }
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Version2 {
+///     name: String,
+///     #[musli(default)]
+///     age: Option<u32>,
+/// }
+///
+/// // Only upgrade stable formats can remove an existing field since they need
+/// // to know how to skip it over.
+/// musli::macros::assert_decode_eq! {
+///     upgrade_stable,
+///     Version2 {
+///         name: String::from("Aristotle"),
+///         age: Some(62),
+///     },
+///     Version1 {
+///         name: String::from("Aristotle"),
+///     },
+///     json = r#"{"name":"Aristotle","age":62}"#,
+/// };
+///
+/// // Every supported format can add a new field which has a default value.
+/// musli::macros::assert_decode_eq! {
+///     full,
+///     Version1 {
+///         name: String::from("Aristotle"),
+///     },
+///     Version2 {
+///         name: String::from("Aristotle"),
+///         age: None,
+///     },
+///     json = r#"{"name":"Aristotle"}"#,
+/// };
+/// ```
+pub use __assert_decode_eq as assert_decode_eq;
+
+#[cfg(feature = "test")]
 #[macro_export]
 #[doc(hidden)]
-macro_rules! extra {
+macro_rules! __extra {
     ($expr:expr $(,)?) => {};
 
-    ($expr:expr, json = $json_expected:expr $(, $($tt:tt)*)?) => {{
+    ($expr:expr, json = $json_expected:expr $(, $($extra:tt)*)?) => {{
         let json = $crate::json::test::to_vec($expr);
         let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
 
@@ -819,14 +982,18 @@ macro_rules! extra {
             "json: encoded json does not match expected value"
         );
 
-        $crate::extra!($expr $(, $($tt)*)*);
+        $crate::macros::extra!($expr $(, $($extra)*)*);
     }};
 }
 
 #[cfg(feature = "test")]
 #[doc(hidden)]
+pub use __extra as extra;
+
+#[cfg(feature = "test")]
 #[macro_export]
-macro_rules! test_matrix {
+#[doc(hidden)]
+macro_rules! __test_matrix {
     (full, $call:path) => {
         $call!(storage);
         $call!(wire);
@@ -845,11 +1012,6 @@ macro_rules! test_matrix {
         $call!(json);
     };
 
-    // TODO: Deprecate this in favor of only using `upgrade_stable`.
-    (wire_only, $call:path) => {
-        $call!(wire);
-    };
-
     (json, $call:path) => {
         $call!(json);
     };
@@ -859,4 +1021,32 @@ macro_rules! test_matrix {
         $call!(descriptive);
         $call!(json);
     };
+}
+
+#[cfg(feature = "test")]
+#[doc(hidden)]
+pub use __test_matrix as test_matrix;
+
+#[cfg(all(feature = "test", feature = "alloc"))]
+#[doc(hidden)]
+pub mod support {
+    pub use alloc::vec::Vec;
+
+    use crate::mode::Binary;
+    use crate::value::{self, Value};
+    use crate::{Decode, Encode};
+
+    #[track_caller]
+    pub fn musli_value_rt<T>(expected: T)
+    where
+        T: Encode<Binary> + for<'de> Decode<'de, Binary>,
+        T: PartialEq + core::fmt::Debug,
+    {
+        let value: Value = value::encode(&expected).expect("value: Encoding should succeed");
+        let actual: T = value::decode(&value).expect("value: Decoding should succeed");
+        assert_eq!(
+            actual, expected,
+            "value: roundtripped value does not match expected"
+        );
+    }
 }

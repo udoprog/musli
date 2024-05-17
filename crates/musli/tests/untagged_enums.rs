@@ -41,42 +41,42 @@ pub struct EmptyVariant;
 /// the exact specification of fields part of the variant.
 #[test]
 fn untagged_enums() -> Result<(), Box<dyn std::error::Error>> {
-    musli::assert_decode_eq! {
+    musli::macros::assert_decode_eq! {
         full,
         Enum::EmptyVariant1,
         EmptyVariant,
         json = r#"[]"#,
     };
 
-    musli::assert_decode_eq! {
+    musli::macros::assert_decode_eq! {
         full,
         Enum::EmptyVariant2,
         EmptyVariant,
         json = r#"[]"#,
     };
 
-    musli::assert_decode_eq! {
+    musli::macros::assert_decode_eq! {
         full,
         Enum::StringVariant { value: String::from("Hello World") },
         StringVariant { value: String::from("Hello World") },
         json = r#"["Hello World"]"#,
     };
 
-    musli::assert_decode_eq! {
+    musli::macros::assert_decode_eq! {
         full,
         Enum::IntegerVariant { value: 421 },
         IntegerVariant { value: 421 },
         json = r#"[421]"#,
     };
 
-    musli::assert_decode_eq! {
+    musli::macros::assert_decode_eq! {
         full,
         Enum::StringTupleVariant(String::from("Hello..."), String::from("World!")),
         StringTupleVariant(String::from("Hello..."), String::from("World!")),
         json = r#"["Hello...","World!"]"#,
     };
 
-    musli::assert_decode_eq! {
+    musli::macros::assert_decode_eq! {
         full,
         Enum::IntegerTupleVariant(10, 20),
         IntegerTupleVariant(10, 20),

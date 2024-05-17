@@ -64,7 +64,7 @@ const fn array<const N: usize>() -> [u8; N] {
 }
 
 fn test_length<const N: usize, const L: usize>() {
-    crate::rt! {
+    crate::macros::assert_roundtrip_eq! {
         upgrade_stable,
         PackedCompat {
             prefix: 42,
@@ -74,7 +74,7 @@ fn test_length<const N: usize, const L: usize>() {
         }
     };
 
-    crate::assert_decode_eq! {
+    crate::macros::assert_decode_eq! {
         upgrade_stable,
         PackedCompat {
             prefix: 42,
@@ -89,7 +89,7 @@ fn test_length<const N: usize, const L: usize>() {
         }
     };
 
-    crate::assert_decode_eq! {
+    crate::macros::assert_decode_eq! {
         upgrade_stable,
         PackedCompat {
             prefix: 42,
@@ -104,7 +104,7 @@ fn test_length<const N: usize, const L: usize>() {
         }
     };
 
-    crate::assert_decode_eq! {
+    crate::macros::assert_decode_eq! {
         upgrade_stable,
         PackedCompat {
             prefix: 42,

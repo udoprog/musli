@@ -10,7 +10,7 @@ pub struct GenericWithBound<T> {
 
 #[test]
 fn generic_with_bound() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         GenericWithBound {
             value: String::from("Hello"),

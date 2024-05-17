@@ -13,7 +13,7 @@ fn struct_fields() {
                 max: u32,
             }
 
-            musli::rt!(
+            musli::macros::assert_roundtrip_eq!(
                 full,
                 Struct { min: 42, max: 43 },
                 json = format!(r#"{{"{}":42,"{}":43}}"#, <$ty>::MIN, <$ty>::MAX)
@@ -48,13 +48,13 @@ fn variant_names() {
                 Variant2(u32),
             }
 
-            musli::rt!(
+            musli::macros::assert_roundtrip_eq!(
                 full,
                 Enum::Variant1(43),
                 json = format!(r#"{{"{}":[43]}}"#, <$ty>::MAX)
             );
 
-            musli::rt!(
+            musli::macros::assert_roundtrip_eq!(
                 full,
                 Enum::Variant2(44),
                 json = format!(r#"{{"{}":[44]}}"#, <$ty>::MIN)

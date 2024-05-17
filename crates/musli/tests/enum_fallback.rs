@@ -22,28 +22,28 @@ pub enum EnumDefault {
 
 #[test]
 fn enum_default() {
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant1,
         EnumDefault::Fallback,
         json = r#"0"#,
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant2,
         EnumDefault::Fallback,
         json = r#"1"#,
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant3,
         EnumDefault::Fallback,
         json = r#"2"#,
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant4,
         EnumDefault::Variant4,
@@ -63,28 +63,28 @@ pub enum EnumPattern {
 
 #[test]
 fn enum_pattern() {
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant1,
         EnumPattern::Variant1,
         json = r#"0"#,
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant2,
         EnumPattern::Fallback,
         json = r#"1"#,
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant3,
         EnumPattern::Fallback,
         json = r#"2"#,
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Enum::Variant4,
         EnumPattern::Variant4,

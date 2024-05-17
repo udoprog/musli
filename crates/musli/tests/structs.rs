@@ -24,16 +24,16 @@ pub struct Struct5 {
 
 #[test]
 fn structs() {
-    musli::rt!(full, EmptyStruct);
-    musli::rt!(full, Struct2(String::from("Hello World")));
-    musli::rt!(full, Struct3(String::from("Hello World"), 42));
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(full, EmptyStruct);
+    musli::macros::assert_roundtrip_eq!(full, Struct2(String::from("Hello World")));
+    musli::macros::assert_roundtrip_eq!(full, Struct3(String::from("Hello World"), 42));
+    musli::macros::assert_roundtrip_eq!(
         full,
         Struct4 {
             value: String::from("Hello World"),
         }
     );
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Struct5 {
             value: String::from("Hello World"),

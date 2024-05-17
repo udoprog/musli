@@ -14,7 +14,7 @@ pub struct SkipSerializeOuter {
 
 #[test]
 fn skip_serializing_if_outer() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         SkipSerializeOuter {
             flag: false,
@@ -23,7 +23,7 @@ fn skip_serializing_if_outer() {
         json = r#"{"flag":false,"inner":{}}"#,
     );
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         SkipSerializeOuter {
             flag: false,

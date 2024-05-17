@@ -22,17 +22,17 @@ pub enum Variants {
 
 #[test]
 fn tagged_enums() {
-    musli::rt!(full, EmptyVariants::Variant1);
-    musli::rt!(full, EmptyVariants::Variant2);
+    musli::macros::assert_roundtrip_eq!(full, EmptyVariants::Variant1);
+    musli::macros::assert_roundtrip_eq!(full, EmptyVariants::Variant2);
 
-    musli::rt!(full, TupleVariants::Variant1(String::from("foo")));
-    musli::rt!(full, TupleVariants::Variant2(42));
+    musli::macros::assert_roundtrip_eq!(full, TupleVariants::Variant1(String::from("foo")));
+    musli::macros::assert_roundtrip_eq!(full, TupleVariants::Variant2(42));
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Variants::Variant1 {
             value: String::from("foo"),
         }
     );
-    musli::rt!(full, Variants::Variant2 { value: 42 });
+    musli::macros::assert_roundtrip_eq!(full, Variants::Variant2 { value: 42 });
 }

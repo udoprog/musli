@@ -34,16 +34,16 @@ struct TransparentEnumUnpacked {
 
 #[test]
 fn transparent_struct() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         TransparentStruct {
             string: String::from("Hello World"),
         }
     );
 
-    musli::rt!(full, TransparentTuple(String::from("Hello World")));
+    musli::macros::assert_roundtrip_eq!(full, TransparentTuple(String::from("Hello World")));
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         TransparentStruct {
             string: String::from("Hello World"),
@@ -52,7 +52,7 @@ fn transparent_struct() {
         json = r#""Hello World""#,
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         TransparentTuple(String::from("Hello World")),
         String::from("Hello World"),
@@ -62,6 +62,6 @@ fn transparent_struct() {
 
 #[test]
 fn transparent_enum() {
-    musli::rt!(full, TransparentEnum::Transparent(42));
-    musli::rt!(full, TransparentEnum::NotTransparent { a: 1, b: 2 });
+    musli::macros::assert_roundtrip_eq!(full, TransparentEnum::Transparent(42));
+    musli::macros::assert_roundtrip_eq!(full, TransparentEnum::NotTransparent { a: 1, b: 2 });
 }

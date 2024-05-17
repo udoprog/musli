@@ -20,7 +20,7 @@ pub struct StructTo {
 
 #[test]
 fn struct_renamed() {
-    let from = musli::rt!(
+    let from = musli::macros::assert_roundtrip_eq!(
         full,
         StructFrom {
             string: String::from("a string"),
@@ -28,7 +28,7 @@ fn struct_renamed() {
         }
     );
 
-    let to = musli::rt!(
+    let to = musli::macros::assert_roundtrip_eq!(
         full,
         StructTo {
             string: 42,

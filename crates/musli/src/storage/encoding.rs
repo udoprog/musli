@@ -181,7 +181,7 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
         }
     }
 
-    crate::encoding_impls!(
+    crate::macros::encoding_impls!(
         M,
         storage,
         StorageEncoder::<_, OPT, _>::new,

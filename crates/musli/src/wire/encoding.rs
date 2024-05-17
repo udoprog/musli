@@ -184,7 +184,7 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
         }
     }
 
-    crate::encoding_impls!(
+    crate::macros::encoding_impls!(
         M,
         wire,
         WireEncoder::<_, OPT, _>::new,
