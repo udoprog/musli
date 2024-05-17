@@ -1,4 +1,6 @@
-use super::{Parser, SliceParser};
+use core::mem::transmute;
+
+use super::{MutSliceParser, Parser, SliceParser};
 
 /// Trait for types which can be converted into a [`Parser`].
 pub trait IntoParser<'de> {
@@ -24,5 +26,24 @@ impl<'de> IntoParser<'de> for &'de str {
     #[inline]
     fn into_parser(self) -> Self::Parser {
         SliceParser::new(self.as_bytes())
+    }
+}
+
+impl<'a, 'de> IntoParser<'de> for &'a mut &'de [u8] {
+    type Parser = MutSliceParser<'a, 'de>;
+
+    #[inline]
+    fn into_parser(self) -> Self::Parser {
+        MutSliceParser::new(self)
+    }
+}
+
+impl<'a, 'de> IntoParser<'de> for &'a mut &'de str {
+    type Parser = MutSliceParser<'a, 'de>;
+
+    #[inline]
+    fn into_parser(self) -> Self::Parser {
+        // SAFETY: Parsing ensures that the slice being processes keeps being valid UTF-8.
+        MutSliceParser::new(unsafe { transmute(self) })
     }
 }

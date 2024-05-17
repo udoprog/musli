@@ -16,6 +16,9 @@ pub use self::parser::Parser;
 mod slice_parser;
 pub(crate) use self::slice_parser::SliceParser;
 
+mod mut_slice_parser;
+pub(crate) use self::mut_slice_parser::MutSliceParser;
+
 pub(crate) mod string;
 pub(crate) use self::string::StringReference;
 

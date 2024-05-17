@@ -5,7 +5,8 @@ use crate::{Buf, Context};
 
 mod private {
     pub trait Sealed {}
-    impl<'de> Sealed for crate::json::parser::SliceParser<'de> {}
+    impl Sealed for crate::json::parser::SliceParser<'_> {}
+    impl Sealed for crate::json::parser::MutSliceParser<'_, '_> {}
     impl<'de, R> Sealed for &mut R where R: ?Sized + super::Parser<'de> {}
 }
 
@@ -49,7 +50,12 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
     where
-        C: ?Sized + Context;
+        C: ?Sized + Context,
+    {
+        let mut byte = [0];
+        self.read(cx, &mut byte[..])?;
+        Ok(byte[0])
+    }
 
     #[doc(hidden)]
     fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
@@ -60,9 +66,6 @@ pub trait Parser<'de>: private::Sealed {
     fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
     where
         C: ?Sized + Context;
-
-    #[doc(hidden)]
-    fn pos(&self) -> u32;
 
     /// Skip over whitespace.
     #[doc(hidden)]
@@ -262,11 +265,6 @@ where
         C: ?Sized + Context,
     {
         (**self).peek(cx)
-    }
-
-    #[inline(always)]
-    fn pos(&self) -> u32 {
-        (**self).pos()
     }
 
     #[inline(always)]
