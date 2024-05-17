@@ -2,6 +2,8 @@ use crate::json::error::ErrorMessage;
 use crate::json::parser::{Parser, StringReference, Token};
 use crate::{Buf, Context};
 
+use super::string::SliceAccess;
+
 /// An efficient [`Parser`] wrapper around a slice.
 pub struct SliceParser<'de> {
     pub(crate) slice: &'de [u8],
@@ -43,9 +45,22 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         }
 
         self.skip(cx, 1)?;
-        let out = crate::json::parser::string::parse_string_slice_reader(
-            cx, self, validate, start, scratch,
-        );
+
+        let mut access = SliceAccess::new(cx, self.slice, self.index);
+        let out = access.parse_string(validate, start, scratch);
+        self.index = access.index;
+
+        out
+    }
+
+    #[inline]
+    fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        let mut access = SliceAccess::new(cx, self.slice, self.index);
+        let out = access.skip_string();
+        self.index = access.index;
         out
     }
 

@@ -1,6 +1,6 @@
 use crate::de::Visitor;
 use crate::json::parser::integer::decode_signed_full;
-use crate::json::parser::{string, StringReference, Token};
+use crate::json::parser::{StringReference, Token};
 use crate::{Buf, Context};
 
 mod private {
@@ -39,6 +39,12 @@ pub trait Parser<'de>: private::Sealed {
     where
         C: ?Sized + Context,
         S: ?Sized + Buf;
+
+    /// Skip a string.
+    #[doc(hidden)]
+    fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context;
 
     #[doc(hidden)]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
@@ -113,28 +119,6 @@ pub trait Parser<'de>: private::Sealed {
     fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
     where
         C: ?Sized + Context;
-
-    #[doc(hidden)]
-    fn parse_hex_escape<C>(&mut self, cx: &C) -> Result<u16, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        let mut n = 0;
-        let start = cx.mark();
-
-        for _ in 0..4 {
-            match string::decode_hex_val(self.read_byte(cx)?) {
-                None => {
-                    return Err(cx.marked_message(start, "Invalid string escape"));
-                }
-                Some(val) => {
-                    n = (n << 4) + val;
-                }
-            }
-        }
-
-        Ok(n)
-    }
 
     #[doc(hidden)]
     fn parse_exact<C>(&mut self, cx: &C, exact: &str) -> Result<(), C::Error>
@@ -254,6 +238,14 @@ where
         S: ?Sized + Buf,
     {
         (**self).parse_string(cx, validate, scratch)
+    }
+
+    #[inline(always)]
+    fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        (**self).skip_string(cx)
     }
 
     #[inline(always)]

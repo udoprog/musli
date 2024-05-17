@@ -43,7 +43,7 @@ use super::parser::integer::{
 use super::parser::integer::{
     parse_signed_full as parse_signed, parse_unsigned_full as parse_unsigned,
 };
-use super::parser::{integer, string, Parser, StringReference, Token};
+use super::parser::{integer, Parser, StringReference, Token};
 
 #[cfg(feature = "value")]
 const BUFFER_OPTIONS: Options = options::new().with_map_keys_as_numbers(true).build();
@@ -80,7 +80,7 @@ where
             Token::String => {
                 // Skip over opening quote.
                 self.parser.skip(self.cx, 1)?;
-                string::skip_string(self.cx, self.parser.borrow_mut(), true)
+                self.parser.skip_string(self.cx)
             }
             actual => Err(self
                 .cx
