@@ -43,21 +43,21 @@ impl Encoding<OPTIONS, Binary> {
     /// Construct a new [`Encoding`] instance.
     ///
     /// ```
-    /// use musli::descriptive::{Encoding};
     /// use musli::{Encode, Decode};
+    /// use musli::descriptive::Encoding;
+    /// # use musli::descriptive::Error;
     ///
     /// const CONFIG: Encoding = Encoding::new();
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
-    /// struct Struct<'a> {
+    /// struct Person<'a> {
     ///     name: &'a str,
     ///     age: u32,
     /// }
     ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut out = Vec::new();
     ///
-    /// let expected = Struct {
+    /// let expected = Person {
     ///     name: "Aristotle",
     ///     age: 61,
     /// };
@@ -66,7 +66,7 @@ impl Encoding<OPTIONS, Binary> {
     /// let actual = CONFIG.decode(&out[..])?;
     ///
     /// assert_eq!(expected, actual);
-    /// # Ok(()) }
+    /// # Ok::<_, Error>(())
     /// ```
     pub const fn new() -> Self {
         Encoding {

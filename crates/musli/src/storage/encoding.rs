@@ -48,20 +48,20 @@ impl Encoding<OPTIONS, Binary> {
     /// use musli::{Encode, Decode};
     /// use musli::options::{self, Options, Integer};
     /// use musli::storage::Encoding;
+    /// # use musli::storage::Error;
     ///
     /// const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
     /// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
-    /// struct Struct<'a> {
+    /// struct Person<'a> {
     ///     name: &'a str,
     ///     age: u32,
     /// }
     ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut out = Vec::new();
     ///
-    /// let expected = Struct {
+    /// let expected = Person {
     ///     name: "Aristotle",
     ///     age: 61,
     /// };
@@ -70,7 +70,7 @@ impl Encoding<OPTIONS, Binary> {
     /// let actual = CONFIG.decode(&out[..])?;
     ///
     /// assert_eq!(expected, actual);
-    /// # Ok(()) }
+    /// # Ok::<_, Error>(())
     /// ```
     pub const fn new() -> Self {
         Encoding {

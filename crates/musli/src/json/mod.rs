@@ -26,7 +26,7 @@
 //!
 //! let version2 = musli::json::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
-//!     age: Some(62),
+//!     age: Some(61),
 //! })?;
 //!
 //! let version1: Version1 = musli::json::from_slice(version2.as_slice())?;

@@ -39,12 +39,12 @@ crate::macros::bare_encoding!(Text, DEFAULT, json, IntoParser);
 ///
 /// let data = json::to_string(&Person {
 ///     name: "Aristotle".to_string(),
-///     age: 62,
+///     age: 61,
 /// })?;
 ///
 /// let person: Person = json::from_str(&data[..])?;
 /// assert_eq!(person.name, "Aristotle");
-/// assert_eq!(person.age, 62);
+/// assert_eq!(person.age, 61);
 /// # Ok::<(), Error>(())
 /// ```
 #[cfg(feature = "alloc")]
@@ -74,12 +74,12 @@ where
 ///
 /// let mut data = json::to_string(&Person {
 ///     name: "Aristotle".to_string(),
-///     age: 62,
+///     age: 61,
 /// })?;
 ///
 /// let person: Person = json::from_str(&data[..])?;
 /// assert_eq!(person.name, "Aristotle");
-/// assert_eq!(person.age, 62);
+/// assert_eq!(person.age, 61);
 /// # Ok::<(), Error>(())
 /// ```
 #[inline]
@@ -109,7 +109,8 @@ impl Encoding<Text> {
     ///
     /// ```
     /// use musli::{Encode, Decode};
-    /// use musli::json::Encoding;
+    /// use musli::json::{self, Encoding};
+    /// # use musli::json::Error;
     ///
     /// const CONFIG: Encoding<Json> = Encoding::new().with_mode();
     ///
@@ -119,23 +120,21 @@ impl Encoding<Text> {
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
     /// #[musli(mode = Json, name_all = "name")]
-    /// struct Struct<'a> {
+    /// struct Person<'a> {
     ///     name: &'a str,
     ///     age: u32,
     /// }
     ///
-    /// let expected = Struct {
+    /// let expected = Person {
     ///     name: "Aristotle",
     ///     age: 61,
     /// };
     ///
-    /// let out = CONFIG.to_vec(&expected).unwrap();
-    /// println!("{}", core::str::from_utf8(out.as_slice()).unwrap());
-    ///
-    /// let out = musli::json::to_vec(&expected).unwrap();
-    /// println!("{}", core::str::from_utf8(out.as_slice()).unwrap());
-    /// let actual = musli::json::from_slice(out.as_slice()).unwrap();
+    /// let out = CONFIG.to_string(&expected)?;
+    /// let out = json::to_string(&expected)?;
+    /// let actual = json::from_str(&out)?;
     /// assert_eq!(expected, actual);
+    /// # Ok::<(), Error>(())
     /// ```
     #[inline]
     pub const fn new() -> Self {
@@ -191,12 +190,12 @@ impl<M> Encoding<M> {
     ///
     /// let mut data = ENCODING.to_string(&Person {
     ///     name: "Aristotle".to_string(),
-    ///     age: 62,
+    ///     age: 61,
     /// })?;
     ///
     /// let person: Person = ENCODING.from_str(&data[..])?;
     /// assert_eq!(person.name, "Aristotle");
-    /// assert_eq!(person.age, 62);
+    /// assert_eq!(person.age, 61);
     /// # Ok::<(), Error>(())
     /// ```
     #[cfg(feature = "alloc")]
@@ -211,10 +210,42 @@ impl<M> Encoding<M> {
         })
     }
 
-    /// Encode the given value to a [`String`] using the current configuration.
+    /// Encode the given value to the given value to a [`String`] using the
+    /// current [`Encoding`].
     ///
     /// This is the same as [`Encoding::to_string`] but allows for using a
     /// configurable [`Context`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Decode, Encode};
+    /// use musli::json;
+    /// use musli::allocator::System;
+    /// use musli::context::Same;
+    /// # use musli::json::Error;
+    ///
+    /// const ENCODING: json::Encoding = json::Encoding::new();
+    ///
+    /// #[derive(Decode, Encode)]
+    /// struct Person {
+    ///     name: String,
+    ///     age: u32,
+    /// }
+    ///
+    /// let alloc = System::new();
+    /// let cx = Same::new(&alloc);
+    ///
+    /// let mut data = ENCODING.to_string_with(&cx, &Person {
+    ///     name: "Aristotle".to_string(),
+    ///     age: 61,
+    /// })?;
+    ///
+    /// let person: Person = ENCODING.from_str_with(&cx, &data[..])?;
+    /// assert_eq!(person.name, "Aristotle");
+    /// assert_eq!(person.age, 61);
+    /// # Ok::<(), Error>(())
+    /// ```
     #[cfg(feature = "alloc")]
     #[inline]
     pub fn to_string_with<T, C>(self, cx: &C, value: &T) -> Result<String, C::Error>

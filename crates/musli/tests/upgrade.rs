@@ -18,7 +18,7 @@ fn version1_to_2() {
         upgrade_stable,
         Version2 {
             name: String::from("Aristotle"),
-            age: Some(62),
+            age: Some(61),
         },
         Version1 {
             name: String::from("Aristotle"),

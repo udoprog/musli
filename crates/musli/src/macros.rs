@@ -24,12 +24,12 @@ macro_rules! bare_encoding {
         ///
         #[doc = concat!(stringify!($what), "::encode(&mut data, &Person {")]
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -61,12 +61,12 @@ macro_rules! bare_encoding {
         ///
         #[doc = concat!("let data = ", stringify!($what), "::to_vec(&Person {")]
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[cfg(feature = "alloc")]
@@ -95,12 +95,12 @@ macro_rules! bare_encoding {
         ///
         #[doc = concat!("let data: FixedBytes<128> = ", stringify!($what), "::to_fixed_bytes(&Person {")]
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -133,12 +133,12 @@ macro_rules! bare_encoding {
         ///
         #[doc = concat!(stringify!($what), "::to_writer(&mut data, &Person {")]
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[cfg(feature = "std")]
@@ -172,7 +172,7 @@ macro_rules! bare_encoding {
         ///
         #[doc = concat!("let mut data = ", stringify!($what), "::to_vec(&Person {")]
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// // Add some extra data which will be ignored during decoding.
@@ -184,7 +184,7 @@ macro_rules! bare_encoding {
         #[doc = concat!("let person: Person = ", stringify!($what), "::decode(&mut slice)?;")]
         /// assert_eq!(slice, &[0xde, 0xad, 0xbe, 0xef]);
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -214,12 +214,12 @@ macro_rules! bare_encoding {
         ///
         #[doc = concat!("let data = ", stringify!($what), "::to_vec(&Person {")]
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -261,12 +261,12 @@ macro_rules! encoding_impls {
         ///
         /// ENCODING.encode(&mut data, &Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -302,12 +302,12 @@ macro_rules! encoding_impls {
         ///
         /// let data = ENCODING.to_vec(&Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[cfg(feature = "alloc")]
@@ -342,12 +342,12 @@ macro_rules! encoding_impls {
         ///
         /// let data: FixedBytes<128> = ENCODING.to_fixed_bytes(&Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -388,12 +388,12 @@ macro_rules! encoding_impls {
         ///
         /// ENCODING.to_writer(&mut data, &Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[cfg(feature = "std")]
@@ -429,7 +429,7 @@ macro_rules! encoding_impls {
         ///
         /// let mut data = ENCODING.to_vec(&Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// // Add some extra data which will be ignored during decoding.
@@ -441,7 +441,7 @@ macro_rules! encoding_impls {
         ///
         /// assert_eq!(slice, &[0xde, 0xad, 0xbe, 0xef]);
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -476,12 +476,12 @@ macro_rules! encoding_impls {
         ///
         /// let data = ENCODING.to_vec(&Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -541,12 +541,12 @@ macro_rules! encoding_impls {
         ///
         /// ENCODING.encode_with(&cx, &mut data, &Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -590,12 +590,12 @@ macro_rules! encoding_impls {
         ///
         /// let data = ENCODING.to_vec_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[cfg(feature = "alloc")]
@@ -636,12 +636,12 @@ macro_rules! encoding_impls {
         ///
         /// let data: FixedBytes<128> = ENCODING.to_fixed_bytes_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -688,12 +688,12 @@ macro_rules! encoding_impls {
         ///
         /// ENCODING.to_writer_with(&cx, &mut data, &Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[cfg(feature = "std")]
@@ -739,13 +739,13 @@ macro_rules! encoding_impls {
         ///
         /// let buf = ENCODING.to_vec_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let mut slice = &buf[..];
         /// let person: Person = ENCODING.decode_with(&cx, &mut slice)?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -790,12 +790,12 @@ macro_rules! encoding_impls {
         ///
         /// let buf = ENCODING.to_vec_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
-        ///     age: 62,
+        ///     age: 61,
         /// })?;
         ///
         /// let person: Person = ENCODING.from_slice_with(&cx, &buf[..])?;
         /// assert_eq!(person.name, "Aristotle");
-        /// assert_eq!(person.age, 62);
+        /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
@@ -1091,9 +1091,9 @@ macro_rules! __assert_roundtrip_eq {
 ///     full,
 ///     Person {
 ///         name: String::from("Aristotle"),
-///         age: Some(62),
+///         age: Some(61),
 ///     },
-///     json = r#"{"name":"Aristotle","age":62}"#,
+///     json = r#"{"name":"Aristotle","age":61}"#,
 /// };
 /// ```
 pub use __assert_roundtrip_eq as assert_roundtrip_eq;
@@ -1158,12 +1158,12 @@ macro_rules! __assert_decode_eq {
 ///     upgrade_stable,
 ///     Version2 {
 ///         name: String::from("Aristotle"),
-///         age: Some(62),
+///         age: Some(61),
 ///     },
 ///     Version1 {
 ///         name: String::from("Aristotle"),
 ///     },
-///     json = r#"{"name":"Aristotle","age":62}"#,
+///     json = r#"{"name":"Aristotle","age":61}"#,
 /// };
 ///
 /// // Every supported format can add a new field which has a default value.
