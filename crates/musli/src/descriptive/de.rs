@@ -649,7 +649,7 @@ where
     {
         let cx = self.cx;
 
-        let Some(tag) = self.reader.peek(cx)?.map(Tag::from_byte) else {
+        let Some(tag) = self.reader.peek().map(Tag::from_byte) else {
             return Err(cx.message("Expected tag in input"));
         };
 

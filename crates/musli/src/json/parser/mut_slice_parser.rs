@@ -47,7 +47,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         S: ?Sized + Buf,
     {
         let start = cx.mark();
-        let actual = self.peek(cx)?;
+        let actual = self.lex(cx);
 
         if !matches!(actual, Token::String) {
             return Err(cx.marked_message(start, format_args!("Expected string, found {actual}")));
@@ -104,7 +104,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     }
 
     #[inline]
-    fn skip_whitespace<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    fn skip_whitespace<C>(&mut self, cx: &C)
     where
         C: ?Sized + Context,
     {
@@ -124,15 +124,11 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
 
         *self.slice = &self.slice[n..];
         cx.advance(n);
-        Ok(())
     }
 
     #[inline]
-    fn peek_byte<C>(&mut self, _: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        Ok(self.slice.first().copied())
+    fn peek(&mut self) -> Option<u8> {
+        self.slice.first().copied()
     }
 
     fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>

@@ -169,7 +169,7 @@ where
     where
         V: Visitor<'de, C>,
     {
-        match self.parser.peek(self.cx)? {
+        match self.parser.lex(self.cx) {
             Token::String => {
                 let visitor = visitor.visit_string(self.cx, SizeHint::any())?;
                 self.decode_string(visitor)

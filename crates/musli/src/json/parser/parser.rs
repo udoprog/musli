@@ -69,13 +69,7 @@ pub trait Parser<'de>: private::Sealed {
 
     /// Skip over whitespace.
     #[doc(hidden)]
-    fn skip_whitespace<C>(&mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context;
-
-    /// Peek the next byte.
-    #[doc(hidden)]
-    fn peek_byte<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
+    fn skip_whitespace<C>(&mut self, cx: &C)
     where
         C: ?Sized + Context;
 
@@ -86,7 +80,7 @@ pub trait Parser<'de>: private::Sealed {
     {
         let mut c = 0;
 
-        while let Some(b) = self.peek_byte(cx)? {
+        while let Some(b) = self.peek() {
             if !m(b) {
                 return Ok(c);
             }
@@ -98,19 +92,22 @@ pub trait Parser<'de>: private::Sealed {
         Ok(c)
     }
 
+    /// Peek the next byte.
     #[doc(hidden)]
-    fn peek<C>(&mut self, cx: &C) -> Result<Token, C::Error>
+    fn peek(&mut self) -> Option<u8>;
+
+    #[doc(hidden)]
+    fn lex<C>(&mut self, cx: &C) -> Token
     where
         C: ?Sized + Context,
     {
-        self.skip_whitespace(cx)?;
+        self.skip_whitespace(cx);
 
-        let b = match self.peek_byte(cx)? {
-            Some(b) => b,
-            None => return Ok(Token::Eof),
+        let Some(b) = self.peek() else {
+            return Token::Eof;
         };
 
-        Ok(Token::from_byte(b))
+        Token::from_byte(b)
     }
 
     /// Parse a 32-bit floating point number.
@@ -260,27 +257,24 @@ where
     }
 
     #[inline(always)]
-    fn peek<C>(&mut self, cx: &C) -> Result<Token, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        (**self).peek(cx)
+    fn peek(&mut self) -> Option<u8> {
+        (**self).peek()
     }
 
     #[inline(always)]
-    fn skip_whitespace<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    fn lex<C>(&mut self, cx: &C) -> Token
     where
         C: ?Sized + Context,
     {
-        (**self).skip_whitespace(cx)
+        (**self).lex(cx)
     }
 
     #[inline(always)]
-    fn peek_byte<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
+    fn skip_whitespace<C>(&mut self, cx: &C)
     where
         C: ?Sized + Context,
     {
-        (**self).peek_byte(cx)
+        (**self).skip_whitespace(cx);
     }
 
     #[inline(always)]

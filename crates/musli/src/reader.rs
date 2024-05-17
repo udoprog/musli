@@ -48,9 +48,7 @@ pub trait Reader<'de>: self::sealed::Sealed {
         C: ?Sized + Context;
 
     /// Peek the next value.
-    fn peek<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context;
+    fn peek(&mut self) -> Option<u8>;
 
     /// Read a slice into the given buffer.
     #[inline]
@@ -259,11 +257,8 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn peek<C>(&mut self, _: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        Ok(self.first().copied())
+    fn peek(&mut self) -> Option<u8> {
+        self.first().copied()
     }
 }
 
@@ -381,16 +376,13 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
-    fn peek<C>(&mut self, _: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn peek(&mut self) -> Option<u8> {
         if self.range.start == self.range.end {
-            return Ok(None);
+            return None;
         }
 
         // SAFETY: we've checked that the elements are in bound above.
-        unsafe { Ok(Some(ptr::read(self.range.start))) }
+        unsafe { Some(ptr::read(self.range.start)) }
     }
 
     #[inline]
@@ -491,11 +483,12 @@ where
     }
 
     #[inline]
-    fn peek<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        self.reader.peek(cx)
+    fn peek(&mut self) -> Option<u8> {
+        if self.remaining > 0 {
+            self.reader.peek()
+        } else {
+            None
+        }
     }
 
     #[inline]
@@ -557,11 +550,8 @@ where
     }
 
     #[inline]
-    fn peek<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        (**self).peek(cx)
+    fn peek(&mut self) -> Option<u8> {
+        (**self).peek()
     }
 
     #[inline]

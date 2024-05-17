@@ -219,11 +219,11 @@ where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
-    p.skip_whitespace(cx)?;
+    p.skip_whitespace(cx);
 
     let start = cx.mark();
 
-    if p.peek_byte(cx)? == Some(b'-') {
+    if p.peek() == Some(b'-') {
         p.skip(cx, 1)?;
     }
 
@@ -237,15 +237,15 @@ where
         }
     }
 
-    if p.peek_byte(cx)? == Some(b'.') {
+    if p.peek() == Some(b'.') {
         p.skip(cx, 1)?;
         p.consume_while(cx, is_digit)?;
     }
 
-    if matches!(p.peek_byte(cx)?, Some(b'e') | Some(b'E')) {
+    if matches!(p.peek(), Some(b'e') | Some(b'E')) {
         p.skip(cx, 1)?;
 
-        match p.peek_byte(cx)? {
+        match p.peek() {
             Some(b'-') => {
                 p.skip(cx, 1)?;
             }
@@ -270,7 +270,7 @@ where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
-    p.skip_whitespace(cx)?;
+    p.skip_whitespace(cx);
 
     let start = cx.mark();
     decode_unsigned_base::<T, _, _>(cx, p, start)
@@ -285,7 +285,7 @@ where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
-    p.skip_whitespace(cx)?;
+    p.skip_whitespace(cx);
 
     let start = cx.mark();
 
@@ -305,7 +305,7 @@ where
 {
     let start = cx.mark();
 
-    let is_negative = if p.peek_byte(cx)? == Some(b'-') {
+    let is_negative = if p.peek() == Some(b'-') {
         p.skip(cx, 1)?;
         true
     } else {
@@ -330,7 +330,7 @@ where
     T: Signed,
     P: ?Sized + Parser<'de>,
 {
-    p.skip_whitespace(cx)?;
+    p.skip_whitespace(cx);
 
     decode_signed_full_inner(cx, p)
 }
@@ -345,7 +345,7 @@ where
 {
     let start = cx.mark();
 
-    let is_negative = if p.peek_byte(cx)? == Some(b'-') {
+    let is_negative = if p.peek() == Some(b'-') {
         p.skip(cx, 1)?;
         true
     } else {
@@ -369,7 +369,7 @@ where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
-    p.skip_whitespace(cx)?;
+    p.skip_whitespace(cx);
 
     let start = cx.mark();
 
@@ -388,7 +388,7 @@ where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
-    p.skip_whitespace(cx)?;
+    p.skip_whitespace(cx);
 
     let start = cx.mark();
 
@@ -412,7 +412,7 @@ where
         b if is_digit_nonzero(b) => {
             let mut base = T::from_byte(b - b'0');
 
-            while let Some(true) = p.peek_byte(cx)?.map(is_digit) {
+            while let Some(true) = p.peek().map(is_digit) {
                 base = digit(cx, base, p.borrow_mut(), start)?;
             }
 
@@ -443,7 +443,7 @@ where
 
     let mut m = Mantissa::<T>::default();
 
-    if let Some(b'.') = p.peek_byte(cx)? {
+    if let Some(b'.') = p.peek() {
         p.skip(cx, 1)?;
 
         // NB: we use unchecked operations over mantissa_exp since the mantissa
@@ -454,7 +454,7 @@ where
         // they have no bearing on the value of the integer.
         let mut zeros = 0;
 
-        while let Some(true) = p.peek_byte(cx)?.map(is_digit) {
+        while let Some(true) = p.peek().map(is_digit) {
             // Accrue accumulated zeros.
             if zeros > 0 {
                 m.exp += zeros;
@@ -472,7 +472,7 @@ where
         }
     }
 
-    let e = if matches!(p.peek_byte(cx)?, Some(b'e' | b'E')) {
+    let e = if matches!(p.peek(), Some(b'e' | b'E')) {
         p.skip(cx, 1)?;
         decode_exponent(cx, p, start)?
     } else {
@@ -492,7 +492,7 @@ where
     let mut is_negative = false;
     let mut e = 0u32;
 
-    match p.peek_byte(cx)? {
+    match p.peek() {
         Some(b'-') => {
             p.skip(cx, 1)?;
             is_negative = true
@@ -503,7 +503,7 @@ where
         _ => (),
     };
 
-    while let Some(true) = p.peek_byte(cx)?.map(is_digit) {
+    while let Some(true) = p.peek().map(is_digit) {
         e = digit(cx, e, p.borrow_mut(), start)?;
     }
 
@@ -537,7 +537,7 @@ where
 {
     let mut count = 0i32;
 
-    while let Some(b'0') = p.peek_byte(cx)? {
+    while let Some(b'0') = p.peek() {
         count = count.wrapping_add(1);
         p.skip(cx, 1)?;
     }

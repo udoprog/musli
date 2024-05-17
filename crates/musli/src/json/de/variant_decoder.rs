@@ -16,7 +16,7 @@ where
 {
     #[inline]
     pub(super) fn new(cx: &'a C, mut parser: P) -> Result<Self, C::Error> {
-        let actual = parser.peek(cx)?;
+        let actual = parser.lex(cx);
 
         if !matches!(actual, Token::OpenBrace) {
             return Err(cx.message(format_args!("Expected open brace, was {actual}")));
@@ -28,7 +28,7 @@ where
 
     #[inline]
     pub(super) fn end(mut self) -> Result<(), C::Error> {
-        let actual = self.parser.peek(self.cx)?;
+        let actual = self.parser.lex(self.cx);
 
         if !matches!(actual, Token::CloseBrace) {
             return Err(self.cx.message(format_args!(
@@ -59,7 +59,7 @@ where
 
     #[inline]
     fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
-        let actual = self.parser.peek(self.cx)?;
+        let actual = self.parser.lex(self.cx);
 
         if !matches!(actual, Token::Colon) {
             return Err(self
