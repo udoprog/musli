@@ -55,7 +55,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
 
         self.skip(cx, 1)?;
 
-        let mut access = SliceAccess::new(cx, *self.slice, 0);
+        let mut access = SliceAccess::new(cx, self.slice, 0);
         let out = access.parse_string(validate, start, scratch);
         *self.slice = &self.slice[access.index..];
 
@@ -67,7 +67,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     where
         C: ?Sized + Context,
     {
-        let mut access = SliceAccess::new(cx, *self.slice, 0);
+        let mut access = SliceAccess::new(cx, self.slice, 0);
         let out = access.skip_string();
         *self.slice = &self.slice[access.index..];
         out
@@ -132,7 +132,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     where
         C: ?Sized + Context,
     {
-        Ok(self.slice.get(0).copied())
+        Ok(self.slice.first().copied())
     }
 
     fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>

@@ -126,9 +126,9 @@ where
     }
 
     #[inline]
-    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         let encoder = self.encoder.encode_some()?;
         value.serialize(Serializer::new(self.cx, encoder))
@@ -157,19 +157,19 @@ where
     }
 
     #[inline]
-    fn serialize_newtype_struct<T: ?Sized>(
+    fn serialize_newtype_struct<T>(
         self,
         _: &'static str,
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         value.serialize(Serializer::new(self.cx, self.encoder))
     }
 
     #[inline]
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
         _: &'static str,
         _: u32,
@@ -177,7 +177,7 @@ where
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         encode_variant(self.cx, self.encoder, variant_name, move |encoder| {
             value.serialize(Serializer::new(self.cx, encoder))
@@ -266,9 +266,9 @@ where
     }
 
     #[inline]
-    fn collect_str<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    fn collect_str<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: fmt::Display,
+        T: ?Sized + fmt::Display,
     {
         let string = self.cx.collect_string(value)?;
         self.serialize_str(string.as_ref())
@@ -323,9 +323,9 @@ where
     type Error = <E::Cx as Context>::Error;
 
     #[inline]
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         let encoder = self.encoder.encode_next()?;
         value.serialize(Serializer::new(self.cx, encoder))?;
@@ -347,9 +347,9 @@ where
     type Error = <E::Cx as Context>::Error;
 
     #[inline]
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         ser::SerializeSeq::serialize_element(self, value)
     }
@@ -369,9 +369,9 @@ where
     type Error = <E::Cx as Context>::Error;
 
     #[inline]
-    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         ser::SerializeSeq::serialize_element(self, value)
     }
@@ -391,9 +391,9 @@ where
     type Error = <E::Cx as Context>::Error;
 
     #[inline]
-    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         ser::SerializeSeq::serialize_element(self, value)
     }
@@ -430,9 +430,9 @@ where
     type Error = <E::Cx as Context>::Error;
 
     #[inline]
-    fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
+    fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         let encoder = self.encoder.encode_entry_key()?;
         key.serialize(Serializer::new(self.cx, encoder))?;
@@ -440,9 +440,9 @@ where
     }
 
     #[inline]
-    fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         let encoder = self.encoder.encode_entry_value()?;
         value.serialize(Serializer::new(self.cx, encoder))?;
@@ -481,13 +481,9 @@ where
     type Error = <E::Cx as Context>::Error;
 
     #[inline]
-    fn serialize_field<T: ?Sized>(
-        &mut self,
-        key: &'static str,
-        value: &T,
-    ) -> Result<(), Self::Error>
+    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         let mut field = self.encoder.encode_entry()?;
         field.encode_key()?.encode(key)?;
@@ -528,13 +524,9 @@ where
     type Error = <E::Cx as Context>::Error;
 
     #[inline]
-    fn serialize_field<T: ?Sized>(
-        &mut self,
-        key: &'static str,
-        value: &T,
-    ) -> Result<(), Self::Error>
+    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
     where
-        T: ser::Serialize,
+        T: ?Sized + ser::Serialize,
     {
         self.encoder.encode_entry_fn(|field| {
             field.encode_key()?.encode(key)?;

@@ -601,7 +601,7 @@ impl<'a> InteriorBins<'a> {
         fn shuffle(path: &mut PathBuf, to: &Path) -> Result<()> {
             fs::rename(&*path, to)
                 .with_context(|| anyhow!("{} to {}", path.display(), to.display()))?;
-            *path = to.to_owned();
+            to.clone_into(path);
             Ok(())
         }
 
