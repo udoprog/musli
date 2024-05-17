@@ -22,7 +22,7 @@ rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 [features]
 default = ["std", "alloc"]
 std = ["musli-core/std", "serde?/std", "simdutf8?/std"]
-alloc = ["musli-core/alloc"]
+alloc = ["musli-core/alloc", "serde?/alloc"]
 verbose = ["musli-core/verbose"]
 storage = []
 wire = []
@@ -40,7 +40,7 @@ musli-core = { version = "=0.0.121", path = "../musli-core", default-features = 
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 itoa = { version = "1.0.10", optional = true }
 ryu = { version = "1.0.17", optional = true }
-serde = { version = "1.0.198", optional = true }
+serde = { version = "1.0.198", optional = true, default-features = false}
 
 [dev-dependencies]
 musli = { path = ".", features = ["test"] }
