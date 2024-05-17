@@ -5,7 +5,7 @@ use core::marker;
 
 use crate::mode::Binary;
 use crate::options;
-use crate::Options;
+use crate::{Options, Reader};
 
 use super::de::SelfDecoder;
 use super::en::SelfEncoder;
@@ -25,7 +25,7 @@ pub const OPTIONS: options::Options = options::new().build();
 /// [`variable length`]: https://en.wikipedia.org/wiki/Variable-length_quantity
 pub const DEFAULT: Encoding = Encoding::new();
 
-crate::macros::bare_encoding!(DEFAULT, descriptive);
+crate::macros::bare_encoding!(Binary, DEFAULT, descriptive, Reader);
 
 /// Setting up encoding with parameters.
 pub struct Encoding<const OPT: Options = OPTIONS, M = Binary> {

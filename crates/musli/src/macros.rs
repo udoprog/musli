@@ -1,9 +1,9 @@
 //! Helper macros for use with Musli.
 
 macro_rules! bare_encoding {
-    ($default:ident, $what:ident) => {
+    ($mode:ident, $default:ident, $what:ident, $reader_trait:ident) => {
         /// Encode the given value to the given [`Writer`] using the [`DEFAULT`]
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// [`Writer`]: crate::Writer
         ///
@@ -36,13 +36,13 @@ macro_rules! bare_encoding {
         pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
         where
             W: $crate::Writer,
-            T: ?Sized + $crate::Encode<Binary>,
+            T: ?Sized + $crate::Encode<crate::mode::$mode>,
         {
             $default.encode(writer, value)
         }
 
         /// Encode the given value to a fixed-size bytes using the [`DEFAULT`]
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// ```
         /// use musli::{Decode, Encode, FixedBytes};
@@ -68,13 +68,13 @@ macro_rules! bare_encoding {
         #[inline]
         pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<$crate::FixedBytes<N>, Error>
         where
-            T: ?Sized + $crate::Encode<Binary>,
+            T: ?Sized + $crate::Encode<crate::mode::$mode>,
         {
             $default.to_fixed_bytes::<N, _>(value)
         }
 
         /// Decode the given type `T` from the given [`Reader`] using the [`DEFAULT`]
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// [`Reader`]: crate::Reader
         ///
@@ -111,14 +111,14 @@ macro_rules! bare_encoding {
         #[inline]
         pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
         where
-            R: $crate::Reader<'de>,
-            T: $crate::Decode<'de, Binary>,
+            R: $reader_trait<'de>,
+            T: $crate::Decode<'de, $mode>,
         {
             $default.decode(reader)
         }
 
         /// Decode the given type `T` from the given slice using the [`DEFAULT`]
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// # Examples
         ///
@@ -146,7 +146,7 @@ macro_rules! bare_encoding {
         #[inline]
         pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
         where
-            T: $crate::Decode<'de, Binary>,
+            T: $crate::Decode<'de, $mode>,
         {
             $default.from_slice(bytes)
         }
@@ -187,12 +187,13 @@ macro_rules! bare_encoding {
         pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
         where
             W: std::io::Write,
-            T: ?Sized + $crate::Encode<Binary>,
+            T: ?Sized + $crate::Encode<crate::mode::$mode>,
         {
             $default.to_writer(writer, value)
         }
 
-        /// Encode the given value to a [`Vec`] using the [`DEFAULT`] [`Encoding`].
+        /// Encode the given value to a [`Vec`] using the [`DEFAULT`]
+        /// [`Encoding`].
         ///
         /// [`Vec`]: alloc::vec::Vec
         ///
@@ -224,7 +225,7 @@ macro_rules! bare_encoding {
         #[inline]
         pub fn to_vec<T>(value: &T) -> Result<alloc::vec::Vec<u8>, Error>
         where
-            T: ?Sized + $crate::Encode<Binary>,
+            T: ?Sized + $crate::Encode<crate::mode::$mode>,
         {
             $default.to_vec(value)
         }
@@ -237,7 +238,7 @@ pub(crate) use bare_encoding;
 macro_rules! encoding_impls {
     ($mode:ident, $what:ident, $encoder_new:path, $decoder_new:path) => {
         /// Encode the given value to the given [`Writer`] using the current
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// This is the same as [`Encoding::encode`] but allows for using a
         /// configurable [`Context`].
@@ -282,14 +283,14 @@ macro_rules! encoding_impls {
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
             W: $crate::Writer,
-            T: ?Sized + $crate::Encode<$mode>,
+            T: ?Sized + $crate::Encode<C::Mode>,
         {
             cx.clear();
             T::encode(value, cx, $encoder_new(cx, writer))
         }
 
         /// Decode the given type `T` from the given [`Reader`] using the
-        /// current configuration.
+        /// current [`Encoding`].
         ///
         /// This is the same as [`Encoding::decode`] but allows for using a
         /// configurable [`Context`].
@@ -333,14 +334,14 @@ macro_rules! encoding_impls {
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
             R: $crate::Reader<'de>,
-            T: $crate::Decode<'de, $mode>,
+            T: $crate::Decode<'de, C::Mode>,
         {
             cx.clear();
             T::decode(cx, $decoder_new(cx, reader))
         }
 
         /// Decode the given type `T` from the given [`Reader`] using the
-        /// current configuration.
+        /// current [`Encoding`].
         ///
         /// [`Reader`]: crate::Reader
         ///
@@ -389,7 +390,7 @@ macro_rules! encoding_impls {
         }
 
         /// Decode the given type `T` from the given slice using the current
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// # Examples
         ///
@@ -428,7 +429,7 @@ macro_rules! encoding_impls {
         }
 
         /// Decode the given type `T` from the given slice using the current
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// This is the same as [`Encoding::from_slice`], but allows for using a
         /// configurable [`Context`].
@@ -476,7 +477,7 @@ macro_rules! encoding_impls {
         }
 
         /// Decode the given type `T` from the given string using the current
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// This is an alias over [`Encoding::from_slice`] for convenience. See
         /// its documentation for more.
@@ -489,7 +490,7 @@ macro_rules! encoding_impls {
         }
 
         /// Decode the given type `T` from the given string using the current
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// This is the same as [`Encoding::from_str`] but allows for using a
         /// configurable [`Context`].
@@ -604,7 +605,7 @@ macro_rules! encode_with_extensions {
         }
 
         /// Encode the given value to the given [`Write`] using the current
-        /// configuration and context `C`.
+        /// [`Encoding`] and context `C`.
         ///
         /// [`Write`]: std::io::Write
         ///
@@ -646,13 +647,13 @@ macro_rules! encode_with_extensions {
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
             W: std::io::Write,
-            T: ?Sized + $crate::Encode<$mode>,
+            T: ?Sized + $crate::Encode<C::Mode>,
         {
             let writer = $crate::wrap::wrap(write);
             self.encode_with(cx, writer, value)
         }
 
-        /// Encode the given value to a [`Vec`] using the current configuration.
+        /// Encode the given value to a [`Vec`] using the current [`Encoding`].
         ///
         /// [`Vec`]: alloc::vec::Vec
         ///
@@ -693,7 +694,7 @@ macro_rules! encode_with_extensions {
             Ok(vec)
         }
 
-        /// Encode the given value to a [`Vec`] using the current configuration.
+        /// Encode the given value to a [`Vec`] using the current [`Encoding`].
         ///
         /// This is the same as [`Encoding::to_vec`], but allows for using a
         /// configurable [`Context`].
@@ -737,7 +738,7 @@ macro_rules! encode_with_extensions {
         pub fn to_vec_with<C, T>(self, cx: &C, value: &T) -> Result<alloc::vec::Vec<u8>, C::Error>
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
-            T: ?Sized + $crate::Encode<$mode>,
+            T: ?Sized + $crate::Encode<C::Mode>,
         {
             let mut vec = alloc::vec::Vec::new();
             self.encode_with(cx, &mut vec, value)?;
@@ -745,7 +746,7 @@ macro_rules! encode_with_extensions {
         }
 
         /// Encode the given value to a fixed-size bytes using the current
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// # Examples
         ///
@@ -787,7 +788,7 @@ macro_rules! encode_with_extensions {
         }
 
         /// Encode the given value to a fixed-size bytes using the current
-        /// configuration.
+        /// [`Encoding`].
         ///
         /// # Examples
         ///
@@ -827,7 +828,7 @@ macro_rules! encode_with_extensions {
         ) -> Result<$crate::FixedBytes<N>, C::Error>
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
-            T: ?Sized + $crate::Encode<$mode>,
+            T: ?Sized + $crate::Encode<C::Mode>,
         {
             let mut bytes = $crate::FixedBytes::new();
             self.encode_with(cx, &mut bytes, value)?;
@@ -847,14 +848,14 @@ pub(crate) use test_include_if;
 
 /// Generate test functions which provides rich diagnostics when they fail.
 macro_rules! test_fns {
-    ($what:expr, $mode:ty $(, $(#[$option:ident])*)?) => {
+    ($mode:ident, $what:expr $(, $(#[$option:ident])*)?) => {
         /// Roundtrip encode the given value.
         #[doc(hidden)]
         #[track_caller]
         #[cfg(feature = "test")]
         pub fn rt<T>(value: T) -> T
         where
-            T: $crate::en::Encode<$mode> + $crate::de::DecodeOwned<$mode>,
+            T: $crate::en::Encode<crate::mode::$mode> + $crate::de::DecodeOwned<crate::mode::$mode>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
@@ -937,9 +938,9 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn decode<'de, T, U>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, expected: &U) -> U
         where
-            T: $crate::en::Encode<$mode>,
+            T: $crate::en::Encode<crate::mode::$mode>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
-            U: $crate::de::Decode<'de, $mode>,
+            U: $crate::de::Decode<'de, crate::mode::$mode>,
             U: ::core::fmt::Debug + ::core::cmp::PartialEq,
         {
             const WHAT: &str = $what;
@@ -1006,7 +1007,7 @@ macro_rules! test_fns {
         #[cfg(feature = "test")]
         pub fn to_vec<T>(value: T) -> ::alloc::vec::Vec<u8>
         where
-            T: $crate::en::Encode<$mode>,
+            T: $crate::en::Encode<crate::mode::$mode>,
         {
             const WHAT: &str = $what;
             const ENCODING: super::Encoding = super::Encoding::new();

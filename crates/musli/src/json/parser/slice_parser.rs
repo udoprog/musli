@@ -3,7 +3,7 @@ use crate::json::parser::{Parser, StringReference, Token};
 use crate::{Buf, Context};
 
 /// An efficient [`Parser`] wrapper around a slice.
-pub(crate) struct SliceParser<'de> {
+pub struct SliceParser<'de> {
     pub(crate) slice: &'de [u8],
     pub(crate) index: usize,
 }

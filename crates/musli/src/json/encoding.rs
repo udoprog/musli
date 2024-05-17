@@ -8,57 +8,47 @@ use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-#[cfg(feature = "std")]
-use std::io;
-
 use crate::allocator;
 use crate::de::{Decode, Decoder};
 use crate::en::{Encode, Encoder};
 use crate::mode::Text;
-use crate::{Context, FixedBytes, Writer};
+use crate::{Context, Writer};
 
 use super::de::JsonDecoder;
 use super::en::JsonEncoder;
 use super::error::Error;
-use super::parser::{Parser, SliceParser};
+use super::parser::IntoParser;
 
 /// The default configuration.
 pub const DEFAULT: Encoding = Encoding::new();
 
-/// Encode the given value to the given [`Writer`] using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
-where
-    W: Writer,
-    T: ?Sized + Encode<Text>,
-{
-    DEFAULT.encode(writer, value)
-}
+crate::macros::bare_encoding!(Text, DEFAULT, json, IntoParser);
 
-/// Encode the given value to the given [Write][io::Write] using the [`DEFAULT`]
-/// configuration.
-#[cfg(feature = "std")]
-#[inline]
-pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
-where
-    W: io::Write,
-    T: ?Sized + Encode<Text>,
-{
-    DEFAULT.to_writer(writer, value)
-}
-
-/// Encode the given value to a [`Vec`] using the [`DEFAULT`] configuration.
-#[cfg(feature = "alloc")]
-#[inline]
-pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
-where
-    T: ?Sized + Encode<Text>,
-{
-    DEFAULT.to_vec(value)
-}
-
-/// Encode the given value to a [`String`] using the [`DEFAULT`] configuration.
+/// Encode the given value to a [`String`] using the [`DEFAULT`] [`Encoding`].
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Decode, Encode};
+/// use musli::json;
+/// # use musli::json::Error;
+///
+/// #[derive(Decode, Encode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let data = json::to_string(&Person {
+///     name: "Aristotle".to_string(),
+///     age: 62,
+/// })?;
+///
+/// let person: Person = json::from_str(&data[..])?;
+/// assert_eq!(person.name, "Aristotle");
+/// assert_eq!(person.age, 62);
+/// # Ok::<(), Error>(())
+/// ```
 #[cfg(feature = "alloc")]
 #[inline]
 pub fn to_string<T>(value: &T) -> Result<String, Error>
@@ -68,45 +58,38 @@ where
     DEFAULT.to_string(value)
 }
 
-/// Encode the given value to a fixed-size bytes using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, Error>
-where
-    T: ?Sized + Encode<Text>,
-{
-    DEFAULT.to_fixed_bytes::<N, _>(value)
-}
-
-/// Decode the given type `T` from the given [`Parser`] using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
-where
-    R: Parser<'de>,
-    T: Decode<'de, Text>,
-{
-    DEFAULT.decode(reader)
-}
-
 /// Decode the given type `T` from the given string using the [`DEFAULT`]
-/// configuration.
+/// [`Encoding`].
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Decode, Encode};
+/// use musli::json;
+/// # use musli::json::Error;
+///
+/// #[derive(Decode, Encode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let mut data = json::to_string(&Person {
+///     name: "Aristotle".to_string(),
+///     age: 62,
+/// })?;
+///
+/// let person: Person = json::from_str(&data[..])?;
+/// assert_eq!(person.name, "Aristotle");
+/// assert_eq!(person.age, 62);
+/// # Ok::<(), Error>(())
+/// ```
 #[inline]
 pub fn from_str<'de, T>(string: &'de str) -> Result<T, Error>
 where
     T: Decode<'de, Text>,
 {
     DEFAULT.from_str(string)
-}
-
-/// Decode the given type `T` from the given slice using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
-where
-    T: Decode<'de, Text>,
-{
-    DEFAULT.from_slice(bytes)
 }
 
 /// Setting up encoding with parameters.
@@ -234,7 +217,7 @@ impl<M> Encoding<M> {
     #[inline]
     pub fn decode<'de, P, T>(self, parser: P) -> Result<T, Error>
     where
-        P: Parser<'de>,
+        P: IntoParser<'de>,
         T: Decode<'de, M>,
     {
         allocator::default!(|alloc| {
@@ -252,10 +235,11 @@ impl<M> Encoding<M> {
     pub fn decode_with<'de, C, P, T>(self, cx: &C, parser: P) -> Result<T, C::Error>
     where
         C: ?Sized + Context<Mode = M>,
-        P: Parser<'de>,
+        P: IntoParser<'de>,
         T: Decode<'de, M>,
     {
         cx.clear();
+        let parser = parser.into_parser();
         JsonDecoder::new(cx, parser).decode()
     }
 
@@ -308,7 +292,7 @@ impl<M> Encoding<M> {
         T: Decode<'de, M>,
     {
         cx.clear();
-        JsonDecoder::new(cx, SliceParser::new(bytes)).decode()
+        JsonDecoder::new(cx, bytes.into_parser()).decode()
     }
 
     crate::macros::encode_with_extensions!(M, json);
