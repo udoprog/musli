@@ -7,11 +7,19 @@ mod prelude;
 use musli::allocator::{Stack, StackBuffer};
 use musli::context::StackContext;
 use musli::{Decode, Encode};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Serde {
+    field: u32,
+}
 
 #[derive(Debug, Encode, Decode)]
 struct Value<'a> {
     name: &'a str,
     age: u32,
+    #[musli(with = musli::serde)]
+    serde: Serde,
 }
 
 #[start]
@@ -27,6 +35,7 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let value = Value {
         name: "Aristotle",
         age: 61,
+        serde: Serde { field: 42 },
     };
 
     let mut w = &mut buf[..];
@@ -55,6 +64,10 @@ fn main(_argc: isize, _argv: *const *const u8) -> isize {
 
     if value.age != 61 {
         return 4;
+    }
+
+    if value.serde.field != 42 {
+        return 5;
     }
 
     0

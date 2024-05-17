@@ -57,11 +57,10 @@ jobs:
       fail-fast: false
       matrix:
         os: ['windows-latest', 'ubuntu-latest']
-        example: ['json']
+        example: ['json', 'serde']
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo build
       - run: cargo +nightly run -p no-std --example ${{matrix.example}}
 
   fuzz:
