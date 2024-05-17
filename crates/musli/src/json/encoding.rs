@@ -11,8 +11,8 @@ use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::io;
 
+use crate::allocator;
 use crate::de::{Decode, Decoder};
-use crate::default_allocator;
 use crate::en::{Encode, Encoder};
 use crate::mode::Text;
 use crate::{Context, FixedBytes, Writer};
@@ -205,7 +205,7 @@ impl<M> Encoding<M> {
     where
         T: ?Sized + Encode<M>,
     {
-        default_allocator!(|alloc| {
+        allocator::default!(|alloc| {
             let cx = crate::context::Same::new(alloc);
             self.to_string_with(&cx, value)
         })
@@ -237,7 +237,7 @@ impl<M> Encoding<M> {
         P: Parser<'de>,
         T: Decode<'de, M>,
     {
-        default_allocator!(|alloc| {
+        allocator::default!(|alloc| {
             let cx = crate::context::Same::new(alloc);
             self.decode_with(&cx, parser)
         })
@@ -290,7 +290,7 @@ impl<M> Encoding<M> {
     where
         T: Decode<'de, M>,
     {
-        default_allocator!(|alloc| {
+        allocator::default!(|alloc| {
             let cx = crate::context::Same::<_, M, _>::new(alloc);
             self.from_slice_with(&cx, bytes)
         })

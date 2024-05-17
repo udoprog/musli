@@ -22,7 +22,7 @@ pub use self::value::{AsValueDecoder, Value};
 #[doc(inline)]
 pub use error::Error;
 
-use crate::default_allocator;
+use crate::allocator;
 use crate::mode::Binary;
 use crate::value::en::ValueEncoder;
 use crate::{Decode, Encode, Options};
@@ -38,7 +38,7 @@ where
 
     let mut output = Value::Unit;
 
-    default_allocator!(|alloc| {
+    allocator::default!(|alloc| {
         let cx = crate::context::Same::<_, Binary, Error>::new(&alloc);
         ValueEncoder::<OPTIONS, _, _>::new(&cx, &mut output).encode(value)?;
         Ok(output)
@@ -52,7 +52,7 @@ where
 {
     use crate::de::Decoder;
 
-    default_allocator!(|alloc| {
+    allocator::default!(|alloc| {
         let cx = crate::context::Same::<_, Binary, Error>::new(&alloc);
         value.decoder::<OPTIONS, _>(&cx).decode()
     })

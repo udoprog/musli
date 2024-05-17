@@ -1,6 +1,6 @@
 //! Serialization options.
 
-/// Type encapsulating a static flavor of an encoding.
+/// [`Options`] builder.
 pub struct OptionsBuilder(Options);
 
 const DEFAULT: Options = (ByteOrder::NATIVE as Options) << BYTEORDER_BIT;
@@ -12,13 +12,16 @@ pub const fn new() -> OptionsBuilder {
     OptionsBuilder(DEFAULT)
 }
 
-/// Type encapsulating a static flavor of an encoding.
+/// Type encapsulating a static options for an encoding.
 ///
 /// Note: despite being made up of a primitive type, this cannot be serialized
-/// and correctly re-used.
+/// and correctly re-used. This is simply the case because of restrictions in
+/// constant evaluation.
 ///
 /// Making assumptions about its layout might lead to unspecified behavior
-/// during encoding. Only use this type through the provided API.
+/// during encoding. Only use this type through the provided [`options`] APIs.
+///
+/// [`options`]: crate::options
 pub type Options = u128;
 
 const BYTEORDER_BIT: Options = 0;
@@ -178,7 +181,6 @@ impl ByteOrder {
 }
 
 #[doc(hidden)]
-#[macro_export]
 macro_rules! width_arm {
     ($width:expr, $macro:path) => {
         match $width {
@@ -197,6 +199,8 @@ macro_rules! width_arm {
         }
     };
 }
+
+pub(crate) use width_arm;
 
 /// The width of a numerical type.
 #[derive(Clone, Copy)]

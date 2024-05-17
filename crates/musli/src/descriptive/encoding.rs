@@ -1,18 +1,11 @@
 //! Module that defines [`Encoding`] whith allows for customization of the
 //! encoding format, and the [`DEFAULT`] encoding configuration.
 
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
 use core::marker;
-#[cfg(feature = "std")]
-use std::io;
 
-use crate::de::Decode;
-use crate::en::Encode;
 use crate::mode::Binary;
 use crate::options;
-use crate::Context;
-use crate::{FixedBytes, Options, Reader, Writer};
+use crate::Options;
 
 use super::de::SelfDecoder;
 use super::en::SelfEncoder;

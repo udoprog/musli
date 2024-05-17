@@ -41,7 +41,7 @@ where
                 }};
             }
 
-            crate::width_arm!(width, fixed)
+            crate::options::width_arm!(width, fixed)
         }
     }
 }
@@ -94,7 +94,7 @@ where
                 }};
             }
 
-            crate::width_arm!(width, fixed)
+            crate::options::width_arm!(width, fixed)
         }
     }
 }

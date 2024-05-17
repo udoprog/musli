@@ -8,7 +8,11 @@ use alloc::vec::Vec;
 use crate::buf::Error;
 use crate::{Allocator, Buf};
 
-/// Buffer used in combination with an [`Allocator`].
+/// System buffer that can be used in combination with an [`Allocator`].
+///
+/// This uses the [`System`] allocator.
+///
+/// [`System` allocator]: https://doc.rust-lang.org/std/alloc/struct.System.html
 pub struct System {
     internal: UnsafeCell<Internal>,
 }
