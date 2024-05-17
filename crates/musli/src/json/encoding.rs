@@ -8,9 +8,10 @@ use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use crate::allocator;
 use crate::mode::Text;
-use crate::{Context, Decode, Encode};
+use crate::Decode;
+#[cfg(feature = "alloc")]
+use crate::{Context, Encode};
 
 use super::de::JsonDecoder;
 use super::en::JsonEncoder;
@@ -204,7 +205,7 @@ impl<M> Encoding<M> {
     where
         T: ?Sized + Encode<M>,
     {
-        allocator::default!(|alloc| {
+        crate::allocator::default!(|alloc| {
             let cx = crate::context::Same::new(alloc);
             self.to_string_with(&cx, value)
         })

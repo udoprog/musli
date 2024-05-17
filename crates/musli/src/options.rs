@@ -181,6 +181,12 @@ impl ByteOrder {
 }
 
 #[doc(hidden)]
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "value"
+))]
 macro_rules! width_arm {
     ($width:expr, $macro:path) => {
         match $width {
@@ -200,6 +206,12 @@ macro_rules! width_arm {
     };
 }
 
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "value"
+))]
 pub(crate) use width_arm;
 
 /// The width of a numerical type.
