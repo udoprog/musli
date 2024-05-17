@@ -240,7 +240,7 @@ struct Version2 {
 
 let version2 = musli::wire::to_vec(&Version2 {
     name: String::from("Aristotle"),
-    age: Some(62),
+    age: Some(61),
 })?;
 
 let version1: Version1 = musli::wire::decode(version2.as_slice())?;
@@ -255,7 +255,7 @@ versions.
 ```rust
 let version2 = musli::storage::to_vec(&Version2 {
     name: String::from("Aristotle"),
-    age: Some(62),
+    age: Some(61),
 })?;
 
 assert!(musli::storage::decode::<_, Version1>(version2.as_slice()).is_err());

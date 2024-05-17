@@ -22,7 +22,7 @@ where
 {
     #[inline]
     pub(super) fn new(cx: &'a C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
-        let actual = parser.peek(cx)?;
+        let actual = parser.lex(cx);
 
         if !matches!(actual, Token::OpenBracket) {
             return Err(cx.message(format_args!("Expected opening bracket, was {actual}")));
@@ -43,7 +43,7 @@ where
         let first = mem::take(&mut self.first);
 
         loop {
-            let token = self.parser.peek(self.cx)?;
+            let token = self.parser.lex(self.cx);
 
             if token.is_value() {
                 return Ok(true);
@@ -75,7 +75,7 @@ where
             decoder.skip()?;
         }
 
-        let actual = self.parser.peek(self.cx)?;
+        let actual = self.parser.lex(self.cx);
 
         if !matches!(actual, Token::CloseBracket) {
             return Err(self

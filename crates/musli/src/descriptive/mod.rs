@@ -35,7 +35,7 @@
 //!
 //! let version2 = musli::descriptive::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
-//!     age: Some(62),
+//!     age: Some(61),
 //! })?;
 //!
 //! let version1: Version1 = musli::descriptive::decode(version2.as_slice())?;
@@ -60,14 +60,14 @@
 //! const CONFIG: Encoding = Encoding::new();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
-//! struct Struct<'a> {
+//! struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
 //! }
 //!
 //! let mut out = Vec::new();
 //!
-//! let expected = Struct {
+//! let expected = Person {
 //!     name: "Aristotle",
 //!     age: 61,
 //! };

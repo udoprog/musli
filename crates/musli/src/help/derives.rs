@@ -43,8 +43,8 @@
 //! const TEXT: Encoding = Encoding::new();
 //! const BINARY: Encoding<Binary> = Encoding::new().with_mode();
 //!
-//! let named = TEXT.to_vec(&Person { not_name: "Aristotle", age: 62 })?;
-//! assert_eq!(named.as_slice(), br#"{"name":"Aristotle","age":62}"#);
+//! let named = TEXT.to_vec(&Person { not_name: "Aristotle", age: 61 })?;
+//! assert_eq!(named.as_slice(), br#"{"name":"Aristotle","age":61}"#);
 //!
 //! let indexed = BINARY.to_vec(&Person { not_name: "Plato", age: 84 })?;
 //! assert_eq!(indexed.as_slice(), br#"{"0":"Plato","1":84}"#);

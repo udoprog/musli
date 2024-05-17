@@ -10,11 +10,22 @@ use core::slice;
 use crate::de::UnsizedVisitor;
 use crate::Context;
 
+mod sealed {
+    use super::{Limit, Reader};
+
+    pub trait Sealed {}
+
+    impl Sealed for &[u8] {}
+    impl Sealed for super::SliceReader<'_> {}
+    impl<'de, R> Sealed for Limit<R> where R: Reader<'de> {}
+    impl<'de, R> Sealed for &mut R where R: ?Sized + Reader<'de> {}
+}
+
 /// Trait governing how a source of bytes is read.
 ///
 /// This requires the reader to be able to hand out contiguous references to the
 /// byte source through [`Reader::read_bytes`].
-pub trait Reader<'de> {
+pub trait Reader<'de>: self::sealed::Sealed {
     /// Type borrowed from self.
     ///
     /// Why oh why would we want to do this over having a simple `&'this mut T`?
@@ -37,9 +48,7 @@ pub trait Reader<'de> {
         C: ?Sized + Context;
 
     /// Peek the next value.
-    fn peek<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context;
+    fn peek(&mut self) -> Option<u8>;
 
     /// Read a slice into the given buffer.
     #[inline]
@@ -138,6 +147,27 @@ pub trait Reader<'de> {
     }
 }
 
+impl<'de> IntoReader<'de> for &'de [u8] {
+    type Reader = &'de [u8];
+
+    #[inline]
+    fn into_reader(self) -> Self::Reader {
+        self
+    }
+}
+
+impl<'a, 'de, R> IntoReader<'de> for &'a mut R
+where
+    R: ?Sized + Reader<'de>,
+{
+    type Reader = &'a mut R;
+
+    #[inline]
+    fn into_reader(self) -> Self::Reader {
+        self
+    }
+}
+
 impl<'de> Reader<'de> for &'de [u8] {
     type Mut<'this> = &'this mut &'de [u8] where Self: 'this;
 
@@ -170,7 +200,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         C: ?Sized + Context,
     {
         if self.len() < buf.len() {
-            return Err(cx.message("Buffer underflow"));
+            return Err(cx.custom(SliceUnderflow::new(buf.len(), self.len())));
         }
 
         let (head, tail) = self.split_at(buf.len());
@@ -187,7 +217,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         V: UnsizedVisitor<'de, C, [u8]>,
     {
         if self.len() < n {
-            return Err(cx.message("Buffer underflow"));
+            return Err(cx.custom(SliceUnderflow::new(n, self.len())));
         }
 
         let (head, tail) = self.split_at(n);
@@ -203,7 +233,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         C: ?Sized + Context,
     {
         let &[first, ref tail @ ..] = *self else {
-            return Err(cx.message("Buffer underflow"));
+            return Err(cx.custom(SliceUnderflow::new(1, self.len())));
         };
 
         *self = tail;
@@ -217,7 +247,7 @@ impl<'de> Reader<'de> for &'de [u8] {
         C: ?Sized + Context,
     {
         if self.len() < N {
-            return Err(cx.message("Buffer underflow"));
+            return Err(cx.custom(SliceUnderflow::new(N, self.len())));
         }
 
         let (head, tail) = self.split_at(N);
@@ -227,12 +257,18 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn peek<C>(&mut self, _: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        Ok(self.first().copied())
+    fn peek(&mut self) -> Option<u8> {
+        self.first().copied()
     }
+}
+
+/// Coerce a type into a [`Reader`].
+pub trait IntoReader<'de>: self::sealed::Sealed {
+    /// The reader type.
+    type Reader: Reader<'de>;
+
+    /// Convert the type into a reader.
+    fn into_reader(self) -> Self::Reader;
 }
 
 /// An efficient [`Reader`] wrapper around a slice.
@@ -340,16 +376,13 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
-    fn peek<C>(&mut self, _: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
+    fn peek(&mut self) -> Option<u8> {
         if self.range.start == self.range.end {
-            return Ok(None);
+            return None;
         }
 
         // SAFETY: we've checked that the elements are in bound above.
-        unsafe { Ok(Some(ptr::read(self.range.start))) }
+        unsafe { Some(ptr::read(self.range.start)) }
     }
 
     #[inline]
@@ -450,11 +483,12 @@ where
     }
 
     #[inline]
-    fn peek<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        self.reader.peek(cx)
+    fn peek(&mut self) -> Option<u8> {
+        if self.remaining > 0 {
+            self.reader.peek()
+        } else {
+            None
+        }
     }
 
     #[inline]
@@ -516,11 +550,8 @@ where
     }
 
     #[inline]
-    fn peek<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        (**self).peek(cx)
+    fn peek(&mut self) -> Option<u8> {
+        (**self).peek()
     }
 
     #[inline]
@@ -550,9 +581,15 @@ where
 
 /// Underflow when trying to read from a slice.
 #[derive(Debug)]
-struct SliceUnderflow {
+pub(crate) struct SliceUnderflow {
     n: usize,
     remaining: usize,
+}
+
+impl SliceUnderflow {
+    pub(crate) fn new(n: usize, remaining: usize) -> Self {
+        Self { n, remaining }
+    }
 }
 
 impl fmt::Display for SliceUnderflow {
@@ -565,3 +602,6 @@ impl fmt::Display for SliceUnderflow {
         )
     }
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for SliceUnderflow {}

@@ -15,7 +15,7 @@ struct Container {
 
 #[test]
 fn container() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Container {
             vec: vec![0, 1, 2, 3],
@@ -39,7 +39,7 @@ pub struct BytesCompat {
 
 #[test]
 fn bytes_compat() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         BytesCompat {
             empty_bytes: Bytes([]),

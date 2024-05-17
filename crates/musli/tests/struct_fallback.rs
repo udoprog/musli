@@ -23,7 +23,7 @@ pub struct StructPattern {
 
 #[test]
 fn struct_pattern() {
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Struct {
             field1: 0,
@@ -48,7 +48,7 @@ pub struct StructRename {
 
 #[test]
 fn struct_rename() {
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         upgrade_stable,
         Struct {
             field1: 11,

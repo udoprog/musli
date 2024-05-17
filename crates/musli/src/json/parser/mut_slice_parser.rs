@@ -5,26 +5,34 @@ use crate::{Buf, Context};
 
 use super::string::SliceAccess;
 
-/// An efficient [`Parser`] wrapper around a slice.
-pub struct SliceParser<'de> {
-    pub(crate) slice: &'de [u8],
-    pub(crate) index: usize,
+/// An efficient [`Parser`] wrapper around a mutable slice.
+///
+/// As the slice is being parsed, this keeps the referenced slice up-to-date.
+///
+/// # Implementation Note
+///
+/// This MUST ensure that the underlying slice remains valid UTF-8, if it is
+/// valid UTF-8. We transmute a `&'a mut &'de str` in order to construct this
+/// efficiently.
+#[repr(transparent)]
+pub struct MutSliceParser<'a, 'de> {
+    slice: &'a mut &'de [u8],
 }
 
-impl<'de> SliceParser<'de> {
+impl<'a, 'de> MutSliceParser<'a, 'de> {
     /// Construct a new instance around the specified slice.
     #[inline]
-    pub(crate) fn new(slice: &'de [u8]) -> Self {
-        Self { slice, index: 0 }
+    pub(crate) fn new(slice: &'a mut &'de [u8]) -> Self {
+        Self { slice }
     }
 }
 
-impl<'de> Parser<'de> for SliceParser<'de> {
-    type Mut<'this> = &'this mut SliceParser<'de> where Self: 'this;
+impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
+    type Mut<'this> = MutSliceParser<'this, 'de> where Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
-        self
+        MutSliceParser::new(self.slice)
     }
 
     #[inline]
@@ -47,9 +55,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
 
         self.skip(cx, 1)?;
 
-        let mut access = SliceAccess::new(cx, self.slice, self.index);
+        let mut access = SliceAccess::new(cx, self.slice, 0);
         let out = access.parse_string(validate, start, scratch);
-        self.index = access.index;
+        *self.slice = &self.slice[access.index..];
 
         out
     }
@@ -59,9 +67,9 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: ?Sized + Context,
     {
-        let mut access = SliceAccess::new(cx, self.slice, self.index);
+        let mut access = SliceAccess::new(cx, self.slice, 0);
         let out = access.skip_string();
-        self.index = access.index;
+        *self.slice = &self.slice[access.index..];
         out
     }
 
@@ -70,13 +78,11 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: ?Sized + Context,
     {
-        let outcome = self.index.wrapping_add(n);
-
-        if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.custom(SliceUnderflow::new(n, self.slice.len() - self.index)));
+        if self.slice.len() < n {
+            return Err(cx.custom(SliceUnderflow::new(n, self.slice.len())));
         }
 
-        self.index = outcome;
+        *self.slice = &self.slice[n..];
         cx.advance(n);
         Ok(())
     }
@@ -86,17 +92,13 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: ?Sized + Context,
     {
-        let outcome = self.index.wrapping_add(buf.len());
-
-        if outcome > self.slice.len() || outcome < self.index {
-            return Err(cx.custom(SliceUnderflow::new(
-                buf.len(),
-                self.slice.len() - self.index,
-            )));
+        if self.slice.len() < buf.len() {
+            return Err(cx.custom(SliceUnderflow::new(buf.len(), self.slice.len())));
         }
 
-        buf.copy_from_slice(&self.slice[self.index..outcome]);
-        self.index = outcome;
+        let (head, tail) = self.slice.split_at(buf.len());
+        *self.slice = tail;
+        buf.copy_from_slice(head);
         cx.advance(buf.len());
         Ok(())
     }
@@ -106,29 +108,38 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: ?Sized + Context,
     {
-        while matches!(
-            self.slice.get(self.index),
-            Some(b' ' | b'\n' | b'\t' | b'\r')
-        ) {
-            self.index = self.index.wrapping_add(1);
-            cx.advance(1);
-        }
+        let n = 0;
+
+        let n = 'out: {
+            for (index, &b) in self.slice[n..].iter().enumerate() {
+                if matches!(b, b' ' | b'\n' | b'\t' | b'\r') {
+                    continue;
+                }
+
+                break 'out index;
+            }
+
+            self.slice.len()
+        };
+
+        *self.slice = &self.slice[n..];
+        cx.advance(n);
     }
 
     #[inline]
     fn peek(&mut self) -> Option<u8> {
-        self.slice.get(self.index).copied()
+        self.slice.first().copied()
     }
 
     fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>
     where
         C: ?Sized + Context,
     {
-        let Some((value, read)) = crate::dec2flt::dec2flt(&self.slice[self.index..]) else {
+        let Some((value, read)) = crate::dec2flt::dec2flt(self.slice) else {
             return Err(cx.custom(ErrorMessage::ParseFloat));
         };
 
-        self.index += read;
+        *self.slice = &self.slice[read..];
         cx.advance(read);
         Ok(value)
     }
@@ -137,11 +148,11 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: ?Sized + Context,
     {
-        let Some((value, read)) = crate::dec2flt::dec2flt(&self.slice[self.index..]) else {
+        let Some((value, read)) = crate::dec2flt::dec2flt(self.slice) else {
             return Err(cx.custom(ErrorMessage::ParseFloat));
         };
 
-        self.index += read;
+        *self.slice = &self.slice[read..];
         cx.advance(read);
         Ok(value)
     }

@@ -25,7 +25,7 @@ pub struct Indexed {
 
 #[test]
 fn named_struct() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Named {
             string: String::from("foo"),
@@ -34,7 +34,7 @@ fn named_struct() {
         json = r#"{"string":"foo","number":42}"#,
     );
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         NamedByType {
             string: String::from("foo"),
@@ -46,7 +46,7 @@ fn named_struct() {
 
 #[test]
 fn indexed_struct() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         Indexed {
             string: String::from("foo"),

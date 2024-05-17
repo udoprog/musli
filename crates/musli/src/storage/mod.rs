@@ -32,7 +32,7 @@
 //!
 //! let version2 = musli::storage::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
-//!     age: Some(62),
+//!     age: Some(61),
 //! })?;
 //!
 //! assert!(musli::storage::decode::<_, Version1>(version2.as_slice()).is_err());
@@ -67,14 +67,14 @@
 //! const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
-//! struct Struct<'a> {
+//! struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
 //! }
 //!
 //! let mut out = Vec::new();
 //!
-//! let expected = Struct {
+//! let expected = Person {
 //!     name: "Aristotle",
 //!     age: 61,
 //! };

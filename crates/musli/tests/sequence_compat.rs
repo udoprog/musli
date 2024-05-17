@@ -13,7 +13,7 @@ pub struct SequenceCompat {
 
 #[test]
 fn sequence_compat() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         SequenceCompat {
             empty_sequence: Sequence(()),

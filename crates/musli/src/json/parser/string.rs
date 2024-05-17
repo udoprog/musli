@@ -1,6 +1,5 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::json::parser::{Parser, SliceParser};
 use crate::{Buf, Context};
 
 // Copied and adapter form the serde-json project under the MIT and Apache 2.0
@@ -43,212 +42,370 @@ pub enum StringReference<'de, 'scratch> {
     Scratch(&'scratch str),
 }
 
-/// Specialized reader implementation from a slice.
-pub(crate) fn parse_string_slice_reader<'de, 'scratch, C, S>(
-    cx: &C,
-    reader: &mut SliceParser<'de>,
-    validate: bool,
-    start: C::Mark,
-    scratch: &'scratch mut S,
-) -> Result<StringReference<'de, 'scratch>, C::Error>
+/// Accessor for a slice.
+pub(crate) struct SliceAccess<'a, 'de, C>
 where
-    C: ?Sized + Context,
-    S: ?Sized + Buf,
+    C: ?Sized,
 {
-    // Index of the first byte not yet copied into the scratch space.
-    let mut open_mark = cx.mark();
-    let mut open = reader.index;
-
-    loop {
-        while reader.index < reader.slice.len() && !ESCAPE[reader.slice[reader.index] as usize] {
-            reader.index = reader.index.wrapping_add(1);
-            cx.advance(1);
-        }
-
-        if reader.index == reader.slice.len() {
-            return Err(cx.message("End of input"));
-        }
-
-        match reader.slice[reader.index] {
-            b'"' => {
-                if scratch.is_empty() {
-                    // Fast path: return a slice of the raw JSON without any
-                    // copying.
-                    let borrowed = &reader.slice[open..reader.index];
-                    reader.index = reader.index.wrapping_add(1);
-                    cx.advance(1);
-                    check_utf8(cx, borrowed, start)?;
-                    // SAFETY: we've checked each segment to be valid UTF-8.
-                    let borrowed = unsafe { core::str::from_utf8_unchecked(borrowed) };
-                    return Ok(StringReference::Borrowed(borrowed));
-                } else {
-                    let slice = &reader.slice[open..reader.index];
-                    check_utf8(cx, slice, start)?;
-
-                    if !scratch.write(slice) {
-                        return Err(cx.message("Scratch buffer overflow"));
-                    }
-
-                    reader.index = reader.index.wrapping_add(1);
-                    cx.advance(1);
-                    // SAFETY: we've checked each segment to be valid UTF-8.
-                    let scratch = unsafe { core::str::from_utf8_unchecked(scratch.as_slice()) };
-                    return Ok(StringReference::Scratch(scratch));
-                }
-            }
-            b'\\' => {
-                let slice = &reader.slice[open..reader.index];
-                check_utf8(cx, slice, start)?;
-
-                if !scratch.write(slice) {
-                    return Err(cx.message("Scratch buffer overflow"));
-                }
-
-                reader.index = reader.index.wrapping_add(1);
-                cx.advance(1);
-
-                if !parse_escape(cx, reader, validate, scratch)? {
-                    return Err(cx.marked_message(open_mark, "Buffer overflow"));
-                }
-
-                open = reader.index;
-                open_mark = cx.mark();
-            }
-            _ => {
-                if validate {
-                    return Err(
-                        cx.marked_message(open_mark, "Control character while parsing string")
-                    );
-                }
-
-                reader.index = reader.index.wrapping_add(1);
-                cx.advance(1);
-            }
-        }
-    }
+    cx: &'a C,
+    slice: &'de [u8],
+    pub(crate) index: usize,
 }
 
-/// Check that the given slice is valid UTF-8.
-#[inline]
-fn check_utf8<C>(cx: &C, bytes: &[u8], start: C::Mark) -> Result<(), C::Error>
+impl<'a, 'de, C> SliceAccess<'a, 'de, C>
 where
     C: ?Sized + Context,
 {
-    if crate::str::from_utf8(bytes).is_err() {
-        Err(cx.marked_message(start, "Invalid unicode string"))
-    } else {
-        Ok(())
+    #[inline]
+    pub(crate) fn new(cx: &'a C, slice: &'de [u8], index: usize) -> Self {
+        Self { cx, slice, index }
     }
-}
 
-/// Parses a JSON escape sequence and appends it into the scratch space. Assumes
-/// the previous byte read was a backslash.
-fn parse_escape<C, B>(
-    cx: &C,
-    parser: &mut SliceParser<'_>,
-    validate: bool,
-    scratch: &mut B,
-) -> Result<bool, C::Error>
-where
-    C: ?Sized + Context,
-    B: ?Sized + Buf,
-{
-    let start = cx.mark();
-    let b = parser.read_byte(cx)?;
+    #[inline]
+    fn next(&mut self) -> Result<u8, C::Error> {
+        let Some(b) = self.slice.get(self.index) else {
+            return Err(self.cx.message("End of input"));
+        };
 
-    let extend = match b {
-        b'"' => scratch.push(b'"'),
-        b'\\' => scratch.push(b'\\'),
-        b'/' => scratch.push(b'/'),
-        b'b' => scratch.push(b'\x08'),
-        b'f' => scratch.push(b'\x0c'),
-        b'n' => scratch.push(b'\n'),
-        b'r' => scratch.push(b'\r'),
-        b't' => scratch.push(b'\t'),
-        b'u' => {
-            fn encode_surrogate<B>(scratch: &mut B, n: u16) -> bool
-            where
-                B: ?Sized + Buf,
-            {
-                scratch.write(&[
-                    (n >> 12 & 0b0000_1111) as u8 | 0b1110_0000,
-                    (n >> 6 & 0b0011_1111) as u8 | 0b1000_0000,
-                    (n & 0b0011_1111) as u8 | 0b1000_0000,
-                ])
-            }
+        self.cx.advance(1);
+        self.index += 1;
+        Ok(*b)
+    }
 
-            let c = match parser.parse_hex_escape(cx)? {
-                n @ 0xDC00..=0xDFFF => {
-                    return if validate {
-                        Err(cx.marked_message(start, "Lone leading surrogate in hex escape"))
-                    } else {
-                        Ok(encode_surrogate(scratch, n))
-                    };
-                }
+    #[inline]
+    fn parse_hex_escape(&mut self) -> Result<u16, C::Error> {
+        let &[a, b, c, d, ..] = &self.slice[self.index..] else {
+            return Err(self.cx.message("Unexpected end of hex escape"));
+        };
 
-                // Non-BMP characters are encoded as a sequence of two hex
-                // escapes, representing UTF-16 surrogates. If deserializing a
-                // utf-8 string the surrogates are required to be paired,
-                // whereas deserializing a byte string accepts lone surrogates.
-                n1 @ 0xD800..=0xDBFF => {
-                    let pos = cx.mark();
+        let mut n = 0;
+        let start = self.cx.mark();
 
-                    if parser.read_byte(cx)? != b'\\' {
-                        return if validate {
-                            Err(cx.marked_message(pos, "Unexpected end of hex escape"))
-                        } else {
-                            Ok(encode_surrogate(scratch, n1))
-                        };
-                    }
-
-                    if parser.read_byte(cx)? != b'u' {
-                        return if validate {
-                            Err(cx.marked_message(pos, "Unexpected end of hex escape"))
-                        } else {
-                            if !encode_surrogate(scratch, n1) {
-                                return Ok(false);
-                            }
-
-                            // The \ prior to this byte started an escape sequence,
-                            // so we need to parse that now. This recursive call
-                            // does not blow the stack on malicious input because
-                            // the escape is not \u, so it will be handled by one
-                            // of the easy nonrecursive cases.
-                            parse_escape(cx, parser, validate, scratch)
-                        };
-                    }
-
-                    let n2 = parser.parse_hex_escape(cx)?;
-
-                    if !(0xDC00..=0xDFFF).contains(&n2) {
-                        return Err(
-                            cx.marked_message(start, "Lone leading surrogate in hex escape")
-                        );
-                    }
-
-                    let n = (((n1 - 0xD800) as u32) << 10 | (n2 - 0xDC00) as u32) + 0x1_0000;
-
-                    match char::from_u32(n) {
-                        Some(c) => c,
-                        None => {
-                            return Err(cx.marked_message(start, "Invalid unicode"));
-                        }
-                    }
-                }
-
-                // Every u16 outside of the surrogate ranges above is guaranteed
-                // to be a legal char.
-                n => char::from_u32(n as u32).unwrap(),
+        for b in [a, b, c, d] {
+            let Some(val) = decode_hex_val(b) else {
+                return Err(self
+                    .cx
+                    .marked_message(start, "Non-hex digit in escape sequence"));
             };
 
-            scratch.write(c.encode_utf8(&mut [0u8; 4]).as_bytes())
+            n = (n << 4) + val;
         }
-        _ => {
-            return Err(cx.marked_message(start, "Invalid string escape"));
-        }
-    };
 
-    Ok(extend)
+        self.index += 4;
+        self.cx.advance(4);
+        Ok(n)
+    }
+
+    /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
+    /// the previous byte read was a backslash.
+    pub(crate) fn parse_escape<B>(
+        &mut self,
+        validate: bool,
+        scratch: &mut B,
+    ) -> Result<bool, C::Error>
+    where
+        B: ?Sized + Buf,
+    {
+        let start = self.cx.mark();
+        let b = self.next()?;
+
+        let extend = match b {
+            b'"' => scratch.push(b'"'),
+            b'\\' => scratch.push(b'\\'),
+            b'/' => scratch.push(b'/'),
+            b'b' => scratch.push(b'\x08'),
+            b'f' => scratch.push(b'\x0c'),
+            b'n' => scratch.push(b'\n'),
+            b'r' => scratch.push(b'\r'),
+            b't' => scratch.push(b'\t'),
+            b'u' => {
+                fn encode_surrogate<B>(scratch: &mut B, n: u16) -> bool
+                where
+                    B: ?Sized + Buf,
+                {
+                    scratch.write(&[
+                        (n >> 12 & 0b0000_1111) as u8 | 0b1110_0000,
+                        (n >> 6 & 0b0011_1111) as u8 | 0b1000_0000,
+                        (n & 0b0011_1111) as u8 | 0b1000_0000,
+                    ])
+                }
+
+                let c = match self.parse_hex_escape()? {
+                    n @ 0xDC00..=0xDFFF => {
+                        return if validate {
+                            Err(self
+                                .cx
+                                .marked_message(start, "Lone leading surrogate in hex escape"))
+                        } else {
+                            Ok(encode_surrogate(scratch, n))
+                        };
+                    }
+
+                    // Non-BMP characters are encoded as a sequence of two hex
+                    // escapes, representing UTF-16 surrogates. If deserializing a
+                    // utf-8 string the surrogates are required to be paired,
+                    // whereas deserializing a byte string accepts lone surrogates.
+                    n1 @ 0xD800..=0xDBFF => {
+                        let pos = self.cx.mark();
+
+                        if self.next()? != b'\\' {
+                            return if validate {
+                                Err(self.cx.marked_message(pos, "Unexpected end of hex escape"))
+                            } else {
+                                Ok(encode_surrogate(scratch, n1))
+                            };
+                        }
+
+                        if self.next()? != b'u' {
+                            return if validate {
+                                Err(self.cx.marked_message(pos, "Unexpected end of hex escape"))
+                            } else {
+                                if !encode_surrogate(scratch, n1) {
+                                    return Ok(false);
+                                }
+
+                                // The \ prior to this byte started an escape sequence,
+                                // so we need to parse that now. This recursive call
+                                // does not blow the stack on malicious input because
+                                // the escape is not \u, so it will be handled by one
+                                // of the easy nonrecursive cases.
+                                self.parse_escape(validate, scratch)
+                            };
+                        }
+
+                        let n2 = self.parse_hex_escape()?;
+
+                        if !(0xDC00..=0xDFFF).contains(&n2) {
+                            return Err(self
+                                .cx
+                                .marked_message(start, "Lone leading surrogate in hex escape"));
+                        }
+
+                        let n = (((n1 - 0xD800) as u32) << 10 | (n2 - 0xDC00) as u32) + 0x1_0000;
+
+                        match char::from_u32(n) {
+                            Some(c) => c,
+                            None => {
+                                return Err(self.cx.marked_message(start, "Invalid unicode"));
+                            }
+                        }
+                    }
+
+                    // Every u16 outside of the surrogate ranges above is guaranteed
+                    // to be a legal char.
+                    n => char::from_u32(n as u32).unwrap(),
+                };
+
+                scratch.write(c.encode_utf8(&mut [0u8; 4]).as_bytes())
+            }
+            _ => {
+                return Err(self.cx.marked_message(start, "Invalid string escape"));
+            }
+        };
+
+        Ok(extend)
+    }
+
+    /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
+    /// the previous byte read was a backslash.
+    fn skip_escape(&mut self, validate: bool) -> Result<(), C::Error> {
+        let start = self.cx.mark();
+        let b = self.next()?;
+
+        match b {
+            b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => (),
+            b'u' => {
+                match self.parse_hex_escape()? {
+                    0xDC00..=0xDFFF => {
+                        return if validate {
+                            Err(self
+                                .cx
+                                .marked_message(start, "Lone leading surrogate in hex escape"))
+                        } else {
+                            Ok(())
+                        };
+                    }
+
+                    // Non-BMP characters are encoded as a sequence of two hex
+                    // escapes, representing UTF-16 surrogates. If deserializing a
+                    // utf-8 string the surrogates are required to be paired,
+                    // whereas deserializing a byte string accepts lone surrogates.
+                    n1 @ 0xD800..=0xDBFF => {
+                        let pos = self.cx.mark();
+
+                        if self.next()? != b'\\' {
+                            return if validate {
+                                Err(self.cx.marked_message(pos, "Unexpected end of hex escape"))
+                            } else {
+                                Ok(())
+                            };
+                        }
+
+                        if self.next()? != b'u' {
+                            return if validate {
+                                Err(self.cx.marked_message(pos, "Unexpected end of hex escape"))
+                            } else {
+                                // The \ prior to this byte started an escape sequence,
+                                // so we need to parse that now. This recursive call
+                                // does not blow the stack on malicious input because
+                                // the escape is not \u, so it will be handled by one
+                                // of the easy nonrecursive cases.
+                                self.skip_escape(validate)
+                            };
+                        }
+
+                        let n2 = self.parse_hex_escape()?;
+
+                        if !(0xDC00..=0xDFFF).contains(&n2) {
+                            return Err(self
+                                .cx
+                                .marked_message(start, "Lone leading surrogate in hex escape"));
+                        }
+
+                        let n = (((n1 - 0xD800) as u32) << 10 | (n2 - 0xDC00) as u32) + 0x1_0000;
+
+                        if char::from_u32(n).is_none() {
+                            return Err(self.cx.marked_message(start, "Invalid unicode"));
+                        }
+                    }
+
+                    // Every u16 outside of the surrogate ranges above is guaranteed
+                    // to be a legal char.
+                    _ => (),
+                }
+            }
+            _ => {
+                return Err(self.cx.marked_message(start, "Invalid string escape"));
+            }
+        };
+
+        Ok(())
+    }
+
+    /// Specialized reader implementation from a slice.
+    pub(crate) fn parse_string<'scratch, S>(
+        &mut self,
+        validate: bool,
+        start: C::Mark,
+        scratch: &'scratch mut S,
+    ) -> Result<StringReference<'de, 'scratch>, C::Error>
+    where
+        S: ?Sized + Buf,
+    {
+        // Index of the first byte not yet copied into the scratch space.
+        let mut open_mark = self.cx.mark();
+        let mut open = self.index;
+
+        loop {
+            while self.index < self.slice.len() && !ESCAPE[self.slice[self.index] as usize] {
+                self.index = self.index.wrapping_add(1);
+                self.cx.advance(1);
+            }
+
+            if self.index == self.slice.len() {
+                return Err(self.cx.message("End of input"));
+            }
+
+            match self.slice[self.index] {
+                b'"' => {
+                    if scratch.is_empty() {
+                        // Fast path: return a slice of the raw JSON without any
+                        // copying.
+                        let borrowed = &self.slice[open..self.index];
+
+                        self.index = self.index.wrapping_add(1);
+                        self.cx.advance(1);
+
+                        self.check_utf8(borrowed, start)?;
+
+                        // SAFETY: we've checked each segment to be valid UTF-8.
+                        let borrowed = unsafe { core::str::from_utf8_unchecked(borrowed) };
+                        return Ok(StringReference::Borrowed(borrowed));
+                    } else {
+                        let slice = &self.slice[open..self.index];
+                        self.check_utf8(slice, start)?;
+
+                        if !scratch.write(slice) {
+                            return Err(self.cx.message("Scratch buffer overflow"));
+                        }
+
+                        self.index = self.index.wrapping_add(1);
+                        self.cx.advance(1);
+
+                        // SAFETY: we've checked each segment to be valid UTF-8.
+                        let scratch = unsafe { core::str::from_utf8_unchecked(scratch.as_slice()) };
+                        return Ok(StringReference::Scratch(scratch));
+                    }
+                }
+                b'\\' => {
+                    let slice = &self.slice[open..self.index];
+                    self.check_utf8(slice, start)?;
+
+                    if !scratch.write(slice) {
+                        return Err(self.cx.message("Scratch buffer overflow"));
+                    }
+
+                    self.index = self.index.wrapping_add(1);
+                    self.cx.advance(1);
+
+                    if !self.parse_escape(validate, scratch)? {
+                        return Err(self.cx.marked_message(open_mark, "Buffer overflow"));
+                    }
+
+                    open = self.index;
+                    open_mark = self.cx.mark();
+                }
+                _ => {
+                    if validate {
+                        return Err(self
+                            .cx
+                            .marked_message(open_mark, "Control character while parsing string"));
+                    }
+
+                    self.index = self.index.wrapping_add(1);
+                    self.cx.advance(1);
+                }
+            }
+        }
+    }
+
+    /// Specialized reader implementation from a slice.
+    pub(crate) fn skip_string(&mut self) -> Result<(), C::Error> {
+        loop {
+            while let Some(b) = self.slice.get(self.index) {
+                if ESCAPE[*b as usize] {
+                    break;
+                }
+
+                self.index = self.index.wrapping_add(1);
+                self.cx.advance(1);
+            }
+
+            let b = self.next()?;
+
+            match b {
+                b'"' => {
+                    return Ok(());
+                }
+                b'\\' => {
+                    self.skip_escape(true)?;
+                }
+                _ => {
+                    return Err(self.cx.message("Control character while parsing string"));
+                }
+            }
+        }
+    }
+
+    /// Check that the given slice is valid UTF-8.
+    #[inline]
+    fn check_utf8(&self, bytes: &[u8], start: C::Mark) -> Result<(), C::Error> {
+        if crate::str::from_utf8(bytes).is_err() {
+            Err(self.cx.marked_message(start, "Invalid unicode string"))
+        } else {
+            Ok(())
+        }
+    }
 }
 
 static HEX: [u8; 256] = {
@@ -274,6 +431,7 @@ static HEX: [u8; 256] = {
     ]
 };
 
+#[inline]
 pub(crate) fn decode_hex_val(val: u8) -> Option<u16> {
     let n = HEX[val as usize] as u16;
 
@@ -282,115 +440,4 @@ pub(crate) fn decode_hex_val(val: u8) -> Option<u16> {
     } else {
         Some(n)
     }
-}
-
-/// Specialized reader implementation from a slice.
-pub(crate) fn skip_string<'de, P, C>(cx: &C, mut p: P, validate: bool) -> Result<(), C::Error>
-where
-    P: Parser<'de>,
-    C: ?Sized + Context,
-{
-    loop {
-        while let Some(b) = p.peek_byte(cx)? {
-            if ESCAPE[b as usize] {
-                break;
-            }
-
-            p.skip(cx, 1)?;
-        }
-
-        let b = p.read_byte(cx)?;
-
-        match b {
-            b'"' => {
-                return Ok(());
-            }
-            b'\\' => {
-                skip_escape(cx, p.borrow_mut(), validate)?;
-            }
-            _ => {
-                if validate {
-                    return Err(cx.message("Control character while parsing string"));
-                }
-            }
-        }
-    }
-}
-
-/// Parses a JSON escape sequence and appends it into the scratch space. Assumes
-/// the previous byte read was a backslash.
-fn skip_escape<'de, P, C>(cx: &C, mut p: P, validate: bool) -> Result<(), C::Error>
-where
-    P: Parser<'de>,
-    C: ?Sized + Context,
-{
-    let start = cx.mark();
-    let b = p.read_byte(cx)?;
-
-    match b {
-        b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => (),
-        b'u' => {
-            match p.parse_hex_escape(cx)? {
-                0xDC00..=0xDFFF => {
-                    return if validate {
-                        Err(cx.marked_message(start, "Lone leading surrogate in hex escape"))
-                    } else {
-                        Ok(())
-                    };
-                }
-
-                // Non-BMP characters are encoded as a sequence of two hex
-                // escapes, representing UTF-16 surrogates. If deserializing a
-                // utf-8 string the surrogates are required to be paired,
-                // whereas deserializing a byte string accepts lone surrogates.
-                n1 @ 0xD800..=0xDBFF => {
-                    let pos = cx.mark();
-
-                    if p.read_byte(cx)? != b'\\' {
-                        return if validate {
-                            Err(cx.marked_message(pos, "Unexpected end of hex escape"))
-                        } else {
-                            Ok(())
-                        };
-                    }
-
-                    if p.read_byte(cx)? != b'u' {
-                        return if validate {
-                            Err(cx.marked_message(pos, "Unexpected end of hex escape"))
-                        } else {
-                            // The \ prior to this byte started an escape sequence,
-                            // so we need to parse that now. This recursive call
-                            // does not blow the stack on malicious input because
-                            // the escape is not \u, so it will be handled by one
-                            // of the easy nonrecursive cases.
-                            skip_escape(cx, p, validate)
-                        };
-                    }
-
-                    let n2 = p.parse_hex_escape(cx)?;
-
-                    if !(0xDC00..=0xDFFF).contains(&n2) {
-                        return Err(
-                            cx.marked_message(start, "Lone leading surrogate in hex escape")
-                        );
-                    }
-
-                    let n = (((n1 - 0xD800) as u32) << 10 | (n2 - 0xDC00) as u32) + 0x1_0000;
-
-                    if char::from_u32(n).is_none() {
-                        return Err(cx.marked_message(start, "Invalid unicode"));
-                    }
-                }
-
-                // Every u16 outside of the surrogate ranges above is guaranteed
-                // to be a legal char.
-                _ => (),
-            }
-        }
-        _ => {
-            return Err(cx.marked_message(start, "Invalid string escape"));
-        }
-    };
-
-    Ok(())
 }

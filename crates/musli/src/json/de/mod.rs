@@ -43,7 +43,7 @@ use super::parser::integer::{
 use super::parser::integer::{
     parse_signed_full as parse_signed, parse_unsigned_full as parse_unsigned,
 };
-use super::parser::{integer, string, Parser, StringReference, Token};
+use super::parser::{integer, Parser, StringReference, Token};
 
 #[cfg(feature = "value")]
 const BUFFER_OPTIONS: Options = options::new().with_map_keys_as_numbers(true).build();
@@ -68,7 +68,7 @@ where
     /// Skip over any values.
     pub(crate) fn skip_any(mut self) -> Result<(), C::Error> {
         let start = self.cx.mark();
-        let actual = self.parser.peek(self.cx)?;
+        let actual = self.parser.lex(self.cx);
 
         match actual {
             Token::OpenBrace => self.decode_map(|_| Ok(())),
@@ -80,7 +80,7 @@ where
             Token::String => {
                 // Skip over opening quote.
                 self.parser.skip(self.cx, 1)?;
-                string::skip_string(self.cx, self.parser.borrow_mut(), true)
+                self.parser.skip_string(self.cx)
             }
             actual => Err(self
                 .cx
@@ -188,7 +188,7 @@ where
 
     #[inline]
     fn decode_bool(mut self) -> Result<bool, C::Error> {
-        match self.parser.peek(self.cx)? {
+        match self.parser.lex(self.cx) {
             Token::True => {
                 self.parse_true()?;
                 Ok(true)
@@ -363,7 +363,7 @@ where
 
     #[inline]
     fn decode_option(mut self) -> Result<Option<Self::DecodeSome>, C::Error> {
-        if self.parser.peek(self.cx)?.is_null() {
+        if self.parser.lex(self.cx).is_null() {
             self.parse_null()?;
             Ok(None)
         } else {
@@ -457,7 +457,7 @@ where
     {
         let cx = self.cx;
 
-        match self.parser.peek(cx)? {
+        match self.parser.lex(cx) {
             Token::OpenBrace => self.decode_map(|decoder| visitor.visit_map(cx, decoder)),
             Token::OpenBracket => {
                 self.decode_sequence(|decoder| visitor.visit_sequence(cx, decoder))

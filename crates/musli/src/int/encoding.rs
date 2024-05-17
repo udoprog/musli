@@ -100,6 +100,7 @@ where
         crate::options::Integer::Variable => c::encode(cx, writer, value),
         _ => {
             let bo = crate::options::byteorder::<OPT>();
+
             macro_rules! fixed {
                 ($ty:ty) => {{
                     let Ok(value) = <$ty>::try_from(value) else {
@@ -110,7 +111,7 @@ where
                 }};
             }
 
-            crate::width_arm!(crate::options::length_width::<OPT>(), fixed)
+            crate::options::width_arm!(crate::options::length_width::<OPT>(), fixed)
         }
     }
 }
@@ -139,7 +140,7 @@ where
                 }};
             }
 
-            crate::width_arm!(crate::options::length_width::<OPT>(), fixed)
+            crate::options::width_arm!(crate::options::length_width::<OPT>(), fixed)
         }
     }
 }

@@ -34,7 +34,7 @@ where
 
     #[inline]
     fn decode_value(mut self) -> Result<Self::DecodeValue, C::Error> {
-        let actual = self.parser.peek(self.cx)?;
+        let actual = self.parser.lex(self.cx);
 
         if !matches!(actual, Token::Colon) {
             return Err(self

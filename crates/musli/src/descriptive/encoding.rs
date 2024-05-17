@@ -1,18 +1,11 @@
 //! Module that defines [`Encoding`] whith allows for customization of the
 //! encoding format, and the [`DEFAULT`] encoding configuration.
 
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
 use core::marker;
-#[cfg(feature = "std")]
-use std::io;
 
-use crate::de::Decode;
-use crate::en::Encode;
 use crate::mode::Binary;
 use crate::options;
-use crate::Context;
-use crate::{FixedBytes, Options, Reader, Writer};
+use crate::{IntoReader, Options};
 
 use super::de::SelfDecoder;
 use super::en::SelfEncoder;
@@ -32,69 +25,7 @@ pub const OPTIONS: options::Options = options::new().build();
 /// [`variable length`]: https://en.wikipedia.org/wiki/Variable-length_quantity
 pub const DEFAULT: Encoding = Encoding::new();
 
-/// Encode the given value to the given [`Writer`] using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
-where
-    W: Writer,
-    T: ?Sized + Encode<Binary>,
-{
-    DEFAULT.encode(writer, value)
-}
-
-/// Encode the given value to the given [Write][io::Write] using the [`DEFAULT`]
-/// configuration.
-#[cfg(feature = "std")]
-#[inline]
-pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
-where
-    W: io::Write,
-    T: ?Sized + Encode<Binary>,
-{
-    DEFAULT.to_writer(writer, value)
-}
-
-/// Encode the given value to a [Vec] using the [`DEFAULT`] configuration.
-#[cfg(feature = "alloc")]
-#[inline]
-pub fn to_vec<T>(value: &T) -> Result<Vec<u8>, Error>
-where
-    T: ?Sized + Encode<Binary>,
-{
-    DEFAULT.to_vec(value)
-}
-
-/// Encode the given value to a fixed-size bytes using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<FixedBytes<N>, Error>
-where
-    T: ?Sized + Encode<Binary>,
-{
-    DEFAULT.to_fixed_bytes::<N, _>(value)
-}
-
-/// Decode the given type `T` from the given [`Reader`] using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
-where
-    R: Reader<'de>,
-    T: Decode<'de, Binary>,
-{
-    DEFAULT.decode(reader)
-}
-
-/// Decode the given type `T` from the given slice using the [`DEFAULT`]
-/// configuration.
-#[inline]
-pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
-where
-    T: Decode<'de, Binary>,
-{
-    DEFAULT.from_slice(bytes)
-}
+crate::macros::bare_encoding!(Binary, DEFAULT, descriptive, IntoReader);
 
 /// Setting up encoding with parameters.
 pub struct Encoding<const OPT: Options = OPTIONS, M = Binary> {
@@ -112,21 +43,21 @@ impl Encoding<OPTIONS, Binary> {
     /// Construct a new [`Encoding`] instance.
     ///
     /// ```
-    /// use musli::descriptive::{Encoding};
     /// use musli::{Encode, Decode};
+    /// use musli::descriptive::Encoding;
+    /// # use musli::descriptive::Error;
     ///
     /// const CONFIG: Encoding = Encoding::new();
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
-    /// struct Struct<'a> {
+    /// struct Person<'a> {
     ///     name: &'a str,
     ///     age: u32,
     /// }
     ///
-    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut out = Vec::new();
     ///
-    /// let expected = Struct {
+    /// let expected = Person {
     ///     name: "Aristotle",
     ///     age: 61,
     /// };
@@ -135,7 +66,7 @@ impl Encoding<OPTIONS, Binary> {
     /// let actual = CONFIG.decode(&out[..])?;
     ///
     /// assert_eq!(expected, actual);
-    /// # Ok(()) }
+    /// # Ok::<_, Error>(())
     /// ```
     pub const fn new() -> Self {
         Encoding {
@@ -179,11 +110,12 @@ impl<const OPT: Options, M> Encoding<OPT, M> {
         }
     }
 
-    crate::encoding_impls!(
+    crate::macros::encoding_impls!(
         M,
         descriptive,
         SelfEncoder::<_, OPT, _>::new,
-        SelfDecoder::<_, OPT, _>::new
+        SelfDecoder::<_, OPT, _>::new,
+        IntoReader::into_reader,
     );
 }
 

@@ -28,7 +28,7 @@ fn skip_complex_field() -> Option<Inner> {
 
 #[test]
 fn skip() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         AllSkipped {
             skip: 0,
@@ -38,7 +38,7 @@ fn skip() {
         json = r#"{}"#,
     );
 
-    musli::assert_decode_eq!(
+    musli::macros::assert_decode_eq!(
         full,
         AllSkipped {
             skip: 10,

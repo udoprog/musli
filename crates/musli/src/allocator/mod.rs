@@ -13,7 +13,7 @@
 //! ```
 //! use musli::{Allocator, Buf};
 //!
-//! musli::default_allocator!(|alloc| {
+//! musli::allocator::default!(|alloc| {
 //!     let mut a = alloc.alloc().expect("allocation a failed");
 //!     let mut b = alloc.alloc().expect("allocation b failed");
 //!
@@ -58,10 +58,18 @@ mod stack;
 pub use self::stack::{Stack, StackBuffer};
 
 /// The default stack buffer size for the default allocator provided through
-/// [`default_allocator!`][crate::default_allocator].
+/// [`default!`].
 pub const DEFAULT_STACK_BUFFER: usize = 4096;
 
-/// Call the given block with the default allocator.
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __default {
+    (|$alloc:ident| $body:block) => {
+        $crate::allocator::__default_allocator_impl!(|$alloc| $body)
+    };
+}
+
+/// Call the given block `$body` with the default allocator.
 ///
 /// This is useful if you want to write application which are agnostic to
 /// whether the `alloc` feature is or isn't enabled.
@@ -75,7 +83,7 @@ pub const DEFAULT_STACK_BUFFER: usize = 4096;
 /// ```
 /// use musli::{Allocator, Buf};
 ///
-/// musli::default_allocator!(|alloc| {
+/// musli::allocator::default!(|alloc| {
 ///     let mut a = alloc.alloc().expect("allocation a failed");
 ///     let mut b = alloc.alloc().expect("allocation b failed");
 ///
@@ -98,12 +106,8 @@ pub const DEFAULT_STACK_BUFFER: usize = 4096;
 ///     assert_eq!(a.len(), 12);
 /// });
 /// ```
-#[macro_export]
-macro_rules! default_allocator {
-    (|$alloc:ident| $body:block) => {
-        $crate::__default_allocator_impl!(|$alloc| $body)
-    };
-}
+#[doc(inline)]
+pub use __default as default;
 
 #[cfg(feature = "alloc")]
 #[macro_export]
@@ -126,3 +130,6 @@ macro_rules! __default_allocator_impl {
         $body
     }};
 }
+
+#[doc(hidden)]
+pub use __default_allocator_impl;

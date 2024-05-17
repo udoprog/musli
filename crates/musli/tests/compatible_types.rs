@@ -36,7 +36,7 @@ fn signed_to_unsigned() {
                 f: $ty,
             }
 
-            musli::assert_decode_eq! {
+            musli::macros::assert_decode_eq! {
                 descriptive,
                 SignedIntegers {
                     a: 2,
@@ -80,7 +80,7 @@ fn unsigned_to_signed() {
                 f: $ty,
             }
 
-            musli::assert_decode_eq! {
+            musli::macros::assert_decode_eq! {
                 descriptive,
                 UnsignedIntegers {
                     a: 2,

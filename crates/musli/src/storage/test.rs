@@ -1,3 +1,3 @@
 //! Helpers for writing tests.
 
-crate::test_fns!("storage", crate::mode::Binary);
+crate::macros::test_fns!(Binary, "storage");

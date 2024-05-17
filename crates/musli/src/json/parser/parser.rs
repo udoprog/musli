@@ -1,11 +1,12 @@
 use crate::de::Visitor;
 use crate::json::parser::integer::decode_signed_full;
-use crate::json::parser::{string, StringReference, Token};
+use crate::json::parser::{StringReference, Token};
 use crate::{Buf, Context};
 
 mod private {
     pub trait Sealed {}
-    impl<'de> Sealed for crate::json::parser::SliceParser<'de> {}
+    impl Sealed for crate::json::parser::SliceParser<'_> {}
+    impl Sealed for crate::json::parser::MutSliceParser<'_, '_> {}
     impl<'de, R> Sealed for &mut R where R: ?Sized + super::Parser<'de> {}
 }
 
@@ -40,10 +41,21 @@ pub trait Parser<'de>: private::Sealed {
         C: ?Sized + Context,
         S: ?Sized + Buf;
 
+    /// Skip a string.
+    #[doc(hidden)]
+    fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context;
+
     #[doc(hidden)]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
     where
-        C: ?Sized + Context;
+        C: ?Sized + Context,
+    {
+        let mut byte = [0];
+        self.read(cx, &mut byte[..])?;
+        Ok(byte[0])
+    }
 
     #[doc(hidden)]
     fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
@@ -55,18 +67,9 @@ pub trait Parser<'de>: private::Sealed {
     where
         C: ?Sized + Context;
 
-    #[doc(hidden)]
-    fn pos(&self) -> u32;
-
     /// Skip over whitespace.
     #[doc(hidden)]
-    fn skip_whitespace<C>(&mut self, cx: &C) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context;
-
-    /// Peek the next byte.
-    #[doc(hidden)]
-    fn peek_byte<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
+    fn skip_whitespace<C>(&mut self, cx: &C)
     where
         C: ?Sized + Context;
 
@@ -77,7 +80,7 @@ pub trait Parser<'de>: private::Sealed {
     {
         let mut c = 0;
 
-        while let Some(b) = self.peek_byte(cx)? {
+        while let Some(b) = self.peek() {
             if !m(b) {
                 return Ok(c);
             }
@@ -89,19 +92,22 @@ pub trait Parser<'de>: private::Sealed {
         Ok(c)
     }
 
+    /// Peek the next byte.
     #[doc(hidden)]
-    fn peek<C>(&mut self, cx: &C) -> Result<Token, C::Error>
+    fn peek(&mut self) -> Option<u8>;
+
+    #[doc(hidden)]
+    fn lex<C>(&mut self, cx: &C) -> Token
     where
         C: ?Sized + Context,
     {
-        self.skip_whitespace(cx)?;
+        self.skip_whitespace(cx);
 
-        let b = match self.peek_byte(cx)? {
-            Some(b) => b,
-            None => return Ok(Token::Eof),
+        let Some(b) = self.peek() else {
+            return Token::Eof;
         };
 
-        Ok(Token::from_byte(b))
+        Token::from_byte(b)
     }
 
     /// Parse a 32-bit floating point number.
@@ -113,28 +119,6 @@ pub trait Parser<'de>: private::Sealed {
     fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
     where
         C: ?Sized + Context;
-
-    #[doc(hidden)]
-    fn parse_hex_escape<C>(&mut self, cx: &C) -> Result<u16, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        let mut n = 0;
-        let start = cx.mark();
-
-        for _ in 0..4 {
-            match string::decode_hex_val(self.read_byte(cx)?) {
-                None => {
-                    return Err(cx.marked_message(start, "Invalid string escape"));
-                }
-                Some(val) => {
-                    n = (n << 4) + val;
-                }
-            }
-        }
-
-        Ok(n)
-    }
 
     #[doc(hidden)]
     fn parse_exact<C>(&mut self, cx: &C, exact: &str) -> Result<(), C::Error>
@@ -257,6 +241,14 @@ where
     }
 
     #[inline(always)]
+    fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        (**self).skip_string(cx)
+    }
+
+    #[inline(always)]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
     where
         C: ?Sized + Context,
@@ -265,32 +257,24 @@ where
     }
 
     #[inline(always)]
-    fn peek<C>(&mut self, cx: &C) -> Result<Token, C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        (**self).peek(cx)
+    fn peek(&mut self) -> Option<u8> {
+        (**self).peek()
     }
 
     #[inline(always)]
-    fn pos(&self) -> u32 {
-        (**self).pos()
-    }
-
-    #[inline(always)]
-    fn skip_whitespace<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    fn lex<C>(&mut self, cx: &C) -> Token
     where
         C: ?Sized + Context,
     {
-        (**self).skip_whitespace(cx)
+        (**self).lex(cx)
     }
 
     #[inline(always)]
-    fn peek_byte<C>(&mut self, cx: &C) -> Result<Option<u8>, C::Error>
+    fn skip_whitespace<C>(&mut self, cx: &C)
     where
         C: ?Sized + Context,
     {
-        (**self).peek_byte(cx)
+        (**self).skip_whitespace(cx);
     }
 
     #[inline(always)]

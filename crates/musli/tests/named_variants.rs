@@ -38,21 +38,21 @@ enum ScreamingKebabCase {
 
 #[test]
 fn test_name_all() {
-    musli::rt!(full, PascalCase::VariantName, json = r#""VariantName""#,);
+    musli::macros::assert_roundtrip_eq!(full, PascalCase::VariantName, json = r#""VariantName""#,);
 
-    musli::rt!(full, CamelCase::VariantName, json = r#""variantName""#,);
+    musli::macros::assert_roundtrip_eq!(full, CamelCase::VariantName, json = r#""variantName""#,);
 
-    musli::rt!(full, SnakeCase::VariantName, json = r#""variant_name""#,);
+    musli::macros::assert_roundtrip_eq!(full, SnakeCase::VariantName, json = r#""variant_name""#,);
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         ScreamingSnakeCase::VariantName,
         json = r#""VARIANT_NAME""#,
     );
 
-    musli::rt!(full, KebabCase::VariantName, json = r#""variant-name""#,);
+    musli::macros::assert_roundtrip_eq!(full, KebabCase::VariantName, json = r#""variant-name""#,);
 
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         ScreamingKebabCase::VariantName,
         json = r#""VARIANT-NAME""#,

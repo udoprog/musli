@@ -81,6 +81,7 @@ pub trait Context {
         T: ?Sized + fmt::Display;
 
     /// Generate a map function which maps an error using the `custom` function.
+    #[inline]
     fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
     where
         T: 'static + Send + Sync + no_std::Error,
@@ -96,6 +97,7 @@ pub trait Context {
         T: 'static + Send + Sync + no_std::Error;
 
     /// Generate a map function which maps an error using the `message` function.
+    #[inline]
     fn map_message<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
     where
         T: fmt::Display,

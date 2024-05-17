@@ -10,7 +10,7 @@ struct PackedFields {
 
 #[test]
 fn packed_fields() {
-    musli::rt!(
+    musli::macros::assert_roundtrip_eq!(
         full,
         PackedFields {
             tuple: (11, 13, 15, 17),
