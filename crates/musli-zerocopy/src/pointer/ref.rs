@@ -758,9 +758,9 @@ where
     }
 
     #[cfg(test)]
-    pub(crate) fn cast<U: ?Sized>(self) -> Ref<U, E, O>
+    pub(crate) fn cast<U>(self) -> Ref<U, E, O>
     where
-        U: Pointee<Metadata = T::Metadata>,
+        U: ?Sized + Pointee<Metadata = T::Metadata>,
     {
         Ref {
             offset: self.offset,

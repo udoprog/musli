@@ -43,7 +43,7 @@ macro_rules! test_fns {
             }
 
             $crate::allocator::default!(|alloc| {
-                let mut cx = $crate::context::SystemContext::new(&alloc);
+                let mut cx = $crate::context::SystemContext::with_alloc(alloc);
                 cx.include_type();
 
                 let out = match ENCODING.to_vec_with(&cx, &value) {
@@ -127,7 +127,7 @@ macro_rules! test_fns {
             }
 
             $crate::allocator::default!(|alloc| {
-                let mut cx = $crate::context::SystemContext::new(&alloc);
+                let mut cx = $crate::context::SystemContext::with_alloc(alloc);
                 cx.include_type();
 
                 out.clear();
@@ -173,7 +173,7 @@ macro_rules! test_fns {
             use ::core::any::type_name;
 
             $crate::allocator::default!(|alloc| {
-                let mut cx = $crate::context::SystemContext::new(alloc);
+                let mut cx = $crate::context::SystemContext::with_alloc(alloc);
                 cx.include_type();
 
                 match ENCODING.to_vec_with(&cx, &value) {

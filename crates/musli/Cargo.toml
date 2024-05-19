@@ -42,6 +42,9 @@ itoa = { version = "1.0.10", optional = true }
 ryu = { version = "1.0.17", optional = true }
 serde = { version = "1.0.198", optional = true, default-features = false}
 
+[target.'cfg(loom)'.dependencies]
+loom = "0.7.2"
+
 [dev-dependencies]
 musli = { path = ".", features = ["test"] }
 tests = { path = "../../tests" }

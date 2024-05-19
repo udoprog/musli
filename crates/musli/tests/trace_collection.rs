@@ -19,38 +19,39 @@ struct Collection {
 
 #[test]
 fn trace_collection() {
-    let alloc = System::new();
-    let cx = SystemContext::new(&alloc);
+    musli::allocator::default!(|alloc| {
+        let cx = SystemContext::with_alloc(alloc);
 
-    let mut values = HashMap::new();
+        let mut values = HashMap::new();
 
-    values.insert("Hello".to_string(), "World".to_string());
+        values.insert("Hello".to_string(), "World".to_string());
 
-    let from = From { values };
+        let from = From { values };
 
-    let encoding = musli::json::Encoding::new();
+        let encoding = musli::json::Encoding::new();
 
-    let Ok(bytes) = encoding.to_vec_with(&cx, &from) else {
-        if let Some(error) = cx.errors().next() {
-            panic!("{error}");
-        }
+        let Ok(bytes) = encoding.to_vec_with(&cx, &from) else {
+            if let Some(error) = cx.errors().next() {
+                panic!("{error}");
+            }
 
-        unreachable!()
-    };
+            unreachable!()
+        };
 
-    let cx = SystemContext::new(&alloc);
+        let cx = SystemContext::with_alloc(alloc);
 
-    let Ok(..) = encoding.from_slice_with::<_, Collection>(&cx, &bytes) else {
-        if let Some(error) = cx.errors().next() {
-            assert_eq!(
-                error.to_string(),
-                ".values[Hello]: Invalid numeric (at bytes 19-20)"
-            );
-            return;
-        }
+        let Ok(..) = encoding.from_slice_with::<_, Collection>(&cx, &bytes) else {
+            if let Some(error) = cx.errors().next() {
+                assert_eq!(
+                    error.to_string(),
+                    ".values[Hello]: Invalid numeric (at bytes 19-20)"
+                );
+                return;
+            }
 
-        unreachable!()
-    };
+            unreachable!()
+        };
 
-    panic!("Expected decoding to error");
+        panic!("Expected decoding to error");
+    })
 }

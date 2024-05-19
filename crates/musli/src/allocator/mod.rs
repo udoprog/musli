@@ -50,6 +50,10 @@ mod system;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub use self::system::System;
 
+/// The static system allocator instance.
+#[cfg(all(feature = "alloc", not(loom)))]
+pub static SYSTEM: System = System::new();
+
 mod disabled;
 pub use self::disabled::Disabled;
 
@@ -109,12 +113,23 @@ macro_rules! __default {
 #[doc(inline)]
 pub use __default as default;
 
-#[cfg(feature = "alloc")]
+#[cfg(all(feature = "alloc", not(loom)))]
+#[macro_export]
+#[doc(hidden)]
+macro_rules! __default_allocator_impl {
+    (|$alloc:ident| $body:block) => {{
+        let $alloc = &$crate::allocator::SYSTEM;
+        $body
+    }};
+}
+
+#[cfg(all(feature = "alloc", loom))]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __default_allocator_impl {
     (|$alloc:ident| $body:block) => {{
         let $alloc = $crate::allocator::System::new();
+        let $alloc = &$alloc;
         $body
     }};
 }
