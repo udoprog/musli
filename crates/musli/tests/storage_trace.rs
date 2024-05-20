@@ -30,35 +30,36 @@ struct To {
 
 #[test]
 fn storage_trace() {
-    let alloc = System::new();
-    let cx = SystemContext::new(&alloc);
+    musli::allocator::default!(|alloc| {
+        let cx = SystemContext::with_alloc(alloc);
 
-    let from = From {
-        ok: 10,
-        field: InnerFrom::Variant2 {
+        let from = From {
             ok: 10,
-            vector: vec![42],
-        },
-    };
+            field: InnerFrom::Variant2 {
+                ok: 10,
+                vector: vec![42],
+            },
+        };
 
-    let encoding = musli::storage::Encoding::new();
+        let encoding = musli::storage::Encoding::new();
 
-    let Ok(bytes) = encoding.to_vec_with(&cx, &from) else {
-        if let Some(error) = cx.errors().next() {
-            panic!("{error}");
-        }
+        let Ok(bytes) = encoding.to_vec_with(&cx, &from) else {
+            if let Some(error) = cx.errors().next() {
+                panic!("{error}");
+            }
 
-        unreachable!()
-    };
+            unreachable!()
+        };
 
-    let Ok(..) = encoding.from_slice_with::<_, To>(&cx, &bytes) else {
-        if let Some(error) = cx.errors().next() {
-            assert_eq!(error.to_string(), ".field = Variant2 { .vector[0] }: Tried to read 42 bytes from slice, with 0 byte remaining (at byte 11)");
-            return;
-        }
+        let Ok(..) = encoding.from_slice_with::<_, To>(&cx, &bytes) else {
+            if let Some(error) = cx.errors().next() {
+                assert_eq!(error.to_string(), ".field = Variant2 { .vector[0] }: Tried to read 42 bytes from slice, with 0 byte remaining (at byte 11)");
+                return;
+            }
 
-        unreachable!()
-    };
+            unreachable!()
+        };
 
-    panic!("Expected decoding to error");
+        panic!("Expected decoding to error");
+    })
 }

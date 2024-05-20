@@ -33,41 +33,42 @@ struct To {
 
 #[test]
 fn trace_complex() {
-    let alloc = System::new();
-    let cx = SystemContext::new(&alloc);
+    musli::allocator::default!(|alloc| {
+        let cx = SystemContext::with_alloc(alloc);
 
-    let mut field = HashMap::new();
+        let mut field = HashMap::new();
 
-    field.insert(
-        "hello".to_string(),
-        InnerFrom::Variant2 {
-            vector: vec![42],
-            ok: 10004000,
-        },
-    );
+        field.insert(
+            "hello".to_string(),
+            InnerFrom::Variant2 {
+                vector: vec![42],
+                ok: 10004000,
+            },
+        );
 
-    let from = From { ok: 10, field };
+        let from = From { ok: 10, field };
 
-    let encoding = musli::json::Encoding::new();
+        let encoding = musli::json::Encoding::new();
 
-    let Ok(bytes) = encoding.to_vec_with(&cx, &from) else {
-        if let Some(error) = cx.errors().next() {
-            panic!("{error}");
-        }
+        let Ok(bytes) = encoding.to_vec_with(&cx, &from) else {
+            if let Some(error) = cx.errors().next() {
+                panic!("{error}");
+            }
 
-        unreachable!()
-    };
+            unreachable!()
+        };
 
-    let cx = SystemContext::new(&alloc);
+        let cx = SystemContext::with_alloc(alloc);
 
-    let Ok(..) = encoding.from_slice_with::<_, To>(&cx, &bytes) else {
-        if let Some(error) = cx.errors().next() {
-            assert_eq!(error.to_string(), ".field[hello] = Variant2 { .vector[0] }: Expected string, found <number> (at byte 49)");
-            return;
-        }
+        let Ok(..) = encoding.from_slice_with::<_, To>(&cx, &bytes) else {
+            if let Some(error) = cx.errors().next() {
+                assert_eq!(error.to_string(), ".field[hello] = Variant2 { .vector[0] }: Expected string, found <number> (at byte 49)");
+                return;
+            }
 
-        unreachable!()
-    };
+            unreachable!()
+        };
 
-    panic!("Expected decoding to error");
+        panic!("Expected decoding to error");
+    })
 }

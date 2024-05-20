@@ -6,6 +6,8 @@ use core::ops::Range;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
+#[cfg(not(loom))]
+use crate::allocator::System;
 use crate::buf::{self, BufString};
 use crate::{Allocator, Context};
 
@@ -26,12 +28,27 @@ pub struct SystemContext<A, M> {
     _marker: PhantomData<M>,
 }
 
+#[cfg(not(loom))]
+impl<M> SystemContext<&'static System, M> {
+    /// Construct a new context which uses the system allocator for memory.
+    #[inline]
+    pub fn new() -> Self {
+        Self::with_alloc(&crate::allocator::SYSTEM)
+    }
+}
+
+#[cfg(not(loom))]
+impl<M> Default for SystemContext<&'static System, M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<A, M> SystemContext<A, M> {
     /// Construct a new context which uses allocations to store arbitrary
     /// amounts of diagnostics about decoding.
-    ///
-    /// Or at least until we run out of memory.
-    pub fn new(alloc: A) -> Self {
+    #[inline]
+    pub fn with_alloc(alloc: A) -> Self {
         Self {
             access: Access::new(),
             mark: Cell::new(0),

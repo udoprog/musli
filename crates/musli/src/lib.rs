@@ -406,6 +406,8 @@ extern crate std;
 
 pub mod macros;
 
+mod loom;
+
 #[cfg(test)]
 mod tests;
 
