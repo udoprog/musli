@@ -206,7 +206,6 @@ impl<'a> Stack<'a> {
                 head: None,
                 tail: None,
                 occupied: None,
-                headers: 0,
                 start: data.start,
                 end: data.end,
                 free_start: data.start,
@@ -411,14 +410,19 @@ impl DerefMut for Region {
 struct HeaderId(NonZeroU16);
 
 impl HeaderId {
+    #[cfg(test)]
+    const unsafe fn new_unchecked(value: u16) -> Self {
+        Self(NonZeroU16::new_unchecked(value))
+    }
+
     /// Create a new region identifier.
     ///
     /// # Safety
     ///
     /// The given value must be non-zero.
     #[inline]
-    const unsafe fn new_unchecked(value: u16) -> Self {
-        Self(NonZeroU16::new_unchecked(value))
+    fn new(value: isize) -> Option<Self> {
+        Some(Self(NonZeroU16::new(u16::try_from(value).ok()?)?))
     }
 
     /// Get the value of the region identifier.
@@ -438,8 +442,6 @@ struct Internal {
     tail: Option<HeaderId>,
     // The occupied header region
     occupied: Option<HeaderId>,
-    // The number of headers in use.
-    headers: u16,
     // The start of the allocation region.
     start: *mut MaybeUninit<u8>,
     // The end of the allocation region.
@@ -457,6 +459,12 @@ impl Internal {
     fn bytes(&self) -> usize {
         // SAFETY: It is guaranteed that free_end >= free_start inside of the provided region.
         unsafe { self.free_start.byte_offset_from(self.start) as usize }
+    }
+
+    #[cfg(test)]
+    #[inline]
+    fn headers(&self) -> usize {
+        unsafe { self.end.cast::<Header>().offset_from(self.free_end.cast()) as usize }
     }
 
     // Return the number of remaining bytes.
@@ -588,22 +596,20 @@ impl Internal {
                 break 'out region;
             }
 
-            let headers = self.headers.checked_add(1)?;
-
             if requested + size_of::<Header>() > self.remaining() {
                 return None;
             }
 
             let free_start = self.free_start.wrapping_add(requested);
             let free_end = self.free_end.wrapping_sub(size_of::<Header>());
+            let id = HeaderId::new(self.end.cast::<Header>().offset_from(free_end.cast()))?;
 
             let start = replace(&mut self.free_start, free_start);
             self.free_end = free_end;
-            self.headers = headers;
 
             // NB: We've modified the relevant pointers just above, make sure
             // this is not moved.
-            let region = self.region(HeaderId::new_unchecked(headers));
+            let region = self.region(id);
 
             // We need to write a full header, since we're allocating a new one.
             region.ptr.write(Header {
