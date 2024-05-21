@@ -13,6 +13,16 @@ use core::slice;
 use crate::buf::Error;
 use crate::{Allocator, Buf};
 
+#[cfg(test)]
+macro_rules! if_test {
+    ($($tt:tt)*) => { $($tt)* };
+}
+
+#[cfg(not(test))]
+macro_rules! if_test {
+    ($($tt:tt)*) => {};
+}
+
 use super::DEFAULT_STACK_BUFFER;
 
 // We keep max bytes to 2^31, since that ensures that addition between two
@@ -479,10 +489,9 @@ impl Internal {
         if let Some(prev) = header.prev {
             (*self.header_mut(prev)).next = header.next;
         } else {
-            #[cfg(test)]
-            {
+            if_test! {
                 self.head = header.next;
-            }
+            };
         }
     }
 
@@ -498,18 +507,20 @@ impl Internal {
             (*self.header_mut(next)).prev = prev;
         }
 
-        #[cfg(test)]
-        if self.head == Some(region.id) {
-            self.head = next;
-        }
+        if_test! {
+            if self.head == Some(region.id) {
+                self.head = next;
+            }
+        };
 
         self.push_back(region);
     }
 
     unsafe fn push_back(&mut self, region: &mut Region) {
-        #[cfg(test)]
-        if self.head.is_none() {
-            self.head = Some(region.id);
+        if_test! {
+            if self.head.is_none() {
+                self.head = Some(region.id);
+            }
         }
 
         if let Some(tail) = self.tail.replace(region.id) {
@@ -524,6 +535,7 @@ impl Internal {
             start: self.start,
             end: self.start,
             len: 0,
+            #[cfg(test)]
             state: State::Free,
             next: self.free.replace(region.id),
             prev: None,
@@ -543,7 +555,10 @@ impl Internal {
             let mut region = self.region(occupied);
 
             if region.capacity() >= requested {
-                region.state = State::Used;
+                if_test! {
+                    region.state = State::Used;
+                };
+
                 region.len = 0;
                 self.occupied = None;
                 return Some(region);
@@ -555,7 +570,12 @@ impl Internal {
                 let free_start = self.reserve(requested)?;
                 region.start = replace(&mut self.free_start, free_start);
                 region.end = free_start;
-                region.state = State::Used;
+
+                #[cfg(test)]
+                {
+                    region.state = State::Used;
+                }
+
                 break 'out region;
             }
 
@@ -581,6 +601,7 @@ impl Internal {
                 start,
                 end: free_start,
                 len: 0,
+                #[cfg(test)]
                 state: State::Used,
                 prev: None,
                 next: None,
@@ -595,6 +616,7 @@ impl Internal {
 
     unsafe fn free(&mut self, region: HeaderId) {
         let mut region = self.region(region);
+        #[cfg(test)]
         debug_assert_eq!(region.state, State::Used);
 
         // Just free up the last region in the slab.
@@ -609,7 +631,11 @@ impl Internal {
                 self.occupied.is_none(),
                 "There can only be one occupied region"
             );
-            region.state = OCCUPY;
+
+            if_test! {
+                region.state = State::Occupy;
+            };
+
             region.len = 0;
             self.occupied = Some(region.id);
             return;
@@ -703,7 +729,10 @@ impl Internal {
 
             from.start.copy_to(prev.start, from.len());
 
-            prev.state = State::Used;
+            if_test! {
+                prev.state = State::Used;
+            };
+
             prev.end = from.end;
             prev.len = from.len;
             self.occupied = None;
@@ -725,15 +754,10 @@ impl Internal {
     }
 }
 
-#[cfg(not(test))]
-const OCCUPY: State = State::Free;
-
-#[cfg(test)]
-const OCCUPY: State = State::Occupy;
-
 /// The state of an allocated region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+#[cfg(test)]
 enum State {
     /// The region is fully free and doesn't occupy any memory.
     ///
@@ -750,7 +774,6 @@ enum State {
     /// - The range must point to a non-zero slice of memory.,
     /// - The region must be linked.
     /// - The region must be in the occupied list.
-    #[cfg(test)]
     Occupy,
     /// The region is used by an active allocation.
     Used,
@@ -766,12 +789,13 @@ struct Header {
     end: *mut MaybeUninit<u8>,
     // Number of initialized bytes in the region.
     len: u32,
-    // The state of the region.
-    state: State,
-    // The previous neighbouring region.
+    // The previous region.
     prev: Option<HeaderId>,
-    // The next neighbouring region.
+    // The next region.
     next: Option<HeaderId>,
+    // The state of the region.
+    #[cfg(test)]
+    state: State,
 }
 
 impl Header {
