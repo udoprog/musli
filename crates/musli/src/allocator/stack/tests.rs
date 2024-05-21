@@ -133,9 +133,9 @@ macro_rules! assert_structure {
         let free = assert_free!(i $(, $free)*);
         let list = assert_list!(i $(, $node)*);
 
-        let expected_bytes = (0u32 $(+ (*i.header($region)).cap)*) as u32;
+        let expected_bytes = (0usize $(+ (*i.header($region)).capacity())*);
 
-        assert_eq!(i.bytes, expected_bytes, "The number of bytes allocated should match");
+        assert_eq!(i.bytes(), expected_bytes, "The number of bytes allocated should match");
         assert_eq!(i.headers, (free.len() + list.len()) as u8, "The number of headers should match");
 
         let mut free_next = HashMap::new();
@@ -156,9 +156,9 @@ macro_rules! assert_structure {
             assert_eq! {
                 *i.header($region),
                 Header {
-                    start: $start,
+                    start: unsafe { i.start.add($start) },
+                    end: unsafe { i.start.add($start + $cap) },
                     len: $len,
-                    cap: $cap,
                     state: State::$state,
                     next_free: free_next.get(&$region).copied(),
                     prev: backward.get(&$region).copied(),
@@ -179,9 +179,9 @@ macro_rules! assert_structure {
             assert_eq! {
                 *i.header(node),
                 Header {
-                    start: 0,
+                    start: i.start,
+                    end: i.start,
                     len: 0,
-                    cap: 0,
                     state: State::Free,
                     next_free: free_next.get(&node).copied(),
                     prev: None,
@@ -586,7 +586,7 @@ fn limits() {
     let alloc = Stack::new(&mut buf);
     assert!(alloc.alloc().is_none());
 
-    let mut buf = StackBuffer::<24>::new();
+    let mut buf = StackBuffer::<32>::new();
     let alloc = Stack::new(&mut buf);
 
     let mut a = alloc.alloc().unwrap();
