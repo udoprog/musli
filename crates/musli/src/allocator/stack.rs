@@ -240,7 +240,7 @@ impl<'a> Buf for StackBuf<'a> {
             // Region can fit the bytes available.
             let mut region = 'out: {
                 // Region can already fit in the requested bytes.
-                if region.cap - len >= bytes_len {
+                if region.capacity() - len >= bytes_len {
                     break 'out region;
                 };
 
@@ -254,7 +254,7 @@ impl<'a> Buf for StackBuf<'a> {
                 region
             };
 
-            let dst = i.data.wrapping_add((region.start + len) as usize).cast();
+            let dst = region.start.add(len as usize).cast();
 
             ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
             region.len += bytes.len() as u32;
@@ -276,9 +276,9 @@ impl<'a> Buf for StackBuf<'a> {
                 let i = &mut *self.internal.get();
                 let mut this = i.region(self.region.get());
 
-                debug_assert!(this.cap >= this.len);
+                debug_assert!(this.capacity() >= this.len);
 
-                let data_cap_ptr = this.data_cap_ptr(i.data);
+                let data_cap_ptr = this.end;
 
                 // If this region immediately follows the other region, we can
                 // optimize the write by simply growing the current region and
@@ -298,7 +298,7 @@ impl<'a> Buf for StackBuf<'a> {
 
                 let next = i.region(next);
 
-                let diff = this.cap - this.len;
+                let diff = this.capacity() - this.len;
 
                 // Data needs to be shuffle back to the end of the initialized
                 // region.
@@ -308,7 +308,7 @@ impl<'a> Buf for StackBuf<'a> {
                 }
 
                 let old = i.free_region(next);
-                this.cap += old.cap;
+                this.end = old.end;
                 this.len += old.len;
                 return true;
             }
@@ -330,7 +330,7 @@ impl<'a> Buf for StackBuf<'a> {
         unsafe {
             let i = &*self.internal.get();
             let this = i.header(self.region.get());
-            let ptr = i.data.wrapping_add(this.start as usize).cast();
+            let ptr = this.start.cast();
             slice::from_raw_parts(ptr, this.len as usize)
         }
     }
@@ -364,18 +364,6 @@ impl Drop for StackBuf<'_> {
 struct Region {
     id: HeaderId,
     ptr: *mut Header,
-}
-
-impl Region {
-    #[inline]
-    unsafe fn data_cap_ptr(&self, data: *mut MaybeUninit<u8>) -> *mut MaybeUninit<u8> {
-        data.wrapping_add((self.start + self.cap) as usize)
-    }
-
-    #[inline]
-    unsafe fn data_base_ptr(&self, data: *mut MaybeUninit<u8>) -> *mut MaybeUninit<u8> {
-        data.wrapping_add(self.start as usize)
-    }
 }
 
 impl Deref for Region {
@@ -524,9 +512,9 @@ impl Internal {
     /// Free a region.
     unsafe fn free_region(&mut self, region: Region) -> Header {
         let old = region.ptr.replace(Header {
-            start: 0,
+            start: self.data,
+            end: self.data,
             len: 0,
-            cap: 0,
             state: State::Free,
             next_free: self.free.replace(region.id),
             prev: None,
@@ -545,7 +533,7 @@ impl Internal {
     unsafe fn alloc(&mut self, requested: u32) -> Option<Region> {
         if self.occupied > 0 {
             if let Some(mut region) =
-                self.find_region(|h| h.state == State::Occupy && h.cap >= requested)
+                self.find_region(|h| h.state == State::Occupy && h.capacity() >= requested)
             {
                 self.occupied -= 1;
                 region.state = State::Used;
@@ -561,9 +549,8 @@ impl Internal {
                     return None;
                 }
 
-                region.start = self.bytes;
+                region.set_range(self.data, self.bytes, requested);
                 region.state = State::Used;
-                region.cap = requested;
 
                 self.bytes = bytes;
                 break 'out region;
@@ -583,11 +570,14 @@ impl Internal {
 
             let region = self.region(HeaderId::new_unchecked(headers));
 
+            let start = self.data.add(start as usize);
+            let end = start.add(requested as usize);
+
             // We need to write a full header, since we're allocating a new one.
             region.ptr.write(Header {
                 start,
+                end,
                 len: 0,
-                cap: requested,
                 state: State::Used,
                 next_free: None,
                 prev: None,
@@ -627,11 +617,11 @@ impl Internal {
         // Move allocation to the previous region.
         let region = self.free_region(region);
 
-        prev.cap += region.cap;
+        prev.end = region.end;
 
         // The current header being freed is the last in the list.
         if region.next.is_none() {
-            self.bytes = region.start;
+            self.bytes = region.start.byte_offset_from(self.data) as u32;
         }
     }
 
@@ -641,7 +631,7 @@ impl Internal {
 
         let current = self.free_region(current);
         debug_assert_eq!(current.next, None);
-        self.bytes -= current.cap;
+        self.bytes -= current.capacity();
 
         let Some(prev) = current.prev else {
             return;
@@ -652,7 +642,7 @@ impl Internal {
         // The prior region is occupied, so we can free that as well.
         if prev.state == State::Occupy {
             let prev = self.free_region(prev);
-            self.bytes -= prev.cap;
+            self.bytes -= prev.capacity();
             self.occupied -= 1;
         }
     }
@@ -662,13 +652,13 @@ impl Internal {
 
         // This is the last region in the slab, so we can just expand it.
         if from.next.is_none() {
-            let additional = requested - from.cap;
+            let additional = requested - from.capacity();
 
             if self.bytes + additional > self.size {
                 return None;
             }
 
-            from.cap += additional;
+            from.end = from.end.add(additional as usize);
             self.bytes += additional;
             return Some(from);
         }
@@ -683,35 +673,33 @@ impl Internal {
 
             let mut prev = self.region(prev);
 
-            if prev.state != State::Occupy || prev.cap + len < requested {
+            if prev.state != State::Occupy || prev.capacity() + len < requested {
                 break 'bail;
             }
 
-            let prev_ptr = prev.data_base_ptr(self.data);
-            let from_ptr = from.data_base_ptr(self.data);
+            let from_ptr = from.start.cast_const();
+            let prev_ptr = prev.start;
 
             let from = self.free_region(from);
 
             ptr::copy(from_ptr, prev_ptr, from.len as usize);
 
             prev.state = State::Used;
-            prev.cap += from.cap;
+            prev.end = from.end;
             prev.len = from.len;
             return Some(prev);
         }
 
         // There is no data allocated in the current region, so we can simply
         // re-link it to the end of the chain of allocation.
-        if from.cap == 0 {
+        if from.start == from.end {
             let bytes = self.bytes + requested;
 
             if bytes > self.size {
                 return None;
             }
 
-            from.start = self.bytes;
-            from.cap = requested;
-
+            from.set_range(self.data, self.bytes, requested);
             self.replace_back(&mut from);
             self.bytes = bytes;
             return Some(from);
@@ -719,13 +707,8 @@ impl Internal {
 
         let mut to = self.alloc(requested)?;
 
-        let from_data = self
-            .data
-            .wrapping_add(from.start as usize)
-            .cast::<u8>()
-            .cast_const();
-
-        let to_data = self.data.wrapping_add(to.start as usize).cast::<u8>();
+        let from_data = from.start.cast::<u8>().cast_const();
+        let to_data = to.start.cast::<u8>();
 
         ptr::copy_nonoverlapping(from_data, to_data, len as usize);
         to.len = len;
@@ -798,12 +781,12 @@ enum State {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(align(8))]
 struct Header {
-    // Start of the allocated region as a multiple of 8.
-    start: u32,
-    // The length of the region.
+    // The start pointer to the region.
+    start: *mut MaybeUninit<u8>,
+    // The end pointer of the region.
+    end: *mut MaybeUninit<u8>,
+    // Number of initialized bytes in the region.
     len: u32,
-    // The capacity of the region.
-    cap: u32,
     // The state of the region.
     state: State,
     // Link to the next free region.
@@ -812,4 +795,19 @@ struct Header {
     prev: Option<HeaderId>,
     // The next neighbouring region.
     next: Option<HeaderId>,
+}
+
+impl Header {
+    unsafe fn set_range(&mut self, data: *mut MaybeUninit<u8>, start: u32, len: u32) {
+        let start = data.add(start as usize);
+        let end = start.add(len as usize);
+        self.start = start;
+        self.end = end;
+    }
+
+    #[inline]
+    fn capacity(&self) -> u32 {
+        // SAFETY: Both pointers are defined within the region.
+        unsafe { self.end.byte_offset_from(self.start) as u32 }
+    }
 }
