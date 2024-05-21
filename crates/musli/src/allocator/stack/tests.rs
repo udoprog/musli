@@ -156,7 +156,6 @@ macro_rules! assert_structure {
                 Header {
                     start: unsafe { i.start.add($start) },
                     end: unsafe { i.start.add($start + $cap) },
-                    len: $len,
                     state: State::$state,
                     next: forward.get(&$region).copied(),
                     prev: backward.get(&$region).copied(),
@@ -178,7 +177,6 @@ macro_rules! assert_structure {
                 Header {
                     start: i.start,
                     end: i.start,
-                    len: 0,
                     state: State::Free,
                     next: forward.get(&node).copied(),
                     prev: backward.get(&node).copied(),
@@ -229,19 +227,19 @@ fn realloc() {
 
     let mut a = alloc.alloc().unwrap();
     a.write(&[1, 2, 3, 4]);
-    assert_eq!(a.region.get(), A);
+    assert_eq!(a.region, A);
 
     let mut b = alloc.alloc().unwrap();
     b.write(&[1, 2, 3, 4]);
-    assert_eq!(b.region.get(), B);
+    assert_eq!(b.region, B);
 
     let mut c = alloc.alloc().unwrap();
     c.write(&[1, 2, 3, 4]);
-    assert_eq!(c.region.get(), C);
+    assert_eq!(c.region, C);
 
-    assert_eq!(a.region.get(), A);
-    assert_eq!(b.region.get(), B);
-    assert_eq!(c.region.get(), C);
+    assert_eq!(a.region, A);
+    assert_eq!(b.region, B);
+    assert_eq!(c.region, C);
 
     assert_structure! {
         alloc, free[], list[A, B, C],
@@ -268,7 +266,7 @@ fn realloc() {
     };
 
     let mut d = alloc.alloc().unwrap();
-    assert_eq!(d.region.get(), A);
+    assert_eq!(d.region, A);
 
     assert_structure! {
         alloc, free[B], list[A, C],
@@ -277,7 +275,7 @@ fn realloc() {
     };
 
     d.write(&[1, 2]);
-    assert_eq!(d.region.get(), A);
+    assert_eq!(d.region, A);
 
     assert_structure! {
         alloc, free[B], list[A, C],
@@ -286,7 +284,7 @@ fn realloc() {
     };
 
     d.write(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-    assert_eq!(d.region.get(), B);
+    assert_eq!(d.region, B);
 
     assert_structure! {
         alloc, free[], list[A, C, B],
@@ -516,7 +514,7 @@ fn flip_flop() {
     };
 
     a.write(&[1]);
-    assert_eq!(a.region.get(), C);
+    assert_eq!(a.region, C);
 
     assert_structure! {
         alloc, free[], list[A, B, C],
@@ -526,7 +524,7 @@ fn flip_flop() {
     };
 
     b.write(&[1]);
-    assert_eq!(b.region.get(), A);
+    assert_eq!(b.region, A);
 
     assert_structure! {
         alloc, free[B], list[A, C],
@@ -535,7 +533,7 @@ fn flip_flop() {
     };
 
     a.write(&[2]);
-    assert_eq!(a.region.get(), C);
+    assert_eq!(a.region, C);
 
     assert_structure! {
         alloc, free[B], list[A, C],
@@ -544,7 +542,7 @@ fn flip_flop() {
     };
 
     b.write(&[2]);
-    assert_eq!(b.region.get(), B);
+    assert_eq!(b.region, B);
 
     assert_structure! {
         alloc, free[], list[A, C, B],
@@ -554,7 +552,7 @@ fn flip_flop() {
     };
 
     a.write(&[3]);
-    assert_eq!(a.region.get(), A);
+    assert_eq!(a.region, A);
 
     assert_structure! {
         alloc, free[C], list[A, B],
@@ -563,7 +561,7 @@ fn flip_flop() {
     };
 
     b.write(&[3]);
-    assert_eq!(b.region.get(), B);
+    assert_eq!(b.region, B);
 
     assert_structure! {
         alloc, free[C], list[A, B],

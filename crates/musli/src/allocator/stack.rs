@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use core::cell::{Cell, UnsafeCell};
+use core::cell::UnsafeCell;
 use core::fmt::{self, Arguments};
 use core::marker::PhantomData;
 use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
@@ -12,6 +12,20 @@ use core::slice;
 
 use crate::buf::Error;
 use crate::{Allocator, Buf};
+
+#[cfg(test)]
+macro_rules! let_mut {
+    (let mut $decl:ident = $expr:expr;) => {
+        let mut $decl = $expr;
+    };
+}
+
+#[cfg(not(test))]
+macro_rules! let_mut {
+    (let mut $decl:ident = $expr:expr;) => {
+        let $decl = $expr;
+    };
+}
 
 #[cfg(test)]
 macro_rules! if_test {
@@ -213,7 +227,8 @@ impl Allocator for Stack<'_> {
         let region = unsafe { (*self.internal.get()).alloc(0)? };
 
         Some(StackBuf {
-            region: Cell::new(region.id),
+            region: region.id,
+            len: 0,
             internal: &self.internal,
         })
     }
@@ -221,7 +236,8 @@ impl Allocator for Stack<'_> {
 
 /// A no-std allocated buffer.
 pub struct StackBuf<'a> {
-    region: Cell<HeaderId>,
+    region: HeaderId,
+    len: usize,
     internal: &'a UnsafeCell<Internal>,
 }
 
@@ -243,31 +259,29 @@ impl<'a> Buf for StackBuf<'a> {
         unsafe {
             let i = &mut *self.internal.get();
 
-            let region = i.region(self.region.get());
-
-            let len = region.len();
+            let region = i.region(self.region);
 
             // Region can fit the bytes available.
-            let mut region = 'out: {
+            let region = 'out: {
                 // Region can already fit in the requested bytes.
-                if region.capacity() - len >= bytes_len {
+                if region.capacity() - self.len >= bytes_len {
                     break 'out region;
                 };
 
-                let requested = len + bytes_len;
+                let requested = self.len + bytes_len;
 
-                let Some(region) = i.realloc(self.region.get(), len, requested) else {
+                let Some(region) = i.realloc(self.region, self.len, requested) else {
                     return false;
                 };
 
-                self.region.set(region.id);
+                self.region = region.id;
                 region
             };
 
-            let dest = region.start.add(len).cast();
+            let dest = region.start.add(self.len).cast();
             bytes.as_ptr().copy_to_nonoverlapping(dest, bytes_len);
 
-            region.len += bytes.len() as u32;
+            self.len += bytes.len();
             true
         }
     }
@@ -278,15 +292,16 @@ impl<'a> Buf for StackBuf<'a> {
         B: Buf,
     {
         'out: {
+            let other_len = buf.len();
             // NB: Placing this here to make miri happy, since accessing the
             // slice will mean mutably accessing the internal state.
             let other_ptr = buf.as_slice().as_ptr().cast();
 
             unsafe {
                 let i = &mut *self.internal.get();
-                let mut this = i.region(self.region.get());
+                let mut this = i.region(self.region);
 
-                debug_assert!(this.capacity() >= this.len());
+                debug_assert!(this.capacity() >= self.len);
 
                 // If this region immediately follows the other region, we can
                 // optimize the write by simply growing the current region and
@@ -306,18 +321,18 @@ impl<'a> Buf for StackBuf<'a> {
 
                 let next = i.region(next);
 
-                let diff = this.capacity() - this.len();
+                let diff = this.capacity() - self.len;
 
                 // Data needs to be shuffle back to the end of the initialized
                 // region.
                 if diff > 0 {
                     let to_ptr = this.end.wrapping_sub(diff);
-                    this.end.copy_to(to_ptr, next.len());
+                    this.end.copy_to(to_ptr, other_len);
                 }
 
                 let old = i.free_region(next);
                 this.end = old.end;
-                this.len += old.len;
+                self.len += other_len;
                 return true;
             }
         }
@@ -327,19 +342,16 @@ impl<'a> Buf for StackBuf<'a> {
 
     #[inline(always)]
     fn len(&self) -> usize {
-        unsafe {
-            let i = &*self.internal.get();
-            i.header(self.region.get()).len()
-        }
+        self.len
     }
 
     #[inline(always)]
     fn as_slice(&self) -> &[u8] {
         unsafe {
             let i = &*self.internal.get();
-            let this = i.header(self.region.get());
+            let this = i.header(self.region);
             let ptr = this.start.cast();
-            slice::from_raw_parts(ptr, this.len())
+            slice::from_raw_parts(ptr, self.len)
         }
     }
 
@@ -364,7 +376,7 @@ impl Drop for StackBuf<'_> {
     fn drop(&mut self) {
         // SAFETY: We have exclusive access to the internal state.
         unsafe {
-            (*self.internal.get()).free(self.region.get());
+            (*self.internal.get()).free(self.region);
         }
     }
 }
@@ -534,7 +546,6 @@ impl Internal {
         let old = region.ptr.replace(Header {
             start: self.start,
             end: self.start,
-            len: 0,
             #[cfg(test)]
             state: State::Free,
             next: self.free.replace(region.id),
@@ -552,14 +563,15 @@ impl Internal {
     /// The caller must ensure that `this` is exclusively available.
     unsafe fn alloc(&mut self, requested: usize) -> Option<Region> {
         if let Some(occupied) = self.occupied {
-            let mut region = self.region(occupied);
+            let_mut! {
+                let mut region = self.region(occupied);
+            };
 
             if region.capacity() >= requested {
                 if_test! {
                     region.state = State::Used;
                 };
 
-                region.len = 0;
                 self.occupied = None;
                 return Some(region);
             }
@@ -571,10 +583,9 @@ impl Internal {
                 region.start = replace(&mut self.free_start, free_start);
                 region.end = free_start;
 
-                #[cfg(test)]
-                {
+                if_test! {
                     region.state = State::Used;
-                }
+                };
 
                 break 'out region;
             }
@@ -600,7 +611,6 @@ impl Internal {
             region.ptr.write(Header {
                 start,
                 end: free_start,
-                len: 0,
                 #[cfg(test)]
                 state: State::Used,
                 prev: None,
@@ -615,7 +625,10 @@ impl Internal {
     }
 
     unsafe fn free(&mut self, region: HeaderId) {
-        let mut region = self.region(region);
+        let_mut! {
+            let mut region = self.region(region);
+        }
+
         #[cfg(test)]
         debug_assert_eq!(region.state, State::Used);
 
@@ -636,7 +649,6 @@ impl Internal {
                 region.state = State::Occupy;
             };
 
-            region.len = 0;
             self.occupied = Some(region.id);
             return;
         };
@@ -727,21 +739,19 @@ impl Internal {
 
             let from = self.free_region(from);
 
-            from.start.copy_to(prev.start, from.len());
+            from.start.copy_to(prev.start, len);
 
             if_test! {
                 prev.state = State::Used;
             };
 
             prev.end = from.end;
-            prev.len = from.len;
             self.occupied = None;
             return Some(prev);
         }
 
-        let mut to = self.alloc(requested)?;
+        let to = self.alloc(requested)?;
         from.start.copy_to_nonoverlapping(to.start, len);
-        to.len = len as u32;
         self.free(from.id);
         Some(to)
     }
@@ -787,8 +797,6 @@ struct Header {
     start: *mut MaybeUninit<u8>,
     // The end pointer of the region.
     end: *mut MaybeUninit<u8>,
-    // Number of initialized bytes in the region.
-    len: u32,
     // The previous region.
     prev: Option<HeaderId>,
     // The next region.
@@ -799,11 +807,6 @@ struct Header {
 }
 
 impl Header {
-    #[inline]
-    fn len(&self) -> usize {
-        self.len as usize
-    }
-
     #[inline]
     fn capacity(&self) -> usize {
         // SAFETY: Both pointers are defined within the region.
