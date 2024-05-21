@@ -178,10 +178,11 @@ impl<'a> Stack<'a> {
         Self {
             internal: UnsafeCell::new(Internal {
                 free: None,
+                #[cfg(test)]
                 head: None,
                 tail: None,
+                occupied: None,
                 headers: 0,
-                occupied: 0,
                 start: data.start,
                 end: data.end,
                 free_start: data.start,
@@ -221,11 +222,11 @@ impl<'a> Buf for StackBuf<'a> {
             return true;
         }
 
-        if bytes.len() > MAX_BYTES {
+        let bytes_len = bytes.len();
+
+        if bytes_len > MAX_BYTES {
             return false;
         }
-
-        let bytes_len = bytes.len();
 
         // SAFETY: Due to invariants in the Buffer trait we know that these
         // cannot be used incorrectly.
@@ -233,6 +234,7 @@ impl<'a> Buf for StackBuf<'a> {
             let i = &mut *self.internal.get();
 
             let region = i.region(self.region.get());
+
             let len = region.len();
 
             // Region can fit the bytes available.
@@ -252,9 +254,9 @@ impl<'a> Buf for StackBuf<'a> {
                 region
             };
 
-            let dst = region.start.add(len).cast();
+            let dest = region.start.add(len).cast();
+            bytes.as_ptr().copy_to_nonoverlapping(dest, bytes_len);
 
-            ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
             region.len += bytes.len() as u32;
             true
         }
@@ -300,7 +302,7 @@ impl<'a> Buf for StackBuf<'a> {
                 // region.
                 if diff > 0 {
                     let to_ptr = this.end.wrapping_sub(diff);
-                    ptr::copy(this.end, to_ptr, next.len());
+                    this.end.copy_to(to_ptr, next.len());
                 }
 
                 let old = i.free_region(next);
@@ -410,13 +412,14 @@ struct Internal {
     // The first free region.
     free: Option<HeaderId>,
     // Pointer to the head region.
+    #[cfg(test)]
     head: Option<HeaderId>,
     // Pointer to the tail region.
     tail: Option<HeaderId>,
+    // The occupied header region
+    occupied: Option<HeaderId>,
     // The number of headers in use.
     headers: u8,
-    /// The number of occupied regions.
-    occupied: u8,
     // The start of the allocation region.
     start: *mut MaybeUninit<u8>,
     // The end of the allocation region.
@@ -476,7 +479,10 @@ impl Internal {
         if let Some(prev) = header.prev {
             (*self.header_mut(prev)).next = header.next;
         } else {
-            self.head = header.next;
+            #[cfg(test)]
+            {
+                self.head = header.next;
+            }
         }
     }
 
@@ -492,6 +498,7 @@ impl Internal {
             (*self.header_mut(next)).prev = prev;
         }
 
+        #[cfg(test)]
         if self.head == Some(region.id) {
             self.head = next;
         }
@@ -500,6 +507,7 @@ impl Internal {
     }
 
     unsafe fn push_back(&mut self, region: &mut Region) {
+        #[cfg(test)]
         if self.head.is_none() {
             self.head = Some(region.id);
         }
@@ -532,12 +540,13 @@ impl Internal {
     ///
     /// The caller must ensure that `this` is exclusively available.
     unsafe fn alloc(&mut self, requested: usize) -> Option<Region> {
-        if self.occupied > 0 {
-            if let Some(mut region) =
-                self.find_region(|h| h.state == State::Occupy && h.capacity() >= requested)
-            {
-                self.occupied -= 1;
+        if let Some(occupied) = self.occupied {
+            let mut region = self.region(occupied);
+
+            if region.capacity() >= requested {
                 region.state = State::Used;
+                region.len = 0;
+                self.occupied = None;
                 return Some(region);
             }
         }
@@ -600,14 +609,17 @@ impl Internal {
 
         // If there is no previous region, then mark this region as occupy.
         let Some(prev) = region.prev else {
-            self.occupied += 1;
-            region.state = State::Occupy;
+            debug_assert!(
+                self.occupied.is_none(),
+                "There can only be one occupied region"
+            );
+            region.state = OCCUPY;
             region.len = 0;
+            self.occupied = Some(region.id);
             return;
         };
 
         let mut prev = self.region(prev);
-        debug_assert!(matches!(prev.state, State::Occupy | State::Used));
 
         // Move allocation to the previous region.
         let region = self.free_region(region);
@@ -635,10 +647,10 @@ impl Internal {
         let prev = self.region(prev);
 
         // The prior region is occupied, so we can free that as well.
-        if prev.state == State::Occupy {
+        if self.occupied == Some(prev.id) {
             let prev = self.free_region(prev);
             self.free_start = self.free_start.wrapping_sub(prev.capacity());
-            self.occupied -= 1;
+            self.occupied = None;
         }
     }
 
@@ -663,33 +675,6 @@ impl Internal {
             return Some(from);
         }
 
-        // Try to merge with a preceeding region, if the requested memory can
-        // fit in it.
-        'bail: {
-            // Check if the immediate prior region can fit the requested allocation.
-            let Some(prev) = from.prev else {
-                break 'bail;
-            };
-
-            let mut prev = self.region(prev);
-
-            if prev.state != State::Occupy || prev.capacity() + len < requested {
-                break 'bail;
-            }
-
-            let from_ptr = from.start.cast_const();
-            let prev_ptr = prev.start;
-
-            let from = self.free_region(from);
-
-            ptr::copy(from_ptr, prev_ptr, from.len());
-
-            prev.state = State::Used;
-            prev.end = from.end;
-            prev.len = from.len;
-            return Some(prev);
-        }
-
         // There is no data allocated in the current region, so we can simply
         // re-link it to the end of the chain of allocation.
         if from.start == from.end {
@@ -700,34 +685,40 @@ impl Internal {
             return Some(from);
         }
 
+        // Try to merge with a preceeding region, if the requested memory can
+        // fit in it.
+        'bail: {
+            // Check if the immediate prior region can fit the requested allocation.
+            let Some(prev) = from.prev else {
+                break 'bail;
+            };
+
+            if self.occupied != Some(prev) {
+                break 'bail;
+            }
+
+            let mut prev = self.region(prev);
+
+            if prev.capacity() + len < requested {
+                break 'bail;
+            }
+
+            let from = self.free_region(from);
+
+            from.start.copy_to(prev.start, from.len());
+
+            prev.state = State::Used;
+            prev.end = from.end;
+            prev.len = from.len;
+            self.occupied = None;
+            return Some(prev);
+        }
+
         let mut to = self.alloc(requested)?;
-
-        let from_data = from.start.cast::<u8>().cast_const();
-        let to_data = to.start.cast::<u8>();
-
-        ptr::copy_nonoverlapping(from_data, to_data, len);
+        from.start.copy_to_nonoverlapping(to.start, len);
         to.len = len as u32;
         self.free(from.id);
         Some(to)
-    }
-
-    unsafe fn find_region<T>(&mut self, mut condition: T) -> Option<Region>
-    where
-        T: FnMut(&Header) -> bool,
-    {
-        let mut next = self.head;
-
-        while let Some(id) = next {
-            let ptr = self.header_mut(id);
-
-            if condition(&*ptr) {
-                return Some(Region { id, ptr });
-            }
-
-            next = (*ptr).next;
-        }
-
-        None
     }
 
     unsafe fn pop_free(&mut self) -> Option<Region> {
@@ -737,6 +728,12 @@ impl Internal {
         Some(Region { id, ptr })
     }
 }
+
+#[cfg(not(test))]
+const OCCUPY: State = State::Free;
+
+#[cfg(test)]
+const OCCUPY: State = State::Occupy;
 
 /// The state of an allocated region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -750,13 +747,14 @@ enum State {
     /// - The region must not be linked.
     /// - The region must be in the free list.
     Free = 0,
-    /// The region is occupied.
+    /// The region is occupied (only used during tests).
     ///
     /// # Requirements
     ///
     /// - The range must point to a non-zero slice of memory.,
     /// - The region must be linked.
     /// - The region must be in the occupied list.
+    #[cfg(test)]
     Occupy,
     /// The region is used by an active allocation.
     Used,
