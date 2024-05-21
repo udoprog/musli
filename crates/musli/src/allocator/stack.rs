@@ -250,7 +250,7 @@ impl<'a> Buf for StackBuf<'a> {
 
         let bytes_len = bytes.len();
 
-        if bytes_len > MAX_BYTES {
+        if self.len + bytes_len > MAX_BYTES {
             return false;
         }
 
@@ -263,12 +263,12 @@ impl<'a> Buf for StackBuf<'a> {
 
             // Region can fit the bytes available.
             let region = 'out: {
+                let requested = self.len + bytes_len;
+
                 // Region can already fit in the requested bytes.
-                if region.capacity() - self.len >= bytes_len {
+                if region.capacity() >= requested {
                     break 'out region;
                 };
-
-                let requested = self.len + bytes_len;
 
                 let Some(region) = i.realloc(self.region, self.len, requested) else {
                     return false;
@@ -280,7 +280,6 @@ impl<'a> Buf for StackBuf<'a> {
 
             let dest = region.start.add(self.len).cast();
             bytes.as_ptr().copy_to_nonoverlapping(dest, bytes_len);
-
             self.len += bytes.len();
             true
         }
@@ -671,20 +670,16 @@ impl Internal {
 
         let current = self.free_region(current);
         debug_assert_eq!(current.next, None);
-        self.free_start = self.free_start.wrapping_sub(current.capacity());
 
-        let Some(prev) = current.prev else {
-            return;
+        self.free_start = match current.prev {
+            // The prior region is occupied, so we can free that as well.
+            Some(prev) if self.occupied == Some(prev) => {
+                self.occupied = None;
+                let prev = self.region(prev);
+                self.free_region(prev).start
+            }
+            _ => current.start,
         };
-
-        let prev = self.region(prev);
-
-        // The prior region is occupied, so we can free that as well.
-        if self.occupied == Some(prev.id) {
-            let prev = self.free_region(prev);
-            self.free_start = self.free_start.wrapping_sub(prev.capacity());
-            self.occupied = None;
-        }
     }
 
     fn reserve(&mut self, additional: usize) -> Option<*mut MaybeUninit<u8>> {
@@ -702,6 +697,8 @@ impl Internal {
 
         // This is the last region in the slab, so we can just expand it.
         if from.next.is_none() {
+            // Before we call realloc, we check the capacity of the current
+            // region. So we know that it is <= requested.
             let additional = requested - from.capacity();
             self.free_start = self.reserve(additional)?;
             from.end = from.end.add(additional);
@@ -732,7 +729,7 @@ impl Internal {
 
             let mut prev = self.region(prev);
 
-            if prev.capacity() + len < requested {
+            if prev.capacity() + from.capacity() < requested {
                 break 'bail;
             }
 
