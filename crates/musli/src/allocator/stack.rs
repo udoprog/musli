@@ -5,7 +5,7 @@ use core::cell::UnsafeCell;
 use core::fmt::{self, Arguments};
 use core::marker::PhantomData;
 use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
-use core::num::NonZeroU8;
+use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
@@ -99,7 +99,7 @@ impl<const C: usize> DerefMut for StackBuffer<C> {
 /// unlikely to need to be moved again, usually the last region which has access
 /// to the remainder of the provided buffer.
 ///
-/// For the moment, this allocator only supports 255 unique allocations, which
+/// For the moment, this allocator only supports 65535 unique allocations, which
 /// is fine for use with the `musli` crate, but might be a limitation for other
 /// use-cases.
 ///
@@ -321,13 +321,12 @@ impl<'a> Buf for StackBuf<'a> {
 
                 let next = i.region(next);
 
-                let diff = this.capacity() - self.len;
+                let to = this.start.wrapping_add(self.len);
 
                 // Data needs to be shuffle back to the end of the initialized
                 // region.
-                if diff > 0 {
-                    let to_ptr = this.end.wrapping_sub(diff);
-                    this.end.copy_to(to_ptr, other_len);
+                if this.end != to {
+                    this.end.copy_to(to, other_len);
                 }
 
                 let old = i.free_region(next);
@@ -410,7 +409,7 @@ impl DerefMut for Region {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(test, derive(PartialOrd, Ord, Hash))]
 #[repr(transparent)]
-struct HeaderId(NonZeroU8);
+struct HeaderId(NonZeroU16);
 
 impl HeaderId {
     /// Create a new region identifier.
@@ -419,13 +418,13 @@ impl HeaderId {
     ///
     /// The given value must be non-zero.
     #[inline]
-    const unsafe fn new_unchecked(value: u8) -> Self {
-        Self(NonZeroU8::new_unchecked(value))
+    const unsafe fn new_unchecked(value: u16) -> Self {
+        Self(NonZeroU16::new_unchecked(value))
     }
 
     /// Get the value of the region identifier.
     #[inline]
-    fn get(self) -> u8 {
+    fn get(self) -> u16 {
         self.0.get()
     }
 }
@@ -441,7 +440,7 @@ struct Internal {
     // The occupied header region
     occupied: Option<HeaderId>,
     // The number of headers in use.
-    headers: u8,
+    headers: u16,
     // The start of the allocation region.
     start: *mut MaybeUninit<u8>,
     // The end of the allocation region.
@@ -766,7 +765,6 @@ impl Internal {
 
 /// The state of an allocated region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
 #[cfg(test)]
 enum State {
     /// The region is fully free and doesn't occupy any memory.
@@ -791,7 +789,6 @@ enum State {
 
 /// The header of a region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(align(8))]
 struct Header {
     // The start pointer to the region.
     start: *mut MaybeUninit<u8>,

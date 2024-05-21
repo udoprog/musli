@@ -136,7 +136,7 @@ macro_rules! assert_structure {
         let expected_bytes = (0usize $(+ (*i.header($region)).capacity())*);
 
         assert_eq!(i.bytes(), expected_bytes, "The number of bytes allocated should match");
-        assert_eq!(i.headers, (free.len() + list.len()) as u8, "The number of headers should match");
+        assert_eq!(i.headers, (free.len() + list.len()) as u16, "The number of headers should match");
 
         let mut forward = HashMap::new();
         let mut backward = HashMap::new();
