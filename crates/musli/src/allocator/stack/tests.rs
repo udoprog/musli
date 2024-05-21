@@ -102,7 +102,7 @@ where
 macro_rules! assert_free {
     ($i:expr $(, $free:expr)* $(,)?) => {{
         let expected: &'static [(&str, HeaderId)] = &[$((stringify!($free), $free)),*];
-        let actual = collect("free", $i.free, expected.iter().copied(), |c| $i.header(c).next_free);
+        let actual = collect("free", $i.free, expected.iter().copied(), |c| $i.header(c).next);
         assert_eq!(actual, [$($free),*], "Expected `free` list");
 
         let expected: &'static [HeaderId] = &[$($free),*];
@@ -138,18 +138,16 @@ macro_rules! assert_structure {
         assert_eq!(i.bytes(), expected_bytes, "The number of bytes allocated should match");
         assert_eq!(i.headers, (free.len() + list.len()) as u8, "The number of headers should match");
 
-        let mut free_next = HashMap::new();
-
-        for pair in free.windows(2) {
-            free_next.insert(pair[0], pair[1]);
-        }
-
         let mut forward = HashMap::new();
         let mut backward = HashMap::new();
 
         for pair in list.windows(2) {
             forward.insert(pair[0], pair[1]);
             backward.insert(pair[1], pair[0]);
+        }
+
+        for pair in free.windows(2) {
+            assert!(forward.insert(pair[0], pair[1]).is_none());
         }
 
         $(
@@ -160,9 +158,8 @@ macro_rules! assert_structure {
                     end: unsafe { i.start.add($start + $cap) },
                     len: $len,
                     state: State::$state,
-                    next_free: free_next.get(&$region).copied(),
-                    prev: backward.get(&$region).copied(),
                     next: forward.get(&$region).copied(),
+                    prev: backward.get(&$region).copied(),
                 },
                 "Comparing region `{}`", stringify!($region)
             };
@@ -183,9 +180,8 @@ macro_rules! assert_structure {
                     end: i.start,
                     len: 0,
                     state: State::Free,
-                    next_free: free_next.get(&node).copied(),
-                    prev: None,
-                    next: None,
+                    next: forward.get(&node).copied(),
+                    prev: backward.get(&node).copied(),
                 },
                 "Expected region {:?} to be free", node
             };

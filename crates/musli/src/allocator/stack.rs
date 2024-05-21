@@ -525,9 +525,8 @@ impl Internal {
             end: self.start,
             len: 0,
             state: State::Free,
-            next_free: self.free.replace(region.id),
+            next: self.free.replace(region.id),
             prev: None,
-            next: None,
         });
 
         self.unlink(&old);
@@ -583,7 +582,6 @@ impl Internal {
                 end: free_start,
                 len: 0,
                 state: State::Used,
-                next_free: None,
                 prev: None,
                 next: None,
             });
@@ -597,9 +595,7 @@ impl Internal {
 
     unsafe fn free(&mut self, region: HeaderId) {
         let mut region = self.region(region);
-
         debug_assert_eq!(region.state, State::Used);
-        debug_assert_eq!(region.next_free, None);
 
         // Just free up the last region in the slab.
         if region.next.is_none() {
@@ -724,7 +720,7 @@ impl Internal {
     unsafe fn pop_free(&mut self) -> Option<Region> {
         let id = self.free.take()?;
         let ptr = self.header_mut(id);
-        self.free = (*ptr).next_free.take();
+        self.free = (*ptr).next.take();
         Some(Region { id, ptr })
     }
 }
@@ -772,8 +768,6 @@ struct Header {
     len: u32,
     // The state of the region.
     state: State,
-    // Link to the next free region.
-    next_free: Option<HeaderId>,
     // The previous neighbouring region.
     prev: Option<HeaderId>,
     // The next neighbouring region.
