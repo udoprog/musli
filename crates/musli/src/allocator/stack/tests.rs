@@ -133,9 +133,9 @@ macro_rules! assert_structure {
         let free = assert_free!(i $(, $free)*);
         let list = assert_list!(i $(, $node)*);
 
-        let expected_bytes = (0u32 $(+ (*i.header($region)).capacity())*) as u32;
+        let expected_bytes = (0usize $(+ (*i.header($region)).capacity())*);
 
-        assert_eq!(i.bytes, expected_bytes, "The number of bytes allocated should match");
+        assert_eq!(i.bytes(), expected_bytes, "The number of bytes allocated should match");
         assert_eq!(i.headers, (free.len() + list.len()) as u8, "The number of headers should match");
 
         let mut free_next = HashMap::new();
@@ -156,8 +156,8 @@ macro_rules! assert_structure {
             assert_eq! {
                 *i.header($region),
                 Header {
-                    start: unsafe { i.data.add($start) },
-                    end: unsafe { i.data.add($start + $cap) },
+                    start: unsafe { i.start.add($start) },
+                    end: unsafe { i.start.add($start + $cap) },
                     len: $len,
                     state: State::$state,
                     next_free: free_next.get(&$region).copied(),
@@ -179,8 +179,8 @@ macro_rules! assert_structure {
             assert_eq! {
                 *i.header(node),
                 Header {
-                    start: unsafe { i.data.add(0) },
-                    end: unsafe { i.data.add(0) },
+                    start: i.start,
+                    end: i.start,
                     len: 0,
                     state: State::Free,
                     next_free: free_next.get(&node).copied(),
