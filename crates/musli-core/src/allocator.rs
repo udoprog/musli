@@ -11,10 +11,19 @@ pub trait Allocator {
     where
         Self: 'this;
 
-    /// Allocate an empty, uninitialized buffer.
+    /// Allocate an empty, uninitialized buffer with an alignment matching that
+    /// of `T`.
     ///
     /// Calling this method returns `None` if the allocation failed.
-    fn alloc(&self) -> Option<Self::Buf<'_>>;
+    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_>>;
+
+    /// Allocate an empty, uninitialized buffer with an alignment of 1.
+    ///
+    /// Calling this method returns `None` if the allocation failed.
+    #[inline]
+    fn alloc(&self) -> Option<Self::Buf<'_>> {
+        self.alloc_aligned::<u8>()
+    }
 }
 
 impl<A> Allocator for &A
@@ -22,6 +31,11 @@ where
     A: ?Sized + Allocator,
 {
     type Buf<'this> = A::Buf<'this> where Self: 'this;
+
+    #[inline(always)]
+    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_>> {
+        (*self).alloc_aligned::<T>()
+    }
 
     #[inline(always)]
     fn alloc(&self) -> Option<Self::Buf<'_>> {

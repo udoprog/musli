@@ -4,7 +4,7 @@ mod tests;
 use core::cell::UnsafeCell;
 use core::fmt::{self, Arguments};
 use core::marker::PhantomData;
-use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
+use core::mem::{align_of, forget, replace, MaybeUninit};
 use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
@@ -220,14 +220,15 @@ impl Allocator for Stack<'_> {
     type Buf<'this> = StackBuf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Option<Self::Buf<'_>> {
+    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_>> {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
-        let region = unsafe { (*self.internal.get()).alloc(0)? };
+        let region = unsafe { (*self.internal.get()).alloc(0, align_of::<T>())? };
 
         Some(StackBuf {
             region: region.id,
             len: 0,
+            align: align_of::<T>(),
             internal: &self.internal,
         })
     }
@@ -237,6 +238,7 @@ impl Allocator for Stack<'_> {
 pub struct StackBuf<'a> {
     region: HeaderId,
     len: usize,
+    align: usize,
     internal: &'a UnsafeCell<Internal>,
 }
 
@@ -269,7 +271,7 @@ impl<'a> Buf for StackBuf<'a> {
                     break 'out region;
                 };
 
-                let Some(region) = i.realloc(self.region, self.len, requested) else {
+                let Some(region) = i.realloc(self.region, self.len, requested, self.align) else {
                     return false;
                 };
 
@@ -562,18 +564,64 @@ impl Internal {
         old
     }
 
+    /// Allocate a new header.
+    ///
+    /// # Safety
+    ///
+    /// The caller msut ensure that there is enough space for the region and
+    /// that the end pointer has been aligned to the requirements of `Header`.
+    unsafe fn alloc_header(
+        &mut self,
+        start: *mut MaybeUninit<u8>,
+        end: *mut MaybeUninit<u8>,
+        #[cfg(test)] state: State,
+    ) -> Option<Region> {
+        if let Some(mut region) = self.pop_free() {
+            region.start = start;
+            region.end = end;
+
+            if_test! {
+                region.state = state;
+            };
+
+            return Some(region);
+        }
+
+        let header_ptr = self.free_end.cast::<Header>().wrapping_sub(1);
+
+        if header_ptr < self.free_start.cast() || header_ptr >= self.free_end.cast() {
+            return None;
+        }
+
+        let id = HeaderId::new(self.end.cast::<Header>().offset_from(header_ptr.cast()))?;
+
+        let region = self.region(id);
+
+        region.ptr.write(Header {
+            start,
+            end,
+            #[cfg(test)]
+            state,
+            prev: None,
+            next: None,
+        });
+
+        self.free_end = header_ptr.cast();
+        Some(region)
+    }
+
     /// Allocate a region.
     ///
     /// # Safety
     ///
     /// The caller must ensure that `this` is exclusively available.
-    unsafe fn alloc(&mut self, requested: usize) -> Option<Region> {
+    unsafe fn alloc(&mut self, requested: usize, align: usize) -> Option<Region> {
         if let Some(occupied) = self.occupied {
             let_mut! {
                 let mut region = self.region(occupied);
             };
 
-            if region.capacity() >= requested {
+            if region.capacity() >= requested && region.is_aligned(align) {
                 if_test! {
                     region.state = State::Used;
                 };
@@ -583,49 +631,64 @@ impl Internal {
             }
         }
 
-        let mut region = 'out: {
-            if let Some(mut region) = self.pop_free() {
-                let free_start = self.reserve(requested)?;
-                region.start = replace(&mut self.free_start, free_start);
-                region.end = free_start;
+        self.align(align)?;
 
-                if_test! {
-                    region.state = State::Used;
-                };
+        if self.remaining() < requested {
+            return None;
+        }
 
-                break 'out region;
-            }
+        let end = self.free_start.wrapping_add(requested);
 
-            if requested + size_of::<Header>() > self.remaining() {
-                return None;
-            }
+        let mut region = self.alloc_header(
+            self.free_start,
+            end,
+            #[cfg(test)]
+            State::Used,
+        )?;
 
-            let free_start = self.free_start.wrapping_add(requested);
-            let free_end = self.free_end.wrapping_sub(size_of::<Header>());
-            let id = HeaderId::new(self.end.cast::<Header>().offset_from(free_end.cast()))?;
-
-            let start = replace(&mut self.free_start, free_start);
-            self.free_end = free_end;
-
-            // NB: We've modified the relevant pointers just above, make sure
-            // this is not moved.
-            let region = self.region(id);
-
-            // We need to write a full header, since we're allocating a new one.
-            region.ptr.write(Header {
-                start,
-                end: free_start,
-                #[cfg(test)]
-                state: State::Used,
-                prev: None,
-                next: None,
-            });
-
-            region
-        };
-
+        self.free_start = end;
+        debug_assert!(self.free_start <= self.free_end);
         self.push_back(&mut region);
         Some(region)
+    }
+
+    /// Align the free region by the specified alignment.
+    ///
+    /// This might require either expanding the tail region, or introducing an
+    /// occupied region which matches the number of bytes needed to fulfill the
+    /// specified alignment.
+    unsafe fn align(&mut self, align: usize) -> Option<()> {
+        let align = self.free_start.align_offset(align);
+
+        if align == 0 {
+            return Some(());
+        }
+
+        if self.remaining() < align {
+            return None;
+        }
+
+        let aligned_start = self.free_start.wrapping_add(align);
+
+        if let Some(tail) = self.tail {
+            // Simply expand the tail region to fill the gap created.
+            self.region(tail).end = aligned_start;
+        } else {
+            // We need to construct a new occupied header to fill in the gap
+            // which we just aligned from since there is no previous region to
+            // expand.
+            let mut region = self.alloc_header(
+                self.free_start,
+                aligned_start,
+                #[cfg(test)]
+                State::Occupy,
+            )?;
+
+            self.push_back(&mut region);
+        }
+
+        self.free_start = aligned_start;
+        Some(())
     }
 
     unsafe fn free(&mut self, region: HeaderId) {
@@ -698,7 +761,13 @@ impl Internal {
         Some(free_start)
     }
 
-    unsafe fn realloc(&mut self, from: HeaderId, len: usize, requested: usize) -> Option<Region> {
+    unsafe fn realloc(
+        &mut self,
+        from: HeaderId,
+        len: usize,
+        requested: usize,
+        align: usize,
+    ) -> Option<Region> {
         let mut from = self.region(from);
 
         // This is the last region in the slab, so we can just expand it.
@@ -752,7 +821,7 @@ impl Internal {
             return Some(prev);
         }
 
-        let to = self.alloc(requested)?;
+        let to = self.alloc(requested, align)?;
         from.start.copy_to_nonoverlapping(to.start, len);
         self.free(from.id);
         Some(to)
@@ -811,5 +880,11 @@ impl Header {
     fn capacity(&self) -> usize {
         // SAFETY: Both pointers are defined within the region.
         unsafe { self.end.byte_offset_from(self.start) as usize }
+    }
+
+    /// Test if region is aligned to `align`.
+    #[inline]
+    fn is_aligned(&self, align: usize) -> bool {
+        self.start.align_offset(align) == 0
     }
 }

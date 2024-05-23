@@ -1,4 +1,5 @@
 use core::fmt::{self, Arguments};
+use core::mem::align_of;
 use core::ptr::NonNull;
 
 use alloc::boxed::Box;
@@ -143,7 +144,13 @@ impl Allocator for System {
     type Buf<'this> = SystemBuf<'this> where Self: 'this;
 
     #[inline(always)]
-    fn alloc(&self) -> Option<Self::Buf<'_>> {
+    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_>> {
+        assert_eq!(
+            align_of::<T>(),
+            1,
+            "The system allocator currently only supported an alignment of 1"
+        );
+
         let region = self.root.alloc();
 
         Some(SystemBuf {
