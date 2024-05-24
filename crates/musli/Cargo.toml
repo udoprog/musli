@@ -19,6 +19,9 @@ categories = ["encoding", "no-std", "no-std::no-alloc"]
 all-features = true
 rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(doc_cfg, loom)'] }
+
 [features]
 default = ["std", "alloc"]
 std = ["musli-core/std", "serde?/std", "simdutf8?/std"]

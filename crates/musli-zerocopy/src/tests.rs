@@ -260,7 +260,7 @@ fn enum_boundaries() -> Result<()> {
     test_case!(U32, u32, u32, 0, 4_294_967_295u32,);
     test_case!(U64, u64, u64, 0, 18_446_744_073_709_551_615u64,);
     // nightly: feature(repr128)
-    #[cfg(rune_nightly)]
+    #[cfg(musli_nightly)]
     test_case!(
         U128,
         u128,
@@ -279,7 +279,7 @@ fn enum_boundaries() -> Result<()> {
         9_223_372_036_854_775_807i64,
     );
     // nightly: feature(repr128)
-    #[cfg(rune_nightly)]
+    #[cfg(musli_nightly)]
     test_case!(
         I128,
         i128,
@@ -330,7 +330,7 @@ fn test_signed_wraparound() -> Result<()> {
     test_case!(I32, i32, i32);
     test_case!(I64, i64, i64);
     // nightly: feature(repr128)
-    #[cfg(rune_nightly)]
+    #[cfg(musli_nightly)]
     test_case!(I128, i128, i128);
     Ok(())
 }
@@ -375,7 +375,7 @@ fn test_neg0() -> Result<()> {
     test_case!(I32, i32, i32);
     test_case!(I64, i64, i64);
     // nightly: feature(repr128)
-    #[cfg(rune_nightly)]
+    #[cfg(musli_nightly)]
     test_case!(I128, i128, i128);
     Ok(())
 }

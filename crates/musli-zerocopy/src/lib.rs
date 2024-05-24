@@ -525,10 +525,9 @@
 #![no_std]
 #![allow(clippy::module_inception)]
 #![allow(clippy::enum_variant_names)]
-#![allow(unexpected_cfgs)]
 #![deny(missing_docs)]
-#![cfg_attr(all(rune_nightly), feature(repr128))]
-#![cfg_attr(all(rune_nightly), allow(incomplete_features))]
+#![cfg_attr(all(musli_nightly), feature(repr128))]
+#![cfg_attr(all(musli_nightly), allow(incomplete_features))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
