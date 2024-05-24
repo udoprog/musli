@@ -7,7 +7,6 @@
 //! [Müsli]: https://docs.rs/musli
 
 #![deny(missing_docs)]
-#![allow(unexpected_cfgs)]
 #![no_std]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 
