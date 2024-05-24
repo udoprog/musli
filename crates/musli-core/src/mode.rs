@@ -19,3 +19,21 @@ pub enum Binary {}
 ///
 /// [modes]: https://docs.rs/musli/latest/musli/help/derives/index.html#modes
 pub enum Text {}
+
+/// Trait implemented for Modes to indicate human-readable formats.
+pub trait Mode {
+    /// Return whether the Mode is human-readable or not
+    fn is_human_readable() -> bool;
+}
+
+impl Mode for Binary {
+    fn is_human_readable() -> bool {
+        false
+    }
+}
+
+impl Mode for Text {
+    fn is_human_readable() -> bool {
+        true
+    }
+}

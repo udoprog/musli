@@ -97,6 +97,7 @@ mod serializer;
 use core::cell::RefCell;
 use core::fmt;
 
+use musli_core::mode::Mode;
 use serde::{Deserialize, Serialize};
 
 use self::deserializer::Deserializer;
@@ -177,6 +178,7 @@ pub fn encode<E, T>(value: &T, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error
 where
     E: Encoder,
     T: Serialize,
+    <E::Cx as Context>::Mode: Mode,
 {
     let cx = SerdeContext {
         error: RefCell::new(None),
@@ -209,6 +211,7 @@ pub fn decode<'de, D, T>(cx: &D::Cx, decoder: D) -> Result<T, D::Error>
 where
     D: Decoder<'de>,
     T: Deserialize<'de>,
+    <D::Cx as Context>::Mode: Mode,
 {
     let cx = SerdeContext {
         error: RefCell::new(None),

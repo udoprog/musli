@@ -1,5 +1,6 @@
 use core::fmt;
 
+use musli_core::mode::Mode;
 use serde::de;
 
 use crate::de::{
@@ -35,6 +36,7 @@ impl<'de, 'a, D> de::Deserializer<'de> for Deserializer<'de, 'a, D>
 where
     D: Decoder<'de>,
     <D::Cx as Context>::Error: de::Error,
+    <D::Cx as Context>::Mode: Mode,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -338,6 +340,11 @@ where
         self.decoder.skip()?;
         visitor.visit_unit()
     }
+
+    #[inline]
+    fn is_human_readable(&self) -> bool {
+        <<D::Cx as Context>::Mode as Mode>::is_human_readable()
+    }
 }
 
 struct SequenceAccess<'de, 'a, D>
@@ -361,6 +368,7 @@ impl<'de, 'a, D> de::SeqAccess<'de> for SequenceAccess<'de, 'a, D>
 where
     D: SequenceDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
+    <D::Cx as Context>::Mode: Mode,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -404,6 +412,7 @@ impl<'de, 'a, D> de::MapAccess<'de> for StructAccess<'de, 'a, D>
 where
     D: EntriesDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
+    <D::Cx as Context>::Mode: Mode,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -498,6 +507,7 @@ impl<'de, 'a, D> de::SeqAccess<'de> for SeqAccess<'de, 'a, D>
 where
     D: SequenceDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
+    <D::Cx as Context>::Mode: Mode,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -541,6 +551,7 @@ impl<'de, 'a, D: ?Sized> de::MapAccess<'de> for MapAccess<'de, 'a, D>
 where
     D: EntriesDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
+    <D::Cx as Context>::Mode: Mode,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -629,6 +640,7 @@ impl<'de, 'a, D> de::VariantAccess<'de> for EnumAccess<'de, 'a, D>
 where
     D: VariantDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
+    <D::Cx as Context>::Mode: Mode,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -680,6 +692,7 @@ impl<'de, 'a, D> de::EnumAccess<'de> for EnumAccess<'de, 'a, D>
 where
     D: VariantDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
+    <D::Cx as Context>::Mode: Mode,
 {
     type Error = <D::Cx as Context>::Error;
     type Variant = Self;
@@ -710,6 +723,7 @@ impl<'de, C, V> Visitor<'de, C> for AnyVisitor<V>
 where
     C: ?Sized + Context,
     C::Error: de::Error,
+    C::Mode: Mode,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;

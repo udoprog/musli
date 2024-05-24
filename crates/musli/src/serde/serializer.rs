@@ -4,6 +4,7 @@ use crate::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, Varia
 use crate::hint::{MapHint, SequenceHint};
 use crate::{Context, Encoder};
 
+use musli_core::mode::Mode;
 use serde::ser::{self, Serialize};
 
 pub struct Serializer<'a, E>
@@ -28,6 +29,7 @@ impl<'a, E> ser::Serializer for Serializer<'a, E>
 where
     E: Encoder,
     <E::Cx as Context>::Error: ser::Error,
+    <E::Cx as Context>::Mode: Mode,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -273,6 +275,11 @@ where
         let string = self.cx.collect_string(value)?;
         self.serialize_str(string.as_ref())
     }
+
+    #[inline]
+    fn is_human_readable(&self) -> bool {
+        <<E::Cx as Context>::Mode as Mode>::is_human_readable()
+    }
 }
 
 #[inline]
@@ -284,6 +291,7 @@ fn encode_variant<E, T, F, O>(
 ) -> Result<O, <E::Cx as Context>::Error>
 where
     <E::Cx as Context>::Error: ser::Error,
+    <E::Cx as Context>::Mode: Mode,
     E: Encoder,
     T: ?Sized + Serialize,
     F: FnOnce(
@@ -317,6 +325,7 @@ where
 impl<'a, E> ser::SerializeSeq for SerializeSeq<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
+    <E::Cx as Context>::Mode: Mode,
     E: SequenceEncoder,
 {
     type Ok = E::Ok;
@@ -341,6 +350,7 @@ where
 impl<'a, E> ser::SerializeTupleStruct for SerializeSeq<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
+    <E::Cx as Context>::Mode: Mode,
     E: SequenceEncoder,
 {
     type Ok = E::Ok;
@@ -363,6 +373,7 @@ where
 impl<'a, E> ser::SerializeTuple for SerializeSeq<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
+    <E::Cx as Context>::Mode: Mode,
     E: SequenceEncoder,
 {
     type Ok = E::Ok;
@@ -385,6 +396,7 @@ where
 impl<'a, E> ser::SerializeTupleVariant for SerializeSeq<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
+    <E::Cx as Context>::Mode: Mode,
     E: SequenceEncoder,
 {
     type Ok = E::Ok;
@@ -424,6 +436,7 @@ where
 impl<'a, E> ser::SerializeMap for SerializeMap<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
+    <E::Cx as Context>::Mode: Mode,
     E: EntriesEncoder,
 {
     type Ok = E::Ok;
@@ -475,6 +488,7 @@ where
 impl<'a, E> ser::SerializeStruct for SerializeStruct<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
+    <E::Cx as Context>::Mode: Mode,
     E: MapEncoder,
 {
     type Ok = E::Ok;
@@ -518,6 +532,7 @@ where
 impl<'a, E> ser::SerializeStructVariant for SerializeStructVariant<'a, E>
 where
     <E::Cx as Context>::Error: ser::Error,
+    <E::Cx as Context>::Mode: Mode,
     E: MapEncoder,
 {
     type Ok = E::Ok;
