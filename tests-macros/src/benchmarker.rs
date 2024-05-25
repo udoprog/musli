@@ -14,12 +14,14 @@ enum AsBytes {
 
 pub(super) struct Attributes {
     as_bytes: AsBytes,
+    disabled: bool,
 }
 
 impl Parse for Attributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut end = false;
         let mut as_bytes = AsBytes::Default;
+        let mut disabled = false;
 
         while !input.is_empty() {
             let path: syn::Path = input.parse()?;
@@ -29,6 +31,8 @@ impl Parse for Attributes {
             } else if path.is_ident("as_bytes") {
                 input.parse::<Token![=]>()?;
                 as_bytes = AsBytes::Method(input.parse()?);
+            } else if path.is_ident("disabled") {
+                disabled = true;
             } else {
                 return Err(syn::Error::new_spanned(path, "Unsupported attribute"));
             }
@@ -40,7 +44,7 @@ impl Parse for Attributes {
             end = input.parse::<Option<Token![,]>>()?.is_none();
         }
 
-        Ok(Attributes { as_bytes })
+        Ok(Attributes { as_bytes, disabled })
     }
 }
 
@@ -373,6 +377,15 @@ impl Benchmarker {
                 #visibility fn len(&self) -> usize {
                     self.as_bytes().map(|bytes| bytes.len()).unwrap_or_default()
                 }
+            }
+        });
+
+        let enabled = !attrs.disabled;
+
+        new_content.push(syn::parse_quote! {
+            /// Indicates if the framework is enabled.
+            #visibility fn is_enabled() -> bool {
+                #enabled
             }
         });
 

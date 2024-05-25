@@ -15,7 +15,9 @@ fn criterion_benchmark(c: &mut Criterion) {
                 ($framework:ident) => {{
                     tests::if_supported! {
                         $framework, $name, {
-                            $call!($framework)
+                            if utils::$framework::is_enabled() {
+                                $call!($framework)
+                            }
                         }
                     }
                 }};
@@ -26,14 +28,16 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     macro_rules! group {
-        ($group_name:expr, $name:ident, $it:ident) => {{
-            let mut g = c.benchmark_group($group_name);
+        ($bench:ident, $name:ident, $it:ident) => {{
+            let mut g = c.benchmark_group(concat!(stringify!($bench), "/", stringify!($name)));
 
             macro_rules! inner {
                 ($framework:ident) => {{
                     tests::if_supported! {
                         $framework, $name, {
-                            g.bench_function(stringify!($framework), |b| $it!(b, $framework));
+                            if utils::$framework::is_enabled() {
+                                g.bench_function(stringify!($framework), |b| $it!(b, $framework));
+                            }
                         }
                     }
                 }};
@@ -56,15 +60,13 @@ fn criterion_benchmark(c: &mut Criterion) {
                         frameworks.push(utils::$framework::new());
                     }
 
-                    #[allow(unused_variables)]
-                    let mut index = 0;
-
-                    for (value, framework) in values.iter().zip(&mut frameworks) {
+                    for (index, (value, framework)) in
+                        values.iter().zip(&mut frameworks).enumerate()
+                    {
                         let mut state = framework.state();
                         state.reset($size_hint, value);
                         let mut out = state.encode(value).expect("encoding should success");
 
-                        #[cfg_attr(feature = "no-binary-equality", allow(unused_variables))]
                         let actual = out.decode::<$ty>().expect("decoding should succeed");
 
                         #[cfg(not(feature = "no-binary-equality"))]
@@ -76,14 +78,14 @@ fn criterion_benchmark(c: &mut Criterion) {
                             stringify!($name)
                         );
 
-                        index += 1;
+                        #[cfg(feature = "no-binary-equality")]
+                        drop((actual, index));
                     }
                 }};
             }
 
             for_each!($name, check);
 
-            #[allow(unused)]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
                     let mut frameworks = Vec::with_capacity(values.len());
@@ -102,9 +104,8 @@ fn criterion_benchmark(c: &mut Criterion) {
                 }};
             }
 
-            group!(concat!("enc/", stringify!($name)), $name, it);
+            group!(enc, $name, it);
 
-            #[allow(unused)]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
                     let mut frameworks = Vec::with_capacity(values.len());
@@ -134,32 +135,33 @@ fn criterion_benchmark(c: &mut Criterion) {
                 }};
             }
 
-            group!(concat!("dec/", stringify!($name)), $name, it);
+            group!(dec, $name, it);
 
-            #[allow(unused)]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
-                    let mut frameworks = Vec::with_capacity(values.len());
+                    if utils::$framework::is_enabled() {
+                        let mut frameworks = Vec::with_capacity(values.len());
 
-                    for _ in &values {
-                        frameworks.push(utils::$framework::new());
-                    }
-
-                    $b.iter(|| {
-                        for (value, framework) in values.iter().zip(&mut frameworks) {
-                            let mut state = framework.state();
-                            state.reset($size_hint, value);
-                            let mut out = black_box(state.encode(value).unwrap());
-                            let actual = black_box(out.decode::<$ty>().unwrap());
-                            debug_assert_eq!(actual, *value);
-                            black_box(actual);
+                        for _ in &values {
+                            frameworks.push(utils::$framework::new());
                         }
-                    });
+
+                        $b.iter(|| {
+                            for (value, framework) in values.iter().zip(&mut frameworks) {
+                                let mut state = framework.state();
+                                state.reset($size_hint, value);
+                                let mut out = black_box(state.encode(value).unwrap());
+                                let actual = black_box(out.decode::<$ty>().unwrap());
+                                debug_assert_eq!(actual, *value);
+                                black_box(actual);
+                            }
+                        });
+                    }
                 }};
             }
 
             #[cfg(not(feature = "no-rt"))]
-            group!(concat!("rt/", stringify!($name)), $name, it);
+            group!(rt, $name, it);
         }};
     }
 

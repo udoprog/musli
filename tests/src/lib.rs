@@ -39,12 +39,7 @@ mod aligned_buf;
 #[macro_export]
 macro_rules! feature_matrix {
     ($call:path $(, $($tt:tt)*)?) => {
-        #[cfg(feature = "serde_json")]
-        $call!(serde_json $(, $($tt)*)*);
-        #[cfg(feature = "bincode")]
-        $call!(serde_bincode $(, $($tt)*)*);
-        #[cfg(feature = "rmp-serde")]
-        $call!(serde_rmp $(, $($tt)*)*);
+        $call!(mock $(, $($tt)*)*);
         #[cfg(feature = "musli-json")]
         $call!(musli_json $(, $($tt)*)*);
         #[cfg(feature = "musli-wire")]
@@ -59,6 +54,12 @@ macro_rules! feature_matrix {
         $call!(musli_value $(, $($tt)*)*);
         #[cfg(feature = "musli-zerocopy")]
         $call!(musli_zerocopy $(, $($tt)*)*);
+        #[cfg(feature = "serde_json")]
+        $call!(serde_json $(, $($tt)*)*);
+        #[cfg(feature = "bincode")]
+        $call!(serde_bincode $(, $($tt)*)*);
+        #[cfg(feature = "rmp-serde")]
+        $call!(serde_rmp $(, $($tt)*)*);
         #[cfg(feature = "zerocopy")]
         $call!(zerocopy $(, $($tt)*)*);
         #[cfg(feature = "dlhn")]

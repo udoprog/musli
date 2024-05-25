@@ -1,5 +1,3 @@
-#![allow(unused_assignments)]
-
 use std::env;
 use std::fmt;
 use std::fs;
@@ -171,7 +169,7 @@ fn main() -> Result<()> {
 
                 let name = concat!(stringify!($framework), "/", stringify!($name), "/random");
 
-                if random && condition(name) {
+                if utils::$framework::is_enabled() && condition(name) {
                     write!(o, "{name}: ")?;
                     o.flush()?;
                     let start = Instant::now();
@@ -235,7 +233,7 @@ fn main() -> Result<()> {
                 $framework, $name, {
                 let name = concat!(stringify!($framework), "/", stringify!($name), "/size");
 
-                if size && condition(name) {
+                if utils::$framework::is_enabled() && condition(name) {
                     let mut buf = utils::$framework::new();
 
                     let mut set = SizeSet {
@@ -270,7 +268,7 @@ fn main() -> Result<()> {
                 $framework, $name, {
                 let name = concat!(stringify!($framework), "/", stringify!($name));
 
-                if (!random && !size) && condition(name) {
+                if utils::$framework::is_enabled() && condition(name) {
                     write!(o, "{name}: ")?;
                     o.flush()?;
                     let start = Instant::now();
@@ -345,9 +343,17 @@ fn main() -> Result<()> {
     macro_rules! build {
         ($name:ident, $ty:ty, $num:expr, $size_hint:expr) => {{
             let $name = rng.next_vector::<$ty>($num);
-            tests::feature_matrix!(random, $name, $ty, $size_hint);
-            tests::feature_matrix!(size, $name, $ty, $size_hint);
-            tests::feature_matrix!(run, $name, $ty, $size_hint);
+            if random {
+                tests::feature_matrix!(random, $name, $ty, $size_hint);
+            }
+
+            if size {
+                tests::feature_matrix!(size, $name, $ty, $size_hint);
+            }
+
+            if !random && !size {
+                tests::feature_matrix!(run, $name, $ty, $size_hint);
+            }
         }};
     }
 
