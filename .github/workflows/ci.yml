@@ -142,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.76
+    - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
     - run: cargo clippy --all-targets --features test -- -D warnings
