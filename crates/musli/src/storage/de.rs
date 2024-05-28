@@ -7,7 +7,6 @@ use crate::de::{
     DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint,
     UnsizedVisitor, VariantDecoder,
 };
-use crate::hint::{MapHint, SequenceHint};
 use crate::{Context, Decode, Options, Reader};
 
 /// A very simple decoder suitable for storage decoding.
@@ -48,8 +47,6 @@ where
     type DecodePack = Self;
     type DecodeSome = Self;
     type DecodeSequence = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeSequenceHint = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeMapHint = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMap = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
@@ -288,14 +285,6 @@ where
     }
 
     #[inline]
-    fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
-    {
-        self.decode_sequence(f)
-    }
-
-    #[inline]
     fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
@@ -312,16 +301,11 @@ where
     }
 
     #[inline]
-    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
     {
         self.decode_map(f)
-    }
-
-    #[inline]
-    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
-        LimitedStorageDecoder::new(self.cx, self.reader)
     }
 
     #[inline]

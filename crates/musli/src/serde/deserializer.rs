@@ -286,10 +286,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self.decoder.decode_map_entries()?;
-        let output = visitor.visit_map(MapAccess::new(self.cx, &mut decoder))?;
-        decoder.end_entries()?;
-        Ok(output)
+        self.decoder
+            .decode_map_entries(|decoder| visitor.visit_map(MapAccess::new(self.cx, decoder)))
     }
 
     #[inline]
@@ -302,10 +300,8 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let mut decoder = self.decoder.decode_map_entries()?;
-        let output = visitor.visit_map(StructAccess::new(self.cx, &mut decoder))?;
-        decoder.end_entries()?;
-        Ok(output)
+        self.decoder
+            .decode_map_entries(|decoder| visitor.visit_map(StructAccess::new(self.cx, decoder)))
     }
 
     #[inline]
@@ -668,11 +664,9 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let decoder = self.decoder.decode_value()?;
-        let mut st = decoder.decode_map_entries()?;
-        let value = visitor.visit_map(StructAccess::new(self.cx, &mut st))?;
-        st.end_entries()?;
-        Ok(value)
+        self.decoder
+            .decode_value()?
+            .decode_map_entries(|decoder| visitor.visit_map(StructAccess::new(self.cx, decoder)))
     }
 }
 

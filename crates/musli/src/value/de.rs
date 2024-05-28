@@ -8,7 +8,7 @@ use crate::de::{
     SequenceDecoder, SizeHint, Skip, VariantDecoder, Visitor,
 };
 #[cfg(feature = "alloc")]
-use crate::hint::{MapHint, SequenceHint};
+use crate::hint::SequenceHint;
 use crate::reader::SliceReader;
 use crate::storage::de::StorageDecoder;
 use crate::{Context, Options};
@@ -91,9 +91,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     type DecodeSome = Self;
     type DecodePack = StorageDecoder<'a, SliceReader<'de>, OPT, C>;
     type DecodeSequence = IterValueDecoder<'a, 'de, OPT, C>;
-    type DecodeSequenceHint = IterValueDecoder<'a, 'de, OPT, C>;
     type DecodeMap = IterValuePairsDecoder<'a, 'de, OPT, C>;
-    type DecodeMapHint = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeMapEntries = IterValuePairsDecoder<'a, 'de, OPT, C>;
     type DecodeVariant = IterValueVariantDecoder<'a, 'de, OPT, C>;
 
@@ -296,7 +294,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     #[inline]
     fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
     {
         ensure!(self, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
             f(&mut IterValueDecoder::new(self.cx, sequence))
@@ -316,21 +314,11 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
     {
-        ensure!(self, hint, ExpectedMap(hint), Value::Map(map) => {
-            f(&mut IterValuePairsDecoder::new(self.cx, map))
-        })
-    }
-
-    #[cfg(feature = "alloc")]
-    #[inline]
-    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
-        ensure!(self, hint, ExpectedMap(hint), Value::Map(map) => {
-            Ok(IterValuePairsDecoder::new(self.cx, map))
-        })
+        self.decode_map(f)
     }
 
     #[cfg(feature = "alloc")]

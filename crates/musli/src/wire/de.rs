@@ -215,9 +215,7 @@ where
     type DecodePack = WireDecoder<'a, Limit<R>, OPT, C>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingWireDecoder<'a, R, OPT, C>;
-    type DecodeSequenceHint = RemainingWireDecoder<'a, R, OPT, C>;
     type DecodeMap = RemainingWireDecoder<'a, R, OPT, C>;
-    type DecodeMapHint = RemainingWireDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = RemainingWireDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
@@ -485,7 +483,7 @@ where
     #[inline]
     fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
     {
         self.decode_sequence(f)
     }
@@ -504,14 +502,17 @@ where
     #[inline]
     fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
     {
         self.decode_map(f)
     }
 
     #[inline]
-    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
-        self.shared_decode_pair_sequence()
+    fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
+    {
+        self.decode_map(f)
     }
 
     #[inline]

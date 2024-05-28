@@ -102,8 +102,6 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     type DecodeBuffer = Self;
     type DecodePack = Self;
     type DecodeSequence = Self;
-    type DecodeSequenceHint = Self;
-    type DecodeMapHint = Self;
     type DecodeMapEntries = Self;
     type DecodeSome = Self;
     type DecodeMap = Self;
