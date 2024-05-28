@@ -118,9 +118,7 @@ where
     type DecodeBuffer = crate::value::AsValueDecoder<'a, BUFFER_OPTIONS, C>;
     type DecodePack = JsonSequenceDecoder<'a, P, C>;
     type DecodeSequence = JsonSequenceDecoder<'a, P, C>;
-    type DecodeSequenceHint = JsonSequenceDecoder<'a, P, C>;
     type DecodeMap = JsonObjectDecoder<'a, P, C>;
-    type DecodeMapHint = JsonObjectDecoder<'a, P, C>;
     type DecodeMapEntries = JsonObjectDecoder<'a, P, C>;
     type DecodeSome = JsonDecoder<'a, P, C>;
     type DecodeVariant = JsonVariantDecoder<'a, P, C>;
@@ -396,7 +394,7 @@ where
     #[inline]
     fn decode_sequence_hint<F, O>(self, hint: &SequenceHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
     {
         let mut decoder = JsonSequenceDecoder::new(self.cx, Some(hint.size), self.parser)?;
         let output = f(&mut decoder)?;
@@ -418,7 +416,7 @@ where
     #[inline]
     fn decode_map_hint<F, O>(self, hint: &MapHint, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
     {
         let mut decoder = JsonObjectDecoder::new(self.cx, Some(hint.size), self.parser)?;
         let output = f(&mut decoder)?;
@@ -427,8 +425,11 @@ where
     }
 
     #[inline]
-    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
-        JsonObjectDecoder::new(self.cx, None, self.parser)
+    fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
+    where
+        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
+    {
+        self.decode_map(f)
     }
 
     #[inline]

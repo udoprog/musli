@@ -33,12 +33,8 @@ pub trait Decoder<'de>: Sized {
     type DecodePack: SequenceDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_sequence`].
     type DecodeSequence: SequenceDecoder<'de, Cx = Self::Cx>;
-    /// Decoder returned by [`Decoder::decode_sequence_hint`].
-    type DecodeSequenceHint: SequenceDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_map`].
     type DecodeMap: MapDecoder<'de, Cx = Self::Cx>;
-    /// Decoder used by [`Decoder::decode_map_hint`].
-    type DecodeMapHint: MapDecoder<'de, Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_map_entries`].
     type DecodeMapEntries: EntriesDecoder<'de, Cx = Self::Cx>;
     /// Decoder used by [`Decoder::decode_variant`].
@@ -1285,12 +1281,9 @@ pub trait Decoder<'de>: Sized {
         f: F,
     ) -> Result<O, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, <Self::Cx as Context>::Error>,
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, <Self::Cx as Context>::Error>,
     {
-        Err(self.cx().message(expecting::unsupported_type(
-            &expecting::SequenceWith(hint.size_hint()),
-            ExpectingWrapper::new(&self),
-        )))
+        self.decode_sequence(f)
     }
 
     /// Decode a map who's size is not known at compile time.
@@ -1401,14 +1394,11 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_map_hint<F, O>(self, hint: &MapHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
-        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, <Self::Cx as Context>::Error>,
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, <Self::Cx as Context>::Error>,
     {
-        Err(self.cx().message(expecting::unsupported_type(
-            &expecting::Map,
-            ExpectingWrapper::new(&self),
-        )))
+        self.decode_map(f)
     }
 
     /// Simplified decoding a map of unknown length.
@@ -1416,9 +1406,9 @@ pub trait Decoder<'de>: Sized {
     /// The length of the map must somehow be determined from the underlying
     /// format.
     #[inline]
-    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, <Self::Cx as Context>::Error>
+    fn decode_map_entries<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
-        Self: Sized,
+        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, <Self::Cx as Context>::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::MapEntries,

@@ -8,7 +8,6 @@ use crate::de::{
     Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
     SizeHint, Skip, UnsizedVisitor, VariantDecoder, Visitor,
 };
-use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
 #[cfg(feature = "value")]
 use crate::options;
@@ -229,9 +228,7 @@ where
     type DecodePack = SelfDecoder<'a, Limit<R>, OPT, C>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingSelfDecoder<'a, R, OPT, C>;
-    type DecodeSequenceHint = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeMap = RemainingSelfDecoder<'a, R, OPT, C>;
-    type DecodeMapHint = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeMapEntries = RemainingSelfDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
@@ -592,14 +589,6 @@ where
     }
 
     #[inline]
-    fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
-    where
-        F: FnOnce(&mut Self::DecodeSequenceHint) -> Result<O, C::Error>,
-    {
-        self.decode_sequence(f)
-    }
-
-    #[inline]
     fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
@@ -611,16 +600,14 @@ where
     }
 
     #[inline]
-    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
     where
-        F: FnOnce(&mut Self::DecodeMapHint) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
     {
-        self.decode_map(f)
-    }
-
-    #[inline]
-    fn decode_map_entries(self) -> Result<Self::DecodeMapEntries, C::Error> {
-        self.shared_decode_map()
+        let mut decoder = self.shared_decode_map()?;
+        let output = f(&mut decoder)?;
+        decoder.skip_map_remaining()?;
+        Ok(output)
     }
 
     #[inline]
