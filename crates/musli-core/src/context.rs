@@ -12,7 +12,7 @@ use crate::{Buf, Decode, Decoder};
 /// This is used to among other things report diagnostics.
 pub trait Context {
     /// Mode of the context.
-    type Mode;
+    type Mode: 'static;
     /// Error produced by context.
     type Error: 'static;
     /// A mark during processing.

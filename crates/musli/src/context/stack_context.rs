@@ -147,6 +147,7 @@ where
 impl<'a, const E: usize, const P: usize, A, M> Context for StackContext<'a, E, P, A, M>
 where
     A: ?Sized + Allocator,
+    M: 'static,
 {
     type Mode = M;
     type Error = ErrorMarker;

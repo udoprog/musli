@@ -13,13 +13,15 @@ macro_rules! test_fns {
         /// Roundtrip encode the given value.
         #[doc(hidden)]
         #[track_caller]
-        pub fn rt<T>(value: T) -> T
+        pub fn rt<T, M>(value: T) -> T
         where
-            T: $crate::en::Encode<crate::mode::$mode> + $crate::de::DecodeOwned<crate::mode::$mode>,
+            T: $crate::en::Encode<M> + $crate::de::DecodeOwned<M>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
+            M: 'static,
         {
             const WHAT: &str = $what;
-            const ENCODING: super::Encoding = super::Encoding::new();
+
+            let encoding = super::Encoding::new().with_mode::<M>();
 
             use ::core::any::type_name;
 
@@ -46,7 +48,7 @@ macro_rules! test_fns {
                 let mut cx = $crate::context::SystemContext::with_alloc(alloc);
                 cx.include_type();
 
-                let out = match ENCODING.to_vec_with(&cx, &value) {
+                let out = match encoding.to_vec_with(&cx, &value) {
                     Ok(out) => out,
                     Err(..) => {
                         let error = cx.report();
@@ -54,7 +56,7 @@ macro_rules! test_fns {
                     }
                 };
 
-                let decoded: T = match ENCODING.from_slice_with(&cx, out.as_slice()) {
+                let decoded: T = match encoding.from_slice_with(&cx, out.as_slice()) {
                     Ok(decoded) => decoded,
                     Err(..) => {
                         let out = FormatBytes(&out);
@@ -67,7 +69,7 @@ macro_rules! test_fns {
 
                 $crate::macros::test_include_if! {
                     $($(#[$option])*)* =>
-                    let value_decode: $crate::value::Value = match ENCODING.from_slice_with(&cx, out.as_slice()) {
+                    let value_decode: $crate::value::Value = match encoding.from_slice_with(&cx, out.as_slice()) {
                         Ok(decoded) => decoded,
                         Err(..) => {
                             let out = FormatBytes(&out);
@@ -95,15 +97,17 @@ macro_rules! test_fns {
         /// Encode and then decode the given value once.
         #[doc(hidden)]
         #[track_caller]
-        pub fn decode<'de, T, U>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, expected: &U) -> U
+        pub fn decode<'de, T, U, M>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, expected: &U) -> U
         where
-            T: $crate::en::Encode<crate::mode::$mode>,
+            T: $crate::en::Encode<M>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
-            U: $crate::de::Decode<'de, crate::mode::$mode>,
+            U: $crate::de::Decode<'de, M>,
             U: ::core::fmt::Debug + ::core::cmp::PartialEq,
+            M: 'static,
         {
             const WHAT: &str = $what;
-            const ENCODING: super::Encoding = super::Encoding::new();
+
+            let encoding = super::Encoding::new().with_mode::<M>();
 
             use ::core::any::type_name;
 
@@ -132,7 +136,7 @@ macro_rules! test_fns {
 
                 out.clear();
 
-                match ENCODING.to_writer_with(&cx, &mut *out, &value) {
+                match encoding.to_writer_with(&cx, &mut *out, &value) {
                     Ok(()) => (),
                     Err(..) => {
                         let error = cx.report();
@@ -140,7 +144,7 @@ macro_rules! test_fns {
                     }
                 };
 
-                let actual = match ENCODING.from_slice_with(&cx, &*out) {
+                let actual = match encoding.from_slice_with(&cx, &*out) {
                     Ok(decoded) => decoded,
                     Err(..) => {
                         let out = FormatBytes(&*out);
@@ -163,12 +167,14 @@ macro_rules! test_fns {
         /// Encode a value to bytes.
         #[doc(hidden)]
         #[track_caller]
-        pub fn to_vec<T>(value: T) -> ::alloc::vec::Vec<u8>
+        pub fn to_vec<T, M>(value: T) -> ::alloc::vec::Vec<u8>
         where
-            T: $crate::en::Encode<crate::mode::$mode>,
+            T: $crate::en::Encode<M>,
+            M: 'static,
         {
             const WHAT: &str = $what;
-            const ENCODING: super::Encoding = super::Encoding::new();
+
+            let encoding = super::Encoding::new().with_mode::<M>();
 
             use ::core::any::type_name;
 
@@ -176,7 +182,7 @@ macro_rules! test_fns {
                 let mut cx = $crate::context::SystemContext::with_alloc(alloc);
                 cx.include_type();
 
-                match ENCODING.to_vec_with(&cx, &value) {
+                match encoding.to_vec_with(&cx, &value) {
                     Ok(out) => out,
                     Err(..) => {
                         let error = cx.report();
@@ -243,9 +249,10 @@ macro_rules! assert_roundtrip_eq {
         let expected = $expr;
 
         macro_rules! inner {
-            ($name:ident) => {{
+            ($name:ident, $mode:ident) => {{
                 assert_eq!(
-                    $crate::$name::test::rt($expr), expected,
+                    $crate::$name::test::rt::<_, $crate::mode::$mode>($expr),
+                    expected,
                     "{}: roundtripped value does not match expected",
                     stringify!($name),
                 );
@@ -328,8 +335,8 @@ macro_rules! assert_decode_eq {
         let mut bytes = $crate::macros::support::Vec::<u8>::new();
 
         macro_rules! decode {
-            ($name:ident) => {{
-                $crate::$name::test::decode($expr, &mut bytes, &$expected);
+            ($name:ident, $mode:ident) => {{
+                $crate::$name::test::decode::<_, _, $crate::mode::$mode>($expr, &mut bytes, &$expected);
             }}
         }
 
@@ -346,7 +353,19 @@ macro_rules! __test_extra {
     ($expr:expr $(,)?) => {};
 
     ($expr:expr, json = $json_expected:expr $(, $($extra:tt)*)?) => {{
-        let json = $crate::json::test::to_vec($expr);
+        let json = $crate::json::test::to_vec::<_, $crate::mode::Text>($expr);
+        let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
+
+        assert_eq!(
+            string, $json_expected,
+            "json: encoded json does not match expected value"
+        );
+
+        $crate::macros::__test_extra!($expr $(, $($extra)*)*);
+    }};
+
+    ($expr:expr, json_binary = $json_expected:expr $(, $($extra:tt)*)?) => {{
+        let json = $crate::json::test::to_vec::<_, $crate::mode::Binary>($expr);
         let string = ::std::string::String::from_utf8(json).expect("Encoded JSON is not valid utf-8");
 
         assert_eq!(
@@ -364,31 +383,45 @@ pub use __test_extra;
 #[macro_export]
 macro_rules! __test_matrix {
     (full, $call:path) => {
-        $call!(storage);
-        $call!(wire);
-        $call!(descriptive);
-        $call!(json);
+        $call!(storage, Binary);
+        $call!(wire, Binary);
+        $call!(descriptive, Binary);
+        $call!(json, Text);
+    };
+
+    (text_mode, $call:path) => {
+        $call!(storage, Text);
+        $call!(wire, Text);
+        $call!(descriptive, Text);
+        $call!(json, Text);
+    };
+
+    (binary_mode, $call:path) => {
+        $call!(storage, Binary);
+        $call!(wire, Binary);
+        $call!(descriptive, Binary);
+        $call!(json, Binary);
     };
 
     (no_json, $call:path) => {
-        $call!(storage);
-        $call!(wire);
-        $call!(descriptive);
+        $call!(storage, Binary);
+        $call!(wire, Binary);
+        $call!(descriptive, Binary);
     };
 
     (descriptive, $call:path) => {
-        $call!(descriptive);
-        $call!(json);
+        $call!(descriptive, Binary);
+        $call!(json, Text);
     };
 
     (json, $call:path) => {
-        $call!(json);
+        $call!(json, Text);
     };
 
     (upgrade_stable, $call:path) => {
-        $call!(wire);
-        $call!(descriptive);
-        $call!(json);
+        $call!(wire, Binary);
+        $call!(descriptive, Binary);
+        $call!(json, Text);
     };
 }
 

@@ -1,3 +1,4 @@
+use core::any::TypeId;
 use core::fmt;
 
 use serde::de;
@@ -6,6 +7,7 @@ use crate::de::{
     Decoder, EntriesDecoder, MapDecoder, SequenceDecoder, SizeHint, VariantDecoder, Visitor,
 };
 use crate::hint::SequenceHint;
+use crate::mode::Text;
 use crate::Context;
 
 #[cfg(feature = "alloc")]
@@ -333,6 +335,11 @@ where
     {
         self.decoder.skip()?;
         visitor.visit_unit()
+    }
+
+    #[inline]
+    fn is_human_readable(&self) -> bool {
+        TypeId::of::<D::Mode>() == TypeId::of::<Text>()
     }
 }
 

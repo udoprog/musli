@@ -20,7 +20,7 @@ pub trait Encoder: Sized {
     /// Error associated with encoding.
     type Error;
     /// Mode associated with encoding.
-    type Mode;
+    type Mode: 'static;
     /// Constructed [`Encoder`] with a different context.
     type WithContext<'this, U>: Encoder<Cx = U, Ok = Self::Ok, Error = U::Error, Mode = U::Mode>
     where

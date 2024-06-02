@@ -1,7 +1,9 @@
+use core::any::TypeId;
 use core::fmt;
 
 use crate::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
 use crate::hint::{MapHint, SequenceHint};
+use crate::mode::Text;
 use crate::{Context, Encoder};
 
 use serde::ser::{self, Serialize};
@@ -272,6 +274,11 @@ where
     {
         let string = self.cx.collect_string(value)?;
         self.serialize_str(string.as_ref())
+    }
+
+    #[inline]
+    fn is_human_readable(&self) -> bool {
+        TypeId::of::<E::Mode>() == TypeId::of::<Text>()
     }
 }
 

@@ -19,7 +19,7 @@ pub trait Decoder<'de>: Sized {
     /// Error associated with decoding.
     type Error;
     /// Mode associated with decoding.
-    type Mode;
+    type Mode: 'static;
     /// [`Decoder`] with a different context returned by
     /// [`Decoder::with_context`]
     type WithContext<'this, U>: Decoder<'de, Cx = U, Error = U::Error, Mode = U::Mode>
