@@ -123,6 +123,7 @@ where
 impl<A, M> Context for SystemContext<A, M>
 where
     A: Allocator,
+    M: 'static,
 {
     type Mode = M;
     type Error = ErrorMarker;

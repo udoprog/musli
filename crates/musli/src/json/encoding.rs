@@ -92,7 +92,10 @@ where
 }
 
 /// Setting up encoding with parameters.
-pub struct Encoding<M = Text> {
+pub struct Encoding<M = Text>
+where
+    M: 'static,
+{
     _marker: marker::PhantomData<M>,
 }
 
@@ -145,7 +148,10 @@ impl Encoding<Text> {
     }
 }
 
-impl<M> Encoding<M> {
+impl<M> Encoding<M>
+where
+    M: 'static,
+{
     /// Change the mode of the encoding.
     ///
     /// # Examples

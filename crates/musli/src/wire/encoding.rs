@@ -28,7 +28,10 @@ pub const DEFAULT: Encoding = Encoding::new();
 crate::macros::bare_encoding!(Binary, DEFAULT, wire, IntoReader);
 
 /// Setting up encoding with parameters.
-pub struct Encoding<const OPT: Options = OPTIONS, M = Binary> {
+pub struct Encoding<const OPT: Options = OPTIONS, M = Binary>
+where
+    M: 'static,
+{
     _marker: marker::PhantomData<M>,
 }
 
@@ -80,7 +83,10 @@ impl Encoding<OPTIONS, Binary> {
     }
 }
 
-impl<const OPT: Options, M> Encoding<OPT, M> {
+impl<const OPT: Options, M> Encoding<OPT, M>
+where
+    M: 'static,
+{
     /// Change the mode of the encoding.
     ///
     /// # Examples

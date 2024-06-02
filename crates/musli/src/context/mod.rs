@@ -73,6 +73,7 @@ where
 impl<A, M, E> Context for Same<A, M, E>
 where
     A: Allocator,
+    M: 'static,
     E: Error,
 {
     type Mode = M;
@@ -169,9 +170,11 @@ where
     }
 }
 
-impl<A, M, E: 'static> Context for Ignore<A, M, E>
+impl<A, M, E> Context for Ignore<A, M, E>
 where
     A: Allocator,
+    M: 'static,
+    E: 'static,
 {
     type Mode = M;
     type Error = ErrorMarker;
@@ -245,6 +248,7 @@ impl<A, M, E> Context for Capture<A, M, E>
 where
     A: Allocator,
     E: Error,
+    M: 'static,
 {
     type Mode = M;
     type Error = ErrorMarker;
