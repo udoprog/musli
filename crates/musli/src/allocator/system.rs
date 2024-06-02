@@ -1,9 +1,12 @@
+use core::alloc::Layout;
 use core::fmt::{self, Arguments};
 use core::mem::align_of;
+use core::ptr;
 use core::ptr::NonNull;
+use core::slice;
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use ::alloc::alloc;
+use ::alloc::boxed::Box;
 
 use crate::buf::Error;
 use crate::loom::cell::UnsafeCell;
@@ -145,13 +148,8 @@ impl Allocator for System {
 
     #[inline(always)]
     fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_>> {
-        assert_eq!(
-            align_of::<T>(),
-            1,
-            "The system allocator currently only supported an alignment of 1"
-        );
-
-        let region = self.root.alloc();
+        // SAFETY: The alignment of `T` is always valid.
+        let region = unsafe { self.root.alloc(align_of::<T>())? };
 
         Some(SystemBuf {
             root: &self.root,
@@ -185,18 +183,17 @@ pub struct SystemBuf<'a> {
 impl<'a> Buf for SystemBuf<'a> {
     #[inline]
     fn write(&mut self, bytes: &[u8]) -> bool {
-        self.region.data.extend_from_slice(bytes);
-        true
+        self.region.extend_from_slice(bytes)
     }
 
     #[inline(always)]
     fn len(&self) -> usize {
-        self.region.data.len()
+        self.region.len()
     }
 
     #[inline(always)]
     fn as_slice(&self) -> &[u8] {
-        &self.region.data
+        self.region.as_slice()
     }
 
     #[inline(always)]
@@ -208,7 +205,10 @@ impl<'a> Buf for SystemBuf<'a> {
 impl fmt::Write for SystemBuf<'_> {
     #[inline(always)]
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.region.data.extend_from_slice(s.as_bytes());
+        if !self.region.extend_from_slice(s.as_bytes()) {
+            return Err(fmt::Error);
+        }
+
         Ok(())
     }
 }
@@ -221,9 +221,197 @@ impl<'a> Drop for SystemBuf<'a> {
 
 /// An allocated region.
 struct Region {
-    data: Vec<u8>,
-    // Pointer to the next free region.
+    /// Data pointer to the allocated region.
+    data: NonNull<u8>,
+    /// Initialized length of the region.
+    len: usize,
+    /// The capacity of the region.
+    cap: usize,
+    /// The alignment of the allocated region.
+    align: usize,
+    /// Pointer to the next free region.
     next: Option<NonNull<Region>>,
+}
+
+impl Region {
+    const DANGLING: Region = Region {
+        data: NonNull::dangling(),
+        len: 0,
+        cap: 0,
+        align: 0,
+        next: None,
+    };
+
+    /// Allocate with the specifiec alignment and default capacity.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the alignment and capacity are valid per
+    /// [`Layout`] constraints.
+    unsafe fn alloc(align: usize) -> Option<Self> {
+        Self::alloc_capacity(align, INITIAL_CAPACITY)
+    }
+
+    /// Allocate with the specifiec alignment and capacity.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the alignment and capacity are valid per
+    /// [`Layout`] constraints.
+    unsafe fn alloc_capacity(align: usize, cap: usize) -> Option<Self> {
+        let layout = Layout::from_size_align_unchecked(cap, align);
+        let data = alloc::alloc(layout);
+
+        if data.is_null() {
+            return None;
+        }
+
+        Some(Region {
+            data: NonNull::new_unchecked(data),
+            len: 0,
+            cap,
+            align,
+            next: None,
+        })
+    }
+
+    /// Align the region to the given alignment.
+    #[must_use = "allocation is fallible and must be checked"]
+    unsafe fn initialize(&mut self, align: usize) -> bool {
+        // Region is not allocated.
+        if self.cap == 0 {
+            if let Some(new) = Self::alloc(align) {
+                *self = new;
+                return true;
+            }
+
+            return false;
+        }
+
+        // Region is already aligned.
+        if self.align % align == 0 {
+            return true;
+        }
+
+        if let Some(new) = Self::alloc_capacity(align, self.cap) {
+            *self = new;
+            return true;
+        }
+
+        false
+    }
+
+    fn shrink_to(&mut self, cap: usize) -> bool {
+        if self.cap <= cap {
+            return true;
+        }
+
+        // SAFETY: A smaller capacity is always valid.
+        unsafe { self.realloc_to(cap) }
+    }
+
+    /// Reallocate the region to the given capacity.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the new capacity is valid per [`Layout`].
+    #[must_use = "allocating is fallible and must be checked"]
+    unsafe fn realloc_to(&mut self, cap: usize) -> bool {
+        let old_layout = Layout::from_size_align_unchecked(self.cap, self.align);
+        let data = alloc::realloc(self.data.as_ptr(), old_layout, cap);
+
+        if data.is_null() {
+            return false;
+        }
+
+        self.data = NonNull::new_unchecked(data);
+        self.cap = cap;
+        true
+    }
+
+    #[must_use = "allocating is fallible and must be checked"]
+    unsafe fn reserve(&mut self, additional: usize) -> bool {
+        let min_cap = self.len + additional;
+
+        if self.cap >= min_cap {
+            return true;
+        }
+
+        let new_cap = min_cap.next_power_of_two();
+
+        // Ensure we don't overflow isize which guarantees that the computed
+        // layout is valid.
+        if new_cap > max_size_for_align(self.align) {
+            return false;
+        }
+
+        if new_cap < min_cap {
+            return false;
+        }
+
+        if self.cap == 0 {
+            if let Some(new) = Self::alloc_capacity(self.align, new_cap) {
+                *self = new;
+                return true;
+            }
+
+            return false;
+        }
+
+        if new_cap > self.cap {
+            return self.realloc_to(new_cap);
+        }
+
+        true
+    }
+
+    /// Extend the region with the given bytes.
+    #[must_use = "allocating is fallible and must be checked"]
+    fn extend_from_slice(&mut self, bytes: &[u8]) -> bool {
+        // SAFETY: The region is correctly initialized.
+        unsafe {
+            if !self.reserve(bytes.len()) {
+                return false;
+            }
+
+            let dst = self.data.as_ptr().wrapping_add(self.len);
+            let len = bytes.len();
+            bytes.as_ptr().copy_to_nonoverlapping(dst, len);
+            self.len += len;
+        }
+
+        true
+    }
+
+    fn free(&mut self) {
+        if self.cap != 0 {
+            // SAFETY: Layout assumptions are correctly encoded in the type as it was being allocated or grown.
+            unsafe {
+                let layout = Layout::from_size_align_unchecked(self.cap, self.align);
+                alloc::dealloc(self.data.as_ptr(), layout);
+                ptr::write(self, Region::DANGLING);
+            }
+        }
+    }
+
+    /// Get initialized slice of the region.
+    #[inline]
+    fn as_slice(&self) -> &[u8] {
+        // SAFETY: The region is correctly initialized.
+        unsafe { slice::from_raw_parts(self.data.as_ptr(), self.len) }
+    }
+
+    /// Get the length of the region.
+    #[inline]
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl Drop for Region {
+    fn drop(&mut self) {
+        self.free();
+    }
 }
 
 /// Internals of the allocator.
@@ -247,10 +435,12 @@ impl Root {
     ///
     /// Clippy note: We know that we are correctly returning mutable references
     /// to different mutable regions.
+    ///
+    /// # Safety
+    ///
+    /// The specified alignment must be a power of 2.
     #[allow(clippy::mut_from_ref)]
-    fn alloc(&self) -> &mut Region {
-        self.regions.fetch_add(1, Ordering::SeqCst);
-
+    unsafe fn alloc(&self, align: usize) -> Option<&mut Region> {
         // SAFETY: We have exclusive access to all regions.
         let this = self.lock().with_mut(|current| unsafe {
             let mut this = current.take()?;
@@ -259,14 +449,18 @@ impl Root {
             Some(this)
         });
 
-        if let Some(this) = this {
-            return this;
-        }
+        let region = if let Some(this) = this {
+            if !this.initialize(align) {
+                return None;
+            }
 
-        Box::leak(Box::new(Region {
-            data: Vec::with_capacity(INITIAL_CAPACITY),
-            next: None,
-        }))
+            this
+        } else {
+            Box::leak(Box::new(Region::alloc(align)?))
+        };
+
+        self.regions.fetch_add(1, Ordering::SeqCst);
+        Some(region)
     }
 
     fn free<'a>(&'a self, region: &'a mut Region) {
@@ -282,8 +476,15 @@ impl Root {
             return;
         }
 
-        region.data.clear();
-        region.data.shrink_to(MAX_CAPACITY);
+        if region.shrink_to(MAX_CAPACITY) {
+            region.len = 0;
+        } else {
+            // If we fail to shrink the region, the only option we have left is
+            // to free it. Shrinking should only fail if there is insufficient
+            // memory to allocate a new smaller region at the samt time as
+            // maintaining the old one.
+            region.free();
+        }
 
         let mut current = self.lock();
 
@@ -292,4 +493,9 @@ impl Root {
             *current = Some(NonNull::from(region));
         });
     }
+}
+
+#[inline(always)]
+const fn max_size_for_align(align: usize) -> usize {
+    isize::MAX as usize - (align - 1)
 }
