@@ -696,21 +696,21 @@ pub use musli_zerocopy_macros::Visit;
 ///
 /// # Padding
 ///
-/// The constant [`ZeroCopy::Padded`] determines whether the derives struct uses
+/// The constant [`ZeroCopy::PADDED`] determines whether the derives struct uses
 /// padding or not. This derive currently uses a fairly conservative algorithm:
 ///
-/// The constant [`ZeroCopy::Padded`] will be set to `true` if:
+/// The constant [`ZeroCopy::PADDED`] will be set to `true` if:
 /// * The size of the type is 0, and the alignment is larger than 1. This
 ///   indicates a zero-sized type with an explicit `#[repr(align(N))]` that is
 ///   not set to 1.
 /// * The sum of the size of all the fields is not the same as the size of the
 ///   type.
-/// * Any of the fields has its [`ZeroCopy::Padded`] set to `true`.
+/// * Any of the fields has its [`ZeroCopy::PADDED`] set to `true`.
 /// * For enums, we test every variant with the same rules, except each variant
 ///   is treated as a struct where the discriminant (`u32` in `#[repr(u32)]`) is
 ///   treated like [a leading hidden field].
 ///
-/// [`ZeroCopy::Padded`]: crate::traits::ZeroCopy::Padded
+/// [`ZeroCopy::PADDED`]: ZeroCopy::PADDED
 /// [a first hidden field]: https://doc.rust-lang.org/beta/reference/type-layout.html#primitive-representation-of-enums-with-fields
 ///
 /// ```
