@@ -50,7 +50,7 @@ impl Default for Disabled {
 }
 
 impl Allocator for Disabled {
-    type Buf<'this> = EmptyBuf;
+    type Buf<'this, T> = EmptyBuf;
 
     #[inline(always)]
     fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_>> {

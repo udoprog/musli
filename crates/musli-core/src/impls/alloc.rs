@@ -619,7 +619,6 @@ where
         use std::os::windows::ffi::OsStrExt;
 
         use crate::en::VariantEncoder;
-        use crate::Buf;
 
         encoder.encode_variant_fn(|variant| {
             variant.encode_tag()?.encode(PlatformTag::Windows)?;

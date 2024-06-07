@@ -3,6 +3,7 @@
 use core::fmt;
 use core::str;
 
+use crate::buf::BytesBuf;
 use crate::de::{DecodeBytes, DecodeUnsized, DecodeUnsizedBytes};
 use crate::no_std;
 use crate::{Buf, Decode, Decoder};
@@ -18,7 +19,7 @@ pub trait Context {
     /// A mark during processing.
     type Mark: Copy + Default;
     /// A growable buffer.
-    type Buf<'this>: Buf
+    type Buf<'this>: Buf<Item = u8>
     where
         Self: 'this;
     /// An allocated buffer containing a valid string.
@@ -70,8 +71,8 @@ pub trait Context {
         T::decode_unsized_bytes(self, decoder, f)
     }
 
-    /// Allocate a buffer.
-    fn alloc(&self) -> Option<Self::Buf<'_>>;
+    /// Allocate a bytes buffer.
+    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>>;
 
     /// Collect and allocate a string from a [`Display`] implementation.
     ///
@@ -213,7 +214,11 @@ pub trait Context {
 
     /// Encountered an unsupported field tag.
     #[inline(always)]
-    fn invalid_field_string_tag(&self, _: &'static str, field: Self::Buf<'_>) -> Self::Error {
+    fn invalid_field_string_tag(
+        &self,
+        _: &'static str,
+        field: BytesBuf<Self::Buf<'_>>,
+    ) -> Self::Error {
         // SAFETY: Getting the slice does not overlap any interleaving operations.
         let bytes = field.as_slice();
 
