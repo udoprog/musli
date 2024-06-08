@@ -145,7 +145,7 @@ where
 
     #[inline]
     fn alloc(&self) -> Option<BufVec<Self::Buf<'_>>> {
-        Some(BufVec::new(self.alloc.alloc()?))
+        BufVec::new(&self.alloc)
     }
 
     #[inline]

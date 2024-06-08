@@ -5,6 +5,8 @@ use core::mem::ManuallyDrop;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
+use crate::allocator::Allocator;
+
 /// An error raised when we fail to write.
 #[derive(Debug)]
 pub struct Error;
@@ -37,7 +39,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     let mut a = BufVec::new(alloc).expect("allocation failed");
     ///
     ///     a.push(String::from("Hello"));
     ///     a.push(String::from("World"));
@@ -45,8 +47,14 @@ where
     ///     assert_eq!(a.as_slice(), ["Hello", "World"]);
     /// });
     /// ```
-    pub fn new(buf: B) -> Self {
-        Self { buf, len: 0 }
+    pub fn new<'a, T>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, T> = B>)) -> Option<Self>
+    where
+        T: 'static,
+    {
+        Some(Self {
+            buf: alloc.alloc::<T>()?,
+            len: 0,
+        })
     }
 
     /// Get the number of initialized elements in the buffer.
@@ -58,7 +66,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     let mut a = BufVec::new(alloc).expect("allocation failed");
     ///
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
@@ -78,7 +86,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     let mut a = BufVec::new(alloc).expect("allocation failed");
     ///
     ///     assert!(a.is_empty());
     ///     a.write(b"Hello");
@@ -102,7 +110,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     let mut a = BufVec::new(alloc).expect("allocation failed");
     ///
     ///     a.push(b'H');
     ///     a.push(b'e');
@@ -137,7 +145,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     let mut a = BufVec::new(alloc).expect("allocation failed");
     ///     assert_eq!(a.as_slice(), b"");
     ///     a.write(b"Hello");
     ///     assert_eq!(a.as_slice(), b"Hello");
@@ -177,7 +185,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     let mut a = BufVec::new(alloc).expect("allocation failed");
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
     ///     assert_eq!(a.len(), 5);
@@ -217,8 +225,8 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
-    ///     let mut b = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     let mut a = BufVec::new(alloc).expect("allocation failed");
+    ///     let mut b = BufVec::new(alloc).expect("allocation failed");
     ///
     ///     a.write(b"Hello");
     ///     b.write(b" World");
@@ -257,7 +265,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     let mut a = BufVec::new(alloc).expect("allocation failed");
     ///     let world = "World";
     ///
     ///     write!(a, "Hello {world}")?;

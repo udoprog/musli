@@ -39,8 +39,8 @@ const MAX_REGIONS: usize = 2;
 ///
 /// let allocator = System::new();
 ///
-/// let mut buf1 = BufVec::new(allocator.alloc().expect("allocation failed"));
-/// let mut buf2 = BufVec::new(allocator.alloc().expect("allocation failed"));
+/// let mut buf1 = BufVec::new(&allocator).expect("allocation failed");
+/// let mut buf2 = BufVec::new(&allocator).expect("allocation failed");
 //
 /// assert!(buf1.write(b"Hello, "));
 /// assert!(buf2.write(b"world!"));

@@ -15,8 +15,8 @@
 //! use musli::buf::BufVec;
 //!
 //! musli::allocator::default!(|alloc| {
-//!     let mut a = BufVec::new(alloc.alloc().expect("allocation a failed"));
-//!     let mut b = BufVec::new(alloc.alloc().expect("allocation b failed"));
+//!     let mut a = BufVec::new(alloc).expect("allocation a failed");
+//!     let mut b = BufVec::new(alloc).expect("allocation b failed");
 //!
 //!     b.write(b"He11o");
 //!     a.write(b.as_slice());
@@ -29,7 +29,7 @@
 //!     assert_eq!(a.as_slice(), b"He11o W0rld");
 //!     assert_eq!(a.len(), 11);
 //!
-//!     let mut c = BufVec::new(alloc.alloc().expect("allocation c failed"));
+//!     let mut c = BufVec::new(alloc).expect("allocation c failed");
 //!     c.write(b"!");
 //!     a.write(c.as_slice());
 //!
@@ -90,8 +90,8 @@ macro_rules! __default {
 /// use musli::buf::BufVec;
 ///
 /// musli::allocator::default!(|alloc| {
-///     let mut a = BufVec::new(alloc.alloc().expect("allocation a failed"));
-///     let mut b = BufVec::new(alloc.alloc().expect("allocation b failed"));
+///     let mut a = BufVec::new(alloc).expect("allocation a failed");
+///     let mut b = BufVec::new(alloc).expect("allocation b failed");
 ///
 ///     b.write(b"He11o");
 ///     a.write(b.as_slice());
@@ -104,7 +104,7 @@ macro_rules! __default {
 ///     assert_eq!(a.as_slice(), b"He11o W0rld");
 ///     assert_eq!(a.len(), 11);
 ///
-///     let mut c = BufVec::new(alloc.alloc().expect("allocation c failed"));
+///     let mut c = BufVec::new(alloc).expect("allocation c failed");
 ///     c.write(b"!");
 ///     a.write(c.as_slice());
 ///
