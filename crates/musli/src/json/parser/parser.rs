@@ -1,4 +1,4 @@
-use crate::buf::BytesBuf;
+use crate::buf::BufVec;
 use crate::de::Visitor;
 use crate::json::parser::integer::decode_signed_full;
 use crate::json::parser::{StringReference, Token};
@@ -36,7 +36,7 @@ pub trait Parser<'de>: private::Sealed {
         &mut self,
         cx: &C,
         validate: bool,
-        scratch: &'scratch mut BytesBuf<impl Buf<Item = u8>>,
+        scratch: &'scratch mut BufVec<impl Buf<Item = u8>>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: ?Sized + Context;
@@ -231,7 +231,7 @@ where
         &mut self,
         cx: &C,
         validate: bool,
-        scratch: &'scratch mut BytesBuf<impl Buf<Item = u8>>,
+        scratch: &'scratch mut BufVec<impl Buf<Item = u8>>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: ?Sized + Context,

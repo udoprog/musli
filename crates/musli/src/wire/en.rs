@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::buf::BytesBuf;
+use crate::buf::BufVec;
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
@@ -58,16 +58,22 @@ where
     }
 }
 
-pub struct WireSequenceEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
+pub struct WireSequenceEncoder<'a, W, B, const OPT: Options, C: ?Sized>
+where
+    B: Buf,
+{
     cx: &'a C,
     writer: W,
     buffer: BufWriter<B>,
 }
 
-impl<'a, W, B, const OPT: Options, C: ?Sized> WireSequenceEncoder<'a, W, B, OPT, C> {
+impl<'a, W, B, const OPT: Options, C: ?Sized> WireSequenceEncoder<'a, W, B, OPT, C>
+where
+    B: Buf,
+{
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W, buffer: BytesBuf<B>) -> Self {
+    pub(crate) fn new(cx: &'a C, writer: W, buffer: BufVec<B>) -> Self {
         Self {
             cx,
             writer,

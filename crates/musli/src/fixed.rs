@@ -9,7 +9,7 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use crate::buf::BytesBuf;
+use crate::buf::BufVec;
 use crate::writer::Writer;
 use crate::{Buf, Context};
 
@@ -190,7 +190,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     }
 
     #[inline]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,

@@ -2,7 +2,7 @@ use core::fmt::{self, Write};
 use core::ops::Deref;
 use core::str;
 
-use crate::buf::BytesBuf;
+use crate::buf::BufVec;
 use crate::fixed::CapacityError;
 use crate::{Buf, Context};
 
@@ -11,7 +11,7 @@ pub struct BufString<B>
 where
     B: Buf,
 {
-    buf: BytesBuf<B>,
+    buf: BufVec<B>,
 }
 
 /// Collect a string into a string buffer.
@@ -38,7 +38,7 @@ where
     B: Buf<Item = u8>,
 {
     /// Construct a new fixed string.
-    pub(crate) const fn new(buf: BytesBuf<B>) -> BufString<B> {
+    pub(crate) const fn new(buf: BufVec<B>) -> BufString<B> {
         BufString { buf }
     }
 

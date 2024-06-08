@@ -1,9 +1,9 @@
-use crate::buf::BytesBuf;
+use crate::buf::BufVec;
 use crate::Allocator;
 
 fn basic_allocations<A: Allocator>(alloc: &A) {
-    let mut a = BytesBuf::new(alloc.alloc().unwrap());
-    let mut b = BytesBuf::new(alloc.alloc().unwrap());
+    let mut a = BufVec::new(alloc.alloc().unwrap());
+    let mut b = BufVec::new(alloc.alloc().unwrap());
 
     b.write(b"He11o");
 
@@ -20,7 +20,7 @@ fn basic_allocations<A: Allocator>(alloc: &A) {
     assert_eq!(a.as_slice(), b"He11o W0rld");
     assert_eq!(a.len(), 11);
 
-    let mut c = BytesBuf::new(alloc.alloc().unwrap());
+    let mut c = BufVec::new(alloc.alloc().unwrap());
     c.write(b"!");
     assert_eq!(c.len(), 1);
 
@@ -32,8 +32,8 @@ fn basic_allocations<A: Allocator>(alloc: &A) {
 fn grow_allocations<A: Allocator>(alloc: &A) {
     const BYTES: &[u8] = b"abcd";
 
-    let mut a = BytesBuf::new(alloc.alloc().unwrap());
-    let mut b = BytesBuf::new(alloc.alloc().unwrap());
+    let mut a = BufVec::new(alloc.alloc().unwrap());
+    let mut b = BufVec::new(alloc.alloc().unwrap());
 
     for _ in 0..1024 {
         assert!(a.write(BYTES));
@@ -51,7 +51,7 @@ fn grow_allocations<A: Allocator>(alloc: &A) {
     }
 
     drop(a);
-    let mut c = BytesBuf::new(alloc.alloc().unwrap());
+    let mut c = BufVec::new(alloc.alloc().unwrap());
 
     for _ in 0..1024 {
         assert!(c.write(BYTES));

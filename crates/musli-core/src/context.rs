@@ -3,7 +3,7 @@
 use core::fmt;
 use core::str;
 
-use crate::buf::BytesBuf;
+use crate::buf::BufVec;
 use crate::de::{DecodeBytes, DecodeUnsized, DecodeUnsizedBytes};
 use crate::no_std;
 use crate::{Buf, Decode, Decoder};
@@ -72,7 +72,7 @@ pub trait Context {
     }
 
     /// Allocate a bytes buffer.
-    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>>;
+    fn alloc(&self) -> Option<BufVec<Self::Buf<'_>>>;
 
     /// Collect and allocate a string from a [`Display`] implementation.
     ///
@@ -217,7 +217,7 @@ pub trait Context {
     fn invalid_field_string_tag(
         &self,
         _: &'static str,
-        field: BytesBuf<Self::Buf<'_>>,
+        field: BufVec<Self::Buf<'_>>,
     ) -> Self::Error {
         // SAFETY: Getting the slice does not overlap any interleaving operations.
         let bytes = field.as_slice();

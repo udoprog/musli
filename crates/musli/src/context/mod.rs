@@ -16,7 +16,7 @@ use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::buf::{self, BufString, BytesBuf};
+use crate::buf::{self, BufString, BufVec};
 use crate::mode::Binary;
 use crate::no_std;
 use crate::{Allocator, Context};
@@ -86,8 +86,8 @@ where
     fn clear(&self) {}
 
     #[inline]
-    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
-        Some(BytesBuf::new(self.alloc.alloc()?))
+    fn alloc(&self) -> Option<BufVec<Self::Buf<'_>>> {
+        Some(BufVec::new(self.alloc.alloc()?))
     }
 
     #[inline]
@@ -186,8 +186,8 @@ where
     fn clear(&self) {}
 
     #[inline]
-    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
-        Some(BytesBuf::new(self.alloc.alloc()?))
+    fn alloc(&self) -> Option<BufVec<Self::Buf<'_>>> {
+        Some(BufVec::new(self.alloc.alloc()?))
     }
 
     #[inline]
@@ -266,8 +266,8 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
-        Some(BytesBuf::new(self.alloc.alloc()?))
+    fn alloc(&self) -> Option<BufVec<Self::Buf<'_>>> {
+        Some(BufVec::new(self.alloc.alloc()?))
     }
 
     #[inline]

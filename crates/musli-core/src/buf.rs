@@ -16,7 +16,7 @@ impl fmt::Display for Error {
 }
 
 /// A bytes-oriented buffer.
-pub struct BytesBuf<B>
+pub struct BufVec<B>
 where
     B: Buf,
 {
@@ -24,7 +24,7 @@ where
     len: usize,
 }
 
-impl<B> BytesBuf<B>
+impl<B> BufVec<B>
 where
     B: Buf,
 {
@@ -79,7 +79,7 @@ where
     }
 }
 
-impl<B> BytesBuf<B>
+impl<B> BufVec<B>
 where
     B: Buf<Item = u8>,
 {
@@ -199,7 +199,7 @@ where
     /// });
     /// ```
     #[inline]
-    pub fn extend<U>(&mut self, other: BytesBuf<U>) -> bool
+    pub fn extend<U>(&mut self, other: BufVec<U>) -> bool
     where
         U: Buf<Item = u8>,
     {
@@ -207,7 +207,7 @@ where
 
         // Try to merge one buffer with another.
         if let Err(buf) = self.buf.try_merge(self.len, other, other_len) {
-            let other = BytesBuf {
+            let other = BufVec {
                 buf,
                 len: other_len,
             };
@@ -238,7 +238,7 @@ where
     /// ```
     #[inline]
     pub fn write_fmt(&mut self, arguments: Arguments<'_>) -> Result<(), Error> {
-        struct Write<'a, B>(&'a mut BytesBuf<B>)
+        struct Write<'a, B>(&'a mut BufVec<B>)
         where
             B: Buf;
 
@@ -260,7 +260,7 @@ where
     }
 }
 
-impl<B> Deref for BytesBuf<B>
+impl<B> Deref for BufVec<B>
 where
     B: Buf,
 {
@@ -272,7 +272,7 @@ where
     }
 }
 
-impl<B> DerefMut for BytesBuf<B>
+impl<B> DerefMut for BufVec<B>
 where
     B: Buf,
 {
@@ -282,7 +282,7 @@ where
     }
 }
 
-impl<B> Drop for BytesBuf<B>
+impl<B> Drop for BufVec<B>
 where
     B: Buf,
 {

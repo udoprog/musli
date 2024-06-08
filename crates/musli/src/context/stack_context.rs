@@ -3,7 +3,7 @@ use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::ops::Range;
 
-use crate::buf::{self, BufString, BytesBuf};
+use crate::buf::{self, BufString, BufVec};
 use crate::fixed::FixedVec;
 use crate::{Allocator, Context};
 
@@ -137,7 +137,7 @@ where
     where
         T: fmt::Display,
     {
-        let buf = BytesBuf::new(self.alloc.alloc()?);
+        let buf = BufVec::new(self.alloc.alloc()?);
         let mut string = BufString::new(buf);
         write!(string, "{value}").ok()?;
         Some(string)
@@ -168,8 +168,8 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
-        Some(BytesBuf::new(self.alloc.alloc()?))
+    fn alloc(&self) -> Option<BufVec<Self::Buf<'_>>> {
+        Some(BufVec::new(self.alloc.alloc()?))
     }
 
     #[inline]

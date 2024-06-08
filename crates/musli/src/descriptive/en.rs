@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::buf::BytesBuf;
+use crate::buf::BufVec;
 use crate::en::{
     Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
@@ -31,16 +31,22 @@ impl<'a, W, const OPT: Options, C: ?Sized> SelfEncoder<'a, W, OPT, C> {
     }
 }
 
-pub struct SelfPackEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
+pub struct SelfPackEncoder<'a, W, B, const OPT: Options, C: ?Sized>
+where
+    B: Buf,
+{
     cx: &'a C,
     writer: W,
     buffer: BufWriter<B>,
 }
 
-impl<'a, W, B, const OPT: Options, C: ?Sized> SelfPackEncoder<'a, W, B, OPT, C> {
+impl<'a, W, B, const OPT: Options, C: ?Sized> SelfPackEncoder<'a, W, B, OPT, C>
+where
+    B: Buf,
+{
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W, buffer: BytesBuf<B>) -> Self {
+    pub(crate) fn new(cx: &'a C, writer: W, buffer: BufVec<B>) -> Self {
         Self {
             cx,
             writer,

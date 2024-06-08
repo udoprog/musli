@@ -252,7 +252,8 @@ where
             return true;
         }
 
-        let requested = size_of::<T>() * (len + additional);
+        let len = len * size_of::<T>();
+        let requested = len + size_of::<T>() * additional;
 
         if requested > MAX_BYTES {
             return false;
@@ -269,8 +270,6 @@ where
             if region.capacity() >= requested {
                 return true;
             };
-
-            let len = len * size_of::<T>();
 
             let Some(region) = i.realloc(self.region, len, requested, align_of::<T>()) else {
                 return false;

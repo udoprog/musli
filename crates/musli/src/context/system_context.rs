@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 
 #[cfg(not(loom))]
 use crate::allocator::System;
-use crate::buf::{self, BufString, BytesBuf};
+use crate::buf::{self, BufString, BufVec};
 use crate::{Allocator, Context};
 
 use super::access::{self, Access};
@@ -144,8 +144,8 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
-        Some(BytesBuf::new(self.alloc.alloc()?))
+    fn alloc(&self) -> Option<BufVec<Self::Buf<'_>>> {
+        Some(BufVec::new(self.alloc.alloc()?))
     }
 
     #[inline]

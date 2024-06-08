@@ -4,7 +4,7 @@
 //! adapter around an I/O type to work with musli.
 
 #[cfg(feature = "std")]
-use crate::buf::BytesBuf;
+use crate::buf::BufVec;
 #[cfg(feature = "std")]
 use crate::{Buf, Context};
 
@@ -40,7 +40,7 @@ where
     }
 
     #[inline]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,

@@ -7,7 +7,7 @@
 use core::fmt;
 use core::mem::take;
 
-use crate::buf::BytesBuf;
+use crate::buf::BufVec;
 use crate::{Buf, Context};
 
 #[cfg(feature = "alloc")]
@@ -33,7 +33,7 @@ pub trait Writer {
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write a buffer to the current writer.
-    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>;
@@ -65,7 +65,7 @@ where
     }
 
     #[inline]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,
@@ -100,7 +100,7 @@ impl Writer for Vec<u8> {
     }
 
     #[inline]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,
@@ -139,7 +139,7 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,
@@ -190,7 +190,7 @@ pub struct BufWriter<B>
 where
     B: Buf,
 {
-    buf: BytesBuf<B>,
+    buf: BufVec<B>,
 }
 
 impl<B> BufWriter<B>
@@ -198,12 +198,12 @@ where
     B: Buf,
 {
     /// Construct a new buffer writer.
-    pub fn new(buf: BytesBuf<B>) -> Self {
+    pub fn new(buf: BufVec<B>) -> Self {
         Self { buf }
     }
 
     /// Coerce into inner buffer.
-    pub fn into_inner(self) -> BytesBuf<B> {
+    pub fn into_inner(self) -> BufVec<B> {
         self.buf
     }
 }
@@ -222,7 +222,7 @@ where
     }
 
     #[inline(always)]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,
