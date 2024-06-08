@@ -278,7 +278,7 @@ where
 
     /// Get get a raw mutable pointer to the current buffer.
     #[inline]
-    pub fn as_ptr_mut(&mut self) -> *mut u8 {
+    pub fn as_mut_ptr(&mut self) -> *mut u8 {
         self.data.as_ptr()
     }
 
@@ -314,7 +314,7 @@ where
     /// ```
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self.as_ptr_mut(), self.len()) }
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
     }
 
     /// Store an uninitialized value.
@@ -774,7 +774,7 @@ where
     where
         T: ZeroCopy,
     {
-        let dst = self.as_ptr_mut().add(self.len);
+        let dst = self.as_mut_ptr().add(self.len);
         dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
         self.len += size_of_val(values);
     }

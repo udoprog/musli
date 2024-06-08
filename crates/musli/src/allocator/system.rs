@@ -201,7 +201,7 @@ where
     }
 
     #[inline]
-    fn as_ptr_mut(&mut self) -> *mut Self::Item {
+    fn as_mut_ptr(&mut self) -> *mut Self::Item {
         self.region.data.as_ptr().cast()
     }
 

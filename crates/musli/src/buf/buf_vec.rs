@@ -124,7 +124,7 @@ where
 
         // SAFETY: The call to reserve ensures that we have enough capacity.
         unsafe {
-            self.buf.as_ptr_mut().add(self.len).write(item);
+            self.buf.as_mut_ptr().add(self.len).write(item);
             self.len += 1;
         }
 
@@ -194,7 +194,7 @@ where
         // SAFETY: The call to reserve ensures that we have enough capacity.
         unsafe {
             self.buf
-                .as_ptr_mut()
+                .as_mut_ptr()
                 .add(self.len)
                 .copy_from_nonoverlapping(items.as_ptr(), items.len());
             self.len += items.len();
@@ -323,7 +323,7 @@ where
         // SAFETY: We know that the buffer is initialized up to `len`.
         unsafe {
             core::ptr::drop_in_place(core::slice::from_raw_parts_mut(
-                self.buf.as_ptr_mut(),
+                self.buf.as_mut_ptr(),
                 self.len,
             ))
         }

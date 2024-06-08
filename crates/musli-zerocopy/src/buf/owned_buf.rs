@@ -380,7 +380,7 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
 
     /// Get get a raw mutable pointer to the current buffer.
     #[inline]
-    pub(crate) fn as_ptr_mut(&mut self) -> *mut u8 {
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
         self.data.as_ptr()
     }
 
@@ -421,7 +421,7 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     /// ```
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self.as_ptr_mut(), self.len()) }
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
     }
 
     /// Store an uninitialized value.
@@ -854,7 +854,7 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     where
         T: ZeroCopy,
     {
-        let dst = self.as_ptr_mut().add(self.len);
+        let dst = self.as_mut_ptr().add(self.len);
         dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
         self.len += size_of_val(values);
     }
@@ -1085,7 +1085,7 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
         debug_assert_eq!(old_layout.align(), new_layout.align());
 
         unsafe {
-            let ptr = alloc::realloc(self.as_ptr_mut(), old_layout, new_layout.size());
+            let ptr = alloc::realloc(self.as_mut_ptr(), old_layout, new_layout.size());
 
             if ptr.is_null() {
                 alloc::handle_alloc_error(old_layout);
@@ -1109,7 +1109,7 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
             }
 
             ptr.copy_from_nonoverlapping(self.as_ptr(), self.len);
-            alloc::dealloc(self.as_ptr_mut(), old_layout);
+            alloc::dealloc(self.as_mut_ptr(), old_layout);
 
             // We've deallocated the old pointer.
             self.data = NonNull::new_unchecked(ptr);
@@ -1225,7 +1225,7 @@ impl<E: ByteOrder, O: Size> Clone for OwnedBuf<E, O> {
             let mut new = ManuallyDrop::new(Self::with_capacity_and_custom_alignment(
                 self.len, self.align,
             ));
-            new.as_ptr_mut()
+            new.as_mut_ptr()
                 .copy_from_nonoverlapping(self.as_ptr(), self.len);
             // Set requested to the same as original.
             new.requested = self.requested;

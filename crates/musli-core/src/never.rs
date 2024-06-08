@@ -84,7 +84,7 @@ where
     }
 
     #[inline]
-    fn as_ptr_mut(&mut self) -> *mut Self::Item {
+    fn as_mut_ptr(&mut self) -> *mut Self::Item {
         match self._never {}
     }
 

@@ -31,7 +31,7 @@ pub trait Buf {
     fn as_ptr(&self) -> *const Self::Item;
 
     /// Get a mutable pointer into the buffer.
-    fn as_ptr_mut(&mut self) -> *mut Self::Item;
+    fn as_mut_ptr(&mut self) -> *mut Self::Item;
 
     /// Try to merge one buffer with another.
     ///

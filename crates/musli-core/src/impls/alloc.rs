@@ -637,7 +637,7 @@ where
 
                 // SAFETY: We've just resized the above buffer.
                 unsafe {
-                    buf.as_ptr_mut()
+                    buf.as_mut_ptr()
                         .add(len)
                         .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
                 }
