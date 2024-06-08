@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use core::ptr;
 
 use crate::{Allocator, Buf};
 
@@ -20,12 +21,12 @@ where
 
     #[inline]
     fn as_ptr(&self) -> *const Self::Item {
-        unimplemented!()
+        ptr::null()
     }
 
     #[inline]
     fn as_ptr_mut(&mut self) -> *mut Self::Item {
-        unimplemented!()
+        ptr::null_mut()
     }
 
     #[inline]

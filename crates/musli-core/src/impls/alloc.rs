@@ -622,8 +622,6 @@ where
         use crate::Buf;
 
         encoder.encode_variant_fn(|variant| {
-            variant.encode_tag()?.encode(PlatformTag::Windows)?;
-
             let Some(mut buf) = cx.alloc::<u8>() else {
                 return Err(cx.message("Failed to allocate buffer"));
             };
@@ -649,6 +647,8 @@ where
 
             // SAFETY: Slice does not outlive the buffer it references.
             let bytes = unsafe { core::slice::from_raw_parts(buf.as_ptr(), len) };
+
+            variant.encode_tag()?.encode(PlatformTag::Windows)?;
             variant.encode_data()?.encode_bytes(bytes)?;
             Ok(())
         })
