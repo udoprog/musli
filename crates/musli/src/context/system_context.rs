@@ -128,8 +128,8 @@ where
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = usize;
-    type Buf<'this> = A::Buf<'this> where Self: 'this;
-    type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
+    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'static;
+    type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
 
     #[inline]
     fn clear(&self) {
@@ -144,7 +144,10 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Option<Self::Buf<'_>> {
+    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
+    where
+        T: 'static,
+    {
         self.alloc.alloc()
     }
 

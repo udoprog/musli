@@ -7,6 +7,7 @@
 use core::fmt;
 use core::mem::take;
 
+use crate::buf::BufVec;
 use crate::{Buf, Context};
 
 #[cfg(feature = "alloc")]
@@ -32,10 +33,10 @@ pub trait Writer {
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write a buffer to the current writer.
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf;
+        B: Buf<Item = u8>;
 
     /// Write bytes to the current writer.
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
@@ -64,12 +65,12 @@ where
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf,
+        B: Buf<Item = u8>,
     {
-        (*self).write_buffer(cx, buffer)
+        (*self).extend(cx, buffer)
     }
 
     #[inline]
@@ -99,10 +100,10 @@ impl Writer for Vec<u8> {
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf,
+        B: Buf<Item = u8>,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
@@ -138,10 +139,10 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf,
+        B: Buf<Item = u8>,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
@@ -185,25 +186,33 @@ impl Writer for &mut [u8] {
 }
 
 /// A writer that writes against an underlying [`Buf`].
-pub struct BufWriter<T> {
-    buf: T,
+pub struct BufWriter<B>
+where
+    B: Buf,
+{
+    buf: BufVec<B>,
 }
 
-impl<T> BufWriter<T> {
+impl<B> BufWriter<B>
+where
+    B: Buf,
+{
     /// Construct a new buffer writer.
-    pub fn new(buf: T) -> Self {
-        Self { buf }
+    pub fn new(buf: B) -> Self {
+        Self {
+            buf: BufVec::new(buf),
+        }
     }
 
     /// Coerce into inner buffer.
-    pub fn into_inner(self) -> T {
+    pub fn into_inner(self) -> BufVec<B> {
         self.buf
     }
 }
 
 impl<T> Writer for BufWriter<T>
 where
-    T: Buf,
+    T: Buf<Item = u8>,
 {
     type Mut<'this> = &'this mut Self
     where
@@ -215,10 +224,10 @@ where
     }
 
     #[inline(always)]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf,
+        B: Buf<Item = u8>,
     {
         if !self.buf.write(buffer.as_slice()) {
             return Err(cx.message("Buffer overflow"));

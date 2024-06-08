@@ -18,9 +18,10 @@ pub trait Context {
     /// A mark during processing.
     type Mark: Copy + Default;
     /// A growable buffer.
-    type Buf<'this>: Buf
+    type Buf<'this, T>: Buf<Item = T>
     where
-        Self: 'this;
+        Self: 'this,
+        T: 'static;
     /// An allocated buffer containing a valid string.
     type BufString<'this>: AsRef<str>
     where
@@ -70,8 +71,13 @@ pub trait Context {
         T::decode_unsized_bytes(self, decoder, f)
     }
 
-    /// Allocate a buffer.
-    fn alloc(&self) -> Option<Self::Buf<'_>>;
+    /// Allocate a bytes buffer.
+    ///
+    /// Returns `None` if the underlying allocator cannot allocate memory for
+    /// some reason, typically this indicates that we've run out of memory.
+    ///
+    /// The buffer will be deallocated once the returned handle is dropped.
+    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>;
 
     /// Collect and allocate a string from a [`Display`] implementation.
     ///
@@ -213,15 +219,9 @@ pub trait Context {
 
     /// Encountered an unsupported field tag.
     #[inline(always)]
-    fn invalid_field_string_tag(&self, _: &'static str, field: Self::Buf<'_>) -> Self::Error {
-        // SAFETY: Getting the slice does not overlap any interleaving operations.
-        let bytes = field.as_slice();
-
-        if let Ok(string) = str::from_utf8(bytes) {
-            self.message(format_args!("Invalid field tag {string:?}"))
-        } else {
-            self.message(format_args!("Invalid field tag {bytes:?}"))
-        }
+    fn invalid_field_string_tag(&self, _: &'static str, field: Self::BufString<'_>) -> Self::Error {
+        let field = field.as_ref();
+        self.message(format_args!("Invalid field tag `{field}`"))
     }
 
     /// Missing variant field required to decode.

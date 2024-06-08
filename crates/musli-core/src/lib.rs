@@ -20,10 +20,6 @@ mod context;
 #[doc(inline)]
 pub use self::context::Context;
 
-mod allocator;
-#[doc(inline)]
-pub use self::allocator::Allocator;
-
 pub mod buf;
 #[doc(inline)]
 pub use self::buf::Buf;
@@ -190,7 +186,6 @@ pub use musli_macros::visitor;
 /// Using these directly is not supported.
 #[doc(hidden)]
 pub mod __priv {
-    use crate::buf::Buf;
     use crate::context::Context;
     use crate::de::{Decoder, EntryDecoder};
 
@@ -199,15 +194,6 @@ pub mod __priv {
     pub use ::core::result::Result;
 
     pub use crate::never::Never;
-
-    #[inline(always)]
-    pub fn write<O, T>(out: &mut O, value: T) -> Result<(), crate::buf::Error>
-    where
-        O: ?Sized + Buf,
-        T: fmt::Debug,
-    {
-        ::core::write!(out, "{value:?}")
-    }
 
     #[inline(always)]
     pub fn default<T>() -> T

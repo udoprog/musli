@@ -7,8 +7,7 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
 use crate::storage::en::StorageEncoder;
 use crate::writer::BufWriter;
-use crate::{Buf, Context, Encode};
-use crate::{Options, Writer};
+use crate::{Context, Encode, Options, Writer};
 
 use super::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use super::tag::{
@@ -31,20 +30,26 @@ impl<'a, W, const OPT: Options, C: ?Sized> SelfEncoder<'a, W, OPT, C> {
     }
 }
 
-pub struct SelfPackEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
+pub struct SelfPackEncoder<'a, W, const OPT: Options, C>
+where
+    C: ?Sized + Context,
+{
     cx: &'a C,
     writer: W,
-    buffer: BufWriter<B>,
+    buffer: BufWriter<C::Buf<'a, u8>>,
 }
 
-impl<'a, W, B, const OPT: Options, C: ?Sized> SelfPackEncoder<'a, W, B, OPT, C> {
+impl<'a, W, const OPT: Options, C> SelfPackEncoder<'a, W, OPT, C>
+where
+    C: ?Sized + Context,
+{
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W, buffer: B) -> Self {
+    pub(crate) fn new(cx: &'a C, writer: W, buf: C::Buf<'a, u8>) -> Self {
         Self {
             cx,
             writer,
-            buffer: BufWriter::new(buffer),
+            buffer: BufWriter::new(buf),
         }
     }
 }
@@ -60,7 +65,7 @@ where
     type Ok = ();
     type Mode = C::Mode;
     type WithContext<'this, U> = SelfEncoder<'this, W, OPT, U> where U: 'this + Context;
-    type EncodePack = SelfPackEncoder<'a, W, C::Buf<'a>, OPT, C>;
+    type EncodePack = SelfPackEncoder<'a, W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -324,15 +329,14 @@ where
     }
 }
 
-impl<'a, W, B, const OPT: Options, C> SequenceEncoder for SelfPackEncoder<'a, W, B, OPT, C>
+impl<'a, W, const OPT: Options, C> SequenceEncoder for SelfPackEncoder<'a, W, OPT, C>
 where
     W: Writer,
-    B: Buf,
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this;
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a, u8>>, OPT, C> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -343,7 +347,7 @@ where
     fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Bytes, buffer.len())?;
-        self.writer.write_buffer(self.cx, buffer)?;
+        self.writer.extend(self.cx, buffer)?;
         Ok(())
     }
 }

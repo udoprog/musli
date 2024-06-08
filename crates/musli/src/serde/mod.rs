@@ -121,10 +121,11 @@ where
     type Mode = C::Mode;
     type Error = error::SerdeError;
     type Mark = C::Mark;
-    type Buf<'this> = C::Buf<'this>
+    type Buf<'this, T> = C::Buf<'this, T>
     where
-        Self: 'this;
-    type BufString<'this> = BufString<C::Buf<'this>>
+        Self: 'this,
+        T: 'static;
+    type BufString<'this> = BufString<C::Buf<'this, u8>>
     where
         Self: 'this;
 
@@ -140,7 +141,10 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Option<Self::Buf<'_>> {
+    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
+    where
+        T: 'static,
+    {
         self.inner.alloc()
     }
 

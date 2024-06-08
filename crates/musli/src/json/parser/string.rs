@@ -1,5 +1,6 @@
 #![allow(clippy::zero_prefixed_literal)]
 
+use crate::buf::BufVec;
 use crate::{Buf, Context};
 
 // Copied and adapter form the serde-json project under the MIT and Apache 2.0
@@ -98,14 +99,11 @@ where
 
     /// Parses a JSON escape sequence and appends it into the scratch space. Assumes
     /// the previous byte read was a backslash.
-    pub(crate) fn parse_escape<B>(
+    pub(crate) fn parse_escape(
         &mut self,
         validate: bool,
-        scratch: &mut B,
-    ) -> Result<bool, C::Error>
-    where
-        B: ?Sized + Buf,
-    {
+        scratch: &mut BufVec<impl Buf<Item = u8>>,
+    ) -> Result<bool, C::Error> {
         let start = self.cx.mark();
         let b = self.next()?;
 
@@ -119,10 +117,7 @@ where
             b'r' => scratch.push(b'\r'),
             b't' => scratch.push(b'\t'),
             b'u' => {
-                fn encode_surrogate<B>(scratch: &mut B, n: u16) -> bool
-                where
-                    B: ?Sized + Buf,
-                {
+                fn encode_surrogate(scratch: &mut BufVec<impl Buf<Item = u8>>, n: u16) -> bool {
                     scratch.write(&[
                         (n >> 12 & 0b0000_1111) as u8 | 0b1110_0000,
                         (n >> 6 & 0b0011_1111) as u8 | 0b1000_0000,
@@ -283,15 +278,12 @@ where
     }
 
     /// Specialized reader implementation from a slice.
-    pub(crate) fn parse_string<'scratch, S>(
+    pub(crate) fn parse_string<'scratch>(
         &mut self,
         validate: bool,
         start: C::Mark,
-        scratch: &'scratch mut S,
-    ) -> Result<StringReference<'de, 'scratch>, C::Error>
-    where
-        S: ?Sized + Buf,
-    {
+        scratch: &'scratch mut BufVec<impl Buf<Item = u8>>,
+    ) -> Result<StringReference<'de, 'scratch>, C::Error> {
         // Index of the first byte not yet copied into the scratch space.
         let mut open_mark = self.cx.mark();
         let mut open = self.index;

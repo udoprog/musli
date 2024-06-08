@@ -1,6 +1,6 @@
 //! Types related to buffers.
 
-use core::fmt::{self, Arguments};
+use core::fmt;
 
 /// An error raised when we fail to write.
 #[derive(Debug)]
@@ -12,78 +12,32 @@ impl fmt::Display for Error {
     }
 }
 
-/// A buffer allocated from a context.
+#[cfg(feature = "std")]
+impl std::error::Error for Error {}
+
+/// A raw buffer allocated from a [`Context`].
 ///
-/// Buffers are allocated through an allocator using [`Allocator::alloc`].
-///
-/// [`Allocator::alloc`]: crate::Allocator::alloc
+/// [`Context`]: crate::Context
 pub trait Buf {
-    /// Write the given number of bytes.
-    ///
-    /// Returns `true` if the bytes could be successfully written. A `false`
-    /// value indicates that we are out of buffer capacity.
-    fn write(&mut self, bytes: &[u8]) -> bool;
+    /// An item in the buffer.
+    type Item: 'static;
 
-    /// Write a buffer of the same type onto the current buffer.
+    /// Resize the buffer.
+    fn resize(&mut self, len: usize, additional: usize) -> bool;
+
+    /// Get a pointer into the buffer.
+    fn as_ptr(&self) -> *const Self::Item;
+
+    /// Get a mutable pointer into the buffer.
+    fn as_mut_ptr(&mut self) -> *mut Self::Item;
+
+    /// Try to merge one buffer with another.
     ///
-    /// This allows allocators to provide more efficient means of extending the
-    /// current buffer with one provided from the same allocator.
-    #[inline(always)]
-    fn write_buffer<B>(&mut self, other: B) -> bool
+    /// The two length parameters refers to the initialized length of the two
+    /// buffers.
+    ///
+    /// If this returns `Err(B)` if merging was not possible.
+    fn try_merge<B>(&mut self, this_len: usize, other: B, other_len: usize) -> Result<(), B>
     where
-        B: Buf,
-    {
-        self.write(other.as_slice())
-    }
-
-    /// Write a single byte.
-    ///
-    /// Returns `true` if the bytes could be successfully written. A `false`
-    /// value indicates that we are out of buffer capacity.
-    #[inline(always)]
-    fn push(&mut self, byte: u8) -> bool {
-        self.write(&[byte])
-    }
-
-    /// Get the length of the buffer in bytes.
-    fn len(&self) -> usize;
-
-    /// Test if the buffer is empty.
-    #[inline(always)]
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Get the buffer as its initialized slice.
-    fn as_slice(&self) -> &[u8];
-
-    /// Try to write a format string into the buffer.
-    fn write_fmt(&mut self, arguments: Arguments<'_>) -> Result<(), Error>;
-}
-
-impl Buf for [u8] {
-    #[inline(always)]
-    fn write(&mut self, _: &[u8]) -> bool {
-        false
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        <[_]>::len(self)
-    }
-
-    #[inline(always)]
-    fn is_empty(&self) -> bool {
-        <[_]>::is_empty(self)
-    }
-
-    #[inline(always)]
-    fn as_slice(&self) -> &[u8] {
-        self
-    }
-
-    #[inline]
-    fn write_fmt(&mut self, _: Arguments<'_>) -> Result<(), Error> {
-        Err(Error)
-    }
+        B: Buf<Item = Self::Item>;
 }

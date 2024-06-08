@@ -3,7 +3,8 @@ use std::fmt::{self, Write};
 use std::string::String;
 use std::vec::Vec;
 
-use crate::{Allocator, Buf};
+use crate::buf::BufVec;
+use crate::Allocator;
 
 use super::{Header, HeaderId, Stack, StackBuffer, State};
 
@@ -192,9 +193,9 @@ fn grow_last() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let a = alloc.alloc().unwrap();
+    let a = BufVec::new_in::<u8>(&alloc).unwrap();
 
-    let mut b = alloc.alloc().unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
     b.write(&[1, 2, 3, 4, 5, 6]);
     b.write(&[7, 8]);
 
@@ -225,15 +226,15 @@ fn realloc() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
     a.write(&[1, 2, 3, 4]);
     assert_eq!(a.region, A);
 
-    let mut b = alloc.alloc().unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
     b.write(&[1, 2, 3, 4]);
     assert_eq!(b.region, B);
 
-    let mut c = alloc.alloc().unwrap();
+    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
     c.write(&[1, 2, 3, 4]);
     assert_eq!(c.region, C);
 
@@ -265,7 +266,7 @@ fn realloc() {
         C => { 8, 4, 4, Used },
     };
 
-    let mut d = alloc.alloc().unwrap();
+    let mut d = BufVec::new_in::<u8>(&alloc).unwrap();
     assert_eq!(d.region, A);
 
     assert_structure! {
@@ -301,9 +302,9 @@ fn grow_empty_moved() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = alloc.alloc().unwrap();
-    let b = alloc.alloc().unwrap();
-    let mut c = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let b = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
 
     c.write(&[0]);
     a.write(&[1, 2, 3, 4]);
@@ -346,12 +347,12 @@ fn grow_empty_moved() {
 /// Ensure that we support write buffer optimizations which allows for zero-copy
 /// merging of buffers.
 #[test]
-fn write_buffer() {
+fn extend() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = alloc.alloc().unwrap();
-    let mut b = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
 
     a.write(&[1, 2]);
     b.write(&[1, 2, 3, 4]);
@@ -362,7 +363,7 @@ fn write_buffer() {
         B => { 2, 4, 4, Used },
     };
 
-    a.write_buffer(b);
+    a.extend(b);
 
     assert_structure! {
         alloc, free[B], list[A],
@@ -374,13 +375,13 @@ fn write_buffer() {
 /// Ensure that we support write buffer optimizations which allows for zero-copy
 /// merging of buffers.
 #[test]
-fn write_buffer_middle() {
+fn extend_middle() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = alloc.alloc().unwrap();
-    let mut b = alloc.alloc().unwrap();
-    let mut c = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
 
     a.write(&[1, 2]);
     b.write(&[1, 2, 3, 4]);
@@ -393,7 +394,7 @@ fn write_buffer_middle() {
         C => { 6, 4, 4, Used },
     };
 
-    a.write_buffer(b);
+    a.extend(b);
 
     assert_structure! {
         alloc, free[B], list[A, C],
@@ -406,13 +407,13 @@ fn write_buffer_middle() {
 /// Ensure that we support write buffer optimizations which allows for zero-copy
 /// merging of buffers.
 #[test]
-fn write_buffer_gap() {
+fn extend_gap() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = alloc.alloc().unwrap();
-    let mut b = alloc.alloc().unwrap();
-    let mut c = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
 
     a.write(&[1, 2]);
     b.write(&[7, 8, 9, 10]);
@@ -426,7 +427,7 @@ fn write_buffer_gap() {
     };
 
     drop(b);
-    a.write_buffer(c);
+    a.extend(c);
 
     assert_structure! {
         alloc, free[C, B], list[A],
@@ -445,11 +446,11 @@ fn test_overlapping_slice_miri() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
     a.write(&[1, 2, 3, 4]);
     let a_slice = a.as_slice();
 
-    let mut b = alloc.alloc().unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
     b.write(&[5, 6, 7, 8]);
     let b_slice = b.as_slice();
 
@@ -463,16 +464,16 @@ fn grow_into_preceeding() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
     a.write(&[0]);
 
-    let mut b = alloc.alloc().unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
     b.write(&[1]);
 
-    let mut c = alloc.alloc().unwrap();
+    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
     c.write(&[2]);
 
-    let mut d = alloc.alloc().unwrap();
+    let mut d = BufVec::new_in::<u8>(&alloc).unwrap();
     d.write(&[3]);
 
     drop(a);
@@ -501,8 +502,8 @@ fn flip_flop() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = alloc.alloc().unwrap();
-    let mut b = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
 
     a.write(&[0]);
     b.write(&[0]);
@@ -578,12 +579,12 @@ fn flip_flop() {
 fn limits() {
     let mut buf = StackBuffer::<8>::new();
     let alloc = Stack::new(&mut buf);
-    assert!(alloc.alloc().is_none());
+    assert!(alloc.alloc::<u8>().is_none());
 
     let mut buf = StackBuffer::<32>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
     assert!(a.write(&[0, 1, 2, 3, 4, 5, 6, 7]));
 
     assert_structure! {

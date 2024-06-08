@@ -6,8 +6,7 @@ use crate::en::{
 use crate::hint::{MapHint, SequenceHint};
 use crate::storage::en::StorageEncoder;
 use crate::writer::BufWriter;
-use crate::{Buf, Context};
-use crate::{Options, Writer};
+use crate::{Context, Options, Writer};
 
 use super::tag::{Kind, Tag};
 
@@ -57,20 +56,26 @@ where
     }
 }
 
-pub struct WireSequenceEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
+pub struct WireSequenceEncoder<'a, W, const OPT: Options, C>
+where
+    C: ?Sized + Context,
+{
     cx: &'a C,
     writer: W,
-    buffer: BufWriter<B>,
+    buffer: BufWriter<C::Buf<'a, u8>>,
 }
 
-impl<'a, W, B, const OPT: Options, C: ?Sized> WireSequenceEncoder<'a, W, B, OPT, C> {
+impl<'a, W, const OPT: Options, C> WireSequenceEncoder<'a, W, OPT, C>
+where
+    C: ?Sized + Context,
+{
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W, buffer: B) -> Self {
+    pub(crate) fn new(cx: &'a C, writer: W, buf: C::Buf<'a, u8>) -> Self {
         Self {
             cx,
             writer,
-            buffer: BufWriter::new(buffer),
+            buffer: BufWriter::new(buf),
         }
     }
 }
@@ -86,7 +91,7 @@ where
     type Ok = ();
     type Mode = C::Mode;
     type WithContext<'this, U> = WireEncoder<'this, W, OPT, U> where U: 'this + Context;
-    type EncodePack = WireSequenceEncoder<'a, W, C::Buf<'a>, OPT, C>;
+    type EncodePack = WireSequenceEncoder<'a, W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -334,15 +339,14 @@ where
     }
 }
 
-impl<'a, W, B, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<'a, W, B, OPT, C>
+impl<'a, W, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
-    B: Buf,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this, B: Buf;
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a, u8>>, OPT, C> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -353,7 +357,7 @@ where
     fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), buffer.len())?;
-        self.writer.write_buffer(self.cx, buffer)?;
+        self.writer.extend(self.cx, buffer)?;
         Ok(())
     }
 }

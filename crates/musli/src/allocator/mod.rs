@@ -12,10 +12,11 @@
 //!
 //! ```
 //! use musli::{Allocator, Buf};
+//! use musli::buf::BufVec;
 //!
 //! musli::allocator::default!(|alloc| {
-//!     let mut a = alloc.alloc().expect("allocation a failed");
-//!     let mut b = alloc.alloc().expect("allocation b failed");
+//!     let mut a = BufVec::new_in(alloc).expect("allocation a failed");
+//!     let mut b = BufVec::new_in(alloc).expect("allocation b failed");
 //!
 //!     b.write(b"He11o");
 //!     a.write(b.as_slice());
@@ -28,7 +29,7 @@
 //!     assert_eq!(a.as_slice(), b"He11o W0rld");
 //!     assert_eq!(a.len(), 11);
 //!
-//!     let mut c = alloc.alloc().expect("allocation c failed");
+//!     let mut c = BufVec::new_in(alloc).expect("allocation c failed");
 //!     c.write(b"!");
 //!     a.write(c.as_slice());
 //!
@@ -61,6 +62,10 @@ mod stack;
 #[doc(inline)]
 pub use self::stack::{Stack, StackBuffer};
 
+mod allocator;
+#[doc(inline)]
+pub use self::allocator::Allocator;
+
 /// The default stack buffer size for the default allocator provided through
 /// [`default!`].
 pub const DEFAULT_STACK_BUFFER: usize = 4096;
@@ -86,10 +91,11 @@ macro_rules! __default {
 ///
 /// ```
 /// use musli::{Allocator, Buf};
+/// use musli::buf::BufVec;
 ///
 /// musli::allocator::default!(|alloc| {
-///     let mut a = alloc.alloc().expect("allocation a failed");
-///     let mut b = alloc.alloc().expect("allocation b failed");
+///     let mut a = BufVec::new_in(alloc).expect("allocation a failed");
+///     let mut b = BufVec::new_in(alloc).expect("allocation b failed");
 ///
 ///     b.write(b"He11o");
 ///     a.write(b.as_slice());
@@ -102,7 +108,7 @@ macro_rules! __default {
 ///     assert_eq!(a.as_slice(), b"He11o W0rld");
 ///     assert_eq!(a.len(), 11);
 ///
-///     let mut c = alloc.alloc().expect("allocation c failed");
+///     let mut c = BufVec::new_in(alloc).expect("allocation c failed");
 ///     c.write(b"!");
 ///     a.write(c.as_slice());
 ///

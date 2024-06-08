@@ -1,8 +1,9 @@
-use crate::{Allocator, Buf};
+use crate::buf::BufVec;
+use crate::Allocator;
 
 fn basic_allocations<A: Allocator>(alloc: &A) {
-    let mut a = alloc.alloc().unwrap();
-    let mut b = alloc.alloc().unwrap();
+    let mut a = BufVec::new_in(alloc).unwrap();
+    let mut b = BufVec::new_in(alloc).unwrap();
 
     b.write(b"He11o");
 
@@ -19,7 +20,7 @@ fn basic_allocations<A: Allocator>(alloc: &A) {
     assert_eq!(a.as_slice(), b"He11o W0rld");
     assert_eq!(a.len(), 11);
 
-    let mut c = alloc.alloc().unwrap();
+    let mut c = BufVec::new_in(alloc).unwrap();
     c.write(b"!");
     assert_eq!(c.len(), 1);
 
@@ -28,10 +29,52 @@ fn basic_allocations<A: Allocator>(alloc: &A) {
     assert_eq!(a.len(), 12);
 }
 
+fn grow_allocations<A: Allocator>(alloc: &A) {
+    const BYTES: &[u8] = b"abcd";
+
+    let mut a = BufVec::new_in(alloc).unwrap();
+    let mut b = BufVec::new_in(alloc).unwrap();
+
+    for _ in 0..1024 {
+        assert!(a.write(BYTES));
+        assert!(b.write(BYTES));
+    }
+
+    assert_eq!(a.len(), 1024 * 4);
+    assert_eq!(b.len(), 1024 * 4);
+
+    assert_eq!(a.as_slice(), b.as_slice());
+
+    for n in 0..1024 {
+        assert_eq!(&a.as_slice()[n * 4..n * 4 + 4], BYTES);
+        assert_eq!(&b.as_slice()[n * 4..n * 4 + 4], BYTES);
+    }
+
+    drop(a);
+    let mut c = BufVec::new_in(alloc).unwrap();
+
+    for _ in 0..1024 {
+        assert!(c.write(BYTES));
+    }
+
+    assert_eq!(c.as_slice(), b.as_slice());
+
+    for n in 0..1024 {
+        assert_eq!(&c.as_slice()[n * 4..n * 4 + 4], BYTES);
+        assert_eq!(&b.as_slice()[n * 4..n * 4 + 4], BYTES);
+    }
+}
+
 #[test]
-fn alloc_basic() {
+fn system_basic() {
     let alloc = super::System::new();
     basic_allocations(&alloc);
+}
+
+#[test]
+fn system_grow() {
+    let alloc = super::System::new();
+    grow_allocations(&alloc);
 }
 
 #[test]

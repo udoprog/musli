@@ -26,9 +26,7 @@ pub trait RawFloat:
     + Debug
 {
     const INFINITY: Self;
-    const NEG_INFINITY: Self;
     const NAN: Self;
-    const NEG_NAN: Self;
 
     /// The number of bits in the significand, *excluding* the hidden bit.
     const MANTISSA_EXPLICIT_BITS: usize;
@@ -70,9 +68,6 @@ pub trait RawFloat:
     // Largest exponent value `(1 << EXP_BITS) - 1`.
     const INFINITE_POWER: i32;
 
-    // Index (in bits) of the sign.
-    const SIGN_INDEX: usize;
-
     // Smallest decimal exponent for a non-zero value.
     const SMALLEST_POWER_OF_TEN: i32;
 
@@ -107,9 +102,7 @@ pub trait RawFloat:
 
 impl RawFloat for f32 {
     const INFINITY: Self = f32::INFINITY;
-    const NEG_INFINITY: Self = f32::NEG_INFINITY;
     const NAN: Self = f32::NAN;
-    const NEG_NAN: Self = -f32::NAN;
 
     const MANTISSA_EXPLICIT_BITS: usize = 23;
     const MIN_EXPONENT_ROUND_TO_EVEN: i32 = -17;
@@ -119,7 +112,6 @@ impl RawFloat for f32 {
     const MAX_EXPONENT_DISGUISED_FAST_PATH: i64 = 17;
     const MINIMUM_EXPONENT: i32 = -127;
     const INFINITE_POWER: i32 = 0xFF;
-    const SIGN_INDEX: usize = 31;
     const SMALLEST_POWER_OF_TEN: i32 = -65;
     const LARGEST_POWER_OF_TEN: i32 = 38;
 
@@ -166,9 +158,7 @@ impl RawFloat for f32 {
 
 impl RawFloat for f64 {
     const INFINITY: Self = f64::INFINITY;
-    const NEG_INFINITY: Self = f64::NEG_INFINITY;
     const NAN: Self = f64::NAN;
-    const NEG_NAN: Self = -f64::NAN;
 
     const MANTISSA_EXPLICIT_BITS: usize = 52;
     const MIN_EXPONENT_ROUND_TO_EVEN: i32 = -4;
@@ -178,7 +168,6 @@ impl RawFloat for f64 {
     const MAX_EXPONENT_DISGUISED_FAST_PATH: i64 = 37;
     const MINIMUM_EXPONENT: i32 = -1023;
     const INFINITE_POWER: i32 = 0x7FF;
-    const SIGN_INDEX: usize = 63;
     const SMALLEST_POWER_OF_TEN: i32 = -342;
     const LARGEST_POWER_OF_TEN: i32 = 308;
 

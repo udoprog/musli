@@ -622,19 +622,34 @@ where
         use crate::Buf;
 
         encoder.encode_variant_fn(|variant| {
-            variant.encode_tag()?.encode(PlatformTag::Windows)?;
-
-            let Some(mut buf) = cx.alloc() else {
+            let Some(mut buf) = cx.alloc::<u8>() else {
                 return Err(cx.message("Failed to allocate buffer"));
             };
 
+            let mut len = 0;
+
             for w in self.encode_wide() {
-                if !buf.write(&w.to_le_bytes()) {
-                    return Err(cx.message("Failed to write to buffer"));
+                let bytes = w.to_le_bytes();
+
+                if !buf.resize(len, bytes.len()) {
+                    return Err(cx.message("Allocation failed"));
                 }
+
+                // SAFETY: We've just resized the above buffer.
+                unsafe {
+                    buf.as_mut_ptr()
+                        .add(len)
+                        .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
+                }
+
+                len += bytes.len();
             }
 
-            variant.encode_data()?.encode_bytes(buf.as_slice())?;
+            // SAFETY: Slice does not outlive the buffer it references.
+            let bytes = unsafe { core::slice::from_raw_parts(buf.as_ptr(), len) };
+
+            variant.encode_tag()?.encode(PlatformTag::Windows)?;
+            variant.encode_data()?.encode_bytes(bytes)?;
             Ok(())
         })
     }

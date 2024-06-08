@@ -14,8 +14,6 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::storage::en::StorageEncoder;
 #[cfg(feature = "alloc")]
 use crate::writer::BufWriter;
-#[cfg(feature = "alloc")]
-use crate::Buf;
 use crate::{Context, Options};
 
 use super::value::{Number, Value};
@@ -428,7 +426,7 @@ where
 {
     cx: &'a C,
     output: O,
-    writer: BufWriter<C::Buf<'a>>,
+    writer: BufWriter<C::Buf<'a, u8>>,
 }
 
 #[cfg(feature = "alloc")]
@@ -458,8 +456,7 @@ where
 {
     type Cx = C;
     type Ok = ();
-
-    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a>>, OPT, C>
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a, u8>>, OPT, C>
     where
         Self: 'this;
 

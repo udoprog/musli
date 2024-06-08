@@ -21,31 +21,6 @@ use crate::en::{
 };
 use crate::{Buf, Context};
 
-/// An empty buffer.
-pub enum NeverBuffer {}
-
-impl Buf for NeverBuffer {
-    #[inline(always)]
-    fn write(&mut self, _: &[u8]) -> bool {
-        false
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        0
-    }
-
-    #[inline(always)]
-    fn as_slice(&self) -> &[u8] {
-        &[]
-    }
-
-    #[inline(always)]
-    fn write_fmt(&mut self, _: fmt::Arguments<'_>) -> Result<(), crate::buf::Error> {
-        Err(crate::buf::Error)
-    }
-}
-
 /// Marker type used for the [`Never`] type.
 #[doc(hidden)]
 pub enum NeverMarker {}
@@ -90,6 +65,36 @@ pub struct Never<A = NeverMarker, B: ?Sized = NeverMarker> {
     // Field makes type uninhabitable.
     _never: NeverMarker,
     _marker: marker::PhantomData<(A, B)>,
+}
+
+impl<T> Buf for Never<T>
+where
+    T: 'static,
+{
+    type Item = T;
+
+    #[inline]
+    fn resize(&mut self, _: usize, _: usize) -> bool {
+        match self._never {}
+    }
+
+    #[inline]
+    fn as_ptr(&self) -> *const Self::Item {
+        match self._never {}
+    }
+
+    #[inline]
+    fn as_mut_ptr(&mut self) -> *mut Self::Item {
+        match self._never {}
+    }
+
+    #[inline]
+    fn try_merge<B>(&mut self, _: usize, _: B, _: usize) -> Result<(), B>
+    where
+        B: Buf<Item = Self::Item>,
+    {
+        match self._never {}
+    }
 }
 
 impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
