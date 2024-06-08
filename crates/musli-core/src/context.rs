@@ -3,7 +3,6 @@
 use core::fmt;
 use core::str;
 
-use crate::buf::BufVec;
 use crate::de::{DecodeBytes, DecodeUnsized, DecodeUnsizedBytes};
 use crate::no_std;
 use crate::{Buf, Decode, Decoder};
@@ -19,9 +18,10 @@ pub trait Context {
     /// A mark during processing.
     type Mark: Copy + Default;
     /// A growable buffer.
-    type Buf<'this>: Buf<Item = u8>
+    type Buf<'this, T>: Buf<Item = T>
     where
-        Self: 'this;
+        Self: 'this,
+        T: 'static;
     /// An allocated buffer containing a valid string.
     type BufString<'this>: AsRef<str>
     where
@@ -72,7 +72,7 @@ pub trait Context {
     }
 
     /// Allocate a bytes buffer.
-    fn alloc(&self) -> Option<BufVec<Self::Buf<'_>>>;
+    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>;
 
     /// Collect and allocate a string from a [`Display`] implementation.
     ///

@@ -4,7 +4,7 @@ use core::str;
 
 use crate::buf::BufVec;
 use crate::fixed::CapacityError;
-use crate::{Buf, Context};
+use crate::{Allocator, Buf, Context};
 
 /// Wrapper around a [`Buf`], guaranteed to be a valid utf-8 string.
 pub struct BufString<B>
@@ -15,7 +15,7 @@ where
 }
 
 /// Collect a string into a string buffer.
-pub(crate) fn collect_string<C, T>(cx: &C, value: T) -> Result<BufString<C::Buf<'_>>, C::Error>
+pub(crate) fn collect_string<C, T>(cx: &C, value: T) -> Result<BufString<C::Buf<'_, u8>>, C::Error>
 where
     C: ?Sized + Context,
     T: fmt::Display,
@@ -37,9 +37,16 @@ impl<B> BufString<B>
 where
     B: Buf<Item = u8>,
 {
+    /// Construct a new string buffer in the provided allocator.
+    pub fn new_in<'a>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, u8> = B>)) -> Option<Self> {
+        Some(Self::new(alloc.alloc::<u8>()?))
+    }
+
     /// Construct a new fixed string.
-    pub(crate) const fn new(buf: BufVec<B>) -> BufString<B> {
-        BufString { buf }
+    pub(crate) const fn new(buf: B) -> BufString<B> {
+        BufString {
+            buf: BufVec::new(buf),
+        }
     }
 
     fn as_str(&self) -> &str {

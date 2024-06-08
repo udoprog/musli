@@ -198,8 +198,10 @@ where
     B: Buf,
 {
     /// Construct a new buffer writer.
-    pub fn new(buf: BufVec<B>) -> Self {
-        Self { buf }
+    pub fn new(buf: B) -> Self {
+        Self {
+            buf: BufVec::new(buf),
+        }
     }
 
     /// Coerce into inner buffer.

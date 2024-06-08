@@ -25,6 +25,7 @@ use core::str;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
+use crate::buf::BufVec;
 use crate::de::{
     Decode, DecodeUnsized, Decoder, SequenceDecoder, SizeHint, Skip, UnsizedVisitor, Visitor,
 };
@@ -205,9 +206,11 @@ where
     fn decode_char(mut self) -> Result<char, C::Error> {
         let start = self.cx.mark();
 
-        let Some(mut scratch) = self.cx.alloc() else {
+        let Some(scratch) = self.cx.alloc() else {
             return Err(self.cx.message("Failed to allocate scratch buffer"));
         };
+
+        let mut scratch = BufVec::new(scratch);
 
         let string = match self.parser.parse_string(self.cx, true, &mut scratch)? {
             StringReference::Borrowed(string) => string,
@@ -349,9 +352,11 @@ where
     where
         V: UnsizedVisitor<'de, C, str>,
     {
-        let Some(mut scratch) = self.cx.alloc() else {
+        let Some(scratch) = self.cx.alloc() else {
             return Err(self.cx.message("Failed to allocate scratch buffer"));
         };
+
+        let mut scratch = BufVec::new(scratch);
 
         match self.parser.parse_string(self.cx, true, &mut scratch)? {
             StringReference::Borrowed(borrowed) => visitor.visit_borrowed(self.cx, borrowed),

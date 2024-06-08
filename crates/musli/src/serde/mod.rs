@@ -102,7 +102,7 @@ use serde::{Deserialize, Serialize};
 use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
-use crate::buf::{self, BufString, BufVec};
+use crate::buf::{self, BufString};
 use crate::no_std;
 use crate::{Context, Decoder, Encoder};
 
@@ -121,10 +121,11 @@ where
     type Mode = C::Mode;
     type Error = error::SerdeError;
     type Mark = C::Mark;
-    type Buf<'this> = C::Buf<'this>
+    type Buf<'this, T> = C::Buf<'this, T>
     where
-        Self: 'this;
-    type BufString<'this> = BufString<C::Buf<'this>>
+        Self: 'this,
+        T: 'static;
+    type BufString<'this> = BufString<C::Buf<'this, u8>>
     where
         Self: 'this;
 
@@ -140,7 +141,10 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Option<BufVec<Self::Buf<'_>>> {
+    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
+    where
+        T: 'static,
+    {
         self.inner.alloc()
     }
 

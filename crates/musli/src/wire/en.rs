@@ -1,14 +1,12 @@
 use core::fmt;
 
-use crate::buf::BufVec;
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::storage::en::StorageEncoder;
 use crate::writer::BufWriter;
-use crate::{Buf, Context};
-use crate::{Options, Writer};
+use crate::{Context, Options, Writer};
 
 use super::tag::{Kind, Tag};
 
@@ -58,26 +56,26 @@ where
     }
 }
 
-pub struct WireSequenceEncoder<'a, W, B, const OPT: Options, C: ?Sized>
+pub struct WireSequenceEncoder<'a, W, const OPT: Options, C>
 where
-    B: Buf,
+    C: ?Sized + Context,
 {
     cx: &'a C,
     writer: W,
-    buffer: BufWriter<B>,
+    buffer: BufWriter<C::Buf<'a, u8>>,
 }
 
-impl<'a, W, B, const OPT: Options, C: ?Sized> WireSequenceEncoder<'a, W, B, OPT, C>
+impl<'a, W, const OPT: Options, C> WireSequenceEncoder<'a, W, OPT, C>
 where
-    B: Buf,
+    C: ?Sized + Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W, buffer: BufVec<B>) -> Self {
+    pub(crate) fn new(cx: &'a C, writer: W, buf: C::Buf<'a, u8>) -> Self {
         Self {
             cx,
             writer,
-            buffer: BufWriter::new(buffer),
+            buffer: BufWriter::new(buf),
         }
     }
 }
@@ -93,7 +91,7 @@ where
     type Ok = ();
     type Mode = C::Mode;
     type WithContext<'this, U> = WireEncoder<'this, W, OPT, U> where U: 'this + Context;
-    type EncodePack = WireSequenceEncoder<'a, W, C::Buf<'a>, OPT, C>;
+    type EncodePack = WireSequenceEncoder<'a, W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -341,15 +339,14 @@ where
     }
 }
 
-impl<'a, W, B, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<'a, W, B, OPT, C>
+impl<'a, W, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<'a, W, OPT, C>
 where
     C: ?Sized + Context,
     W: Writer,
-    B: Buf<Item = u8>,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this;
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a, u8>>, OPT, C> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {

@@ -33,14 +33,14 @@ const MAX_REGIONS: usize = 2;
 /// # Examples
 ///
 /// ```
-/// use musli::allocator::System;
 /// use musli::{Allocator, Buf};
+/// use musli::allocator::System;
 /// use musli::buf::BufVec;
 ///
-/// let allocator = System::new();
+/// let alloc = System::new();
 ///
-/// let mut buf1 = BufVec::new(&allocator).expect("allocation failed");
-/// let mut buf2 = BufVec::new(&allocator).expect("allocation failed");
+/// let mut buf1 = BufVec::new_in(&alloc).expect("allocation failed");
+/// let mut buf2 = BufVec::new_in(&alloc).expect("allocation failed");
 //
 /// assert!(buf1.write(b"Hello, "));
 /// assert!(buf2.write(b"world!"));
