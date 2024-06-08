@@ -9,6 +9,7 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
+use crate::buf::BytesBuf;
 use crate::writer::Writer;
 use crate::{Buf, Context};
 
@@ -189,10 +190,10 @@ impl<const N: usize> Writer for FixedBytes<N> {
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: B) -> Result<(), C::Error>
+    fn write_buffer<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf,
+        B: Buf<Item = u8>,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())

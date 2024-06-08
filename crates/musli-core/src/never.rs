@@ -74,7 +74,7 @@ where
     type Item = T;
 
     #[inline]
-    fn reserve(&mut self, _: usize) -> bool {
+    fn resize(&mut self, _: usize, _: usize) -> bool {
         match self._never {}
     }
 
@@ -89,7 +89,7 @@ where
     }
 
     #[inline]
-    fn try_merge<B>(&mut self, _: B) -> Result<(), B>
+    fn try_merge<B>(&mut self, _: usize, _: B, _: usize) -> Result<(), B>
     where
         B: Buf<Item = Self::Item>,
     {

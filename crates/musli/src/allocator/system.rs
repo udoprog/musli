@@ -1,14 +1,13 @@
 use core::alloc::Layout;
-use core::fmt::{self, Arguments};
+use core::marker::PhantomData;
 use core::mem::align_of;
 use core::ptr;
 use core::ptr::NonNull;
-use core::slice;
 
 use ::alloc::alloc;
 use ::alloc::boxed::Box;
 
-use crate::buf::Error;
+use crate::buf::AlignedBuf;
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::loom::sync::with_mut_usize;
@@ -144,17 +143,21 @@ impl Default for System {
 }
 
 impl Allocator for System {
-    type Buf<'this> = SystemBuf<'this> where Self: 'this;
+    type Buf<'this, T> = SystemBuf<'this, T> where Self: 'this, T: 'static;
 
     #[inline(always)]
-    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_>> {
+    fn alloc_aligned<T>(&self) -> Option<AlignedBuf<Self::Buf<'_, T>>>
+    where
+        T: 'static,
+    {
         // SAFETY: The alignment of `T` is always valid.
         let region = unsafe { self.root.alloc(align_of::<T>())? };
 
-        Some(SystemBuf {
+        Some(AlignedBuf::new(SystemBuf {
             root: &self.root,
             region,
-        })
+            _marker: PhantomData,
+        }))
     }
 }
 
@@ -175,45 +178,47 @@ impl Drop for System {
 }
 
 /// A vector-backed allocation.
-pub struct SystemBuf<'a> {
+pub struct SystemBuf<'a, T> {
     root: &'a Root,
     region: &'a mut Region,
+    _marker: PhantomData<T>,
 }
 
-impl<'a> Buf for SystemBuf<'a> {
+impl<'a, T> Buf for SystemBuf<'a, T>
+where
+    T: 'static,
+{
+    type Item = T;
+
     #[inline]
-    fn write(&mut self, bytes: &[u8]) -> bool {
-        self.region.extend_from_slice(bytes)
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.region.len()
-    }
-
-    #[inline(always)]
-    fn as_slice(&self) -> &[u8] {
-        self.region.as_slice()
-    }
-
-    #[inline(always)]
-    fn write_fmt(&mut self, arguments: Arguments<'_>) -> Result<(), Error> {
-        fmt::write(self, arguments).map_err(|_| Error)
-    }
-}
-
-impl fmt::Write for SystemBuf<'_> {
-    #[inline(always)]
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        if !self.region.extend_from_slice(s.as_bytes()) {
-            return Err(fmt::Error);
+    fn resize(&mut self, old: usize, new: usize) -> bool {
+        if new < old {
+            return true;
         }
 
-        Ok(())
+        unsafe { self.region.reserve(new - old) }
+    }
+
+    #[inline]
+    fn as_ptr(&self) -> *const Self::Item {
+        self.region.data.as_ptr().cast_const().cast()
+    }
+
+    #[inline]
+    fn as_ptr_mut(&mut self) -> *mut Self::Item {
+        self.region.data.as_ptr().cast()
+    }
+
+    #[inline]
+    fn try_merge<B>(&mut self, _: usize, other: B, _: usize) -> Result<(), B>
+    where
+        B: Buf<Item = Self::Item>,
+    {
+        Err(other)
     }
 }
 
-impl<'a> Drop for SystemBuf<'a> {
+impl<'a, T> Drop for SystemBuf<'a, T> {
     fn drop(&mut self) {
         self.root.free(self.region);
     }
@@ -365,24 +370,6 @@ impl Region {
         true
     }
 
-    /// Extend the region with the given bytes.
-    #[must_use = "allocating is fallible and must be checked"]
-    fn extend_from_slice(&mut self, bytes: &[u8]) -> bool {
-        // SAFETY: The region is correctly initialized.
-        unsafe {
-            if !self.reserve(bytes.len()) {
-                return false;
-            }
-
-            let dst = self.data.as_ptr().wrapping_add(self.len);
-            let len = bytes.len();
-            bytes.as_ptr().copy_to_nonoverlapping(dst, len);
-            self.len += len;
-        }
-
-        true
-    }
-
     fn free(&mut self) {
         if self.cap != 0 {
             // SAFETY: Layout assumptions are correctly encoded in the type as it was being allocated or grown.
@@ -392,19 +379,6 @@ impl Region {
                 ptr::write(self, Region::DANGLING);
             }
         }
-    }
-
-    /// Get initialized slice of the region.
-    #[inline]
-    fn as_slice(&self) -> &[u8] {
-        // SAFETY: The region is correctly initialized.
-        unsafe { slice::from_raw_parts(self.data.as_ptr(), self.len) }
-    }
-
-    /// Get the length of the region.
-    #[inline]
-    fn len(&self) -> usize {
-        self.len
     }
 }
 

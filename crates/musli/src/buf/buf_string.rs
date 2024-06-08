@@ -2,12 +2,13 @@ use core::fmt::{self, Write};
 use core::ops::Deref;
 use core::str;
 
+use crate::buf::BytesBuf;
 use crate::fixed::CapacityError;
 use crate::{Buf, Context};
 
 /// Wrapper around a [`Buf`], guaranteed to be a valid utf-8 string.
 pub struct BufString<B> {
-    buf: B,
+    buf: BytesBuf<B>,
 }
 
 /// Collect a string into a string buffer.
@@ -31,10 +32,10 @@ where
 
 impl<B> BufString<B>
 where
-    B: Buf,
+    B: Buf<Item = u8>,
 {
     /// Construct a new fixed string.
-    pub(crate) const fn new(buf: B) -> BufString<B> {
+    pub(crate) const fn new(buf: BytesBuf<B>) -> BufString<B> {
         BufString { buf }
     }
 
@@ -62,7 +63,7 @@ where
 
 impl<B> fmt::Write for BufString<B>
 where
-    B: Buf,
+    B: Buf<Item = u8>,
 {
     fn write_char(&mut self, c: char) -> fmt::Result {
         self.try_push(c).map_err(|_| fmt::Error)
@@ -75,7 +76,7 @@ where
 
 impl<B> Deref for BufString<B>
 where
-    B: Buf,
+    B: Buf<Item = u8>,
 {
     type Target = str;
 
@@ -87,7 +88,7 @@ where
 
 impl<B> fmt::Display for BufString<B>
 where
-    B: Buf,
+    B: Buf<Item = u8>,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -97,7 +98,7 @@ where
 
 impl<B> AsRef<str> for BufString<B>
 where
-    B: Buf,
+    B: Buf<Item = u8>,
 {
     #[inline]
     fn as_ref(&self) -> &str {

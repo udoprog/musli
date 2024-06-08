@@ -1,30 +1,40 @@
-use core::fmt::Arguments;
+use core::marker::PhantomData;
 
-use crate::buf::Error;
+use crate::buf::AlignedBuf;
 use crate::{Allocator, Buf};
 
 /// An empty buffer.
-pub struct EmptyBuf;
+pub struct EmptyBuf<T> {
+    _marker: PhantomData<T>,
+}
 
-impl Buf for EmptyBuf {
-    #[inline(always)]
-    fn write(&mut self, _: &[u8]) -> bool {
+impl<T> Buf for EmptyBuf<T>
+where
+    T: 'static,
+{
+    type Item = T;
+
+    #[inline]
+    fn resize(&mut self, _: usize, _: usize) -> bool {
         false
     }
 
-    #[inline(always)]
-    fn len(&self) -> usize {
-        0
+    #[inline]
+    fn as_ptr(&self) -> *const Self::Item {
+        unimplemented!()
     }
 
-    #[inline(always)]
-    fn as_slice(&self) -> &[u8] {
-        &[]
+    #[inline]
+    fn as_ptr_mut(&mut self) -> *mut Self::Item {
+        unimplemented!()
     }
 
-    #[inline(always)]
-    fn write_fmt(&mut self, _: Arguments<'_>) -> Result<(), Error> {
-        Err(Error)
+    #[inline]
+    fn try_merge<B>(&mut self, _: usize, other: B, _: usize) -> Result<(), B>
+    where
+        B: Buf<Item = Self::Item>,
+    {
+        Err(other)
     }
 }
 
@@ -50,15 +60,15 @@ impl Default for Disabled {
 }
 
 impl Allocator for Disabled {
-    type Buf<'this, T> = EmptyBuf;
+    type Buf<'this, T> = EmptyBuf<T> where T: 'static;
 
     #[inline(always)]
-    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_>> {
-        Some(EmptyBuf)
-    }
-
-    #[inline(always)]
-    fn alloc(&self) -> Option<Self::Buf<'_>> {
-        Some(EmptyBuf)
+    fn alloc_aligned<T>(&self) -> Option<AlignedBuf<Self::Buf<'_, T>>>
+    where
+        T: 'static,
+    {
+        Some(AlignedBuf::new(EmptyBuf {
+            _marker: PhantomData,
+        }))
     }
 }

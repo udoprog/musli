@@ -49,7 +49,9 @@ where
     /// });
     /// ```
     pub fn write(&mut self, bytes: &[u8]) -> bool {
-        if !self.buf.reserve(bytes.len()) {
+        let new = self.len + bytes.len();
+
+        if !self.buf.resize(self.len, new) {
             return false;
         }
 
@@ -59,7 +61,7 @@ where
                 .as_ptr_mut()
                 .add(self.len)
                 .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
-            self.len += bytes.len();
+            self.len = new;
         }
 
         true
@@ -174,7 +176,7 @@ where
         U: Buf<Item = u8>,
     {
         // Try to merge one buffer with another.
-        if let Err(buf) = self.buf.try_merge(other.buf) {
+        if let Err(buf) = self.buf.try_merge(self.len, other.buf, other.len) {
             let other = BytesBuf {
                 len: other.len,
                 buf,
@@ -238,6 +240,11 @@ impl<B> AlignedBuf<B>
 where
     B: Buf,
 {
+    /// Construct a new aligned buffer wrapping the given buffer.
+    pub fn new(buf: B) -> Self {
+        Self { buf, len: 0 }
+    }
+
     fn into_inner(self) -> B {
         let buf = ManuallyDrop::new(self);
         unsafe { ptr::addr_of!((&buf).buf).read() }
@@ -245,14 +252,16 @@ where
 
     /// Push an item into the buffer.
     pub fn push(&mut self, item: B::Item) -> bool {
-        if !self.buf.reserve(1) {
+        let new = self.len + 1;
+
+        if !self.buf.resize(self.len, new) {
             return false;
         }
 
         // SAFETY: The call to reserve ensures that we have enough capacity.
         unsafe {
             self.buf.as_ptr_mut().add(self.len).write(item);
-            self.len += 1;
+            self.len = new;
         }
 
         true
@@ -285,8 +294,8 @@ pub trait Buf {
     /// An item in the buffer.
     type Item: 'static;
 
-    /// Reserve space for the given number of items.
-    fn reserve(&mut self, additional: usize) -> bool;
+    /// Resize the buffer.
+    fn resize(&mut self, old: usize, new: usize) -> bool;
 
     /// Get a pointer into the buffer.
     fn as_ptr(&self) -> *const Self::Item;
@@ -296,8 +305,11 @@ pub trait Buf {
 
     /// Try to merge one buffer with another.
     ///
+    /// The two length parameters refers to the initialized length of the two
+    /// buffers.
+    ///
     /// If this returns `Err(B)` if merging was not possible.
-    fn try_merge<B>(&mut self, other: B) -> Result<(), B>
+    fn try_merge<B>(&mut self, this_len: usize, other: B, other_len: usize) -> Result<(), B>
     where
         B: Buf<Item = Self::Item>;
 }

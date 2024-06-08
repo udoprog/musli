@@ -2,15 +2,13 @@
 mod tests;
 
 use core::cell::UnsafeCell;
-use core::fmt::{self, Arguments};
 use core::marker::PhantomData;
-use core::mem::{align_of, forget, replace, MaybeUninit};
+use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
 use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
-use core::slice;
 
-use crate::buf::Error;
+use crate::buf::AlignedBuf;
 use crate::{Allocator, Buf};
 
 #[cfg(test)]
@@ -217,41 +215,47 @@ impl<'a> Stack<'a> {
 }
 
 impl Allocator for Stack<'_> {
-    type Buf<'this> = StackBuf<'this> where Self: 'this;
+    type Buf<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'static;
 
-    #[inline(always)]
-    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_>> {
+    #[inline]
+    fn alloc_aligned<T>(&self) -> Option<AlignedBuf<Self::Buf<'_, T>>>
+    where
+        T: 'static,
+    {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
         let region = unsafe { (*self.internal.get()).alloc(0, align_of::<T>())? };
 
-        Some(StackBuf {
+        Some(AlignedBuf::new(StackBuf {
             region: region.id,
-            len: 0,
-            align: align_of::<T>(),
             internal: &self.internal,
-        })
+            _marker: PhantomData,
+        }))
     }
 }
 
 /// A no-std allocated buffer.
-pub struct StackBuf<'a> {
+pub struct StackBuf<'a, T> {
     region: HeaderId,
-    len: usize,
-    align: usize,
     internal: &'a UnsafeCell<Internal>,
+    _marker: PhantomData<T>,
 }
 
-impl<'a> Buf for StackBuf<'a> {
+impl<'a, T> Buf for StackBuf<'a, T>
+where
+    T: 'static,
+{
+    type Item = T;
+
     #[inline]
-    fn write(&mut self, bytes: &[u8]) -> bool {
-        if bytes.is_empty() {
+    fn resize(&mut self, old: usize, requested: usize) -> bool {
+        if requested == 0 {
             return true;
         }
 
-        let bytes_len = bytes.len();
+        let requested = size_of::<T>() * requested;
 
-        if self.len + bytes_len > MAX_BYTES {
+        if requested > MAX_BYTES {
             return false;
         }
 
@@ -262,116 +266,92 @@ impl<'a> Buf for StackBuf<'a> {
 
             let region = i.region(self.region);
 
-            // Region can fit the bytes available.
-            let region = 'out: {
-                let requested = self.len + bytes_len;
-
-                // Region can already fit in the requested bytes.
-                if region.capacity() >= requested {
-                    break 'out region;
-                };
-
-                let Some(region) = i.realloc(self.region, self.len, requested, self.align) else {
-                    return false;
-                };
-
-                self.region = region.id;
-                region
+            // Region can already fit in the requested bytes.
+            if region.capacity() >= requested {
+                return true;
             };
 
-            let dest = region.start.add(self.len).cast();
-            bytes.as_ptr().copy_to_nonoverlapping(dest, bytes_len);
-            self.len += bytes.len();
+            let old = old * size_of::<T>();
+
+            let Some(region) = i.realloc(self.region, old, requested, align_of::<T>()) else {
+                return false;
+            };
+
+            self.region = region.id;
             true
         }
     }
 
     #[inline]
-    fn write_buffer<B>(&mut self, buf: B) -> bool
-    where
-        B: Buf,
-    {
-        'out: {
-            let other_len = buf.len();
-            // NB: Placing this here to make miri happy, since accessing the
-            // slice will mean mutably accessing the internal state.
-            let other_ptr = buf.as_slice().as_ptr().cast();
-
-            unsafe {
-                let i = &mut *self.internal.get();
-                let mut this = i.region(self.region);
-
-                debug_assert!(this.capacity() >= self.len);
-
-                // If this region immediately follows the other region, we can
-                // optimize the write by simply growing the current region and
-                // de-allocating the second since the only conclusion is that
-                // they share the same allocator.
-                if !ptr::eq(this.end.cast_const(), other_ptr) {
-                    break 'out;
-                }
-
-                let Some(next) = this.next else {
-                    break 'out;
-                };
-
-                // Prevent the other buffer from being dropped, since we're
-                // taking care of the allocation in here directly instead.
-                forget(buf);
-
-                let next = i.region(next);
-
-                let to = this.start.wrapping_add(self.len);
-
-                // Data needs to be shuffle back to the end of the initialized
-                // region.
-                if this.end != to {
-                    this.end.copy_to(to, other_len);
-                }
-
-                let old = i.free_region(next);
-                this.end = old.end;
-                self.len += other_len;
-                return true;
-            }
-        }
-
-        self.write(buf.as_slice())
-    }
-
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.len
-    }
-
-    #[inline(always)]
-    fn as_slice(&self) -> &[u8] {
+    fn as_ptr(&self) -> *const Self::Item {
         unsafe {
             let i = &*self.internal.get();
             let this = i.header(self.region);
-            let ptr = this.start.cast();
-            slice::from_raw_parts(ptr, self.len)
+            this.start.cast_const().cast()
         }
     }
 
-    #[inline(always)]
-    fn write_fmt(&mut self, arguments: Arguments<'_>) -> Result<(), Error> {
-        fmt::write(self, arguments).map_err(|_| Error)
-    }
-}
-
-impl fmt::Write for StackBuf<'_> {
     #[inline]
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        if !self.write(s.as_bytes()) {
-            return Err(fmt::Error);
+    fn as_ptr_mut(&mut self) -> *mut Self::Item {
+        unsafe {
+            let i = &*self.internal.get();
+            let this = i.header(self.region);
+            this.start.cast()
         }
+    }
 
-        Ok(())
+    #[inline]
+    fn try_merge<B>(&mut self, this_len: usize, buf: B, other_len: usize) -> Result<(), B>
+    where
+        B: Buf<Item = T>,
+    {
+        let this_len = this_len * size_of::<T>();
+        let other_len = other_len * size_of::<T>();
+
+        // NB: Placing this here to make miri happy, since accessing the
+        // slice will mean mutably accessing the internal state.
+        let other_ptr = buf.as_ptr().cast();
+
+        unsafe {
+            let i = &mut *self.internal.get();
+            let mut this = i.region(self.region);
+
+            debug_assert!(this.capacity() >= this_len);
+
+            // If this region immediately follows the other region, we can
+            // optimize the write by simply growing the current region and
+            // de-allocating the second since the only conclusion is that
+            // they share the same allocator.
+            if !ptr::eq(this.end.cast_const(), other_ptr) {
+                return Err(buf);
+            }
+
+            let Some(next) = this.next else {
+                return Err(buf);
+            };
+
+            // Prevent the other buffer from being dropped, since we're
+            // taking care of the allocation in here directly instead.
+            forget(buf);
+
+            let next = i.region(next);
+
+            let to = this.start.wrapping_add(this_len);
+
+            // Data needs to be shuffle back to the end of the initialized
+            // region.
+            if this.end != to {
+                this.end.copy_to(to, other_len);
+            }
+
+            let old = i.free_region(next);
+            this.end = old.end;
+            Ok(())
+        }
     }
 }
 
-impl Drop for StackBuf<'_> {
+impl<T> Drop for StackBuf<'_, T> {
     fn drop(&mut self) {
         // SAFETY: We have exclusive access to the internal state.
         unsafe {

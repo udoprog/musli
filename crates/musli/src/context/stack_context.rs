@@ -3,7 +3,7 @@ use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::ops::Range;
 
-use crate::buf::{self, BufString};
+use crate::buf::{self, BufString, BytesBuf};
 use crate::fixed::FixedVec;
 use crate::{Allocator, Context};
 
@@ -11,7 +11,7 @@ use super::access::{Access, Shared};
 use super::rich_error::{RichError, Step};
 use super::ErrorMarker;
 
-type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a>>);
+type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a, u8>>);
 
 /// A rich context which uses allocations and tracks the exact location of
 /// errors.
@@ -25,7 +25,7 @@ where
     alloc: &'a A,
     mark: Cell<usize>,
     errors: UnsafeCell<FixedVec<BufPair<'a, A>, E>>,
-    path: UnsafeCell<FixedVec<Step<BufString<A::Buf<'a>>>, P>>,
+    path: UnsafeCell<FixedVec<Step<BufString<A::Buf<'a, u8>>>, P>>,
     // How many elements of `path` we've gone over capacity.
     path_cap: Cell<usize>,
     include_type: bool,
@@ -95,7 +95,7 @@ where
     }
 
     /// Push an error into the collection.
-    fn push_error(&self, range: Range<usize>, error: BufString<A::Buf<'a>>) {
+    fn push_error(&self, range: Range<usize>, error: BufString<A::Buf<'a, u8>>) {
         let _access = self.access.exclusive();
 
         // SAFETY: We've checked that we have exclusive access just above.
@@ -105,7 +105,7 @@ where
     }
 
     /// Push a path.
-    fn push_path(&self, step: Step<BufString<A::Buf<'a>>>) {
+    fn push_path(&self, step: Step<BufString<A::Buf<'a, u8>>>) {
         let _access = self.access.exclusive();
 
         // SAFETY: We've checked that we have exclusive access just above.
@@ -133,7 +133,7 @@ where
         }
     }
 
-    fn format_string<T>(&self, value: T) -> Option<BufString<A::Buf<'a>>>
+    fn format_string<T>(&self, value: T) -> Option<BufString<A::Buf<'a, u8>>>
     where
         T: fmt::Display,
     {
@@ -152,8 +152,8 @@ where
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = usize;
-    type Buf<'this> = A::Buf<'this> where Self: 'this;
-    type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
+    type Buf<'this> = A::Buf<'this, u8> where Self: 'this;
+    type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
 
     #[inline]
     fn clear(&self) {
@@ -168,7 +168,7 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Option<Self::Buf<'_>> {
+    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
         self.alloc.alloc()
     }
 
@@ -349,8 +349,8 @@ pub struct Errors<'a, 'buf, A>
 where
     A: 'buf + ?Sized + Allocator,
 {
-    path: &'a [Step<BufString<A::Buf<'buf>>>],
-    errors: &'a [(Range<usize>, BufString<A::Buf<'buf>>)],
+    path: &'a [Step<BufString<A::Buf<'buf, u8>>>],
+    errors: &'a [(Range<usize>, BufString<A::Buf<'buf, u8>>)],
     index: usize,
     path_cap: usize,
     _access: Shared<'a>,
@@ -360,7 +360,7 @@ impl<'a, 'buf, A> Iterator for Errors<'a, 'buf, A>
 where
     A: ?Sized + Allocator,
 {
-    type Item = RichError<'a, BufString<A::Buf<'buf>>, BufString<A::Buf<'buf>>>;
+    type Item = RichError<'a, BufString<A::Buf<'buf, u8>>, BufString<A::Buf<'buf, u8>>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

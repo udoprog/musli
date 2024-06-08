@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 
 #[cfg(not(loom))]
 use crate::allocator::System;
-use crate::buf::{self, BufString};
+use crate::buf::{self, BufString, BytesBuf};
 use crate::{Allocator, Context};
 
 use super::access::{self, Access};
@@ -128,8 +128,8 @@ where
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = usize;
-    type Buf<'this> = A::Buf<'this> where Self: 'this;
-    type BufString<'this> = BufString<A::Buf<'this>> where Self: 'this;
+    type Buf<'this> = A::Buf<'this, u8> where Self: 'this;
+    type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
 
     #[inline]
     fn clear(&self) {
@@ -144,7 +144,7 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Option<Self::Buf<'_>> {
+    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
         self.alloc.alloc()
     }
 
