@@ -1,3 +1,4 @@
+use crate::buf::BytesBuf;
 use crate::de::Visitor;
 use crate::json::parser::integer::decode_signed_full;
 use crate::json::parser::{StringReference, Token};
@@ -31,15 +32,14 @@ pub trait Parser<'de>: private::Sealed {
     /// Must parse the string from the input buffer and validate that it is
     /// valid UTF-8.
     #[doc(hidden)]
-    fn parse_string<'scratch, C, S>(
+    fn parse_string<'scratch, C>(
         &mut self,
         cx: &C,
         validate: bool,
-        scratch: &'scratch mut S,
+        scratch: &'scratch mut BytesBuf<impl Buf<Item = u8>>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: ?Sized + Context,
-        S: ?Sized + Buf;
+        C: ?Sized + Context;
 
     /// Skip a string.
     #[doc(hidden)]
@@ -227,15 +227,14 @@ where
     }
 
     #[inline(always)]
-    fn parse_string<'scratch, C, S>(
+    fn parse_string<'scratch, C>(
         &mut self,
         cx: &C,
         validate: bool,
-        scratch: &'scratch mut S,
+        scratch: &'scratch mut BytesBuf<impl Buf<Item = u8>>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: ?Sized + Context,
-        S: ?Sized + Buf,
     {
         (**self).parse_string(cx, validate, scratch)
     }

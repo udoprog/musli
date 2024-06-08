@@ -1,4 +1,3 @@
-use crate::buf::BytesBuf;
 use crate::Buf;
 
 /// An allocator that can be used in combination with a context.
@@ -25,8 +24,8 @@ pub trait Allocator {
     ///
     /// Calling this method returns `None` if the allocation failed.
     #[inline]
-    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_, u8>>> {
-        Some(BytesBuf::new(self.alloc_aligned::<u8>()?))
+    fn alloc(&self) -> Option<Self::Buf<'_, u8>> {
+        self.alloc_aligned::<u8>()
     }
 }
 
@@ -45,7 +44,7 @@ where
     }
 
     #[inline(always)]
-    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_, u8>>> {
+    fn alloc(&self) -> Option<Self::Buf<'_, u8>> {
         (*self).alloc()
     }
 }

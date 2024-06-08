@@ -137,7 +137,7 @@ where
     where
         T: fmt::Display,
     {
-        let buf = self.alloc.alloc()?;
+        let buf = BytesBuf::new(self.alloc.alloc()?);
         let mut string = BufString::new(buf);
         write!(string, "{value}").ok()?;
         Some(string)
@@ -169,7 +169,7 @@ where
 
     #[inline]
     fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
-        self.alloc.alloc()
+        Some(BytesBuf::new(self.alloc.alloc()?))
     }
 
     #[inline]

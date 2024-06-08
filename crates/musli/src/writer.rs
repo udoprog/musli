@@ -33,7 +33,7 @@ pub trait Writer {
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write a buffer to the current writer.
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>;
@@ -65,12 +65,12 @@ where
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,
     {
-        (*self).write_buffer(cx, buffer)
+        (*self).extend(cx, buffer)
     }
 
     #[inline]
@@ -100,7 +100,7 @@ impl Writer for Vec<u8> {
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,
@@ -139,7 +139,7 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,
@@ -186,18 +186,24 @@ impl Writer for &mut [u8] {
 }
 
 /// A writer that writes against an underlying [`Buf`].
-pub struct BufWriter<T> {
-    buf: BytesBuf<T>,
+pub struct BufWriter<B>
+where
+    B: Buf,
+{
+    buf: BytesBuf<B>,
 }
 
-impl<T> BufWriter<T> {
+impl<B> BufWriter<B>
+where
+    B: Buf,
+{
     /// Construct a new buffer writer.
-    pub fn new(buf: BytesBuf<T>) -> Self {
+    pub fn new(buf: BytesBuf<B>) -> Self {
         Self { buf }
     }
 
     /// Coerce into inner buffer.
-    pub fn into_inner(self) -> BytesBuf<T> {
+    pub fn into_inner(self) -> BytesBuf<B> {
         self.buf
     }
 }
@@ -216,7 +222,7 @@ where
     }
 
     #[inline(always)]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,

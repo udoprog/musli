@@ -14,8 +14,6 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::storage::en::StorageEncoder;
 #[cfg(feature = "alloc")]
 use crate::writer::BufWriter;
-#[cfg(feature = "alloc")]
-use crate::Buf;
 use crate::{Context, Options};
 
 use super::value::{Number, Value};

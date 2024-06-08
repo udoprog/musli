@@ -1,6 +1,9 @@
 //! Types related to buffers.
 
 use core::fmt::{self, Arguments};
+use core::mem::ManuallyDrop;
+use core::ops::{Deref, DerefMut};
+use core::ptr;
 
 /// An error raised when we fail to write.
 #[derive(Debug)]
@@ -13,16 +16,75 @@ impl fmt::Display for Error {
 }
 
 /// A bytes-oriented buffer.
-pub struct BytesBuf<B> {
+pub struct BytesBuf<B>
+where
+    B: Buf,
+{
     buf: B,
     len: usize,
 }
 
 impl<B> BytesBuf<B>
 where
+    B: Buf,
+{
+    #[inline]
+    fn into_parts(self) -> (B, usize) {
+        let this = ManuallyDrop::new(self);
+
+        // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
+        unsafe {
+            let buf = ptr::addr_of!((&this).buf).read();
+            (buf, this.len)
+        }
+    }
+
+    /// Write a single item.
+    ///
+    /// Returns `true` if the item could be successfully written. A `false`
+    /// value indicates that we are out of buffer capacity.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Buf};
+    ///
+    /// musli::allocator::default!(|alloc| {
+    ///     let mut a = alloc.alloc().expect("allocation failed");
+    ///
+    ///     a.push(b'H');
+    ///     a.push(b'e');
+    ///     a.push(b'l');
+    ///     a.push(b'l');
+    ///     a.push(b'o');
+    ///
+    ///     assert_eq!(a.as_slice(), b"Hello");
+    /// });
+    /// ```
+    #[inline]
+    pub fn push(&mut self, item: B::Item) -> bool {
+        let new = self.len + 1;
+
+        if !self.buf.resize(self.len, new) {
+            return false;
+        }
+
+        // SAFETY: The call to reserve ensures that we have enough capacity.
+        unsafe {
+            self.buf.as_ptr_mut().add(self.len).write(item);
+            self.len = new;
+        }
+
+        true
+    }
+}
+
+impl<B> BytesBuf<B>
+where
     B: Buf<Item = u8>,
 {
-    pub(crate) fn new(buf: B) -> Self {
+    /// Construct a new bytes buffer wrapper.
+    pub fn new(buf: B) -> Self {
         Self { buf, len: 0 }
     }
 
@@ -44,9 +106,7 @@ where
     /// });
     /// ```
     pub fn write(&mut self, bytes: &[u8]) -> bool {
-        let new = self.len + bytes.len();
-
-        if !self.buf.resize(self.len, new) {
+        if !self.buf.resize(self.len, bytes.len()) {
             return false;
         }
 
@@ -56,37 +116,10 @@ where
                 .as_ptr_mut()
                 .add(self.len)
                 .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
-            self.len = new;
+            self.len += bytes.len();
         }
 
         true
-    }
-
-    /// Write a single byte.
-    ///
-    /// Returns `true` if the bytes could be successfully written. A `false`
-    /// value indicates that we are out of buffer capacity.
-    ///
-    /// ## Examples
-    ///
-    /// ```
-    /// use musli::{Allocator, Buf};
-    ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = alloc.alloc().expect("allocation failed");
-    ///
-    ///     a.push(b'H');
-    ///     a.push(b'e');
-    ///     a.push(b'l');
-    ///     a.push(b'l');
-    ///     a.push(b'o');
-    ///
-    ///     assert_eq!(a.as_slice(), b"Hello");
-    /// });
-    /// ```
-    #[inline]
-    pub fn push(&mut self, byte: u8) -> bool {
-        self.write(&[byte])
     }
 
     /// Get the initialized part of the buffer as a slice.
@@ -161,25 +194,28 @@ where
     ///     a.write(b"Hello");
     ///     b.write(b" World");
     ///
-    ///     a.write_buffer(b);
+    ///     a.extend(b);
     ///     assert_eq!(a.as_slice(), b"Hello World");
     /// });
     /// ```
     #[inline]
-    pub fn write_buffer<U>(&mut self, other: BytesBuf<U>) -> bool
+    pub fn extend<U>(&mut self, other: BytesBuf<U>) -> bool
     where
         U: Buf<Item = u8>,
     {
+        let (other, other_len) = other.into_parts();
+
         // Try to merge one buffer with another.
-        if let Err(buf) = self.buf.try_merge(self.len, other.buf, other.len) {
+        if let Err(buf) = self.buf.try_merge(self.len, other, other_len) {
             let other = BytesBuf {
-                len: other.len,
                 buf,
+                len: other_len,
             };
 
             return self.write(other.as_slice());
         }
 
+        self.len += other_len;
         true
     }
 
@@ -202,7 +238,9 @@ where
     /// ```
     #[inline]
     pub fn write_fmt(&mut self, arguments: Arguments<'_>) -> Result<(), Error> {
-        struct Write<'a, B>(&'a mut BytesBuf<B>);
+        struct Write<'a, B>(&'a mut BytesBuf<B>)
+        where
+            B: Buf;
 
         impl<B> fmt::Write for Write<'_, B>
         where
@@ -222,43 +260,29 @@ where
     }
 }
 
-/// An aligned buffer.
-pub struct AlignedBuf<B>
+impl<B> Deref for BytesBuf<B>
 where
     B: Buf,
 {
-    buf: B,
-    len: usize,
+    type Target = B;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.buf
+    }
 }
 
-impl<B> AlignedBuf<B>
+impl<B> DerefMut for BytesBuf<B>
 where
     B: Buf,
 {
-    /// Construct a new aligned buffer wrapping the given buffer.
-    pub fn new(buf: B) -> Self {
-        Self { buf, len: 0 }
-    }
-
-    /// Push an item into the buffer.
-    pub fn push(&mut self, item: B::Item) -> bool {
-        let new = self.len + 1;
-
-        if !self.buf.resize(self.len, new) {
-            return false;
-        }
-
-        // SAFETY: The call to reserve ensures that we have enough capacity.
-        unsafe {
-            self.buf.as_ptr_mut().add(self.len).write(item);
-            self.len = new;
-        }
-
-        true
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buf
     }
 }
 
-impl<B> Drop for AlignedBuf<B>
+impl<B> Drop for BytesBuf<B>
 where
     B: Buf,
 {
@@ -273,8 +297,6 @@ where
     }
 }
 
-impl<B> AlignedBuf<B> where B: Buf {}
-
 /// A raw buffer allocated from a context.
 ///
 /// Buffers are allocated through an allocator using [`Allocator::alloc`].
@@ -285,7 +307,7 @@ pub trait Buf {
     type Item: 'static;
 
     /// Resize the buffer.
-    fn resize(&mut self, old: usize, new: usize) -> bool;
+    fn resize(&mut self, len: usize, additional: usize) -> bool;
 
     /// Get a pointer into the buffer.
     fn as_ptr(&self) -> *const Self::Item;

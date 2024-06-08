@@ -7,7 +7,10 @@ use crate::fixed::CapacityError;
 use crate::{Buf, Context};
 
 /// Wrapper around a [`Buf`], guaranteed to be a valid utf-8 string.
-pub struct BufString<B> {
+pub struct BufString<B>
+where
+    B: Buf,
+{
     buf: BytesBuf<B>,
 }
 

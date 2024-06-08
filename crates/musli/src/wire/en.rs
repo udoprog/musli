@@ -1,5 +1,6 @@
 use core::fmt;
 
+use crate::buf::BytesBuf;
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
@@ -66,7 +67,7 @@ pub struct WireSequenceEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
 impl<'a, W, B, const OPT: Options, C: ?Sized> WireSequenceEncoder<'a, W, B, OPT, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W, buffer: B) -> Self {
+    pub(crate) fn new(cx: &'a C, writer: W, buffer: BytesBuf<B>) -> Self {
         Self {
             cx,
             writer,
@@ -338,11 +339,11 @@ impl<'a, W, B, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<'a
 where
     C: ?Sized + Context,
     W: Writer,
-    B: Buf,
+    B: Buf<Item = u8>,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this, B: Buf;
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<B>, OPT, C> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -353,7 +354,7 @@ where
     fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), buffer.len())?;
-        self.writer.write_buffer(self.cx, buffer)?;
+        self.writer.extend(self.cx, buffer)?;
         Ok(())
     }
 }

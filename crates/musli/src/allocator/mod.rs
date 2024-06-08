@@ -12,10 +12,11 @@
 //!
 //! ```
 //! use musli::{Allocator, Buf};
+//! use musli::buf::BytesBuf;
 //!
 //! musli::allocator::default!(|alloc| {
-//!     let mut a = alloc.alloc().expect("allocation a failed");
-//!     let mut b = alloc.alloc().expect("allocation b failed");
+//!     let mut a = BytesBuf::new(alloc.alloc().expect("allocation a failed"));
+//!     let mut b = BytesBuf::new(alloc.alloc().expect("allocation b failed"));
 //!
 //!     b.write(b"He11o");
 //!     a.write(b.as_slice());
@@ -28,7 +29,7 @@
 //!     assert_eq!(a.as_slice(), b"He11o W0rld");
 //!     assert_eq!(a.len(), 11);
 //!
-//!     let mut c = alloc.alloc().expect("allocation c failed");
+//!     let mut c = BytesBuf::new(alloc.alloc().expect("allocation c failed"));
 //!     c.write(b"!");
 //!     a.write(c.as_slice());
 //!
@@ -86,10 +87,11 @@ macro_rules! __default {
 ///
 /// ```
 /// use musli::{Allocator, Buf};
+/// use musli::buf::BytesBuf;
 ///
 /// musli::allocator::default!(|alloc| {
-///     let mut a = alloc.alloc().expect("allocation a failed");
-///     let mut b = alloc.alloc().expect("allocation b failed");
+///     let mut a = BytesBuf::new(alloc.alloc().expect("allocation a failed"));
+///     let mut b = BytesBuf::new(alloc.alloc().expect("allocation b failed"));
 ///
 ///     b.write(b"He11o");
 ///     a.write(b.as_slice());
@@ -102,7 +104,7 @@ macro_rules! __default {
 ///     assert_eq!(a.as_slice(), b"He11o W0rld");
 ///     assert_eq!(a.len(), 11);
 ///
-///     let mut c = alloc.alloc().expect("allocation c failed");
+///     let mut c = BytesBuf::new(alloc.alloc().expect("allocation c failed"));
 ///     c.write(b"!");
 ///     a.write(c.as_slice());
 ///

@@ -145,7 +145,7 @@ where
 
     #[inline]
     fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
-        self.alloc.alloc()
+        Some(BytesBuf::new(self.alloc.alloc()?))
     }
 
     #[inline]

@@ -102,7 +102,7 @@ use serde::{Deserialize, Serialize};
 use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
-use crate::buf::{self, BufString};
+use crate::buf::{self, BufString, BytesBuf};
 use crate::no_std;
 use crate::{Context, Decoder, Encoder};
 
@@ -140,7 +140,7 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Option<Self::Buf<'_>> {
+    fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_>>> {
         self.inner.alloc()
     }
 

@@ -1,5 +1,6 @@
 use core::fmt;
 
+use crate::buf::BytesBuf;
 use crate::en::{
     Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
@@ -7,8 +8,7 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
 use crate::storage::en::StorageEncoder;
 use crate::writer::BufWriter;
-use crate::{Buf, Context, Encode};
-use crate::{Options, Writer};
+use crate::{Buf, Context, Encode, Options, Writer};
 
 use super::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use super::tag::{
@@ -40,7 +40,7 @@ pub struct SelfPackEncoder<'a, W, B, const OPT: Options, C: ?Sized> {
 impl<'a, W, B, const OPT: Options, C: ?Sized> SelfPackEncoder<'a, W, B, OPT, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W, buffer: B) -> Self {
+    pub(crate) fn new(cx: &'a C, writer: W, buffer: BytesBuf<B>) -> Self {
         Self {
             cx,
             writer,
@@ -327,7 +327,7 @@ where
 impl<'a, W, B, const OPT: Options, C> SequenceEncoder for SelfPackEncoder<'a, W, B, OPT, C>
 where
     W: Writer,
-    B: Buf,
+    B: Buf<Item = u8>,
     C: ?Sized + Context,
 {
     type Cx = C;
@@ -343,7 +343,7 @@ where
     fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Bytes, buffer.len())?;
-        self.writer.write_buffer(self.cx, buffer)?;
+        self.writer.extend(self.cx, buffer)?;
         Ok(())
     }
 }

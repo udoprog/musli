@@ -40,7 +40,7 @@ where
     }
 
     #[inline]
-    fn write_buffer<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
+    fn extend<C, B>(&mut self, cx: &C, buffer: BytesBuf<B>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
         B: Buf<Item = u8>,

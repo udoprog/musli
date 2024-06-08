@@ -1,6 +1,6 @@
 use core::alloc::Layout;
 use core::marker::PhantomData;
-use core::mem::align_of;
+use core::mem::{align_of, size_of};
 use core::ptr;
 use core::ptr::NonNull;
 
@@ -39,19 +39,20 @@ const MAX_REGIONS: usize = 2;
 /// ```
 /// use musli::allocator::System;
 /// use musli::{Allocator, Buf};
+/// use musli::buf::BytesBuf;
 ///
 /// let allocator = System::new();
 ///
-/// let mut buf1 = allocator.alloc().expect("allocation failed");
-/// let mut buf2 = allocator.alloc().expect("allocation failed");
-///
+/// let mut buf1 = BytesBuf::new(allocator.alloc().expect("allocation failed"));
+/// let mut buf2 = BytesBuf::new(allocator.alloc().expect("allocation failed"));
+//
 /// assert!(buf1.write(b"Hello, "));
 /// assert!(buf2.write(b"world!"));
 ///
 /// assert_eq!(buf1.as_slice(), b"Hello, ");
 /// assert_eq!(buf2.as_slice(), b"world!");
 ///
-/// buf1.write_buffer(buf2);
+/// buf1.extend(buf2);
 /// assert_eq!(buf1.as_slice(), b"Hello, world!");
 /// ```
 pub struct System {
@@ -190,12 +191,15 @@ where
     type Item = T;
 
     #[inline]
-    fn resize(&mut self, old: usize, new: usize) -> bool {
-        if new < old {
+    fn resize(&mut self, len: usize, additional: usize) -> bool {
+        if additional == 0 {
             return true;
         }
 
-        unsafe { self.region.reserve(new - old) }
+        // SAFETY: The region is always valid.
+        let len = size_of::<T>() * len;
+        let additional = size_of::<T>() * additional;
+        unsafe { self.region.reserve(len, additional) }
     }
 
     #[inline]
@@ -227,8 +231,6 @@ impl<'a, T> Drop for SystemBuf<'a, T> {
 struct Region {
     /// Data pointer to the allocated region.
     data: NonNull<u8>,
-    /// Initialized length of the region.
-    len: usize,
     /// The capacity of the region.
     cap: usize,
     /// The alignment of the allocated region.
@@ -240,7 +242,6 @@ struct Region {
 impl Region {
     const DANGLING: Region = Region {
         data: NonNull::dangling(),
-        len: 0,
         cap: 0,
         align: 0,
         next: None,
@@ -272,7 +273,6 @@ impl Region {
 
         Some(Region {
             data: NonNull::new_unchecked(data),
-            len: 0,
             cap,
             align,
             next: None,
@@ -334,8 +334,8 @@ impl Region {
     }
 
     #[must_use = "allocating is fallible and must be checked"]
-    unsafe fn reserve(&mut self, additional: usize) -> bool {
-        let min_cap = self.len + additional;
+    unsafe fn reserve(&mut self, len: usize, additional: usize) -> bool {
+        let min_cap = len + additional;
 
         if self.cap >= min_cap {
             return true;
@@ -449,9 +449,7 @@ impl Root {
             return;
         }
 
-        if region.shrink_to(MAX_CAPACITY) {
-            region.len = 0;
-        } else {
+        if !region.shrink_to(MAX_CAPACITY) {
             // If we fail to shrink the region, the only option we have left is
             // to free it. Shrinking should only fail if there is insufficient
             // memory to allocate a new smaller region at the samt time as

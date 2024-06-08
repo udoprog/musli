@@ -89,7 +89,7 @@ impl<const C: usize> DerefMut for StackBuffer<C> {
 /// It is geared towards handling few allocations, but they can be arbitrarily
 /// large. It is optimized to work best when allocations are short lived and
 /// "merged back" into one previously allocated region through
-/// `Buffer::write_buffer`.
+/// `Buffer::extend`.
 ///
 /// It's also optimized to write to one allocation "at a time". So once an
 /// allocation has been grown once, it will be put in a region where it is
@@ -247,12 +247,12 @@ where
     type Item = T;
 
     #[inline]
-    fn resize(&mut self, old: usize, requested: usize) -> bool {
-        if requested == 0 {
+    fn resize(&mut self, len: usize, additional: usize) -> bool {
+        if additional == 0 {
             return true;
         }
 
-        let requested = size_of::<T>() * requested;
+        let requested = size_of::<T>() * (len + additional);
 
         if requested > MAX_BYTES {
             return false;
@@ -270,9 +270,9 @@ where
                 return true;
             };
 
-            let old = old * size_of::<T>();
+            let len = len * size_of::<T>();
 
-            let Some(region) = i.realloc(self.region, old, requested, align_of::<T>()) else {
+            let Some(region) = i.realloc(self.region, len, requested, align_of::<T>()) else {
                 return false;
             };
 

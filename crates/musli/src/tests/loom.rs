@@ -17,7 +17,7 @@ fn work(alloc: &System) {
     assert!(buf1.write(BIG1));
     assert!(buf2.write(BIG2));
 
-    buf1.write_buffer(buf2);
+    buf1.extend(buf2);
     assert!(buf1.as_slice().iter().eq(BIG1.iter().chain(BIG2)));
 }
 

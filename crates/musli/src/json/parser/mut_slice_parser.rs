@@ -1,3 +1,4 @@
+use crate::buf::BytesBuf;
 use crate::json::error::ErrorMessage;
 use crate::json::parser::{Parser, StringReference, Token};
 use crate::reader::SliceUnderflow;
@@ -36,15 +37,14 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     }
 
     #[inline]
-    fn parse_string<'scratch, C, S>(
+    fn parse_string<'scratch, C>(
         &mut self,
         cx: &C,
         validate: bool,
-        scratch: &'scratch mut S,
+        scratch: &'scratch mut BytesBuf<impl Buf<Item = u8>>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: ?Sized + Context,
-        S: ?Sized + Buf,
     {
         let start = cx.mark();
         let actual = self.lex(cx);
