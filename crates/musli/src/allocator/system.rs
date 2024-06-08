@@ -412,7 +412,7 @@ impl Root {
         Some(region)
     }
 
-    fn free<'a, T>(&'a self, region: &'a mut Region) {
+    fn free<T>(&self, region: &mut Region) {
         let regions = self.regions.fetch_sub(1, Ordering::SeqCst);
 
         if regions >= MAX_REGIONS {
