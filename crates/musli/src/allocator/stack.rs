@@ -217,7 +217,7 @@ impl Allocator for Stack<'_> {
     type Buf<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'static;
 
     #[inline]
-    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_, T>>
+    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
     where
         T: 'static,
     {

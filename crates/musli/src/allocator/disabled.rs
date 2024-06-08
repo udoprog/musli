@@ -62,7 +62,7 @@ impl Allocator for Disabled {
     type Buf<'this, T> = EmptyBuf<T> where T: 'static;
 
     #[inline(always)]
-    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_, T>>
+    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
     where
         T: 'static,
     {
