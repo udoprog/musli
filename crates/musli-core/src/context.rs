@@ -72,6 +72,11 @@ pub trait Context {
     }
 
     /// Allocate a bytes buffer.
+    ///
+    /// Returns `None` if the underlying allocator cannot allocate memory for
+    /// some reason, typically this indicates that we've run out of memory.
+    ///
+    /// The buffer will be deallocated once the returned handle is dropped.
     fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>;
 
     /// Collect and allocate a string from a [`Display`] implementation.

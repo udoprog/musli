@@ -15,11 +15,9 @@ impl fmt::Display for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-/// A raw buffer allocated from a context.
+/// A raw buffer allocated from a [`Context`].
 ///
-/// Buffers are allocated through an allocator using [`Allocator::alloc`].
-///
-/// [`Allocator::alloc`]: crate::Allocator::alloc
+/// [`Context`]: crate::Context
 pub trait Buf {
     /// An item in the buffer.
     type Item: 'static;

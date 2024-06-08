@@ -1,10 +1,6 @@
-use crate::Buf;
+use crate::buf::Buf;
 
 /// An allocator that can be used in combination with a context.
-///
-/// See the [musli-allocator] crate for examples.
-///
-/// [musli-allocator]: https://crates.io/crates/musli-allocator
 pub trait Allocator {
     /// The type of an allocated buffer.
     type Buf<'this, T>: Buf<Item = T>

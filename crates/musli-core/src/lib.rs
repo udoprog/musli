@@ -20,10 +20,6 @@ mod context;
 #[doc(inline)]
 pub use self::context::Context;
 
-mod allocator;
-#[doc(inline)]
-pub use self::allocator::Allocator;
-
 pub mod buf;
 #[doc(inline)]
 pub use self::buf::Buf;

@@ -62,6 +62,10 @@ mod stack;
 #[doc(inline)]
 pub use self::stack::{Stack, StackBuffer};
 
+mod allocator;
+#[doc(inline)]
+pub use self::allocator::Allocator;
+
 /// The default stack buffer size for the default allocator provided through
 /// [`default!`].
 pub const DEFAULT_STACK_BUFFER: usize = 4096;

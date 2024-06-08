@@ -388,7 +388,7 @@
 //! [detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
 //! [musli-name-type]: <https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type-->
 //! [no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/no-std-json.rs>
-//! [scoped allocations]: <https://docs.rs/musli-allocator>
+//! [scoped allocations]: <https://docs.rs/musli/latest/musli/trait.Context.html#tymethod.alloc>
 //! [size comparisons]: <https://udoprog.github.io/musli/benchmarks/#size-comparisons>
 //! [zerocopy]: <https://docs.rs/musli-zerocopy>
 
@@ -556,12 +556,15 @@ pub use musli_core::decoder;
 pub use musli_core::visitor;
 
 #[doc(inline)]
-pub use musli_core::{Allocator, Buf, Context, Decode, Decoder, Encode, Encoder};
+pub use musli_core::{Buf, Context, Decode, Decoder, Encode, Encoder};
 
 #[doc(hidden)]
 pub use musli_core::__priv;
 
 pub mod allocator;
+#[doc(inline)]
+pub use self::allocator::Allocator;
+
 pub mod descriptive;
 pub mod json;
 pub mod serde;
