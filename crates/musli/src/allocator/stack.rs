@@ -252,8 +252,17 @@ where
             return true;
         }
 
-        let len = len * size_of::<T>();
-        let requested = len + size_of::<T>() * additional;
+        let Some(len) = len.checked_mul(size_of::<T>()) else {
+            return false;
+        };
+
+        let Some(additional) = additional.checked_mul(size_of::<T>()) else {
+            return false;
+        };
+
+        let Some(requested) = len.checked_add(additional) else {
+            return false;
+        };
 
         if requested > MAX_BYTES {
             return false;
@@ -550,12 +559,11 @@ impl Internal {
     /// that the end pointer has been aligned to the requirements of `Header`.
     unsafe fn alloc_header(
         &mut self,
-        start: *mut MaybeUninit<u8>,
         end: *mut MaybeUninit<u8>,
         #[cfg(test)] state: State,
     ) -> Option<Region> {
         if let Some(mut region) = self.pop_free() {
-            region.start = start;
+            region.start = self.free_start;
             region.end = end;
 
             if_test! {
@@ -576,7 +584,7 @@ impl Internal {
         let region = self.region(id);
 
         region.ptr.write(Header {
-            start,
+            start: self.free_start,
             end,
             #[cfg(test)]
             state,
@@ -618,7 +626,6 @@ impl Internal {
         let end = self.free_start.wrapping_add(requested);
 
         let mut region = self.alloc_header(
-            self.free_start,
             end,
             #[cfg(test)]
             State::Used,
@@ -656,7 +663,6 @@ impl Internal {
             // which we just aligned from since there is no previous region to
             // expand.
             let mut region = self.alloc_header(
-                self.free_start,
                 aligned_start,
                 #[cfg(test)]
                 State::Occupy,
@@ -729,7 +735,9 @@ impl Internal {
         };
     }
 
-    fn reserve(&mut self, additional: usize) -> Option<*mut MaybeUninit<u8>> {
+    unsafe fn reserve(&mut self, additional: usize, align: usize) -> Option<*mut MaybeUninit<u8>> {
+        self.align(align)?;
+
         let free_start = self.free_start.wrapping_add(additional);
 
         if free_start > self.free_end || free_start < self.free_start {
@@ -753,7 +761,7 @@ impl Internal {
             // Before we call realloc, we check the capacity of the current
             // region. So we know that it is <= requested.
             let additional = requested - from.capacity();
-            self.free_start = self.reserve(additional)?;
+            self.free_start = self.reserve(additional, align)?;
             from.end = from.end.add(additional);
             return Some(from);
         }
@@ -761,7 +769,7 @@ impl Internal {
         // There is no data allocated in the current region, so we can simply
         // re-link it to the end of the chain of allocation.
         if from.start == from.end {
-            let free_start = self.reserve(requested)?;
+            let free_start = self.reserve(requested, align)?;
             from.start = replace(&mut self.free_start, free_start);
             from.end = free_start;
             self.replace_back(&mut from);
@@ -783,6 +791,10 @@ impl Internal {
             let mut prev = self.region(prev);
 
             if prev.capacity() + from.capacity() < requested {
+                break 'bail;
+            }
+
+            if !prev.is_aligned(align) {
                 break 'bail;
             }
 

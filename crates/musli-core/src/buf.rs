@@ -183,8 +183,8 @@ where
     ///     assert_eq!(a.len(), 5);
     /// });
     /// ```
-    pub fn write(&mut self, bytes: &[B::Item]) -> bool {
-        if !self.buf.resize(self.len, bytes.len()) {
+    pub fn write(&mut self, items: &[B::Item]) -> bool {
+        if !self.buf.resize(self.len, items.len()) {
             return false;
         }
 
@@ -193,8 +193,8 @@ where
             self.buf
                 .as_ptr_mut()
                 .add(self.len)
-                .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
-            self.len += bytes.len();
+                .copy_from_nonoverlapping(items.as_ptr(), items.len());
+            self.len += items.len();
         }
 
         true
