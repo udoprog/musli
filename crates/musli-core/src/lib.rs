@@ -190,7 +190,6 @@ pub use musli_macros::visitor;
 /// Using these directly is not supported.
 #[doc(hidden)]
 pub mod __priv {
-    use crate::buf::{Buf, BufVec};
     use crate::context::Context;
     use crate::de::{Decoder, EntryDecoder};
 
@@ -199,17 +198,6 @@ pub mod __priv {
     pub use ::core::result::Result;
 
     pub use crate::never::Never;
-
-    #[inline(always)]
-    pub fn write<T>(
-        out: &mut BufVec<impl Buf<Item = u8>>,
-        value: T,
-    ) -> Result<(), crate::buf::Error>
-    where
-        T: fmt::Debug,
-    {
-        ::core::write!(out, "{value:?}")
-    }
 
     #[inline(always)]
     pub fn default<T>() -> T

@@ -214,19 +214,9 @@ pub trait Context {
 
     /// Encountered an unsupported field tag.
     #[inline(always)]
-    fn invalid_field_string_tag(
-        &self,
-        _: &'static str,
-        field: BufVec<Self::Buf<'_>>,
-    ) -> Self::Error {
-        // SAFETY: Getting the slice does not overlap any interleaving operations.
-        let bytes = field.as_slice();
-
-        if let Ok(string) = str::from_utf8(bytes) {
-            self.message(format_args!("Invalid field tag {string:?}"))
-        } else {
-            self.message(format_args!("Invalid field tag {bytes:?}"))
-        }
+    fn invalid_field_string_tag(&self, _: &'static str, field: Self::BufString<'_>) -> Self::Error {
+        let field = field.as_ref();
+        self.message(format_args!("Invalid field tag `{field}`"))
     }
 
     /// Missing variant field required to decode.
