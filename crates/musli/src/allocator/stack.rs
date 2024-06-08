@@ -8,7 +8,6 @@ use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
-use crate::buf::AlignedBuf;
 use crate::{Allocator, Buf};
 
 #[cfg(test)]
@@ -218,7 +217,7 @@ impl Allocator for Stack<'_> {
     type Buf<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'static;
 
     #[inline]
-    fn alloc_aligned<T>(&self) -> Option<AlignedBuf<Self::Buf<'_, T>>>
+    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_, T>>
     where
         T: 'static,
     {
@@ -226,11 +225,11 @@ impl Allocator for Stack<'_> {
         // held for the duration of this call.
         let region = unsafe { (*self.internal.get()).alloc(0, align_of::<T>())? };
 
-        Some(AlignedBuf::new(StackBuf {
+        Some(StackBuf {
             region: region.id,
             internal: &self.internal,
             _marker: PhantomData,
-        }))
+        })
     }
 }
 

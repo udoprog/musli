@@ -1,4 +1,4 @@
-use crate::buf::{AlignedBuf, BytesBuf};
+use crate::buf::BytesBuf;
 use crate::Buf;
 
 /// An allocator that can be used in combination with a context.
@@ -17,7 +17,7 @@ pub trait Allocator {
     /// of `T`.
     ///
     /// Calling this method returns `None` if the allocation failed.
-    fn alloc_aligned<T>(&self) -> Option<AlignedBuf<Self::Buf<'_, T>>>
+    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_, T>>
     where
         T: 'static;
 
@@ -26,7 +26,7 @@ pub trait Allocator {
     /// Calling this method returns `None` if the allocation failed.
     #[inline]
     fn alloc(&self) -> Option<BytesBuf<Self::Buf<'_, u8>>> {
-        Some(BytesBuf::from_aligned(self.alloc_aligned::<u8>()?))
+        Some(BytesBuf::new(self.alloc_aligned::<u8>()?))
     }
 }
 
@@ -37,7 +37,7 @@ where
     type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'static;
 
     #[inline(always)]
-    fn alloc_aligned<T>(&self) -> Option<AlignedBuf<Self::Buf<'_, T>>>
+    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_, T>>
     where
         T: 'static,
     {

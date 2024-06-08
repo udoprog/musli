@@ -1,6 +1,5 @@
 use core::marker::PhantomData;
 
-use crate::buf::AlignedBuf;
 use crate::{Allocator, Buf};
 
 /// An empty buffer.
@@ -63,12 +62,12 @@ impl Allocator for Disabled {
     type Buf<'this, T> = EmptyBuf<T> where T: 'static;
 
     #[inline(always)]
-    fn alloc_aligned<T>(&self) -> Option<AlignedBuf<Self::Buf<'_, T>>>
+    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_, T>>
     where
         T: 'static,
     {
-        Some(AlignedBuf::new(EmptyBuf {
+        Some(EmptyBuf {
             _marker: PhantomData,
-        }))
+        })
     }
 }

@@ -7,7 +7,6 @@ use core::ptr::NonNull;
 use ::alloc::alloc;
 use ::alloc::boxed::Box;
 
-use crate::buf::AlignedBuf;
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::loom::sync::with_mut_usize;
@@ -146,18 +145,18 @@ impl Allocator for System {
     type Buf<'this, T> = SystemBuf<'this, T> where Self: 'this, T: 'static;
 
     #[inline(always)]
-    fn alloc_aligned<T>(&self) -> Option<AlignedBuf<Self::Buf<'_, T>>>
+    fn alloc_aligned<T>(&self) -> Option<Self::Buf<'_, T>>
     where
         T: 'static,
     {
         // SAFETY: The alignment of `T` is always valid.
         let region = unsafe { self.root.alloc(align_of::<T>())? };
 
-        Some(AlignedBuf::new(SystemBuf {
+        Some(SystemBuf {
             root: &self.root,
             region,
             _marker: PhantomData,
-        }))
+        })
     }
 }
 

@@ -1,8 +1,6 @@
 //! Types related to buffers.
 
 use core::fmt::{self, Arguments};
-use core::mem::ManuallyDrop;
-use core::ptr;
 
 /// An error raised when we fail to write.
 #[derive(Debug)]
@@ -24,11 +22,8 @@ impl<B> BytesBuf<B>
 where
     B: Buf<Item = u8>,
 {
-    pub(crate) fn from_aligned(buf: AlignedBuf<B>) -> Self {
-        Self {
-            buf: buf.into_inner(),
-            len: 0,
-        }
+    pub(crate) fn new(buf: B) -> Self {
+        Self { buf, len: 0 }
     }
 
     /// Write the given number of bytes.
@@ -243,11 +238,6 @@ where
     /// Construct a new aligned buffer wrapping the given buffer.
     pub fn new(buf: B) -> Self {
         Self { buf, len: 0 }
-    }
-
-    fn into_inner(self) -> B {
-        let buf = ManuallyDrop::new(self);
-        unsafe { ptr::addr_of!((&buf).buf).read() }
     }
 
     /// Push an item into the buffer.
