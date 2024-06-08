@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use core::cell::{Cell, UnsafeCell};
 use core::fmt::{self, Write};
 use core::marker::PhantomData;

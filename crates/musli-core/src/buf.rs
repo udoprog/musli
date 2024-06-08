@@ -34,7 +34,7 @@ where
 
         // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
         unsafe {
-            let buf = ptr::addr_of!((&this).buf).read();
+            let buf = ptr::addr_of!(this.buf).read();
             (buf, this.len)
         }
     }
