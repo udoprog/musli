@@ -216,7 +216,7 @@ where
 
 impl<'a, T> Drop for SystemBuf<'a, T> {
     fn drop(&mut self) {
-        self.root.free::<T>(self.region);
+        self.root.free(self.region);
     }
 }
 
@@ -412,7 +412,7 @@ impl Root {
         Some(region)
     }
 
-    fn free<T>(&self, region: &mut Region) {
+    fn free(&self, region: &mut Region) {
         let regions = self.regions.fetch_sub(1, Ordering::SeqCst);
 
         if regions >= MAX_REGIONS {

@@ -162,7 +162,8 @@ where
 
 impl<B> BufVec<B>
 where
-    B: Buf<Item = u8>,
+    B: Buf,
+    B::Item: Copy,
 {
     /// Write the given number of bytes.
     ///
@@ -182,7 +183,7 @@ where
     ///     assert_eq!(a.len(), 5);
     /// });
     /// ```
-    pub fn write(&mut self, bytes: &[u8]) -> bool {
+    pub fn write(&mut self, bytes: &[B::Item]) -> bool {
         if !self.buf.resize(self.len, bytes.len()) {
             return false;
         }
@@ -198,7 +199,12 @@ where
 
         true
     }
+}
 
+impl<B> BufVec<B>
+where
+    B: Buf<Item = u8>,
+{
     /// Write a buffer of the same type onto the current buffer.
     ///
     /// This allows allocators to provide more efficient means of extending the

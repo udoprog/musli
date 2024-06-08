@@ -193,9 +193,9 @@ fn grow_last() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let a = BufVec::new(alloc.alloc().unwrap());
+    let a = BufVec::new(alloc.alloc::<u8>().unwrap());
 
-    let mut b = BufVec::new(alloc.alloc().unwrap());
+    let mut b = BufVec::new(alloc.alloc::<u8>().unwrap());
     b.write(&[1, 2, 3, 4, 5, 6]);
     b.write(&[7, 8]);
 
@@ -303,7 +303,7 @@ fn grow_empty_moved() {
     let alloc = Stack::new(&mut buf);
 
     let mut a = BufVec::new(alloc.alloc().unwrap());
-    let b = BufVec::new(alloc.alloc().unwrap());
+    let b = BufVec::new(alloc.alloc::<u8>().unwrap());
     let mut c = BufVec::new(alloc.alloc().unwrap());
 
     c.write(&[0]);
