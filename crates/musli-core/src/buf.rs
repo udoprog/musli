@@ -28,15 +28,66 @@ impl<B> BufVec<B>
 where
     B: Buf,
 {
-    #[inline]
-    fn into_parts(self) -> (B, usize) {
-        let this = ManuallyDrop::new(self);
+    /// Construct a new buffer vector.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
+    ///
+    /// musli::allocator::default!(|alloc| {
+    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///
+    ///     a.push(String::from("Hello"));
+    ///     a.push(String::from("World"));
+    ///
+    ///     assert_eq!(a.as_slice(), ["Hello", "World"]);
+    /// });
+    /// ```
+    pub fn new(buf: B) -> Self {
+        Self { buf, len: 0 }
+    }
 
-        // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
-        unsafe {
-            let buf = ptr::addr_of!(this.buf).read();
-            (buf, this.len)
-        }
+    /// Get the number of initialized elements in the buffer.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
+    ///
+    /// musli::allocator::default!(|alloc| {
+    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///
+    ///     assert_eq!(a.len(), 0);
+    ///     a.write(b"Hello");
+    ///     assert_eq!(a.len(), 5);
+    /// });
+    /// ```
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Check if the buffer is empty.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
+    ///
+    /// musli::allocator::default!(|alloc| {
+    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///
+    ///     assert!(a.is_empty());
+    ///     a.write(b"Hello");
+    ///     assert!(!a.is_empty());
+    /// });
+    /// ```
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     /// Write a single item.
@@ -48,9 +99,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = alloc.alloc().expect("allocation failed");
+    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
     ///
     ///     a.push(b'H');
     ///     a.push(b'e');
@@ -63,19 +115,48 @@ where
     /// ```
     #[inline]
     pub fn push(&mut self, item: B::Item) -> bool {
-        let new = self.len + 1;
-
-        if !self.buf.resize(self.len, new) {
+        if !self.buf.resize(self.len, 1) {
             return false;
         }
 
         // SAFETY: The call to reserve ensures that we have enough capacity.
         unsafe {
             self.buf.as_ptr_mut().add(self.len).write(item);
-            self.len = new;
+            self.len += 1;
         }
 
         true
+    }
+
+    /// Get the initialized part of the buffer as a slice.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
+    ///
+    /// musli::allocator::default!(|alloc| {
+    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     assert_eq!(a.as_slice(), b"");
+    ///     a.write(b"Hello");
+    ///     assert_eq!(a.as_slice(), b"Hello");
+    /// });
+    /// ```
+    pub fn as_slice(&self) -> &[B::Item] {
+        // SAFETY: We know that the buffer is initialized up to `self.len`.
+        unsafe { core::slice::from_raw_parts(self.buf.as_ptr(), self.len) }
+    }
+
+    #[inline]
+    fn into_parts(self) -> (B, usize) {
+        let this = ManuallyDrop::new(self);
+
+        // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
+        unsafe {
+            let buf = ptr::addr_of!(this.buf).read();
+            (buf, this.len)
+        }
     }
 }
 
@@ -83,11 +164,6 @@ impl<B> BufVec<B>
 where
     B: Buf<Item = u8>,
 {
-    /// Construct a new bytes buffer wrapper.
-    pub fn new(buf: B) -> Self {
-        Self { buf, len: 0 }
-    }
-
     /// Write the given number of bytes.
     ///
     /// Returns `true` if the bytes could be successfully written. A `false`
@@ -97,9 +173,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = alloc.alloc().expect("allocation failed");
+    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
     ///     assert_eq!(a.len(), 5);
@@ -122,62 +199,6 @@ where
         true
     }
 
-    /// Get the initialized part of the buffer as a slice.
-    ///
-    /// ## Examples
-    ///
-    /// ```
-    /// use musli::{Allocator, Buf};
-    ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = alloc.alloc().expect("allocation failed");
-    ///     assert_eq!(a.as_slice(), b"");
-    ///     a.write(b"Hello");
-    ///     assert_eq!(a.as_slice(), b"Hello");
-    /// });
-    /// ```
-    pub fn as_slice(&self) -> &[u8] {
-        // SAFETY: We know that the buffer is initialized up to `self.len`.
-        unsafe { core::slice::from_raw_parts(self.buf.as_ptr(), self.len) }
-    }
-
-    /// Get the number of initialized elements in the buffer.
-    ///
-    /// ## Examples
-    ///
-    /// ```
-    /// use musli::{Allocator, Buf};
-    ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = alloc.alloc().expect("allocation failed");
-    ///     assert_eq!(a.len(), 0);
-    ///     a.write(b"Hello");
-    ///     assert_eq!(a.len(), 5);
-    /// });
-    /// ```
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
-    /// Check if the buffer is empty.
-    ///
-    /// ## Examples
-    ///
-    /// ```
-    /// use musli::{Allocator, Buf};
-    ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = alloc.alloc().expect("allocation failed");
-    ///     assert!(a.is_empty());
-    ///     a.write(b"Hello");
-    ///     assert!(!a.is_empty());
-    /// });
-    /// ```
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
     /// Write a buffer of the same type onto the current buffer.
     ///
     /// This allows allocators to provide more efficient means of extending the
@@ -187,10 +208,12 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = alloc.alloc().expect("allocation failed");
-    ///     let mut b = alloc.alloc().expect("allocation failed");
+    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///     let mut b = BufVec::new(alloc.alloc().expect("allocation failed"));
+    ///
     ///     a.write(b"Hello");
     ///     b.write(b" World");
     ///
@@ -225,9 +248,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = alloc.alloc().expect("allocation failed");
+    ///     let mut a = BufVec::new(alloc.alloc().expect("allocation failed"));
     ///     let world = "World";
     ///
     ///     write!(a, "Hello {world}")?;

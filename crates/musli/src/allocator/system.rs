@@ -1,4 +1,5 @@
 use core::alloc::Layout;
+use core::cmp;
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of};
 use core::ptr;
@@ -12,11 +13,6 @@ use crate::loom::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::loom::sync::with_mut_usize;
 use crate::{Allocator, Buf};
 
-/// The initial capacity of an allocated region.
-#[cfg(not(loom))]
-const INITIAL_CAPACITY: usize = 128;
-#[cfg(loom)]
-const INITIAL_CAPACITY: usize = 4;
 /// The max capacity of an allocated region as it's being handed back.
 #[cfg(not(loom))]
 const MAX_CAPACITY: usize = 4096;
@@ -150,8 +146,7 @@ impl Allocator for System {
     where
         T: 'static,
     {
-        // SAFETY: The alignment of `T` is always valid.
-        let region = unsafe { self.root.alloc(align_of::<T>())? };
+        let region = self.root.alloc()?;
 
         Some(SystemBuf {
             root: &self.root,
@@ -197,9 +192,7 @@ where
         }
 
         // SAFETY: The region is always valid.
-        let len = size_of::<T>() * len;
-        let additional = size_of::<T>() * additional;
-        unsafe { self.region.reserve(len, additional) }
+        unsafe { self.region.reserve::<T>(len, additional) }
     }
 
     #[inline]
@@ -223,7 +216,7 @@ where
 
 impl<'a, T> Drop for SystemBuf<'a, T> {
     fn drop(&mut self) {
-        self.root.free(self.region);
+        self.root.free::<T>(self.region);
     }
 }
 
@@ -231,10 +224,8 @@ impl<'a, T> Drop for SystemBuf<'a, T> {
 struct Region {
     /// Data pointer to the allocated region.
     data: NonNull<u8>,
-    /// The capacity of the region.
-    cap: usize,
-    /// The alignment of the allocated region.
-    align: usize,
+    /// The size of the allocated region.
+    layout: Option<Layout>,
     /// Pointer to the next free region.
     next: Option<NonNull<Region>>,
 }
@@ -242,29 +233,17 @@ struct Region {
 impl Region {
     const DANGLING: Region = Region {
         data: NonNull::dangling(),
-        cap: 0,
-        align: 0,
+        layout: None,
         next: None,
     };
 
-    /// Allocate with the specifiec alignment and default capacity.
+    /// Allocate with the specified layout.
     ///
     /// # Safety
     ///
     /// The caller must ensure that the alignment and capacity are valid per
     /// [`Layout`] constraints.
-    unsafe fn alloc(align: usize) -> Option<Self> {
-        Self::alloc_capacity(align, INITIAL_CAPACITY)
-    }
-
-    /// Allocate with the specifiec alignment and capacity.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the alignment and capacity are valid per
-    /// [`Layout`] constraints.
-    unsafe fn alloc_capacity(align: usize, cap: usize) -> Option<Self> {
-        let layout = Layout::from_size_align_unchecked(cap, align);
+    unsafe fn alloc(layout: Layout) -> Option<Self> {
         let data = alloc::alloc(layout);
 
         if data.is_null() {
@@ -273,45 +252,9 @@ impl Region {
 
         Some(Region {
             data: NonNull::new_unchecked(data),
-            cap,
-            align,
+            layout: Some(layout),
             next: None,
         })
-    }
-
-    /// Align the region to the given alignment.
-    #[must_use = "allocation is fallible and must be checked"]
-    unsafe fn initialize(&mut self, align: usize) -> bool {
-        // Region is not allocated.
-        if self.cap == 0 {
-            if let Some(new) = Self::alloc(align) {
-                *self = new;
-                return true;
-            }
-
-            return false;
-        }
-
-        // Region is already aligned.
-        if self.align % align == 0 {
-            return true;
-        }
-
-        if let Some(new) = Self::alloc_capacity(align, self.cap) {
-            *self = new;
-            return true;
-        }
-
-        false
-    }
-
-    fn shrink_to(&mut self, cap: usize) -> bool {
-        if self.cap <= cap {
-            return true;
-        }
-
-        // SAFETY: A smaller capacity is always valid.
-        unsafe { self.realloc_to(cap) }
     }
 
     /// Reallocate the region to the given capacity.
@@ -320,60 +263,97 @@ impl Region {
     ///
     /// The caller must ensure that the new capacity is valid per [`Layout`].
     #[must_use = "allocating is fallible and must be checked"]
-    unsafe fn realloc_to(&mut self, cap: usize) -> bool {
-        let old_layout = Layout::from_size_align_unchecked(self.cap, self.align);
-        let data = alloc::realloc(self.data.as_ptr(), old_layout, cap);
+    unsafe fn realloc(&mut self, existing: Layout, new_layout: Layout) -> bool {
+        debug_assert_eq!(existing.align(), new_layout.align());
+
+        let data = alloc::realloc(self.data.as_ptr(), existing, new_layout.size());
 
         if data.is_null() {
             return false;
         }
 
         self.data = NonNull::new_unchecked(data);
-        self.cap = cap;
+        self.layout = Some(new_layout);
         true
     }
 
-    #[must_use = "allocating is fallible and must be checked"]
-    unsafe fn reserve(&mut self, len: usize, additional: usize) -> bool {
-        let min_cap = len + additional;
+    fn shrink_to(&mut self, max_bytes: usize) -> bool {
+        let Some(layout) = self.layout else {
+            return true;
+        };
 
-        if self.cap >= min_cap {
+        if layout.size() <= max_bytes {
             return true;
         }
 
-        let new_cap = min_cap.next_power_of_two();
-
-        // Ensure we don't overflow isize which guarantees that the computed
-        // layout is valid.
-        if new_cap > max_size_for_align(self.align) {
+        let Ok(new_layout) = Layout::from_size_align(max_bytes, layout.align()) else {
             return false;
-        }
+        };
 
-        if new_cap < min_cap {
+        // SAFETY: We're taking care to ensure that elements are layout compatible.
+        unsafe { self.realloc(layout, new_layout) }
+    }
+
+    #[must_use = "allocating is fallible and must be checked"]
+    unsafe fn reserve<T>(&mut self, len: usize, additional: usize) -> bool {
+        let Some(required_cap) = len.checked_add(additional) else {
             return false;
-        }
+        };
 
-        if self.cap == 0 {
-            if let Some(new) = Self::alloc_capacity(self.align, new_cap) {
-                *self = new;
-                return true;
+        assert_ne!(size_of::<T>(), 0, "ZSTs are not supported");
+
+        let cap = match self.layout {
+            Some(layout)
+                if layout.align() % align_of::<T>() == 0 && layout.size() % size_of::<T>() == 0 =>
+            {
+                let cap = layout.size() / size_of::<T>();
+
+                if cap >= required_cap {
+                    return true;
+                }
+
+                cap
             }
+            _ => 0,
+        };
 
+        let cap = cmp::max(cap * 2, required_cap);
+        let cap = cmp::max(min_non_zero_cap::<T>(), cap);
+        self.alloc_capacity::<T>(cap)
+    }
+
+    fn alloc_capacity<T>(&mut self, cap: usize) -> bool {
+        let Ok(new_layout) = Layout::array::<T>(cap) else {
             return false;
-        }
+        };
 
-        if new_cap > self.cap {
-            return self.realloc_to(new_cap);
-        }
+        // SAFETY: We're taking care to ensure that elements are layout compatible.
+        unsafe {
+            match self.layout {
+                Some(existing) if existing.align() % new_layout.align() == 0 => {
+                    if existing.size() >= new_layout.size() {
+                        return true;
+                    }
 
-        true
+                    self.realloc(existing, new_layout)
+                }
+                _ => {
+                    let Some(new) = Self::alloc(new_layout) else {
+                        return false;
+                    };
+
+                    *self = new;
+                    true
+                }
+            }
+        }
     }
 
     fn free(&mut self) {
-        if self.cap != 0 {
-            // SAFETY: Layout assumptions are correctly encoded in the type as it was being allocated or grown.
+        if let Some(layout) = self.layout {
+            // SAFETY: Layout assumptions are correctly encoded in the type as
+            // it was being allocated or grown.
             unsafe {
-                let layout = Layout::from_size_align_unchecked(self.cap, self.align);
                 alloc::dealloc(self.data.as_ptr(), layout);
                 ptr::write(self, Region::DANGLING);
             }
@@ -413,7 +393,7 @@ impl Root {
     ///
     /// The specified alignment must be a power of 2.
     #[allow(clippy::mut_from_ref)]
-    unsafe fn alloc(&self, align: usize) -> Option<&mut Region> {
+    fn alloc(&self) -> Option<&mut Region> {
         // SAFETY: We have exclusive access to all regions.
         let this = self.lock().with_mut(|current| unsafe {
             let mut this = current.take()?;
@@ -423,20 +403,16 @@ impl Root {
         });
 
         let region = if let Some(this) = this {
-            if !this.initialize(align) {
-                return None;
-            }
-
             this
         } else {
-            Box::leak(Box::new(Region::alloc(align)?))
+            Box::leak(Box::new(Region::DANGLING))
         };
 
         self.regions.fetch_add(1, Ordering::SeqCst);
         Some(region)
     }
 
-    fn free<'a>(&'a self, region: &'a mut Region) {
+    fn free<'a, T>(&'a self, region: &'a mut Region) {
         let regions = self.regions.fetch_sub(1, Ordering::SeqCst);
 
         if regions >= MAX_REGIONS {
@@ -452,7 +428,7 @@ impl Root {
         if !region.shrink_to(MAX_CAPACITY) {
             // If we fail to shrink the region, the only option we have left is
             // to free it. Shrinking should only fail if there is insufficient
-            // memory to allocate a new smaller region at the samt time as
+            // memory to allocate a new smaller region at the same time as
             // maintaining the old one.
             region.free();
         }
@@ -466,7 +442,12 @@ impl Root {
     }
 }
 
-#[inline(always)]
-const fn max_size_for_align(align: usize) -> usize {
-    isize::MAX as usize - (align - 1)
+fn min_non_zero_cap<T>() -> usize {
+    if size_of::<T>() == 1 {
+        8
+    } else if size_of::<T>() <= 1024 {
+        4
+    } else {
+        1
+    }
 }
