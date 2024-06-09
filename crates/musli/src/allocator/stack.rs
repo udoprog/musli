@@ -166,13 +166,16 @@ impl<'a> Stack<'a> {
     ///
     /// # Panics
     ///
-    /// This method panics if called with a buffer larger than 2**31 or is
-    /// provided a buffer which is not aligned by 8.
+    /// This panics if called with a buffer larger than `2^31` bytes.
     ///
     /// An easy way to align a buffer is to use [`StackBuffer`] when
     /// constructing it.
     pub fn new(buffer: &'a mut [MaybeUninit<u8>]) -> Self {
         let size = buffer.len();
+        assert!(
+            size <= MAX_BYTES,
+            "Buffer of {size} bytes is larger than the maximum {MAX_BYTES}"
+        );
 
         let mut data = buffer.as_mut_ptr_range();
 
@@ -214,43 +217,52 @@ impl<'a> Stack<'a> {
 }
 
 impl Allocator for Stack<'_> {
-    type Buf<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'static;
+    type Buf<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'this;
 
     #[inline]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
+    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
     where
-        T: 'static,
+        T: 'a,
     {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
-        let region = unsafe { (*self.internal.get()).alloc(0, align_of::<T>())? };
+        let region = if size_of::<T>() == 0 {
+            None
+        } else {
+            unsafe {
+                (*self.internal.get())
+                    .alloc(0, align_of::<T>())
+                    .map(|r| r.id)
+            }
+        };
 
-        Some(StackBuf {
-            region: region.id,
+        StackBuf {
+            region,
             internal: &self.internal,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
 /// A no-std allocated buffer.
 pub struct StackBuf<'a, T> {
-    region: HeaderId,
+    region: Option<HeaderId>,
     internal: &'a UnsafeCell<Internal>,
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> Buf for StackBuf<'a, T>
-where
-    T: 'static,
-{
+impl<'a, T> Buf for StackBuf<'a, T> {
     type Item = T;
 
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {
-        if additional == 0 {
+        if additional == 0 || size_of::<T>() == 0 {
             return true;
         }
+
+        let Some(region_id) = self.region else {
+            return false;
+        };
 
         let Some(len) = len.checked_mul(size_of::<T>()) else {
             return false;
@@ -273,36 +285,44 @@ where
         unsafe {
             let i = &mut *self.internal.get();
 
-            let region = i.region(self.region);
+            let region = i.region(region_id);
 
             // Region can already fit in the requested bytes.
             if region.capacity() >= requested {
                 return true;
             };
 
-            let Some(region) = i.realloc(self.region, len, requested, align_of::<T>()) else {
+            let Some(region) = i.realloc(region_id, len, requested, align_of::<T>()) else {
                 return false;
             };
 
-            self.region = region.id;
+            self.region = Some(region.id);
             true
         }
     }
 
     #[inline]
     fn as_ptr(&self) -> *const Self::Item {
+        let Some(region) = self.region else {
+            return ptr::NonNull::dangling().as_ptr();
+        };
+
         unsafe {
             let i = &*self.internal.get();
-            let this = i.header(self.region);
+            let this = i.header(region);
             this.start.cast_const().cast()
         }
     }
 
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut Self::Item {
+        let Some(region) = self.region else {
+            return ptr::NonNull::dangling().as_ptr();
+        };
+
         unsafe {
             let i = &*self.internal.get();
-            let this = i.header(self.region);
+            let this = i.header(region);
             this.start.cast()
         }
     }
@@ -312,6 +332,10 @@ where
     where
         B: Buf<Item = T>,
     {
+        let Some(region) = self.region else {
+            return Err(buf);
+        };
+
         let this_len = this_len * size_of::<T>();
         let other_len = other_len * size_of::<T>();
 
@@ -321,7 +345,7 @@ where
 
         unsafe {
             let i = &mut *self.internal.get();
-            let mut this = i.region(self.region);
+            let mut this = i.region(region);
 
             debug_assert!(this.capacity() >= this_len);
 
@@ -360,9 +384,11 @@ where
 
 impl<T> Drop for StackBuf<'_, T> {
     fn drop(&mut self) {
-        // SAFETY: We have exclusive access to the internal state.
-        unsafe {
-            (*self.internal.get()).free(self.region);
+        if let Some(region) = self.region.take() {
+            // SAFETY: We have exclusive access to the internal state.
+            unsafe {
+                (*self.internal.get()).free(region);
+            }
         }
     }
 }

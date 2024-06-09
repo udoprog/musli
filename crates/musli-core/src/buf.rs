@@ -20,7 +20,7 @@ impl std::error::Error for Error {}
 /// [`Context`]: crate::Context
 pub trait Buf {
     /// An item in the buffer.
-    type Item: 'static;
+    type Item;
 
     /// Resize the buffer.
     fn resize(&mut self, len: usize, additional: usize) -> bool;

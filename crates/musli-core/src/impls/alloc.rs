@@ -622,10 +622,7 @@ where
         use crate::Buf;
 
         encoder.encode_variant_fn(|variant| {
-            let Some(mut buf) = cx.alloc::<u8>() else {
-                return Err(cx.message("Failed to allocate buffer"));
-            };
-
+            let mut buf = cx.alloc::<u8>();
             let mut len = 0;
 
             for w in self.encode_wide() {

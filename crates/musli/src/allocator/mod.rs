@@ -15,8 +15,8 @@
 //! use musli::buf::BufVec;
 //!
 //! musli::allocator::default!(|alloc| {
-//!     let mut a = BufVec::new_in(alloc).expect("allocation a failed");
-//!     let mut b = BufVec::new_in(alloc).expect("allocation b failed");
+//!     let mut a = BufVec::new_in(alloc);
+//!     let mut b = BufVec::new_in(alloc);
 //!
 //!     b.write(b"He11o");
 //!     a.write(b.as_slice());
@@ -29,7 +29,7 @@
 //!     assert_eq!(a.as_slice(), b"He11o W0rld");
 //!     assert_eq!(a.len(), 11);
 //!
-//!     let mut c = BufVec::new_in(alloc).expect("allocation c failed");
+//!     let mut c = BufVec::new_in(alloc);
 //!     c.write(b"!");
 //!     a.write(c.as_slice());
 //!
@@ -52,7 +52,7 @@ mod system;
 pub use self::system::System;
 
 /// The static system allocator instance.
-#[cfg(all(feature = "alloc", not(loom)))]
+#[cfg(all(not(loom), feature = "alloc"))]
 pub static SYSTEM: System = System::new();
 
 mod disabled;
@@ -94,8 +94,8 @@ macro_rules! __default {
 /// use musli::buf::BufVec;
 ///
 /// musli::allocator::default!(|alloc| {
-///     let mut a = BufVec::new_in(alloc).expect("allocation a failed");
-///     let mut b = BufVec::new_in(alloc).expect("allocation b failed");
+///     let mut a = BufVec::new_in(alloc);
+///     let mut b = BufVec::new_in(alloc);
 ///
 ///     b.write(b"He11o");
 ///     a.write(b.as_slice());
@@ -108,7 +108,7 @@ macro_rules! __default {
 ///     assert_eq!(a.as_slice(), b"He11o W0rld");
 ///     assert_eq!(a.len(), 11);
 ///
-///     let mut c = BufVec::new_in(alloc).expect("allocation c failed");
+///     let mut c = BufVec::new_in(alloc);
 ///     c.write(b"!");
 ///     a.write(c.as_slice());
 ///
@@ -119,7 +119,7 @@ macro_rules! __default {
 #[doc(inline)]
 pub use __default as default;
 
-#[cfg(all(feature = "alloc", not(loom)))]
+#[cfg(all(not(loom), feature = "alloc"))]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __default_allocator_impl {

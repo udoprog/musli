@@ -1,7 +1,9 @@
 use core::fmt::{self, Arguments};
 use core::mem::ManuallyDrop;
+#[cfg(test)]
 use core::ops::{Deref, DerefMut};
 use core::ptr;
+use core::slice;
 
 use crate::buf::{Buf, Error};
 use crate::Allocator;
@@ -28,7 +30,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     a.push(String::from("Hello"));
     ///     a.push(String::from("World"));
@@ -36,14 +38,14 @@ where
     ///     assert_eq!(a.as_slice(), ["Hello", "World"]);
     /// });
     /// ```
-    pub fn new_in<'a, T>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, T> = B>)) -> Option<Self>
+    pub fn new_in<'a, T>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, T> = B>)) -> Self
     where
-        T: 'static,
+        T: 'a,
     {
-        Some(Self {
-            buf: alloc.alloc::<T>()?,
+        Self {
+            buf: alloc.alloc::<T>(),
             len: 0,
-        })
+        }
     }
 
     /// Construct a new buffer vector.
@@ -61,7 +63,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
@@ -81,7 +83,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     assert!(a.is_empty());
     ///     a.write(b"Hello");
@@ -105,7 +107,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     a.push(b'H');
     ///     a.push(b'e');
@@ -131,6 +133,68 @@ where
         true
     }
 
+    /// Pop a single item from the buffer.
+    ///
+    /// Returns `None` if the buffer is empty.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
+    ///
+    /// musli::allocator::default!(|alloc| {
+    ///     let mut a = BufVec::new_in(alloc);
+    ///
+    ///     a.push(String::from("foo"));
+    ///     a.push(String::from("bar"));
+    ///
+    ///     assert_eq!(a.as_slice(), ["foo", "bar"]);
+    ///
+    ///     assert_eq!(a.pop().as_deref(), Some("bar"));
+    ///     assert_eq!(a.pop().as_deref(), Some("foo"));
+    ///     assert_eq!(a.pop(), None);
+    /// });
+    /// ```
+    pub fn pop(&mut self) -> Option<B::Item> {
+        if self.len == 0 {
+            return None;
+        }
+
+        self.len -= 1;
+
+        // SAFETY: We know that the buffer is initialized up to `len`.
+        unsafe { Some(ptr::read(self.buf.as_ptr().add(self.len))) }
+    }
+
+    /// Clear the buffer vector.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
+    ///
+    /// musli::allocator::default!(|alloc| {
+    ///     let mut a = BufVec::new_in(alloc);
+    ///
+    ///     a.push(b'H');
+    ///     a.push(b'e');
+    ///     a.push(b'l');
+    ///     a.push(b'l');
+    ///     a.push(b'o');
+    ///
+    ///     assert_eq!(a.as_slice(), b"Hello");
+    ///     a.clear();
+    ///     assert_eq!(a.as_slice(), b"");
+    /// });
+    /// ```
+    pub fn clear(&mut self) {
+        // SAFETY: We know that the buffer is initialized up to `len`.
+        unsafe { ptr::drop_in_place(slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len)) }
+        self.len = 0;
+    }
+
     /// Get the initialized part of the buffer as a slice.
     ///
     /// ## Examples
@@ -140,7 +204,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///     assert_eq!(a.as_slice(), b"");
     ///     a.write(b"Hello");
     ///     assert_eq!(a.as_slice(), b"Hello");
@@ -148,7 +212,7 @@ where
     /// ```
     pub fn as_slice(&self) -> &[B::Item] {
         // SAFETY: We know that the buffer is initialized up to `self.len`.
-        unsafe { core::slice::from_raw_parts(self.buf.as_ptr(), self.len) }
+        unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.len) }
     }
 
     #[inline]
@@ -180,7 +244,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
     ///     assert_eq!(a.len(), 5);
@@ -220,8 +284,8 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
-    ///     let mut b = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
+    ///     let mut b = BufVec::new_in(alloc);
     ///
     ///     a.write(b"Hello");
     ///     b.write(b" World");
@@ -260,7 +324,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///     let world = "World";
     ///
     ///     write!(a, "Hello {world}")?;
@@ -293,6 +357,7 @@ where
     }
 }
 
+#[cfg(test)]
 impl<B> Deref for BufVec<B>
 where
     B: Buf,
@@ -305,6 +370,7 @@ where
     }
 }
 
+#[cfg(test)]
 impl<B> DerefMut for BufVec<B>
 where
     B: Buf,
@@ -320,12 +386,6 @@ where
     B: Buf,
 {
     fn drop(&mut self) {
-        // SAFETY: We know that the buffer is initialized up to `len`.
-        unsafe {
-            core::ptr::drop_in_place(core::slice::from_raw_parts_mut(
-                self.buf.as_mut_ptr(),
-                self.len,
-            ))
-        }
+        self.clear();
     }
 }

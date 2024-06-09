@@ -29,11 +29,7 @@ where
     where
         V: UnsizedVisitor<'de, C, [u8]>,
     {
-        let Some(scratch) = self.cx.alloc() else {
-            return Err(self.cx.message("Failed to allocate scratch buffer"));
-        };
-
-        let mut scratch = BufVec::new(scratch);
+        let mut scratch = BufVec::new(self.cx.alloc());
 
         match self.parser.parse_string(self.cx, true, &mut scratch)? {
             StringReference::Borrowed(string) => visitor.visit_borrowed(self.cx, string.as_bytes()),

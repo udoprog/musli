@@ -20,10 +20,7 @@ where
     C: ?Sized + Context,
     T: fmt::Display,
 {
-    let Some(buf) = cx.alloc() else {
-        return Err(cx.message("Failed to allocate"));
-    };
-
+    let buf = cx.alloc();
     let mut string = BufString::new(buf);
 
     if write!(string, "{value}").is_err() {
@@ -38,8 +35,8 @@ where
     B: Buf<Item = u8>,
 {
     /// Construct a new string buffer in the provided allocator.
-    pub fn new_in<'a>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, u8> = B>)) -> Option<Self> {
-        Some(Self::new(alloc.alloc::<u8>()?))
+    pub fn new_in<'a>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, u8> = B>)) -> Self {
+        Self::new(alloc.alloc::<u8>())
     }
 
     /// Construct a new fixed string.

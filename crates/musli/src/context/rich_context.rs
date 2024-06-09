@@ -5,29 +5,35 @@ use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::ops::Range;
 
-use crate::buf::{self, BufString};
-use crate::fixed::FixedVec;
+use crate::buf::{self, BufString, BufVec};
 use crate::{Allocator, Context};
 
 use super::access::{Access, Shared};
 use super::rich_error::{RichError, Step};
 use super::ErrorMarker;
 
+#[cfg(all(not(loom), feature = "alloc"))]
+use crate::allocator::System;
+
 type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a, u8>>);
 
 /// A rich context which uses allocations and tracks the exact location of
 /// errors.
 ///
-/// This will only store 4 errors by default, and support a path up to 16. To
-/// control this, use the [`new_with`][StackContext::new_with] constructor.
-pub struct StackContext<'a, const E: usize, const P: usize, A, M>
+/// This uses the provided allocator to allocate memory for the collected
+/// diagnostics. The allocator to use can be provided using
+/// [`RichContext::with_alloc`].
+///
+/// The default constructor is only available when the `alloc` feature is
+/// enabled, and will use the [`System`] allocator.
+pub struct RichContext<'a, A, M>
 where
     A: ?Sized + Allocator,
 {
     alloc: &'a A,
     mark: Cell<usize>,
-    errors: UnsafeCell<FixedVec<BufPair<'a, A>, E>>,
-    path: UnsafeCell<FixedVec<Step<BufString<A::Buf<'a, u8>>>, P>>,
+    errors: UnsafeCell<BufVec<A::Buf<'a, BufPair<'a, A>>>>,
+    path: UnsafeCell<BufVec<A::Buf<'a, Step<BufString<A::Buf<'a, u8>>>>>>,
     // How many elements of `path` we've gone over capacity.
     path_cap: Cell<usize>,
     include_type: bool,
@@ -35,33 +41,40 @@ where
     _marker: PhantomData<M>,
 }
 
-impl<'a, A, M> StackContext<'a, 16, 4, A, M>
-where
-    A: ?Sized + Allocator,
-{
-    /// Construct a new context which uses allocations to a fixed number of
-    /// diagnostics.
-    ///
-    /// This uses the default values of:
-    /// * The first 4 errors.
-    /// * 16 path elements stored when tracing.
-    pub fn new(alloc: &'a A) -> Self {
-        Self::new_with(alloc)
+impl<'a, A, M> RichContext<'a, A, M> where A: ?Sized + Allocator {}
+
+#[cfg(all(not(loom), feature = "alloc"))]
+impl<M> RichContext<'static, System, M> {
+    /// Construct a new context which uses the system allocator for memory.
+    #[inline]
+    pub fn new() -> Self {
+        Self::with_alloc(&crate::allocator::SYSTEM)
     }
 }
 
-impl<'a, const E: usize, const P: usize, A, M> StackContext<'a, E, P, A, M>
+#[cfg(all(not(loom), feature = "alloc"))]
+impl<M> Default for RichContext<'static, System, M> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a, A, M> RichContext<'a, A, M>
 where
     A: ?Sized + Allocator,
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
-    pub fn new_with(alloc: &'a A) -> Self {
+    pub fn with_alloc(alloc: &'a A) -> Self {
+        let errors = BufVec::new_in(alloc);
+        let path = BufVec::new_in(alloc);
+
         Self {
             alloc,
             mark: Cell::new(0),
-            errors: UnsafeCell::new(FixedVec::new()),
-            path: UnsafeCell::new(FixedVec::new()),
+            errors: UnsafeCell::new(errors),
+            path: UnsafeCell::new(path),
             path_cap: Cell::new(0),
             include_type: false,
             access: Access::new(),
@@ -88,8 +101,8 @@ where
         let access = self.access.shared();
 
         Errors {
-            path: unsafe { &*self.path.get() },
-            errors: unsafe { &*self.errors.get() },
+            path: unsafe { (*self.path.get()).as_slice() },
+            errors: unsafe { (*self.errors.get()).as_slice() },
             index: 0,
             path_cap: self.path_cap.get(),
             _access: access,
@@ -102,7 +115,7 @@ where
 
         // SAFETY: We've checked that we have exclusive access just above.
         unsafe {
-            _ = (*self.errors.get()).try_push((range, error));
+            _ = (*self.errors.get()).push((range, error));
         }
     }
 
@@ -113,7 +126,7 @@ where
         // SAFETY: We've checked that we have exclusive access just above.
         let path = unsafe { &mut (*self.path.get()) };
 
-        if path.try_push(step).is_err() {
+        if !path.push(step) {
             self.path_cap.set(self.path_cap.get() + 1);
         }
     }
@@ -139,13 +152,13 @@ where
     where
         T: fmt::Display,
     {
-        let mut string = BufString::new_in(self.alloc)?;
+        let mut string = BufString::new_in(self.alloc);
         write!(string, "{value}").ok()?;
         Some(string)
     }
 }
 
-impl<'a, const E: usize, const P: usize, A, M> Context for StackContext<'a, E, P, A, M>
+impl<'a, A, M> Context for RichContext<'a, A, M>
 where
     A: ?Sized + Allocator,
     M: 'static,
@@ -153,7 +166,7 @@ where
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = usize;
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'static;
+    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
     type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
 
     #[inline]
@@ -169,10 +182,7 @@ where
     }
 
     #[inline]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
-    where
-        T: 'static,
-    {
+    fn alloc<T>(&self) -> Self::Buf<'_, T> {
         self.alloc.alloc()
     }
 

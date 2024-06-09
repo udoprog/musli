@@ -6,27 +6,27 @@ pub trait Allocator {
     type Buf<'this, T>: Buf<Item = T>
     where
         Self: 'this,
-        T: 'static;
+        T: 'this;
 
     /// Allocate an empty, uninitialized buffer with an alignment matching that
     /// of `T`.
     ///
     /// Calling this method returns `None` if the allocation failed.
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
+    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
     where
-        T: 'static;
+        T: 'a;
 }
 
 impl<A> Allocator for &A
 where
     A: ?Sized + Allocator,
 {
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'static;
+    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
 
     #[inline(always)]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
+    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
     where
-        T: 'static,
+        T: 'a,
     {
         (*self).alloc::<T>()
     }
