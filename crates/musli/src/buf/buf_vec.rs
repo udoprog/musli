@@ -9,7 +9,7 @@ use crate::buf::Buf;
 use crate::Allocator;
 
 /// A vector backed by an [`Allocator`] [`Buf`].
-pub struct BufVec<'a, A, T>
+pub struct BufVec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,
@@ -18,7 +18,7 @@ where
     len: usize,
 }
 
-impl<'a, A, T> BufVec<'a, A, T>
+impl<'a, T, A> BufVec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,
@@ -230,7 +230,7 @@ where
     }
 }
 
-impl<'a, A, T> BufVec<'a, A, T>
+impl<'a, T, A> BufVec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a + Copy,
@@ -293,12 +293,12 @@ where
     /// });
     /// ```
     #[inline]
-    pub fn extend(&mut self, other: BufVec<'_, A, T>) -> bool {
+    pub fn extend(&mut self, other: BufVec<'_, T, A>) -> bool {
         let (other, other_len) = other.into_raw_parts();
 
         // Try to merge one buffer with another.
         if let Err(buf) = self.buf.try_merge(self.len, other, other_len) {
-            let other = unsafe { BufVec::<A, T>::from_raw_parts(buf, other_len) };
+            let other = unsafe { BufVec::<T, A>::from_raw_parts(buf, other_len) };
             return self.write(other.as_slice());
         }
 
@@ -325,7 +325,7 @@ where
 /// });
 /// # Ok::<(), musli::buf::Error>(())
 /// ```
-impl<'a, A> fmt::Write for BufVec<'a, A, u8>
+impl<'a, A> fmt::Write for BufVec<'a, u8, A>
 where
     A: 'a + ?Sized + Allocator,
 {
@@ -340,7 +340,7 @@ where
 }
 
 #[cfg(test)]
-impl<'a, A, T> Deref for BufVec<'a, A, T>
+impl<'a, T, A> Deref for BufVec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,
@@ -354,7 +354,7 @@ where
 }
 
 #[cfg(test)]
-impl<'a, A, T> DerefMut for BufVec<'a, A, T>
+impl<'a, T, A> DerefMut for BufVec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,
@@ -365,7 +365,7 @@ where
     }
 }
 
-impl<'a, A, T> Drop for BufVec<'a, A, T>
+impl<'a, T, A> Drop for BufVec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,

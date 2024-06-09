@@ -33,7 +33,7 @@ pub trait Writer {
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write a buffer to the current writer.
-    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context;
 
@@ -64,7 +64,7 @@ where
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {
@@ -98,7 +98,7 @@ impl Writer for Vec<u8> {
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {
@@ -136,7 +136,7 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {
@@ -186,7 +186,7 @@ pub struct BufWriter<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
-    buf: BufVec<'a, A, u8>,
+    buf: BufVec<'a, u8, A>,
 }
 
 impl<'a, A> BufWriter<'a, A>
@@ -201,7 +201,7 @@ where
     }
 
     /// Coerce into inner buffer.
-    pub fn into_inner(self) -> BufVec<'a, A, u8> {
+    pub fn into_inner(self) -> BufVec<'a, u8, A> {
         self.buf
     }
 }
@@ -220,7 +220,7 @@ where
     }
 
     #[inline(always)]
-    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {

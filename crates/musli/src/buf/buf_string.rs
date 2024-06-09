@@ -11,7 +11,7 @@ pub struct BufString<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
-    buf: BufVec<'a, A, u8>,
+    buf: BufVec<'a, u8, A>,
 }
 
 /// Collect a string into a string buffer.

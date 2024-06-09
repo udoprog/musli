@@ -32,8 +32,8 @@ where
 {
     alloc: &'a A,
     mark: Cell<usize>,
-    errors: UnsafeCell<BufVec<'a, A, BufPair<'a, A>>>,
-    path: UnsafeCell<BufVec<'a, A, Step<BufString<'a, A>>>>,
+    errors: UnsafeCell<BufVec<'a, BufPair<'a, A>, A>>,
+    path: UnsafeCell<BufVec<'a, Step<BufString<'a, A>>, A>>,
     // How many elements of `path` we've gone over capacity.
     path_cap: Cell<usize>,
     include_type: bool,

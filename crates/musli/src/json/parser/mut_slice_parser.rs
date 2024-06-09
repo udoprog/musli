@@ -41,7 +41,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         &mut self,
         cx: &C,
         validate: bool,
-        scratch: &'scratch mut BufVec<'_, (impl Allocator + ?Sized), u8>,
+        scratch: &'scratch mut BufVec<'_, u8, (impl Allocator + ?Sized)>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: ?Sized + Context,
