@@ -1,4 +1,4 @@
-use crate::buf::BufVec;
+use crate::alloc::Vec;
 use crate::json::error::ErrorMessage;
 use crate::json::parser::{Parser, StringReference, Token};
 use crate::reader::SliceUnderflow;
@@ -41,7 +41,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         &mut self,
         cx: &C,
         validate: bool,
-        scratch: &'scratch mut BufVec<'_, u8, (impl Allocator + ?Sized)>,
+        scratch: &'scratch mut Vec<'_, u8, (impl Allocator + ?Sized)>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: ?Sized + Context,

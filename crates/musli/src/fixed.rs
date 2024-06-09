@@ -8,7 +8,7 @@ use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
-use crate::buf::BufVec;
+use crate::alloc::Vec;
 use crate::writer::Writer;
 use crate::Context;
 
@@ -193,7 +193,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {

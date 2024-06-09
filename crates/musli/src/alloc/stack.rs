@@ -8,7 +8,7 @@ use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
-use crate::{Allocator, Buf};
+use super::{Allocator, Buf};
 
 #[cfg(test)]
 macro_rules! let_mut {

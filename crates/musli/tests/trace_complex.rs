@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use musli::allocator::System;
+use musli::alloc::System;
 use musli::context::RichContext;
 use musli::{Decode, Encode};
 
@@ -33,7 +33,7 @@ struct To {
 
 #[test]
 fn trace_complex() {
-    musli::allocator::default!(|alloc| {
+    musli::alloc::default!(|alloc| {
         let cx = RichContext::with_alloc(alloc);
 
         let mut field = HashMap::new();

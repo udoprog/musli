@@ -1,6 +1,6 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::buf::BufVec;
+use crate::alloc::Vec;
 use crate::{Allocator, Context};
 
 // Copied and adapter form the serde-json project under the MIT and Apache 2.0
@@ -102,7 +102,7 @@ where
     pub(crate) fn parse_escape(
         &mut self,
         validate: bool,
-        scratch: &mut BufVec<'_, u8, (impl Allocator + ?Sized)>,
+        scratch: &mut Vec<'_, u8, (impl Allocator + ?Sized)>,
     ) -> Result<bool, C::Error> {
         let start = self.cx.mark();
         let b = self.next()?;
@@ -118,7 +118,7 @@ where
             b't' => scratch.push(b'\t'),
             b'u' => {
                 fn encode_surrogate(
-                    scratch: &mut BufVec<'_, u8, (impl Allocator + ?Sized)>,
+                    scratch: &mut Vec<'_, u8, (impl Allocator + ?Sized)>,
                     n: u16,
                 ) -> bool {
                     scratch.write(&[
@@ -285,7 +285,7 @@ where
         &mut self,
         validate: bool,
         start: C::Mark,
-        scratch: &'scratch mut BufVec<'_, u8, (impl Allocator + ?Sized)>,
+        scratch: &'scratch mut Vec<'_, u8, (impl Allocator + ?Sized)>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error> {
         // Index of the first byte not yet copied into the scratch space.
         let mut open_mark = self.cx.mark();

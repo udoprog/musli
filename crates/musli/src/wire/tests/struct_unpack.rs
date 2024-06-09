@@ -1,4 +1,4 @@
-use alloc::string::String;
+use rust_alloc::string::String;
 
 use crate::wire::tag::{Kind, Tag};
 use crate::wire::test::Typed;

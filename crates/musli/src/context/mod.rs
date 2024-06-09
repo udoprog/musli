@@ -20,7 +20,7 @@ use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::buf::{self, BufString};
+use crate::alloc::{self, String};
 use crate::mode::Binary;
 use crate::no_std;
 use crate::{Allocator, Context};
@@ -77,7 +77,7 @@ where
     type Error = E;
     type Mark = ();
     type Allocator = A;
-    type BufString<'this> = BufString<'this, A> where Self: 'this;
+    type String<'this> = String<'this, A> where Self: 'this;
 
     #[inline]
     fn clear(&self) {}
@@ -88,11 +88,11 @@ where
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
-        buf::collect_string(self, value)
+        alloc::collect_string(self, value)
     }
 
     #[inline]
@@ -177,7 +177,7 @@ where
     type Error = ErrorMarker;
     type Mark = ();
     type Allocator = A;
-    type BufString<'this> = BufString<'this, A> where Self: 'this;
+    type String<'this> = String<'this, A> where Self: 'this;
 
     #[inline]
     fn clear(&self) {}
@@ -188,11 +188,11 @@ where
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
-        buf::collect_string(self, value)
+        alloc::collect_string(self, value)
     }
 
     #[inline]
@@ -251,7 +251,7 @@ where
     type Error = ErrorMarker;
     type Mark = ();
     type Allocator = A;
-    type BufString<'this> = BufString<'this, A> where Self: 'this;
+    type String<'this> = String<'this, A> where Self: 'this;
 
     #[inline]
     fn clear(&self) {
@@ -268,11 +268,11 @@ where
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
-        buf::collect_string(self, value)
+        alloc::collect_string(self, value)
     }
 
     #[inline]

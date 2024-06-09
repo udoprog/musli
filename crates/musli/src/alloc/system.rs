@@ -5,13 +5,14 @@ use core::mem::{align_of, size_of};
 use core::ptr;
 use core::ptr::NonNull;
 
-use ::alloc::alloc;
-use ::alloc::boxed::Box;
+use rust_alloc::alloc;
+use rust_alloc::boxed::Box;
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::loom::sync::with_mut_usize;
-use crate::{Allocator, Buf};
+
+use super::{Allocator, Buf};
 
 /// The max capacity of an allocated region as it's being handed back.
 #[cfg(not(loom))]
@@ -34,13 +35,13 @@ const MAX_REGIONS: usize = 2;
 ///
 /// ```
 /// use musli::{Allocator, Buf};
-/// use musli::allocator::System;
-/// use musli::buf::BufVec;
+/// use musli::alloc::System;
+/// use musli::alloc::Vec;
 ///
 /// let alloc = System::new();
 ///
-/// let mut buf1 = BufVec::new_in(&alloc);
-/// let mut buf2 = BufVec::new_in(&alloc);
+/// let mut buf1 = Vec::new_in(&alloc);
+/// let mut buf2 = Vec::new_in(&alloc);
 //
 /// assert!(buf1.write(b"Hello, "));
 /// assert!(buf2.write(b"world!"));

@@ -1,7 +1,7 @@
 use core::fmt;
 
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use rust_alloc::vec::Vec;
 
 use crate::de::{
     DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint,

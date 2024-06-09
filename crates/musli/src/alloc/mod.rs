@@ -6,17 +6,21 @@
 //! * The [`Stack`] allocator, which can allocate buffers from a fixed-size
 //!   slice.
 //!
+//! The following types are also provided for convenience:
+//! * [`Vec`] which can be used as a vector of allocations.
+//! * [`String`] which can be used as a safe string container.
+//!
 //! <br>
 //!
 //! ## Examples
 //!
 //! ```
 //! use musli::{Allocator, Buf};
-//! use musli::buf::BufVec;
+//! use musli::alloc::Vec;
 //!
-//! musli::allocator::default!(|alloc| {
-//!     let mut a = BufVec::new_in(alloc);
-//!     let mut b = BufVec::new_in(alloc);
+//! musli::alloc::default!(|alloc| {
+//!     let mut a = Vec::new_in(alloc);
+//!     let mut b = Vec::new_in(alloc);
 //!
 //!     b.write(b"He11o");
 //!     a.write(b.as_slice());
@@ -29,7 +33,7 @@
 //!     assert_eq!(a.as_slice(), b"He11o W0rld");
 //!     assert_eq!(a.len(), 11);
 //!
-//!     let mut c = BufVec::new_in(alloc);
+//!     let mut c = Vec::new_in(alloc);
 //!     c.write(b"!");
 //!     a.write(c.as_slice());
 //!
@@ -44,6 +48,9 @@
 #[cfg(test)]
 mod tests;
 
+#[doc(inline)]
+pub use musli_core::alloc::{Allocator, Buf};
+
 #[cfg(feature = "alloc")]
 mod system;
 
@@ -56,11 +63,21 @@ pub use self::system::System;
 pub static SYSTEM: System = System::new();
 
 mod disabled;
+#[doc(inline)]
 pub use self::disabled::Disabled;
 
 mod stack;
 #[doc(inline)]
 pub use self::stack::{Stack, StackBuffer};
+
+mod string;
+pub(crate) use self::string::collect_string;
+#[doc(inline)]
+pub use self::string::String;
+
+mod vec;
+#[doc(inline)]
+pub use self::vec::Vec;
 
 /// The default stack buffer size for the default allocator provided through
 /// [`default!`].
@@ -70,7 +87,7 @@ pub const DEFAULT_STACK_BUFFER: usize = 4096;
 #[doc(hidden)]
 macro_rules! __default {
     (|$alloc:ident| $body:block) => {
-        $crate::allocator::__default_allocator_impl!(|$alloc| $body)
+        $crate::alloc::__default_allocator_impl!(|$alloc| $body)
     };
 }
 
@@ -87,11 +104,11 @@ macro_rules! __default {
 ///
 /// ```
 /// use musli::{Allocator, Buf};
-/// use musli::buf::BufVec;
+/// use musli::alloc::Vec;
 ///
-/// musli::allocator::default!(|alloc| {
-///     let mut a = BufVec::new_in(alloc);
-///     let mut b = BufVec::new_in(alloc);
+/// musli::alloc::default!(|alloc| {
+///     let mut a = Vec::new_in(alloc);
+///     let mut b = Vec::new_in(alloc);
 ///
 ///     b.write(b"He11o");
 ///     a.write(b.as_slice());
@@ -104,7 +121,7 @@ macro_rules! __default {
 ///     assert_eq!(a.as_slice(), b"He11o W0rld");
 ///     assert_eq!(a.len(), 11);
 ///
-///     let mut c = BufVec::new_in(alloc);
+///     let mut c = Vec::new_in(alloc);
 ///     c.write(b"!");
 ///     a.write(c.as_slice());
 ///
@@ -120,7 +137,7 @@ pub use __default as default;
 #[doc(hidden)]
 macro_rules! __default_allocator_impl {
     (|$alloc:ident| $body:block) => {{
-        let $alloc = &$crate::allocator::SYSTEM;
+        let $alloc = &$crate::alloc::SYSTEM;
         $body
     }};
 }
@@ -130,7 +147,7 @@ macro_rules! __default_allocator_impl {
 #[doc(hidden)]
 macro_rules! __default_allocator_impl {
     (|$alloc:ident| $body:block) => {{
-        let $alloc = $crate::allocator::System::new();
+        let $alloc = $crate::alloc::System::new();
         let $alloc = &$alloc;
         $body
     }};
@@ -142,8 +159,8 @@ macro_rules! __default_allocator_impl {
 macro_rules! __default_allocator_impl {
     (|$alloc:ident| $body:block) => {{
         let mut __buf =
-            $crate::allocator::StackBuffer::<{ $crate::allocator::DEFAULT_STACK_BUFFER }>::new();
-        let $alloc = $crate::allocator::Stack::new(&mut __buf);
+            $crate::alloc::StackBuffer::<{ $crate::alloc::DEFAULT_STACK_BUFFER }>::new();
+        let $alloc = $crate::alloc::Stack::new(&mut __buf);
         $body
     }};
 }

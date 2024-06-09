@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 use core::ptr;
 
-use crate::{Allocator, Buf};
+use super::{Allocator, Buf};
 
 /// An empty buffer.
 pub struct EmptyBuf<T> {

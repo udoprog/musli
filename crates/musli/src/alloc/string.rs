@@ -2,30 +2,28 @@ use core::fmt;
 use core::ops::Deref;
 use core::str;
 
-use crate::buf::BufVec;
 use crate::fixed::CapacityError;
-use crate::{Allocator, Context};
+use crate::Context;
 
-/// Wrapper around a [`Buf`], guaranteed to be a valid utf-8 string.
-pub struct BufString<'a, A>
+use super::{Allocator, Vec};
+
+/// Wrapper around a buffer that is guaranteed to be a valid utf-8 string.
+pub struct String<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
-    buf: BufVec<'a, u8, A>,
+    buf: Vec<'a, u8, A>,
 }
 
 /// Collect a string into a string buffer.
-pub(crate) fn collect_string<C, T>(
-    cx: &C,
-    value: T,
-) -> Result<BufString<'_, C::Allocator>, C::Error>
+pub(crate) fn collect_string<C, T>(cx: &C, value: T) -> Result<String<'_, C::Allocator>, C::Error>
 where
     C: ?Sized + Context,
     T: fmt::Display,
 {
     use core::fmt::Write;
 
-    let mut string = BufString::new_in(cx.alloc());
+    let mut string = String::new_in(cx.alloc());
 
     if write!(string, "{value}").is_err() {
         return Err(cx.message("Failed to write to string"));
@@ -34,7 +32,7 @@ where
     Ok(string)
 }
 
-impl<'a, A> BufString<'a, A>
+impl<'a, A> String<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
@@ -45,9 +43,7 @@ where
 
     /// Construct a new fixed string.
     pub(crate) const fn new(buf: A::Buf<'a, u8>) -> Self {
-        Self {
-            buf: BufVec::new(buf),
-        }
+        Self { buf: Vec::new(buf) }
     }
 
     fn as_str(&self) -> &str {
@@ -72,7 +68,7 @@ where
     }
 }
 
-impl<'a, A> fmt::Write for BufString<'a, A>
+impl<'a, A> fmt::Write for String<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
@@ -87,7 +83,7 @@ where
     }
 }
 
-impl<'a, A> Deref for BufString<'a, A>
+impl<'a, A> Deref for String<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
@@ -99,7 +95,7 @@ where
     }
 }
 
-impl<'a, A> fmt::Display for BufString<'a, A>
+impl<'a, A> fmt::Display for String<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
@@ -109,7 +105,7 @@ where
     }
 }
 
-impl<'a, A> AsRef<str> for BufString<'a, A>
+impl<'a, A> AsRef<str> for String<'a, A>
 where
     A: ?Sized + Allocator,
 {

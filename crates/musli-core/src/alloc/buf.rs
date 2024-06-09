@@ -1,20 +1,3 @@
-//! Types related to buffers.
-
-use core::fmt;
-
-/// An error raised when we fail to write.
-#[derive(Debug)]
-pub struct Error;
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Allocation failed")
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for Error {}
-
 /// A raw buffer allocated from a [`Context`].
 ///
 /// [`Context`]: crate::Context

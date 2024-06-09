@@ -10,7 +10,7 @@ use core::fmt;
 use crate::no_std;
 
 #[cfg(feature = "alloc")]
-use alloc::string::{String, ToString};
+use rust_alloc::string::{String, ToString};
 
 /// Trait governing errors raised during encodeing or decoding.
 pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {

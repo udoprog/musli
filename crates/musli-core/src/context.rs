@@ -20,7 +20,7 @@ pub trait Context {
     /// The allocator associated with the context.
     type Allocator: ?Sized + Allocator;
     /// An allocated buffer containing a valid string.
-    type BufString<'this>: AsRef<str>
+    type String<'this>: AsRef<str>
     where
         Self: 'this;
 
@@ -74,7 +74,7 @@ pub trait Context {
     /// Collect and allocate a string from a [`Display`] implementation.
     ///
     /// [`Display`]: fmt::Display
-    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display;
 
@@ -211,7 +211,7 @@ pub trait Context {
 
     /// Encountered an unsupported field tag.
     #[inline(always)]
-    fn invalid_field_string_tag(&self, _: &'static str, field: Self::BufString<'_>) -> Self::Error {
+    fn invalid_field_string_tag(&self, _: &'static str, field: Self::String<'_>) -> Self::Error {
         let field = field.as_ref();
         self.message(format_args!("Invalid field tag `{field}`"))
     }

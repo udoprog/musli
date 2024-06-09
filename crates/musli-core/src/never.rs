@@ -12,6 +12,7 @@ use core::marker;
 
 use crate::no_std::ToOwned;
 
+use crate::alloc::Buf;
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder,
     MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
@@ -19,7 +20,7 @@ use crate::de::{
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
-use crate::{Buf, Context};
+use crate::Context;
 
 /// Marker type used for the [`Never`] type.
 #[doc(hidden)]

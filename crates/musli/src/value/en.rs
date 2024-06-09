@@ -1,9 +1,9 @@
 use core::fmt;
 
 #[cfg(feature = "alloc")]
-use alloc::boxed::Box;
+use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use rust_alloc::vec::Vec;
 
 use crate::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]

@@ -5,11 +5,10 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use crate::buf::Buf;
-use crate::Allocator;
+use super::{Allocator, Buf};
 
 /// A vector backed by an [`Allocator`] [`Buf`].
-pub struct BufVec<'a, T, A>
+pub struct Vec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,
@@ -18,11 +17,12 @@ where
     len: usize,
 }
 
-impl<'a, T, A> BufVec<'a, T, A>
+impl<'a, T, A> Vec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,
 {
+    /// Construct a buffer vector from raw parts.
     const unsafe fn from_raw_parts(buf: A::Buf<'a, T>, len: usize) -> Self {
         Self { buf, len }
     }
@@ -33,10 +33,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
+    /// use musli::alloc::Vec;
     ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
+    /// musli::alloc::default!(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
     ///
     ///     a.push(String::from("Hello"));
     ///     a.push(String::from("World"));
@@ -63,10 +63,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
+    /// use musli::alloc::Vec;
     ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
+    /// musli::alloc::default!(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
     ///
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
@@ -83,10 +83,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
+    /// use musli::alloc::Vec;
     ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
+    /// musli::alloc::default!(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
     ///
     ///     assert!(a.is_empty());
     ///     a.write(b"Hello");
@@ -107,10 +107,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
+    /// use musli::alloc::Vec;
     ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
+    /// musli::alloc::default!(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
     ///
     ///     a.push(b'H');
     ///     a.push(b'e');
@@ -144,10 +144,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
+    /// use musli::alloc::Vec;
     ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
+    /// musli::alloc::default!(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
     ///
     ///     a.push(String::from("foo"));
     ///     a.push(String::from("bar"));
@@ -176,10 +176,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
+    /// use musli::alloc::Vec;
     ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
+    /// musli::alloc::default!(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
     ///
     ///     a.push(b'H');
     ///     a.push(b'e');
@@ -204,10 +204,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
+    /// use musli::alloc::Vec;
     ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
+    /// musli::alloc::default!(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
     ///     assert_eq!(a.as_slice(), b"");
     ///     a.write(b"Hello");
     ///     assert_eq!(a.as_slice(), b"Hello");
@@ -230,7 +230,7 @@ where
     }
 }
 
-impl<'a, T, A> BufVec<'a, T, A>
+impl<'a, T, A> Vec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a + Copy,
@@ -244,10 +244,10 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
+    /// use musli::alloc::Vec;
     ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
+    /// musli::alloc::default!(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
     ///     assert_eq!(a.len(), 5);
@@ -279,11 +279,11 @@ where
     ///
     /// ```
     /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
+    /// use musli::alloc::Vec;
     ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
-    ///     let mut b = BufVec::new_in(alloc);
+    /// musli::alloc::default!(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
+    ///     let mut b = Vec::new_in(alloc);
     ///
     ///     a.write(b"Hello");
     ///     b.write(b" World");
@@ -293,12 +293,12 @@ where
     /// });
     /// ```
     #[inline]
-    pub fn extend(&mut self, other: BufVec<'_, T, A>) -> bool {
+    pub fn extend(&mut self, other: Vec<'_, T, A>) -> bool {
         let (other, other_len) = other.into_raw_parts();
 
         // Try to merge one buffer with another.
         if let Err(buf) = self.buf.try_merge(self.len, other, other_len) {
-            let other = unsafe { BufVec::<T, A>::from_raw_parts(buf, other_len) };
+            let other = unsafe { Vec::<T, A>::from_raw_parts(buf, other_len) };
             return self.write(other.as_slice());
         }
 
@@ -313,19 +313,19 @@ where
 ///
 /// ```
 /// use musli::{Allocator, Buf};
-/// use musli::buf::BufVec;
+/// use musli::alloc::Vec;
 ///
-/// musli::allocator::default!(|alloc| {
-///     let mut a = BufVec::new_in(alloc);
+/// musli::alloc::default!(|alloc| {
+///     let mut a = Vec::new_in(alloc);
 ///     let world = "World";
 ///
 ///     write!(a, "Hello {world}")?;
 ///
 ///     assert_eq!(a.as_slice(), b"Hello World");
 /// });
-/// # Ok::<(), musli::buf::Error>(())
+/// # Ok::<(), core::fmt::Error>(())
 /// ```
-impl<'a, A> fmt::Write for BufVec<'a, u8, A>
+impl<'a, A> fmt::Write for Vec<'a, u8, A>
 where
     A: 'a + ?Sized + Allocator,
 {
@@ -340,7 +340,7 @@ where
 }
 
 #[cfg(test)]
-impl<'a, T, A> Deref for BufVec<'a, T, A>
+impl<'a, T, A> Deref for Vec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,
@@ -354,7 +354,7 @@ where
 }
 
 #[cfg(test)]
-impl<'a, T, A> DerefMut for BufVec<'a, T, A>
+impl<'a, T, A> DerefMut for Vec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,
@@ -365,7 +365,7 @@ where
     }
 }
 
-impl<'a, T, A> Drop for BufVec<'a, T, A>
+impl<'a, T, A> Drop for Vec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,

@@ -11,9 +11,9 @@ use crate::mode::Text;
 use crate::Context;
 
 #[cfg(feature = "alloc")]
-use alloc::string::String;
+use rust_alloc::string::String;
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use rust_alloc::vec::Vec;
 
 pub struct Deserializer<'de, 'a, D>
 where

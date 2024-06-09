@@ -1,4 +1,4 @@
-use crate::buf::Buf;
+use super::Buf;
 
 /// An allocator that can be used in combination with a context.
 pub trait Allocator {

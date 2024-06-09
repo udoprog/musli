@@ -4,7 +4,7 @@
 
 mod prelude;
 
-use musli::allocator::{Stack, StackBuffer};
+use musli::alloc::{Stack, StackBuffer};
 use musli::context::RichContext;
 use musli::{Decode, Encode};
 

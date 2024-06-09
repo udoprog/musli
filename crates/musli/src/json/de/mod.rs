@@ -22,10 +22,7 @@ use self::variant_decoder::JsonVariantDecoder;
 use core::fmt;
 use core::str;
 
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
-
-use crate::buf::BufVec;
+use crate::alloc::Vec;
 use crate::de::{
     Decode, DecodeUnsized, Decoder, SequenceDecoder, SizeHint, Skip, UnsizedVisitor, Visitor,
 };
@@ -205,7 +202,7 @@ where
     #[inline]
     fn decode_char(mut self) -> Result<char, C::Error> {
         let start = self.cx.mark();
-        let mut scratch = BufVec::new_in(self.cx.alloc());
+        let mut scratch = Vec::new_in(self.cx.alloc());
 
         let string = match self.parser.parse_string(self.cx, true, &mut scratch)? {
             StringReference::Borrowed(string) => string,
@@ -332,7 +329,7 @@ where
         let cx = self.cx;
 
         self.decode_sequence(|seq| {
-            let mut bytes = Vec::with_capacity(seq.size_hint().or_default());
+            let mut bytes = rust_alloc::vec::Vec::with_capacity(seq.size_hint().or_default());
 
             while let Some(item) = seq.try_decode_next()? {
                 bytes.push(item.decode_u8()?);
@@ -347,7 +344,7 @@ where
     where
         V: UnsizedVisitor<'de, C, str>,
     {
-        let mut scratch = BufVec::new_in(self.cx.alloc());
+        let mut scratch = Vec::new_in(self.cx.alloc());
 
         match self.parser.parse_string(self.cx, true, &mut scratch)? {
             StringReference::Borrowed(borrowed) => visitor.visit_borrowed(self.cx, borrowed),

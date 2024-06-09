@@ -16,7 +16,7 @@
 use core::fmt;
 
 #[cfg(feature = "alloc")]
-pub use alloc::borrow::ToOwned;
+pub use rust_alloc::borrow::ToOwned;
 
 #[cfg(not(feature = "alloc"))]
 pub use self::to_owned::ToOwned;

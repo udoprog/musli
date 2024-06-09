@@ -3,9 +3,9 @@ use core::fmt;
 use crate::Context;
 
 #[cfg(feature = "alloc")]
-use alloc::boxed::Box;
+use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
-use alloc::format;
+use rust_alloc::format;
 
 #[derive(Debug)]
 pub enum SerdeError {
