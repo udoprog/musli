@@ -52,6 +52,7 @@ impl<M> RichContext<'static, System, M> {
     }
 }
 
+#[cfg(all(not(loom), feature = "alloc"))]
 impl<M> Default for RichContext<'static, System, M> {
     #[inline]
     fn default() -> Self {

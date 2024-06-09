@@ -52,7 +52,7 @@ mod system;
 pub use self::system::System;
 
 /// The static system allocator instance.
-#[cfg(all(feature = "alloc", not(loom)))]
+#[cfg(all(not(loom), feature = "alloc"))]
 pub static SYSTEM: System = System::new();
 
 mod disabled;
@@ -119,7 +119,7 @@ macro_rules! __default {
 #[doc(inline)]
 pub use __default as default;
 
-#[cfg(all(feature = "alloc", not(loom)))]
+#[cfg(all(not(loom), feature = "alloc"))]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __default_allocator_impl {
