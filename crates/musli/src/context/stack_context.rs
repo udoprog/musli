@@ -5,8 +5,7 @@ use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::ops::Range;
 
-use crate::buf::{self, BufString};
-use crate::fixed::FixedVec;
+use crate::buf::{self, BufString, BufVec};
 use crate::{Allocator, Context};
 
 use super::access::{Access, Shared};
@@ -20,14 +19,14 @@ type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a, u8>>);
 ///
 /// This will only store 4 errors by default, and support a path up to 16. To
 /// control this, use the [`new_with`][StackContext::new_with] constructor.
-pub struct StackContext<'a, const E: usize, const P: usize, A, M>
+pub struct StackContext<'a, A, M>
 where
     A: ?Sized + Allocator,
 {
     alloc: &'a A,
     mark: Cell<usize>,
-    errors: UnsafeCell<FixedVec<BufPair<'a, A>, E>>,
-    path: UnsafeCell<FixedVec<Step<BufString<A::Buf<'a, u8>>>, P>>,
+    errors: UnsafeCell<BufVec<A::Buf<'a, BufPair<'a, A>>>>,
+    path: UnsafeCell<BufVec<A::Buf<'a, Step<BufString<A::Buf<'a, u8>>>>>>,
     // How many elements of `path` we've gone over capacity.
     path_cap: Cell<usize>,
     include_type: bool,
@@ -35,38 +34,26 @@ where
     _marker: PhantomData<M>,
 }
 
-impl<'a, A, M> StackContext<'a, 16, 4, A, M>
-where
-    A: ?Sized + Allocator,
-{
-    /// Construct a new context which uses allocations to a fixed number of
-    /// diagnostics.
-    ///
-    /// This uses the default values of:
-    /// * The first 4 errors.
-    /// * 16 path elements stored when tracing.
-    pub fn new(alloc: &'a A) -> Self {
-        Self::new_with(alloc)
-    }
-}
-
-impl<'a, const E: usize, const P: usize, A, M> StackContext<'a, E, P, A, M>
+impl<'a, A, M> StackContext<'a, A, M>
 where
     A: ?Sized + Allocator,
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
-    pub fn new_with(alloc: &'a A) -> Self {
-        Self {
+    pub fn new(alloc: &'a A) -> Option<Self> {
+        let errors = BufVec::new_in(alloc)?;
+        let path = BufVec::new_in(alloc)?;
+
+        Some(Self {
             alloc,
             mark: Cell::new(0),
-            errors: UnsafeCell::new(FixedVec::new()),
-            path: UnsafeCell::new(FixedVec::new()),
+            errors: UnsafeCell::new(errors),
+            path: UnsafeCell::new(path),
             path_cap: Cell::new(0),
             include_type: false,
             access: Access::new(),
             _marker: PhantomData,
-        }
+        })
     }
 
     /// Configure the context to visualize type information, and not just
@@ -88,8 +75,8 @@ where
         let access = self.access.shared();
 
         Errors {
-            path: unsafe { &*self.path.get() },
-            errors: unsafe { &*self.errors.get() },
+            path: unsafe { (*self.path.get()).as_slice() },
+            errors: unsafe { (*self.errors.get()).as_slice() },
             index: 0,
             path_cap: self.path_cap.get(),
             _access: access,
@@ -102,7 +89,7 @@ where
 
         // SAFETY: We've checked that we have exclusive access just above.
         unsafe {
-            _ = (*self.errors.get()).try_push((range, error));
+            _ = (*self.errors.get()).push((range, error));
         }
     }
 
@@ -113,7 +100,7 @@ where
         // SAFETY: We've checked that we have exclusive access just above.
         let path = unsafe { &mut (*self.path.get()) };
 
-        if path.try_push(step).is_err() {
+        if !path.push(step) {
             self.path_cap.set(self.path_cap.get() + 1);
         }
     }
@@ -145,7 +132,7 @@ where
     }
 }
 
-impl<'a, const E: usize, const P: usize, A, M> Context for StackContext<'a, E, P, A, M>
+impl<'a, A, M> Context for StackContext<'a, A, M>
 where
     A: ?Sized + Allocator,
     M: 'static,

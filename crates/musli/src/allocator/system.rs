@@ -139,12 +139,12 @@ impl Default for System {
 }
 
 impl Allocator for System {
-    type Buf<'this, T> = SystemBuf<'this, T> where Self: 'this, T: 'static;
+    type Buf<'this, T> = SystemBuf<'this, T> where Self: 'this, T: 'this;
 
     #[inline(always)]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
+    fn alloc<'a, T>(&'a self) -> Option<Self::Buf<'a, T>>
     where
-        T: 'static,
+        T: 'a,
     {
         let region = self.root.alloc()?;
 
@@ -179,10 +179,7 @@ pub struct SystemBuf<'a, T> {
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> Buf for SystemBuf<'a, T>
-where
-    T: 'static,
-{
+impl<'a, T> Buf for SystemBuf<'a, T> {
     type Item = T;
 
     #[inline]

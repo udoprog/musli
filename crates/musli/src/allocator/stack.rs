@@ -214,12 +214,12 @@ impl<'a> Stack<'a> {
 }
 
 impl Allocator for Stack<'_> {
-    type Buf<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'static;
+    type Buf<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'this;
 
     #[inline]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
+    fn alloc<'a, T>(&'a self) -> Option<Self::Buf<'a, T>>
     where
-        T: 'static,
+        T: 'a,
     {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
@@ -240,10 +240,7 @@ pub struct StackBuf<'a, T> {
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> Buf for StackBuf<'a, T>
-where
-    T: 'static,
-{
+impl<'a, T> Buf for StackBuf<'a, T> {
     type Item = T;
 
     #[inline]

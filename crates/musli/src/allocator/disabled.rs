@@ -8,10 +8,7 @@ pub struct EmptyBuf<T> {
     _marker: PhantomData<T>,
 }
 
-impl<T> Buf for EmptyBuf<T>
-where
-    T: 'static,
-{
+impl<T> Buf for EmptyBuf<T> {
     type Item = T;
 
     #[inline]
@@ -60,12 +57,12 @@ impl Default for Disabled {
 }
 
 impl Allocator for Disabled {
-    type Buf<'this, T> = EmptyBuf<T> where T: 'static;
+    type Buf<'this, T> = EmptyBuf<T> where T: 'this;
 
     #[inline(always)]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
+    fn alloc<'a, T>(&'a self) -> Option<Self::Buf<'a, T>>
     where
-        T: 'static,
+        T: 'a,
     {
         Some(EmptyBuf {
             _marker: PhantomData,

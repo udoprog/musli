@@ -2,6 +2,7 @@ use core::fmt::{self, Arguments};
 use core::mem::ManuallyDrop;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
+use core::slice;
 
 use crate::buf::{Buf, Error};
 use crate::Allocator;
@@ -38,7 +39,7 @@ where
     /// ```
     pub fn new_in<'a, T>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, T> = B>)) -> Option<Self>
     where
-        T: 'static,
+        T: 'a,
     {
         Some(Self {
             buf: alloc.alloc::<T>()?,
@@ -131,6 +132,69 @@ where
         true
     }
 
+    /// Pop a single item from the buffer.
+    ///
+    /// Returns `None` if the buffer is empty.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
+    ///
+    /// musli::allocator::default!(|alloc| {
+    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///
+    ///     a.push(String::from("foo"));
+    ///     a.push(String::from("bar"));
+    ///
+    ///     assert_eq!(a.as_slice(), ["foo", "bar"]);
+    ///
+    ///     assert_eq!(a.pop().as_deref(), Some("bar"));
+    ///     assert_eq!(a.pop().as_deref(), Some("foo"));
+    ///     assert_eq!(a.pop(), None);
+    /// });
+    /// ```
+    pub fn pop(&mut self) -> Option<B::Item> {
+        if self.len == 0 {
+            return None;
+        }
+
+        self.len -= 1;
+
+        // SAFETY: We know that the buffer is initialized up to `len`.
+        unsafe { Some(ptr::read(self.buf.as_ptr().add(self.len))) }
+    }
+
+    /// Clear the buffer vector.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Buf};
+    /// use musli::buf::BufVec;
+    ///
+    /// musli::allocator::default!(|alloc| {
+    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///
+    ///     a.push(b'H');
+    ///     a.push(b'e');
+    ///     a.push(b'l');
+    ///     a.push(b'l');
+    ///     a.push(b'o');
+    ///
+    ///     assert_eq!(a.as_slice(), b"Hello");
+    ///     a.clear();
+    ///     assert_eq!(a.as_slice(), b"");
+    /// });
+    /// ```
+    pub fn clear(&mut self) {
+        // SAFETY: We know that the buffer is initialized up to `len`.
+        unsafe { ptr::drop_in_place(slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len)) }
+
+        self.len = 0;
+    }
+
     /// Get the initialized part of the buffer as a slice.
     ///
     /// ## Examples
@@ -148,7 +212,7 @@ where
     /// ```
     pub fn as_slice(&self) -> &[B::Item] {
         // SAFETY: We know that the buffer is initialized up to `self.len`.
-        unsafe { core::slice::from_raw_parts(self.buf.as_ptr(), self.len) }
+        unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.len) }
     }
 
     #[inline]
@@ -320,12 +384,6 @@ where
     B: Buf,
 {
     fn drop(&mut self) {
-        // SAFETY: We know that the buffer is initialized up to `len`.
-        unsafe {
-            core::ptr::drop_in_place(core::slice::from_raw_parts_mut(
-                self.buf.as_mut_ptr(),
-                self.len,
-            ))
-        }
+        self.clear();
     }
 }
