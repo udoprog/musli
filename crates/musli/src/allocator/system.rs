@@ -39,8 +39,8 @@ const MAX_REGIONS: usize = 2;
 ///
 /// let alloc = System::new();
 ///
-/// let mut buf1 = BufVec::new_in(&alloc).expect("allocation failed");
-/// let mut buf2 = BufVec::new_in(&alloc).expect("allocation failed");
+/// let mut buf1 = BufVec::new_in(&alloc);
+/// let mut buf2 = BufVec::new_in(&alloc);
 //
 /// assert!(buf1.write(b"Hello, "));
 /// assert!(buf2.write(b"world!"));
@@ -141,12 +141,16 @@ impl Default for System {
 impl Allocator for System {
     type Buf<'this, T> = SystemBuf<'this, T> where Self: 'this, T: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
     where
         T: 'a,
     {
-        let region = self.root.alloc::<T>();
+        let region = if size_of::<T>() == 0 {
+            None
+        } else {
+            self.root.alloc::<T>()
+        };
 
         SystemBuf {
             root: &self.root,
@@ -184,7 +188,7 @@ impl<'a, T> Buf for SystemBuf<'a, T> {
 
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {
-        if additional == 0 {
+        if additional == 0 || size_of::<T>() == 0 {
             return true;
         }
 
@@ -236,7 +240,7 @@ struct Region {
     /// Data pointer to the allocated region.
     data: NonNull<()>,
     /// The size of the allocated region.
-    layout: Option<Layout>,
+    layout: Layout,
     /// Pointer to the next free region.
     next: Option<NonNull<Region>>,
 }
@@ -245,17 +249,15 @@ impl Region {
     const fn dangling<T>() -> Self {
         Self {
             data: NonNull::<T>::dangling().cast(),
-            layout: None,
+            // SAFETY: A zero-sized layout is always valid, and the alignment stems from T.
+            layout: unsafe { Layout::from_size_align_unchecked(0, align_of::<T>()) },
             next: None,
         }
     }
 
     // Ensure the region is aligned.
     fn is_aligned<T>(&mut self) -> bool {
-        match self.layout {
-            Some(layout) => layout.align() % align_of::<T>() == 0,
-            None => self.data.as_ptr().align_offset(align_of::<T>()) == 0,
-        }
+        self.layout.align() % align_of::<T>() == 0
     }
 
     /// Allocate with the specified layout.
@@ -273,7 +275,7 @@ impl Region {
 
         Some(Region {
             data: NonNull::new_unchecked(data).cast(),
-            layout: Some(layout),
+            layout,
             next: None,
         })
     }
@@ -284,102 +286,102 @@ impl Region {
     ///
     /// The caller must ensure that the new capacity is valid per [`Layout`].
     #[must_use = "allocating is fallible and must be checked"]
-    unsafe fn realloc(&mut self, existing: Layout, new_layout: Layout) -> bool {
-        debug_assert!(existing.align() % new_layout.align() == 0);
+    unsafe fn realloc(&mut self, new_layout: Layout) -> bool {
+        debug_assert!(self.layout.align() % new_layout.align() == 0);
 
-        let data = alloc::realloc(self.data.as_ptr().cast(), existing, new_layout.size());
+        let (data, new_layout) = if self.layout.size() > 0 {
+            // The new layout inherits the alignment of the existing one, but with a new size.
+            let layout = Layout::from_size_align_unchecked(new_layout.size(), self.layout.align());
+
+            (
+                alloc::realloc(self.data.as_ptr().cast(), self.layout, new_layout.size()),
+                layout,
+            )
+        } else {
+            (alloc::alloc(new_layout), new_layout)
+        };
 
         if data.is_null() {
             return false;
         }
 
         self.data = NonNull::new_unchecked(data).cast();
-        // The new layout inherits the alignment of the existing one, but with a new size.
-        self.layout = Some(Layout::from_size_align_unchecked(
-            new_layout.size(),
-            existing.align(),
-        ));
+        self.layout = new_layout;
         true
     }
 
     fn shrink_to(&mut self, max_bytes: usize) -> bool {
-        let Some(layout) = self.layout else {
-            return true;
-        };
-
-        if layout.size() <= max_bytes {
+        if self.layout.size() <= max_bytes {
             return true;
         }
 
-        let Ok(new_layout) = Layout::from_size_align(max_bytes, layout.align()) else {
+        let Ok(new_layout) = Layout::from_size_align(max_bytes, self.layout.align()) else {
             return false;
         };
 
         // SAFETY: We're taking care to ensure that elements are layout compatible.
-        unsafe { self.realloc(layout, new_layout) }
+        unsafe { self.realloc(new_layout) }
     }
 
     #[must_use = "allocating is fallible and must be checked"]
     unsafe fn reserve<T>(&mut self, len: usize, additional: usize) -> bool {
+        if size_of::<T>() == 0 {
+            // This being a ZST by definition means it is compatible with
+            // anything that this region happens to hold as an allocation.
+            // All though we should never reach this point.
+            debug_assert_eq!(align_of::<T>(), 1);
+            return true;
+        }
+
         let Some(required_cap) = len.checked_add(additional) else {
             return false;
         };
 
-        assert_ne!(size_of::<T>(), 0, "ZSTs are not supported");
+        let cap = if self.layout.align() % align_of::<T>() == 0
+            && self.layout.size() % size_of::<T>() == 0
+        {
+            let cap = self.layout.size() / size_of::<T>();
 
-        let cap = match self.layout {
-            Some(layout)
-                if layout.align() % align_of::<T>() == 0 && layout.size() % size_of::<T>() == 0 =>
-            {
-                let cap = layout.size() / size_of::<T>();
-
-                if cap >= required_cap {
-                    return true;
-                }
-
-                cap
+            if cap >= required_cap {
+                return true;
             }
-            _ => 0,
+
+            cap
+        } else {
+            0
         };
 
         let cap = cmp::max(cap * 2, required_cap);
         let cap = cmp::max(min_non_zero_cap::<T>(), cap);
-        self.alloc_capacity::<T>(cap)
-    }
 
-    fn alloc_capacity<T>(&mut self, cap: usize) -> bool {
         let Ok(new_layout) = Layout::array::<T>(cap) else {
             return false;
         };
 
-        // SAFETY: We're taking care to ensure that elements are layout compatible.
-        unsafe {
-            match self.layout {
-                Some(existing) if existing.align() % new_layout.align() == 0 => {
-                    if existing.size() >= new_layout.size() {
-                        return true;
-                    }
-
-                    self.realloc(existing, new_layout)
-                }
-                _ => {
-                    let Some(new) = Self::alloc(new_layout) else {
-                        return false;
-                    };
-
-                    *self = new;
-                    true
-                }
+        if self.layout.align() % new_layout.align() == 0 {
+            if self.layout.size() >= new_layout.size() {
+                return true;
             }
+
+            self.realloc(new_layout)
+        } else {
+            let Some(new) = Self::alloc(new_layout) else {
+                return false;
+            };
+
+            *self = new;
+            true
         }
     }
 
     fn free(&mut self) {
-        if let Some(layout) = self.layout.take() {
+        if self.layout.size() > 0 {
             // SAFETY: Layout assumptions are correctly encoded in the type as
             // it was being allocated or grown.
             unsafe {
-                alloc::dealloc(self.data.as_ptr().cast(), layout);
+                alloc::dealloc(self.data.as_ptr().cast(), self.layout);
+                self.data = NonNull::<u8>::dangling().cast();
+                self.layout = Layout::from_size_align_unchecked(0, 1);
             }
         }
     }

@@ -223,10 +223,18 @@ impl Allocator for Stack<'_> {
     {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
-        let region = unsafe { (*self.internal.get()).alloc(0, align_of::<T>()) };
+        let region = if size_of::<T>() == 0 {
+            None
+        } else {
+            unsafe {
+                (*self.internal.get())
+                    .alloc(0, align_of::<T>())
+                    .map(|r| r.id)
+            }
+        };
 
         StackBuf {
-            region: region.map(|r| r.id),
+            region,
             internal: &self.internal,
             _marker: PhantomData,
         }
@@ -245,7 +253,7 @@ impl<'a, T> Buf for StackBuf<'a, T> {
 
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {
-        if additional == 0 {
+        if additional == 0 || size_of::<T>() == 0 {
             return true;
         }
 

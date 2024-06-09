@@ -30,7 +30,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     a.push(String::from("Hello"));
     ///     a.push(String::from("World"));
@@ -63,7 +63,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
@@ -83,7 +83,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     assert!(a.is_empty());
     ///     a.write(b"Hello");
@@ -107,7 +107,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     a.push(b'H');
     ///     a.push(b'e');
@@ -144,7 +144,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     a.push(String::from("foo"));
     ///     a.push(String::from("bar"));
@@ -176,7 +176,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///
     ///     a.push(b'H');
     ///     a.push(b'e');
@@ -209,7 +209,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///     assert_eq!(a.as_slice(), b"");
     ///     a.write(b"Hello");
     ///     assert_eq!(a.as_slice(), b"Hello");
@@ -249,7 +249,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
     ///     assert_eq!(a.len(), 5);
@@ -289,8 +289,8 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
-    ///     let mut b = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
+    ///     let mut b = BufVec::new_in(alloc);
     ///
     ///     a.write(b"Hello");
     ///     b.write(b" World");
@@ -329,7 +329,7 @@ where
     /// use musli::buf::BufVec;
     ///
     /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc).expect("allocation failed");
+    ///     let mut a = BufVec::new_in(alloc);
     ///     let world = "World";
     ///
     ///     write!(a, "Hello {world}")?;

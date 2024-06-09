@@ -72,14 +72,40 @@ fn system_basic() {
 }
 
 #[test]
+fn nostd_basic() {
+    let mut buf = super::StackBuffer::<4096>::new();
+    let alloc = super::Stack::new(&mut buf);
+    basic_allocations(&alloc);
+}
+
+#[test]
 fn system_grow() {
     let alloc = super::System::new();
     grow_allocations(&alloc);
 }
 
+fn zst_allocations<A: Allocator>(alloc: &A) {
+    let mut a = BufVec::new_in(alloc);
+    let mut b = BufVec::new_in(alloc);
+
+    assert!(a.write(&[(); 100]));
+    assert!(b.write(&[(); 100]));
+
+    assert_eq!(a.len(), 100);
+    assert_eq!(b.len(), 100);
+
+    assert_eq!(a.as_slice(), b.as_slice());
+}
+
 #[test]
-fn nostd_basic() {
+fn system_zst() {
+    let alloc = super::System::new();
+    zst_allocations(&alloc);
+}
+
+#[test]
+fn stack_zst() {
     let mut buf = super::StackBuffer::<4096>::new();
     let alloc = super::Stack::new(&mut buf);
-    basic_allocations(&alloc);
+    zst_allocations(&alloc);
 }

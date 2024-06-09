@@ -48,6 +48,13 @@ impl<M> RichContext<'static, System, M> {
     }
 }
 
+impl<M> Default for RichContext<'static, System, M> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a, A, M> RichContext<'a, A, M>
 where
     A: ?Sized + Allocator,

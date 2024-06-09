@@ -11,8 +11,8 @@ const BIG2: &[u8] = &[
 ];
 
 fn work(alloc: &System) {
-    let mut buf1 = BufVec::new_in(alloc).expect("allocation failed");
-    let mut buf2 = BufVec::new_in(alloc).expect("allocation failed");
+    let mut buf1 = BufVec::new_in(alloc);
+    let mut buf2 = BufVec::new_in(alloc);
 
     assert!(buf1.write(BIG1));
     assert!(buf2.write(BIG2));
