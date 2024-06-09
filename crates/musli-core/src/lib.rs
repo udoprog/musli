@@ -17,8 +17,6 @@ extern crate alloc as rust_alloc;
 extern crate std;
 
 pub mod alloc;
-#[doc(inline)]
-pub use self::alloc::Allocator;
 
 mod context;
 #[doc(inline)]

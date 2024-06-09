@@ -15,7 +15,7 @@
 //! ## Examples
 //!
 //! ```
-//! use musli::{Allocator, Buf};
+//! use musli::Buf;
 //! use musli::alloc::Vec;
 //!
 //! musli::alloc::default!(|alloc| {
@@ -103,7 +103,6 @@ macro_rules! __default {
 /// # Examples
 ///
 /// ```
-/// use musli::{Allocator, Buf};
 /// use musli::alloc::Vec;
 ///
 /// musli::alloc::default!(|alloc| {

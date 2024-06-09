@@ -1,4 +1,4 @@
-//! Types related to memory allocation.
+//! Traits related to memory allocation.
 
 mod allocator;
 #[doc(inline)]

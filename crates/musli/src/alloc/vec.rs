@@ -32,7 +32,6 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::{Allocator, Buf};
     /// use musli::alloc::Vec;
     ///
     /// musli::alloc::default!(|alloc| {
@@ -62,7 +61,6 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::{Allocator, Buf};
     /// use musli::alloc::Vec;
     ///
     /// musli::alloc::default!(|alloc| {
@@ -82,7 +80,6 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::{Allocator, Buf};
     /// use musli::alloc::Vec;
     ///
     /// musli::alloc::default!(|alloc| {
@@ -106,7 +103,6 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::{Allocator, Buf};
     /// use musli::alloc::Vec;
     ///
     /// musli::alloc::default!(|alloc| {
@@ -143,7 +139,6 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::{Allocator, Buf};
     /// use musli::alloc::Vec;
     ///
     /// musli::alloc::default!(|alloc| {
@@ -175,7 +170,6 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::{Allocator, Buf};
     /// use musli::alloc::Vec;
     ///
     /// musli::alloc::default!(|alloc| {
@@ -203,7 +197,6 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::{Allocator, Buf};
     /// use musli::alloc::Vec;
     ///
     /// musli::alloc::default!(|alloc| {
@@ -243,7 +236,6 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::{Allocator, Buf};
     /// use musli::alloc::Vec;
     ///
     /// musli::alloc::default!(|alloc| {
@@ -278,7 +270,6 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::{Allocator, Buf};
     /// use musli::alloc::Vec;
     ///
     /// musli::alloc::default!(|alloc| {
@@ -312,7 +303,6 @@ where
 /// ## Examples
 ///
 /// ```
-/// use musli::{Allocator, Buf};
 /// use musli::alloc::Vec;
 ///
 /// musli::alloc::default!(|alloc| {

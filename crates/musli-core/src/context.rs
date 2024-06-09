@@ -3,9 +3,10 @@
 use core::fmt;
 use core::str;
 
+use crate::alloc::Allocator;
 use crate::de::{DecodeBytes, DecodeUnsized, DecodeUnsizedBytes};
 use crate::no_std;
-use crate::{Allocator, Decode, Decoder};
+use crate::{Decode, Decoder};
 
 /// Provides ergonomic access to the serialization context.
 ///

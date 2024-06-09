@@ -562,8 +562,6 @@ pub use musli_core::{Context, Decode, Decoder, Encode, Encoder};
 pub use musli_core::__priv;
 
 pub mod alloc;
-#[doc(inline)]
-pub use self::alloc::Allocator;
 
 pub mod descriptive;
 pub mod json;

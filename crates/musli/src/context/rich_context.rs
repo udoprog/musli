@@ -5,8 +5,8 @@ use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::ops::Range;
 
-use crate::alloc::{self, String, Vec};
-use crate::{Allocator, Context};
+use crate::alloc::{self, Allocator, String, Vec};
+use crate::Context;
 
 use super::access::{Access, Shared};
 use super::rich_error::{RichError, Step};

@@ -3,8 +3,7 @@ use std::fmt::{self, Write};
 use std::string::String;
 use std::vec::Vec as StdVec;
 
-use crate::alloc::Vec;
-use crate::Allocator;
+use crate::alloc::{Allocator, Vec};
 
 use super::{Header, HeaderId, Stack, StackBuffer, State};
 

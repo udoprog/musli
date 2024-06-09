@@ -7,8 +7,8 @@
 use core::fmt;
 use core::mem::take;
 
-use crate::alloc::Vec;
-use crate::{Allocator, Context};
+use crate::alloc::{Allocator, Vec};
+use crate::Context;
 
 /// The trait governing how a writer works.
 pub trait Writer {

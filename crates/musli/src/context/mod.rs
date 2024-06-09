@@ -20,10 +20,10 @@ use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::alloc::{self, String};
+use crate::alloc::{self, Allocator, String};
 use crate::mode::Binary;
 use crate::no_std;
-use crate::{Allocator, Context};
+use crate::Context;
 
 /// A simple non-diagnostical capturing context which simply emits the original
 /// error.
