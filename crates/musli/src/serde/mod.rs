@@ -124,7 +124,7 @@ where
     type Buf<'this, T> = C::Buf<'this, T>
     where
         Self: 'this,
-        T: 'static;
+        T: 'this;
     type BufString<'this> = BufString<C::Buf<'this, u8>>
     where
         Self: 'this;
@@ -141,10 +141,7 @@ where
     }
 
     #[inline]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
-    where
-        T: 'static,
-    {
+    fn alloc<T>(&self) -> Self::Buf<'_, T> {
         self.inner.alloc()
     }
 

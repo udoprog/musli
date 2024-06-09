@@ -45,11 +45,11 @@ where
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W, buf: C::Buf<'a, u8>) -> Self {
+    pub(crate) fn new(cx: &'a C, writer: W) -> Self {
         Self {
             cx,
             writer,
-            buffer: BufWriter::new(buf),
+            buffer: BufWriter::new(cx.alloc()),
         }
     }
 }
@@ -109,11 +109,7 @@ where
 
     #[inline]
     fn encode_pack(self) -> Result<Self::EncodePack, C::Error> {
-        let Some(buf) = self.cx.alloc() else {
-            return Err(self.cx.message("Failed to allocate pack buffer"));
-        };
-
-        Ok(SelfPackEncoder::new(self.cx, self.writer, buf))
+        Ok(SelfPackEncoder::new(self.cx, self.writer))
     }
 
     #[inline]

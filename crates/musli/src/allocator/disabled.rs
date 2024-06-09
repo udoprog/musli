@@ -18,12 +18,12 @@ impl<T> Buf for EmptyBuf<T> {
 
     #[inline]
     fn as_ptr(&self) -> *const Self::Item {
-        ptr::null()
+        ptr::NonNull::dangling().as_ptr()
     }
 
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut Self::Item {
-        ptr::null_mut()
+        ptr::NonNull::dangling().as_ptr()
     }
 
     #[inline]
@@ -60,12 +60,12 @@ impl Allocator for Disabled {
     type Buf<'this, T> = EmptyBuf<T> where T: 'this;
 
     #[inline(always)]
-    fn alloc<'a, T>(&'a self) -> Option<Self::Buf<'a, T>>
+    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
     where
         T: 'a,
     {
-        Some(EmptyBuf {
+        EmptyBuf {
             _marker: PhantomData,
-        })
+        }
     }
 }

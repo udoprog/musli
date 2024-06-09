@@ -436,14 +436,10 @@ where
 {
     #[inline]
     fn new(cx: &'a C, output: O) -> Result<Self, C::Error> {
-        let Some(buf) = cx.alloc() else {
-            return Err(cx.message("Failed to allocate buffer"));
-        };
-
         Ok(Self {
             cx,
             output,
-            writer: BufWriter::new(buf),
+            writer: BufWriter::new(cx.alloc()),
         })
     }
 }

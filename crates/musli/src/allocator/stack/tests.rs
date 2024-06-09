@@ -193,9 +193,9 @@ fn grow_last() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let a = BufVec::new_in::<u8>(&alloc);
 
-    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc);
     b.write(&[1, 2, 3, 4, 5, 6]);
     b.write(&[7, 8]);
 
@@ -226,21 +226,21 @@ fn realloc() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc);
     a.write(&[1, 2, 3, 4]);
-    assert_eq!(a.region, A);
+    assert_eq!(a.region, Some(A));
 
-    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc);
     b.write(&[1, 2, 3, 4]);
-    assert_eq!(b.region, B);
+    assert_eq!(b.region, Some(B));
 
-    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut c = BufVec::new_in::<u8>(&alloc);
     c.write(&[1, 2, 3, 4]);
-    assert_eq!(c.region, C);
+    assert_eq!(c.region, Some(C));
 
-    assert_eq!(a.region, A);
-    assert_eq!(b.region, B);
-    assert_eq!(c.region, C);
+    assert_eq!(a.region, Some(A));
+    assert_eq!(b.region, Some(B));
+    assert_eq!(c.region, Some(C));
 
     assert_structure! {
         alloc, free[], list[A, B, C],
@@ -266,8 +266,8 @@ fn realloc() {
         C => { 8, 4, 4, Used },
     };
 
-    let mut d = BufVec::new_in::<u8>(&alloc).unwrap();
-    assert_eq!(d.region, A);
+    let mut d = BufVec::new_in::<u8>(&alloc);
+    assert_eq!(d.region, Some(A));
 
     assert_structure! {
         alloc, free[B], list[A, C],
@@ -276,7 +276,7 @@ fn realloc() {
     };
 
     d.write(&[1, 2]);
-    assert_eq!(d.region, A);
+    assert_eq!(d.region, Some(A));
 
     assert_structure! {
         alloc, free[B], list[A, C],
@@ -285,7 +285,7 @@ fn realloc() {
     };
 
     d.write(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-    assert_eq!(d.region, B);
+    assert_eq!(d.region, Some(B));
 
     assert_structure! {
         alloc, free[], list[A, C, B],
@@ -302,9 +302,9 @@ fn grow_empty_moved() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
-    let b = BufVec::new_in::<u8>(&alloc).unwrap();
-    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc);
+    let b = BufVec::new_in::<u8>(&alloc);
+    let mut c = BufVec::new_in::<u8>(&alloc);
 
     c.write(&[0]);
     a.write(&[1, 2, 3, 4]);
@@ -351,8 +351,8 @@ fn extend() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
-    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc);
+    let mut b = BufVec::new_in::<u8>(&alloc);
 
     a.write(&[1, 2]);
     b.write(&[1, 2, 3, 4]);
@@ -379,9 +379,9 @@ fn extend_middle() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
-    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
-    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc);
+    let mut b = BufVec::new_in::<u8>(&alloc);
+    let mut c = BufVec::new_in::<u8>(&alloc);
 
     a.write(&[1, 2]);
     b.write(&[1, 2, 3, 4]);
@@ -411,9 +411,9 @@ fn extend_gap() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
-    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
-    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc);
+    let mut b = BufVec::new_in::<u8>(&alloc);
+    let mut c = BufVec::new_in::<u8>(&alloc);
 
     a.write(&[1, 2]);
     b.write(&[7, 8, 9, 10]);
@@ -446,11 +446,11 @@ fn test_overlapping_slice_miri() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc);
     a.write(&[1, 2, 3, 4]);
     let a_slice = a.as_slice();
 
-    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc);
     b.write(&[5, 6, 7, 8]);
     let b_slice = b.as_slice();
 
@@ -464,16 +464,16 @@ fn grow_into_preceeding() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc);
     a.write(&[0]);
 
-    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut b = BufVec::new_in::<u8>(&alloc);
     b.write(&[1]);
 
-    let mut c = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut c = BufVec::new_in::<u8>(&alloc);
     c.write(&[2]);
 
-    let mut d = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut d = BufVec::new_in::<u8>(&alloc);
     d.write(&[3]);
 
     drop(a);
@@ -502,8 +502,8 @@ fn flip_flop() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
-    let mut b = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc);
+    let mut b = BufVec::new_in::<u8>(&alloc);
 
     a.write(&[0]);
     b.write(&[0]);
@@ -515,7 +515,7 @@ fn flip_flop() {
     };
 
     a.write(&[1]);
-    assert_eq!(a.region, C);
+    assert_eq!(a.region, Some(C));
 
     assert_structure! {
         alloc, free[], list[A, B, C],
@@ -525,7 +525,7 @@ fn flip_flop() {
     };
 
     b.write(&[1]);
-    assert_eq!(b.region, A);
+    assert_eq!(b.region, Some(A));
 
     assert_structure! {
         alloc, free[B], list[A, C],
@@ -534,7 +534,7 @@ fn flip_flop() {
     };
 
     a.write(&[2]);
-    assert_eq!(a.region, C);
+    assert_eq!(a.region, Some(C));
 
     assert_structure! {
         alloc, free[B], list[A, C],
@@ -543,7 +543,7 @@ fn flip_flop() {
     };
 
     b.write(&[2]);
-    assert_eq!(b.region, B);
+    assert_eq!(b.region, Some(B));
 
     assert_structure! {
         alloc, free[], list[A, C, B],
@@ -553,7 +553,7 @@ fn flip_flop() {
     };
 
     a.write(&[3]);
-    assert_eq!(a.region, A);
+    assert_eq!(a.region, Some(A));
 
     assert_structure! {
         alloc, free[C], list[A, B],
@@ -562,7 +562,7 @@ fn flip_flop() {
     };
 
     b.write(&[3]);
-    assert_eq!(b.region, B);
+    assert_eq!(b.region, Some(B));
 
     assert_structure! {
         alloc, free[C], list[A, B],
@@ -579,12 +579,12 @@ fn flip_flop() {
 fn limits() {
     let mut buf = StackBuffer::<8>::new();
     let alloc = Stack::new(&mut buf);
-    assert!(alloc.alloc::<u8>().is_none());
+    assert!(alloc.alloc::<u8>().region.is_none());
 
     let mut buf = StackBuffer::<32>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc).unwrap();
+    let mut a = BufVec::new_in::<u8>(&alloc);
     assert!(a.write(&[0, 1, 2, 3, 4, 5, 6, 7]));
 
     assert_structure! {

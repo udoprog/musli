@@ -12,7 +12,7 @@ pub trait Allocator {
     /// of `T`.
     ///
     /// Calling this method returns `None` if the allocation failed.
-    fn alloc<'a, T>(&'a self) -> Option<Self::Buf<'a, T>>
+    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
     where
         T: 'a;
 }
@@ -24,7 +24,7 @@ where
     type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
 
     #[inline(always)]
-    fn alloc<'a, T>(&'a self) -> Option<Self::Buf<'a, T>>
+    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
     where
         T: 'a,
     {

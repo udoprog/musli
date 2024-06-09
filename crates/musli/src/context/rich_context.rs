@@ -43,7 +43,7 @@ impl<'a, A, M> RichContext<'a, A, M> where A: ?Sized + Allocator {}
 impl<M> RichContext<'static, System, M> {
     /// Construct a new context which uses the system allocator for memory.
     #[inline]
-    pub fn new() -> Option<Self> {
+    pub fn new() -> Self {
         Self::with_alloc(&crate::allocator::SYSTEM)
     }
 }
@@ -54,11 +54,11 @@ where
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
-    pub fn with_alloc(alloc: &'a A) -> Option<Self> {
-        let errors = BufVec::new_in(alloc)?;
-        let path = BufVec::new_in(alloc)?;
+    pub fn with_alloc(alloc: &'a A) -> Self {
+        let errors = BufVec::new_in(alloc);
+        let path = BufVec::new_in(alloc);
 
-        Some(Self {
+        Self {
             alloc,
             mark: Cell::new(0),
             errors: UnsafeCell::new(errors),
@@ -67,7 +67,7 @@ where
             include_type: false,
             access: Access::new(),
             _marker: PhantomData,
-        })
+        }
     }
 
     /// Configure the context to visualize type information, and not just
@@ -140,7 +140,7 @@ where
     where
         T: fmt::Display,
     {
-        let mut string = BufString::new_in(self.alloc)?;
+        let mut string = BufString::new_in(self.alloc);
         write!(string, "{value}").ok()?;
         Some(string)
     }
@@ -154,7 +154,7 @@ where
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = usize;
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'static;
+    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
     type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
 
     #[inline]
@@ -170,10 +170,7 @@ where
     }
 
     #[inline]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
-    where
-        T: 'static,
-    {
+    fn alloc<T>(&self) -> Self::Buf<'_, T> {
         self.alloc.alloc()
     }
 

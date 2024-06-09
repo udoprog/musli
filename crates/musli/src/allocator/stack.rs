@@ -217,25 +217,25 @@ impl Allocator for Stack<'_> {
     type Buf<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'this;
 
     #[inline]
-    fn alloc<'a, T>(&'a self) -> Option<Self::Buf<'a, T>>
+    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
     where
         T: 'a,
     {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
-        let region = unsafe { (*self.internal.get()).alloc(0, align_of::<T>())? };
+        let region = unsafe { (*self.internal.get()).alloc(0, align_of::<T>()) };
 
-        Some(StackBuf {
-            region: region.id,
+        StackBuf {
+            region: region.map(|r| r.id),
             internal: &self.internal,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
 /// A no-std allocated buffer.
 pub struct StackBuf<'a, T> {
-    region: HeaderId,
+    region: Option<HeaderId>,
     internal: &'a UnsafeCell<Internal>,
     _marker: PhantomData<T>,
 }
@@ -248,6 +248,10 @@ impl<'a, T> Buf for StackBuf<'a, T> {
         if additional == 0 {
             return true;
         }
+
+        let Some(region_id) = self.region else {
+            return false;
+        };
 
         let Some(len) = len.checked_mul(size_of::<T>()) else {
             return false;
@@ -270,36 +274,44 @@ impl<'a, T> Buf for StackBuf<'a, T> {
         unsafe {
             let i = &mut *self.internal.get();
 
-            let region = i.region(self.region);
+            let region = i.region(region_id);
 
             // Region can already fit in the requested bytes.
             if region.capacity() >= requested {
                 return true;
             };
 
-            let Some(region) = i.realloc(self.region, len, requested, align_of::<T>()) else {
+            let Some(region) = i.realloc(region_id, len, requested, align_of::<T>()) else {
                 return false;
             };
 
-            self.region = region.id;
+            self.region = Some(region.id);
             true
         }
     }
 
     #[inline]
     fn as_ptr(&self) -> *const Self::Item {
+        let Some(region) = self.region else {
+            return ptr::NonNull::dangling().as_ptr();
+        };
+
         unsafe {
             let i = &*self.internal.get();
-            let this = i.header(self.region);
+            let this = i.header(region);
             this.start.cast_const().cast()
         }
     }
 
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut Self::Item {
+        let Some(region) = self.region else {
+            return ptr::NonNull::dangling().as_ptr();
+        };
+
         unsafe {
             let i = &*self.internal.get();
-            let this = i.header(self.region);
+            let this = i.header(region);
             this.start.cast()
         }
     }
@@ -309,6 +321,10 @@ impl<'a, T> Buf for StackBuf<'a, T> {
     where
         B: Buf<Item = T>,
     {
+        let Some(region) = self.region else {
+            return Err(buf);
+        };
+
         let this_len = this_len * size_of::<T>();
         let other_len = other_len * size_of::<T>();
 
@@ -318,7 +334,7 @@ impl<'a, T> Buf for StackBuf<'a, T> {
 
         unsafe {
             let i = &mut *self.internal.get();
-            let mut this = i.region(self.region);
+            let mut this = i.region(region);
 
             debug_assert!(this.capacity() >= this_len);
 
@@ -357,9 +373,11 @@ impl<'a, T> Buf for StackBuf<'a, T> {
 
 impl<T> Drop for StackBuf<'_, T> {
     fn drop(&mut self) {
-        // SAFETY: We have exclusive access to the internal state.
-        unsafe {
-            (*self.internal.get()).free(self.region);
+        if let Some(region) = self.region.take() {
+            // SAFETY: We have exclusive access to the internal state.
+            unsafe {
+                (*self.internal.get()).free(region);
+            }
         }
     }
 }

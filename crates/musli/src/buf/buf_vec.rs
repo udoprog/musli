@@ -1,5 +1,6 @@
 use core::fmt::{self, Arguments};
 use core::mem::ManuallyDrop;
+#[cfg(test)]
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
@@ -37,14 +38,14 @@ where
     ///     assert_eq!(a.as_slice(), ["Hello", "World"]);
     /// });
     /// ```
-    pub fn new_in<'a, T>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, T> = B>)) -> Option<Self>
+    pub fn new_in<'a, T>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, T> = B>)) -> Self
     where
         T: 'a,
     {
-        Some(Self {
-            buf: alloc.alloc::<T>()?,
+        Self {
+            buf: alloc.alloc::<T>(),
             len: 0,
-        })
+        }
     }
 
     /// Construct a new buffer vector.
@@ -189,9 +190,13 @@ where
     /// });
     /// ```
     pub fn clear(&mut self) {
+        if (self.buf.as_mut_ptr() as usize) % std::mem::align_of::<B::Item>() != 0 {
+            std::println!("{}: {}", self.len, std::any::type_name::<B::Item>());
+            panic!("Unaligned pointer: {:p}", self.buf.as_mut_ptr());
+        }
+
         // SAFETY: We know that the buffer is initialized up to `len`.
         unsafe { ptr::drop_in_place(slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len)) }
-
         self.len = 0;
     }
 
@@ -357,6 +362,7 @@ where
     }
 }
 
+#[cfg(test)]
 impl<B> Deref for BufVec<B>
 where
     B: Buf,
@@ -369,6 +375,7 @@ where
     }
 }
 
+#[cfg(test)]
 impl<B> DerefMut for BufVec<B>
 where
     B: Buf,

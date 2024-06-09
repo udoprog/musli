@@ -21,7 +21,7 @@ pub trait Context {
     type Buf<'this, T>: Buf<Item = T>
     where
         Self: 'this,
-        T: 'static;
+        T: 'this;
     /// An allocated buffer containing a valid string.
     type BufString<'this>: AsRef<str>
     where
@@ -77,7 +77,7 @@ pub trait Context {
     /// some reason, typically this indicates that we've run out of memory.
     ///
     /// The buffer will be deallocated once the returned handle is dropped.
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>;
+    fn alloc<T>(&self) -> Self::Buf<'_, T>;
 
     /// Collect and allocate a string from a [`Display`] implementation.
     ///

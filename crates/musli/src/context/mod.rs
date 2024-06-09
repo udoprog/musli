@@ -76,17 +76,14 @@ where
     type Mode = M;
     type Error = E;
     type Mark = ();
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'static;
+    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
     type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
 
     #[inline]
     fn clear(&self) {}
 
     #[inline]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
-    where
-        T: 'static,
-    {
+    fn alloc<T>(&self) -> Self::Buf<'_, T> {
         self.alloc.alloc()
     }
 
@@ -179,17 +176,14 @@ where
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = ();
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'static;
+    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
     type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
 
     #[inline]
     fn clear(&self) {}
 
     #[inline]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
-    where
-        T: 'static,
-    {
+    fn alloc<T>(&self) -> Self::Buf<'_, T> {
         self.alloc.alloc()
     }
 
@@ -256,7 +250,7 @@ where
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = ();
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'static;
+    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
     type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
 
     #[inline]
@@ -269,10 +263,7 @@ where
     }
 
     #[inline]
-    fn alloc<T>(&self) -> Option<Self::Buf<'_, T>>
-    where
-        T: 'static,
-    {
+    fn alloc<T>(&self) -> Self::Buf<'_, T> {
         self.alloc.alloc()
     }
 

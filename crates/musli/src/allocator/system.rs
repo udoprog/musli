@@ -142,17 +142,17 @@ impl Allocator for System {
     type Buf<'this, T> = SystemBuf<'this, T> where Self: 'this, T: 'this;
 
     #[inline(always)]
-    fn alloc<'a, T>(&'a self) -> Option<Self::Buf<'a, T>>
+    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
     where
         T: 'a,
     {
-        let region = self.root.alloc()?;
+        let region = self.root.alloc::<T>();
 
-        Some(SystemBuf {
+        SystemBuf {
             root: &self.root,
             region,
             _marker: PhantomData,
-        })
+        }
     }
 }
 
@@ -175,7 +175,7 @@ impl Drop for System {
 /// A vector-backed allocation.
 pub struct SystemBuf<'a, T> {
     root: &'a Root,
-    region: &'a mut Region,
+    region: Option<&'a mut Region>,
     _marker: PhantomData<T>,
 }
 
@@ -188,18 +188,30 @@ impl<'a, T> Buf for SystemBuf<'a, T> {
             return true;
         }
 
+        let Some(region) = &mut self.region else {
+            return false;
+        };
+
         // SAFETY: The region is always valid.
-        unsafe { self.region.reserve::<T>(len, additional) }
+        unsafe { region.reserve::<T>(len, additional) }
     }
 
     #[inline]
     fn as_ptr(&self) -> *const Self::Item {
-        self.region.data.as_ptr().cast_const().cast()
+        let Some(region) = &self.region else {
+            return ptr::NonNull::dangling().as_ptr();
+        };
+
+        region.data.as_ptr().cast_const().cast()
     }
 
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut Self::Item {
-        self.region.data.as_ptr().cast()
+        let Some(region) = &mut self.region else {
+            return ptr::NonNull::dangling().as_ptr();
+        };
+
+        region.data.as_ptr().cast()
     }
 
     #[inline]
@@ -213,14 +225,16 @@ impl<'a, T> Buf for SystemBuf<'a, T> {
 
 impl<'a, T> Drop for SystemBuf<'a, T> {
     fn drop(&mut self) {
-        self.root.free(self.region);
+        if let Some(region) = self.region.take() {
+            self.root.free(region);
+        }
     }
 }
 
 /// An allocated region.
 struct Region {
     /// Data pointer to the allocated region.
-    data: NonNull<u8>,
+    data: NonNull<()>,
     /// The size of the allocated region.
     layout: Option<Layout>,
     /// Pointer to the next free region.
@@ -228,11 +242,21 @@ struct Region {
 }
 
 impl Region {
-    const DANGLING: Region = Region {
-        data: NonNull::dangling(),
-        layout: None,
-        next: None,
-    };
+    const fn dangling<T>() -> Self {
+        Self {
+            data: NonNull::<T>::dangling().cast(),
+            layout: None,
+            next: None,
+        }
+    }
+
+    // Ensure the region is aligned.
+    fn is_aligned<T>(&mut self) -> bool {
+        match self.layout {
+            Some(layout) => layout.align() % align_of::<T>() == 0,
+            None => self.data.as_ptr().align_offset(align_of::<T>()) == 0,
+        }
+    }
 
     /// Allocate with the specified layout.
     ///
@@ -248,7 +272,7 @@ impl Region {
         }
 
         Some(Region {
-            data: NonNull::new_unchecked(data),
+            data: NonNull::new_unchecked(data).cast(),
             layout: Some(layout),
             next: None,
         })
@@ -261,16 +285,20 @@ impl Region {
     /// The caller must ensure that the new capacity is valid per [`Layout`].
     #[must_use = "allocating is fallible and must be checked"]
     unsafe fn realloc(&mut self, existing: Layout, new_layout: Layout) -> bool {
-        debug_assert_eq!(existing.align(), new_layout.align());
+        debug_assert!(existing.align() % new_layout.align() == 0);
 
-        let data = alloc::realloc(self.data.as_ptr(), existing, new_layout.size());
+        let data = alloc::realloc(self.data.as_ptr().cast(), existing, new_layout.size());
 
         if data.is_null() {
             return false;
         }
 
-        self.data = NonNull::new_unchecked(data);
-        self.layout = Some(new_layout);
+        self.data = NonNull::new_unchecked(data).cast();
+        // The new layout inherits the alignment of the existing one, but with a new size.
+        self.layout = Some(Layout::from_size_align_unchecked(
+            new_layout.size(),
+            existing.align(),
+        ));
         true
     }
 
@@ -347,12 +375,11 @@ impl Region {
     }
 
     fn free(&mut self) {
-        if let Some(layout) = self.layout {
+        if let Some(layout) = self.layout.take() {
             // SAFETY: Layout assumptions are correctly encoded in the type as
             // it was being allocated or grown.
             unsafe {
-                alloc::dealloc(self.data.as_ptr(), layout);
-                ptr::write(self, Region::DANGLING);
+                alloc::dealloc(self.data.as_ptr().cast(), layout);
             }
         }
     }
@@ -390,7 +417,7 @@ impl Root {
     ///
     /// The specified alignment must be a power of 2.
     #[allow(clippy::mut_from_ref)]
-    fn alloc(&self) -> Option<&mut Region> {
+    fn alloc<T>(&self) -> Option<&mut Region> {
         // SAFETY: We have exclusive access to all regions.
         let this = self.lock().with_mut(|current| unsafe {
             let mut this = current.take()?;
@@ -399,10 +426,18 @@ impl Root {
             Some(this)
         });
 
-        let region = if let Some(this) = this {
-            this
-        } else {
-            Box::leak(Box::new(Region::DANGLING))
+        let region = 'out: {
+            if let Some(this) = this {
+                if this.is_aligned::<T>() {
+                    break 'out this;
+                }
+
+                this.free();
+                this.data = NonNull::<T>::dangling().cast();
+                break 'out this;
+            };
+
+            Box::leak(Box::new(Region::dangling::<T>()))
         };
 
         self.regions.fetch_add(1, Ordering::SeqCst);
