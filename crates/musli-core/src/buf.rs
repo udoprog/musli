@@ -18,18 +18,15 @@ impl std::error::Error for Error {}
 /// A raw buffer allocated from a [`Context`].
 ///
 /// [`Context`]: crate::Context
-pub trait Buf {
-    /// An item in the buffer.
-    type Item;
-
+pub trait Buf<T> {
     /// Resize the buffer.
     fn resize(&mut self, len: usize, additional: usize) -> bool;
 
     /// Get a pointer into the buffer.
-    fn as_ptr(&self) -> *const Self::Item;
+    fn as_ptr(&self) -> *const T;
 
     /// Get a mutable pointer into the buffer.
-    fn as_mut_ptr(&mut self) -> *mut Self::Item;
+    fn as_mut_ptr(&mut self) -> *mut T;
 
     /// Try to merge one buffer with another.
     ///
@@ -39,5 +36,5 @@ pub trait Buf {
     /// If this returns `Err(B)` if merging was not possible.
     fn try_merge<B>(&mut self, this_len: usize, other: B, other_len: usize) -> Result<(), B>
     where
-        B: Buf<Item = Self::Item>;
+        B: Buf<T>;
 }

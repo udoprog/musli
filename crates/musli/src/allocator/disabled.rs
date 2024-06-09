@@ -8,28 +8,26 @@ pub struct EmptyBuf<T> {
     _marker: PhantomData<T>,
 }
 
-impl<T> Buf for EmptyBuf<T> {
-    type Item = T;
-
+impl<T> Buf<T> for EmptyBuf<T> {
     #[inline]
     fn resize(&mut self, _: usize, _: usize) -> bool {
         false
     }
 
     #[inline]
-    fn as_ptr(&self) -> *const Self::Item {
+    fn as_ptr(&self) -> *const T {
         ptr::NonNull::dangling().as_ptr()
     }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut Self::Item {
+    fn as_mut_ptr(&mut self) -> *mut T {
         ptr::NonNull::dangling().as_ptr()
     }
 
     #[inline]
     fn try_merge<B>(&mut self, _: usize, other: B, _: usize) -> Result<(), B>
     where
-        B: Buf<Item = Self::Item>,
+        B: Buf<T>,
     {
         Err(other)
     }

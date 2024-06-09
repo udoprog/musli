@@ -3,7 +3,7 @@ use crate::buf::Buf;
 /// An allocator that can be used in combination with a context.
 pub trait Allocator {
     /// The type of an allocated buffer.
-    type Buf<'this, T>: Buf<Item = T>
+    type Buf<'this, T>: Buf<T>
     where
         Self: 'this,
         T: 'this;

@@ -251,9 +251,7 @@ pub struct StackBuf<'a, T> {
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> Buf for StackBuf<'a, T> {
-    type Item = T;
-
+impl<'a, T> Buf<T> for StackBuf<'a, T> {
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {
         if additional == 0 || size_of::<T>() == 0 {
@@ -302,7 +300,7 @@ impl<'a, T> Buf for StackBuf<'a, T> {
     }
 
     #[inline]
-    fn as_ptr(&self) -> *const Self::Item {
+    fn as_ptr(&self) -> *const T {
         let Some(region) = self.region else {
             return ptr::NonNull::dangling().as_ptr();
         };
@@ -315,7 +313,7 @@ impl<'a, T> Buf for StackBuf<'a, T> {
     }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut Self::Item {
+    fn as_mut_ptr(&mut self) -> *mut T {
         let Some(region) = self.region else {
             return ptr::NonNull::dangling().as_ptr();
         };
@@ -330,7 +328,7 @@ impl<'a, T> Buf for StackBuf<'a, T> {
     #[inline]
     fn try_merge<B>(&mut self, this_len: usize, buf: B, other_len: usize) -> Result<(), B>
     where
-        B: Buf<Item = T>,
+        B: Buf<T>,
     {
         let Some(region) = self.region else {
             return Err(buf);
