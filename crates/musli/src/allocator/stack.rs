@@ -166,13 +166,16 @@ impl<'a> Stack<'a> {
     ///
     /// # Panics
     ///
-    /// This method panics if called with a buffer larger than 2**31 or is
-    /// provided a buffer which is not aligned by 8.
+    /// This panics if called with a buffer larger than `2^31` bytes.
     ///
     /// An easy way to align a buffer is to use [`StackBuffer`] when
     /// constructing it.
     pub fn new(buffer: &'a mut [MaybeUninit<u8>]) -> Self {
         let size = buffer.len();
+        assert!(
+            size <= MAX_BYTES,
+            "Buffer of {size} bytes is larger than the maximum {MAX_BYTES}"
+        );
 
         let mut data = buffer.as_mut_ptr_range();
 
