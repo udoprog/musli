@@ -556,14 +556,12 @@ pub use musli_core::decoder;
 pub use musli_core::visitor;
 
 #[doc(inline)]
-pub use musli_core::{Buf, Context, Decode, Decoder, Encode, Encoder};
+pub use musli_core::{Allocator, Buf, Context, Decode, Decoder, Encode, Encoder};
 
 #[doc(hidden)]
 pub use musli_core::__priv;
 
 pub mod allocator;
-#[doc(inline)]
-pub use self::allocator::Allocator;
 
 pub mod descriptive;
 pub mod json;

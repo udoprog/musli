@@ -8,7 +8,7 @@ use core::fmt;
 use core::mem::take;
 
 use crate::buf::BufVec;
-use crate::{Buf, Context};
+use crate::{Allocator, Context};
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -33,10 +33,9 @@ pub trait Writer {
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write a buffer to the current writer.
-    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
-        B: Buf<Item = u8>;
+        C: ?Sized + Context;
 
     /// Write bytes to the current writer.
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
@@ -65,10 +64,9 @@ where
     }
 
     #[inline]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf<Item = u8>,
     {
         (*self).extend(cx, buffer)
     }
@@ -100,10 +98,9 @@ impl Writer for Vec<u8> {
     }
 
     #[inline]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf<Item = u8>,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
@@ -139,10 +136,9 @@ impl Writer for &mut [u8] {
     }
 
     #[inline]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf<Item = u8>,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
@@ -186,33 +182,33 @@ impl Writer for &mut [u8] {
 }
 
 /// A writer that writes against an underlying [`Buf`].
-pub struct BufWriter<B>
+pub struct BufWriter<'a, A>
 where
-    B: Buf,
+    A: 'a + ?Sized + Allocator,
 {
-    buf: BufVec<B>,
+    buf: BufVec<'a, A, u8>,
 }
 
-impl<B> BufWriter<B>
+impl<'a, A> BufWriter<'a, A>
 where
-    B: Buf,
+    A: 'a + ?Sized + Allocator,
 {
     /// Construct a new buffer writer.
-    pub fn new(buf: B) -> Self {
+    pub fn new(alloc: &'a A) -> Self {
         Self {
-            buf: BufVec::new(buf),
+            buf: BufVec::new_in(alloc),
         }
     }
 
     /// Coerce into inner buffer.
-    pub fn into_inner(self) -> BufVec<B> {
+    pub fn into_inner(self) -> BufVec<'a, A, u8> {
         self.buf
     }
 }
 
-impl<T> Writer for BufWriter<T>
+impl<'a, A> Writer for BufWriter<'a, A>
 where
-    T: Buf<Item = u8>,
+    A: 'a + ?Sized + Allocator,
 {
     type Mut<'this> = &'this mut Self
     where
@@ -224,10 +220,9 @@ where
     }
 
     #[inline(always)]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: BufVec<'_, C::Allocator, u8>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf<Item = u8>,
     {
         if !self.buf.write(buffer.as_slice()) {
             return Err(cx.message("Buffer overflow"));

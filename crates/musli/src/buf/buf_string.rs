@@ -1,27 +1,31 @@
-use core::fmt::{self, Write};
+use core::fmt;
 use core::ops::Deref;
 use core::str;
 
 use crate::buf::BufVec;
 use crate::fixed::CapacityError;
-use crate::{Allocator, Buf, Context};
+use crate::{Allocator, Context};
 
 /// Wrapper around a [`Buf`], guaranteed to be a valid utf-8 string.
-pub struct BufString<B>
+pub struct BufString<'a, A>
 where
-    B: Buf,
+    A: 'a + ?Sized + Allocator,
 {
-    buf: BufVec<B>,
+    buf: BufVec<'a, A, u8>,
 }
 
 /// Collect a string into a string buffer.
-pub(crate) fn collect_string<C, T>(cx: &C, value: T) -> Result<BufString<C::Buf<'_, u8>>, C::Error>
+pub(crate) fn collect_string<C, T>(
+    cx: &C,
+    value: T,
+) -> Result<BufString<'_, C::Allocator>, C::Error>
 where
     C: ?Sized + Context,
     T: fmt::Display,
 {
-    let buf = cx.alloc();
-    let mut string = BufString::new(buf);
+    use core::fmt::Write;
+
+    let mut string = BufString::new_in(cx.alloc());
 
     if write!(string, "{value}").is_err() {
         return Err(cx.message("Failed to write to string"));
@@ -30,18 +34,18 @@ where
     Ok(string)
 }
 
-impl<B> BufString<B>
+impl<'a, A> BufString<'a, A>
 where
-    B: Buf<Item = u8>,
+    A: 'a + ?Sized + Allocator,
 {
     /// Construct a new string buffer in the provided allocator.
-    pub fn new_in<'a>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, u8> = B>)) -> Self {
+    pub fn new_in(alloc: &'a A) -> Self {
         Self::new(alloc.alloc::<u8>())
     }
 
     /// Construct a new fixed string.
-    pub(crate) const fn new(buf: B) -> BufString<B> {
-        BufString {
+    pub(crate) const fn new(buf: A::Buf<'a, u8>) -> Self {
+        Self {
             buf: BufVec::new(buf),
         }
     }
@@ -68,22 +72,24 @@ where
     }
 }
 
-impl<B> fmt::Write for BufString<B>
+impl<'a, A> fmt::Write for BufString<'a, A>
 where
-    B: Buf<Item = u8>,
+    A: 'a + ?Sized + Allocator,
 {
+    #[inline]
     fn write_char(&mut self, c: char) -> fmt::Result {
         self.try_push(c).map_err(|_| fmt::Error)
     }
 
+    #[inline]
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.try_push_str(s).map_err(|_| fmt::Error)
     }
 }
 
-impl<B> Deref for BufString<B>
+impl<'a, A> Deref for BufString<'a, A>
 where
-    B: Buf<Item = u8>,
+    A: 'a + ?Sized + Allocator,
 {
     type Target = str;
 
@@ -93,9 +99,9 @@ where
     }
 }
 
-impl<B> fmt::Display for BufString<B>
+impl<'a, A> fmt::Display for BufString<'a, A>
 where
-    B: Buf<Item = u8>,
+    A: 'a + ?Sized + Allocator,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -103,9 +109,9 @@ where
     }
 }
 
-impl<B> AsRef<str> for BufString<B>
+impl<'a, A> AsRef<str> for BufString<'a, A>
 where
-    B: Buf<Item = u8>,
+    A: ?Sized + Allocator,
 {
     #[inline]
     fn as_ref(&self) -> &str {

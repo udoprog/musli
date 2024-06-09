@@ -5,7 +5,7 @@ use core::str;
 
 use crate::de::{DecodeBytes, DecodeUnsized, DecodeUnsizedBytes};
 use crate::no_std;
-use crate::{Buf, Decode, Decoder};
+use crate::{Allocator, Decode, Decoder};
 
 /// Provides ergonomic access to the serialization context.
 ///
@@ -17,11 +17,8 @@ pub trait Context {
     type Error: 'static;
     /// A mark during processing.
     type Mark: Copy + Default;
-    /// A growable buffer.
-    type Buf<'this, T>: Buf<Item = T>
-    where
-        Self: 'this,
-        T: 'this;
+    /// The allocator associated with the context.
+    type Allocator: ?Sized + Allocator;
     /// An allocated buffer containing a valid string.
     type BufString<'this>: AsRef<str>
     where
@@ -71,13 +68,8 @@ pub trait Context {
         T::decode_unsized_bytes(self, decoder, f)
     }
 
-    /// Allocate a bytes buffer.
-    ///
-    /// Returns `None` if the underlying allocator cannot allocate memory for
-    /// some reason, typically this indicates that we've run out of memory.
-    ///
-    /// The buffer will be deallocated once the returned handle is dropped.
-    fn alloc<T>(&self) -> Self::Buf<'_, T>;
+    /// Access the underlying allocator.
+    fn alloc(&self) -> &Self::Allocator;
 
     /// Collect and allocate a string from a [`Display`] implementation.
     ///

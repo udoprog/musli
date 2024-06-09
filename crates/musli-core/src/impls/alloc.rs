@@ -619,10 +619,10 @@ where
         use std::os::windows::ffi::OsStrExt;
 
         use crate::en::VariantEncoder;
-        use crate::Buf;
+        use crate::{Allocator, Buf};
 
         encoder.encode_variant_fn(|variant| {
-            let mut buf = cx.alloc::<u8>();
+            let mut buf = cx.alloc().alloc::<u8>();
             let mut len = 0;
 
             for w in self.encode_wide() {

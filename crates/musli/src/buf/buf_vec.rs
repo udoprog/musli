@@ -1,26 +1,32 @@
-use core::fmt::{self, Arguments};
+use core::fmt;
 use core::mem::ManuallyDrop;
 #[cfg(test)]
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use crate::buf::{Buf, Error};
+use crate::buf::Buf;
 use crate::Allocator;
 
 /// A vector backed by an [`Allocator`] [`Buf`].
-pub struct BufVec<B>
+pub struct BufVec<'a, A, T>
 where
-    B: Buf,
+    A: 'a + ?Sized + Allocator,
+    T: 'a,
 {
-    buf: B,
+    buf: A::Buf<'a, T>,
     len: usize,
 }
 
-impl<B> BufVec<B>
+impl<'a, A, T> BufVec<'a, A, T>
 where
-    B: Buf,
+    A: 'a + ?Sized + Allocator,
+    T: 'a,
 {
+    const unsafe fn from_raw_parts(buf: A::Buf<'a, T>, len: usize) -> Self {
+        Self { buf, len }
+    }
+
     /// Construct a new buffer vector.
     ///
     /// ## Examples
@@ -38,10 +44,7 @@ where
     ///     assert_eq!(a.as_slice(), ["Hello", "World"]);
     /// });
     /// ```
-    pub fn new_in<'a, T>(alloc: &'a (impl ?Sized + Allocator<Buf<'a, T> = B>)) -> Self
-    where
-        T: 'a,
-    {
+    pub fn new_in(alloc: &'a A) -> Self {
         Self {
             buf: alloc.alloc::<T>(),
             len: 0,
@@ -50,7 +53,7 @@ where
 
     /// Construct a new buffer vector.
     #[inline]
-    pub const fn new(buf: B) -> Self {
+    pub const fn new(buf: A::Buf<'a, T>) -> Self {
         Self { buf, len: 0 }
     }
 
@@ -119,7 +122,7 @@ where
     /// });
     /// ```
     #[inline]
-    pub fn push(&mut self, item: B::Item) -> bool {
+    pub fn push(&mut self, item: T) -> bool {
         if !self.buf.resize(self.len, 1) {
             return false;
         }
@@ -156,7 +159,7 @@ where
     ///     assert_eq!(a.pop(), None);
     /// });
     /// ```
-    pub fn pop(&mut self) -> Option<B::Item> {
+    pub fn pop(&mut self) -> Option<T> {
         if self.len == 0 {
             return None;
         }
@@ -210,13 +213,13 @@ where
     ///     assert_eq!(a.as_slice(), b"Hello");
     /// });
     /// ```
-    pub fn as_slice(&self) -> &[B::Item] {
+    pub fn as_slice(&self) -> &[T] {
         // SAFETY: We know that the buffer is initialized up to `self.len`.
         unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.len) }
     }
 
     #[inline]
-    fn into_parts(self) -> (B, usize) {
+    fn into_raw_parts(self) -> (A::Buf<'a, T>, usize) {
         let this = ManuallyDrop::new(self);
 
         // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
@@ -227,10 +230,10 @@ where
     }
 }
 
-impl<B> BufVec<B>
+impl<'a, A, T> BufVec<'a, A, T>
 where
-    B: Buf,
-    B::Item: Copy,
+    A: 'a + ?Sized + Allocator,
+    T: 'a + Copy,
 {
     /// Write the given number of bytes.
     ///
@@ -250,7 +253,7 @@ where
     ///     assert_eq!(a.len(), 5);
     /// });
     /// ```
-    pub fn write(&mut self, items: &[B::Item]) -> bool {
+    pub fn write(&mut self, items: &[T]) -> bool {
         if !self.buf.resize(self.len, items.len()) {
             return false;
         }
@@ -266,12 +269,7 @@ where
 
         true
     }
-}
 
-impl<B> BufVec<B>
-where
-    B: Buf<Item = u8>,
-{
     /// Write a buffer of the same type onto the current buffer.
     ///
     /// This allows allocators to provide more efficient means of extending the
@@ -295,74 +293,59 @@ where
     /// });
     /// ```
     #[inline]
-    pub fn extend<U>(&mut self, other: BufVec<U>) -> bool
-    where
-        U: Buf<Item = u8>,
-    {
-        let (other, other_len) = other.into_parts();
+    pub fn extend(&mut self, other: BufVec<'_, A, T>) -> bool {
+        let (other, other_len) = other.into_raw_parts();
 
         // Try to merge one buffer with another.
         if let Err(buf) = self.buf.try_merge(self.len, other, other_len) {
-            let other = BufVec {
-                buf,
-                len: other_len,
-            };
-
+            let other = unsafe { BufVec::<A, T>::from_raw_parts(buf, other_len) };
             return self.write(other.as_slice());
         }
 
         self.len += other_len;
         true
     }
+}
 
-    /// Try to write a format string into the buffer.
-    ///
-    /// ## Examples
-    ///
-    /// ```
-    /// use musli::{Allocator, Buf};
-    /// use musli::buf::BufVec;
-    ///
-    /// musli::allocator::default!(|alloc| {
-    ///     let mut a = BufVec::new_in(alloc);
-    ///     let world = "World";
-    ///
-    ///     write!(a, "Hello {world}")?;
-    ///
-    ///     assert_eq!(a.as_slice(), b"Hello World");
-    /// });
-    /// # Ok::<(), musli::buf::Error>(())
-    /// ```
+/// Try to write a format string into the buffer.
+///
+/// ## Examples
+///
+/// ```
+/// use musli::{Allocator, Buf};
+/// use musli::buf::BufVec;
+///
+/// musli::allocator::default!(|alloc| {
+///     let mut a = BufVec::new_in(alloc);
+///     let world = "World";
+///
+///     write!(a, "Hello {world}")?;
+///
+///     assert_eq!(a.as_slice(), b"Hello World");
+/// });
+/// # Ok::<(), musli::buf::Error>(())
+/// ```
+impl<'a, A> fmt::Write for BufVec<'a, A, u8>
+where
+    A: 'a + ?Sized + Allocator,
+{
     #[inline]
-    pub fn write_fmt(&mut self, arguments: Arguments<'_>) -> Result<(), Error> {
-        struct Write<'a, B>(&'a mut BufVec<B>)
-        where
-            B: Buf;
-
-        impl<B> fmt::Write for Write<'_, B>
-        where
-            B: Buf<Item = u8>,
-        {
-            fn write_str(&mut self, s: &str) -> fmt::Result {
-                if !self.0.write(s.as_bytes()) {
-                    return Err(fmt::Error);
-                }
-
-                Ok(())
-            }
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        if !self.write(s.as_bytes()) {
+            return Err(fmt::Error);
         }
 
-        let mut write = Write(self);
-        fmt::write(&mut write, arguments).map_err(|_| Error)
+        Ok(())
     }
 }
 
 #[cfg(test)]
-impl<B> Deref for BufVec<B>
+impl<'a, A, T> Deref for BufVec<'a, A, T>
 where
-    B: Buf,
+    A: 'a + ?Sized + Allocator,
+    T: 'a,
 {
-    type Target = B;
+    type Target = A::Buf<'a, T>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -371,9 +354,10 @@ where
 }
 
 #[cfg(test)]
-impl<B> DerefMut for BufVec<B>
+impl<'a, A, T> DerefMut for BufVec<'a, A, T>
 where
-    B: Buf,
+    A: 'a + ?Sized + Allocator,
+    T: 'a,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -381,9 +365,10 @@ where
     }
 }
 
-impl<B> Drop for BufVec<B>
+impl<'a, A, T> Drop for BufVec<'a, A, T>
 where
-    B: Buf,
+    A: 'a + ?Sized + Allocator,
+    T: 'a,
 {
     fn drop(&mut self) {
         self.clear();

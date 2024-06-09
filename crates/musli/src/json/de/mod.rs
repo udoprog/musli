@@ -205,7 +205,7 @@ where
     #[inline]
     fn decode_char(mut self) -> Result<char, C::Error> {
         let start = self.cx.mark();
-        let mut scratch = BufVec::new(self.cx.alloc());
+        let mut scratch = BufVec::new_in(self.cx.alloc());
 
         let string = match self.parser.parse_string(self.cx, true, &mut scratch)? {
             StringReference::Borrowed(string) => string,
@@ -347,7 +347,7 @@ where
     where
         V: UnsizedVisitor<'de, C, str>,
     {
-        let mut scratch = BufVec::new(self.cx.alloc());
+        let mut scratch = BufVec::new_in(self.cx.alloc());
 
         match self.parser.parse_string(self.cx, true, &mut scratch)? {
             StringReference::Borrowed(borrowed) => visitor.visit_borrowed(self.cx, borrowed),

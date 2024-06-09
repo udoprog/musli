@@ -16,6 +16,10 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod allocator;
+#[doc(inline)]
+pub use self::allocator::Allocator;
+
 mod context;
 #[doc(inline)]
 pub use self::context::Context;
