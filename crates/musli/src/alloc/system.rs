@@ -5,13 +5,14 @@ use core::mem::{align_of, size_of};
 use core::ptr;
 use core::ptr::NonNull;
 
-use ::alloc::alloc;
-use ::alloc::boxed::Box;
+use rust_alloc::alloc;
+use rust_alloc::boxed::Box;
 
 use crate::loom::cell::UnsafeCell;
 use crate::loom::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::loom::sync::with_mut_usize;
-use crate::{Allocator, Buf};
+
+use super::{Allocator, Buf};
 
 /// The max capacity of an allocated region as it's being handed back.
 #[cfg(not(loom))]
@@ -33,14 +34,12 @@ const MAX_REGIONS: usize = 2;
 /// # Examples
 ///
 /// ```
-/// use musli::{Allocator, Buf};
-/// use musli::allocator::System;
-/// use musli::buf::BufVec;
+/// use musli::alloc::{System, Vec};
 ///
 /// let alloc = System::new();
 ///
-/// let mut buf1 = BufVec::new_in(&alloc);
-/// let mut buf2 = BufVec::new_in(&alloc);
+/// let mut buf1 = Vec::new_in(&alloc);
+/// let mut buf2 = Vec::new_in(&alloc);
 //
 /// assert!(buf1.write(b"Hello, "));
 /// assert!(buf2.write(b"world!"));
@@ -183,9 +182,7 @@ pub struct SystemBuf<'a, T> {
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> Buf for SystemBuf<'a, T> {
-    type Item = T;
-
+impl<'a, T> Buf<T> for SystemBuf<'a, T> {
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {
         if additional == 0 || size_of::<T>() == 0 {
@@ -201,7 +198,7 @@ impl<'a, T> Buf for SystemBuf<'a, T> {
     }
 
     #[inline]
-    fn as_ptr(&self) -> *const Self::Item {
+    fn as_ptr(&self) -> *const T {
         let Some(region) = &self.region else {
             return ptr::NonNull::dangling().as_ptr();
         };
@@ -210,7 +207,7 @@ impl<'a, T> Buf for SystemBuf<'a, T> {
     }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut Self::Item {
+    fn as_mut_ptr(&mut self) -> *mut T {
         let Some(region) = &mut self.region else {
             return ptr::NonNull::dangling().as_ptr();
         };
@@ -221,7 +218,7 @@ impl<'a, T> Buf for SystemBuf<'a, T> {
     #[inline]
     fn try_merge<B>(&mut self, _: usize, other: B, _: usize) -> Result<(), B>
     where
-        B: Buf<Item = Self::Item>,
+        B: Buf<T>,
     {
         Err(other)
     }

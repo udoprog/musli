@@ -5,17 +5,17 @@ use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::ops::Range;
 
-use crate::buf::{self, BufString, BufVec};
-use crate::{Allocator, Context};
+use crate::alloc::{self, Allocator, String, Vec};
+use crate::Context;
 
 use super::access::{Access, Shared};
 use super::rich_error::{RichError, Step};
 use super::ErrorMarker;
 
 #[cfg(all(not(loom), feature = "alloc"))]
-use crate::allocator::System;
+use crate::alloc::System;
 
-type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a, u8>>);
+type BufPair<'a, A> = (Range<usize>, String<'a, A>);
 
 /// A rich context which uses allocations and tracks the exact location of
 /// errors.
@@ -28,12 +28,12 @@ type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a, u8>>);
 /// enabled, and will use the [`System`] allocator.
 pub struct RichContext<'a, A, M>
 where
-    A: ?Sized + Allocator,
+    A: 'a + ?Sized + Allocator,
 {
     alloc: &'a A,
     mark: Cell<usize>,
-    errors: UnsafeCell<BufVec<A::Buf<'a, BufPair<'a, A>>>>,
-    path: UnsafeCell<BufVec<A::Buf<'a, Step<BufString<A::Buf<'a, u8>>>>>>,
+    errors: UnsafeCell<Vec<'a, BufPair<'a, A>, A>>,
+    path: UnsafeCell<Vec<'a, Step<String<'a, A>>, A>>,
     // How many elements of `path` we've gone over capacity.
     path_cap: Cell<usize>,
     include_type: bool,
@@ -48,7 +48,7 @@ impl<M> RichContext<'static, System, M> {
     /// Construct a new context which uses the system allocator for memory.
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(&crate::allocator::SYSTEM)
+        Self::with_alloc(&crate::alloc::SYSTEM)
     }
 }
 
@@ -62,13 +62,13 @@ impl<M> Default for RichContext<'static, System, M> {
 
 impl<'a, A, M> RichContext<'a, A, M>
 where
-    A: ?Sized + Allocator,
+    A: 'a + ?Sized + Allocator,
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
     pub fn with_alloc(alloc: &'a A) -> Self {
-        let errors = BufVec::new_in(alloc);
-        let path = BufVec::new_in(alloc);
+        let errors = Vec::new_in(alloc);
+        let path = Vec::new_in(alloc);
 
         Self {
             alloc,
@@ -110,7 +110,7 @@ where
     }
 
     /// Push an error into the collection.
-    fn push_error(&self, range: Range<usize>, error: BufString<A::Buf<'a, u8>>) {
+    fn push_error(&self, range: Range<usize>, error: String<'a, A>) {
         let _access = self.access.exclusive();
 
         // SAFETY: We've checked that we have exclusive access just above.
@@ -120,7 +120,7 @@ where
     }
 
     /// Push a path.
-    fn push_path(&self, step: Step<BufString<A::Buf<'a, u8>>>) {
+    fn push_path(&self, step: Step<String<'a, A>>) {
         let _access = self.access.exclusive();
 
         // SAFETY: We've checked that we have exclusive access just above.
@@ -148,11 +148,11 @@ where
         }
     }
 
-    fn format_string<T>(&self, value: T) -> Option<BufString<A::Buf<'a, u8>>>
+    fn format_string<T>(&self, value: T) -> Option<String<'a, A>>
     where
         T: fmt::Display,
     {
-        let mut string = BufString::new_in(self.alloc);
+        let mut string = String::new_in(self.alloc);
         write!(string, "{value}").ok()?;
         Some(string)
     }
@@ -160,14 +160,14 @@ where
 
 impl<'a, A, M> Context for RichContext<'a, A, M>
 where
-    A: ?Sized + Allocator,
+    A: 'a + ?Sized + Allocator,
     M: 'static,
 {
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = usize;
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
-    type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
+    type Allocator = A;
+    type String<'this> = String<'this, A> where Self: 'this;
 
     #[inline]
     fn clear(&self) {
@@ -182,16 +182,16 @@ where
     }
 
     #[inline]
-    fn alloc<T>(&self) -> Self::Buf<'_, T> {
-        self.alloc.alloc()
+    fn alloc(&self) -> &Self::Allocator {
+        self.alloc
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
-        buf::collect_string(self, value)
+        alloc::collect_string(self, value)
     }
 
     #[inline]
@@ -363,8 +363,8 @@ pub struct Errors<'a, 'buf, A>
 where
     A: 'buf + ?Sized + Allocator,
 {
-    path: &'a [Step<BufString<A::Buf<'buf, u8>>>],
-    errors: &'a [(Range<usize>, BufString<A::Buf<'buf, u8>>)],
+    path: &'a [Step<String<'buf, A>>],
+    errors: &'a [(Range<usize>, String<'buf, A>)],
     index: usize,
     path_cap: usize,
     _access: Shared<'a>,
@@ -372,9 +372,9 @@ where
 
 impl<'a, 'buf, A> Iterator for Errors<'a, 'buf, A>
 where
-    A: ?Sized + Allocator,
+    A: 'buf + ?Sized + Allocator,
 {
-    type Item = RichError<'a, BufString<A::Buf<'buf, u8>>, BufString<A::Buf<'buf, u8>>>;
+    type Item = RichError<'a, String<'buf, A>, String<'buf, A>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

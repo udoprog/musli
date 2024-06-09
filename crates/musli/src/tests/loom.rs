@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use crate::allocator::System;
-use crate::buf::BufVec;
+use crate::alloc::{System, Vec};
 
 const BIG1: &[u8] = &[
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
@@ -11,8 +10,8 @@ const BIG2: &[u8] = &[
 ];
 
 fn work(alloc: &System) {
-    let mut buf1 = BufVec::new_in(alloc);
-    let mut buf2 = BufVec::new_in(alloc);
+    let mut buf1 = Vec::new_in(alloc);
+    let mut buf2 = Vec::new_in(alloc);
 
     assert!(buf1.write(BIG1));
     assert!(buf2.write(BIG2));

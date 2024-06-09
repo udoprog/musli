@@ -44,7 +44,7 @@ macro_rules! bare_encoding {
         /// Encode the given value to a [`Vec`] using the [`DEFAULT`]
         /// [`Encoding`].
         ///
-        /// [`Vec`]: alloc::vec::Vec
+        /// [`Vec`]: rust_alloc::vec::Vec
         ///
         /// # Examples
         ///
@@ -72,7 +72,7 @@ macro_rules! bare_encoding {
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
-        pub fn to_vec<T>(value: &T) -> Result<alloc::vec::Vec<u8>, Error>
+        pub fn to_vec<T>(value: &T) -> Result<rust_alloc::vec::Vec<u8>, Error>
         where
             T: ?Sized + $crate::Encode<crate::mode::$mode>,
         {
@@ -275,7 +275,7 @@ macro_rules! encoding_impls {
             W: $crate::Writer,
             T: ?Sized + $crate::Encode<$mode>,
         {
-            $crate::allocator::default!(|alloc| {
+            $crate::alloc::default!(|alloc| {
                 let cx = $crate::context::Same::new(alloc);
                 self.encode_with(&cx, writer, value)
             })
@@ -283,7 +283,7 @@ macro_rules! encoding_impls {
 
         /// Encode the given value to a [`Vec`] using the current [`Encoding`].
         ///
-        /// [`Vec`]: alloc::vec::Vec
+        /// [`Vec`]: rust_alloc::vec::Vec
         ///
         /// # Examples
         ///
@@ -313,11 +313,11 @@ macro_rules! encoding_impls {
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
-        pub fn to_vec<T>(self, value: &T) -> Result<alloc::vec::Vec<u8>, Error>
+        pub fn to_vec<T>(self, value: &T) -> Result<rust_alloc::vec::Vec<u8>, Error>
         where
             T: ?Sized + $crate::Encode<$mode>,
         {
-            let mut vec = alloc::vec::Vec::new();
+            let mut vec = rust_alloc::vec::Vec::new();
             self.encode(&mut vec, value)?;
             Ok(vec)
         }
@@ -358,7 +358,7 @@ macro_rules! encoding_impls {
         where
             T: ?Sized + $crate::Encode<$mode>,
         {
-            $crate::allocator::default!(|alloc| {
+            $crate::alloc::default!(|alloc| {
                 let cx = $crate::context::Same::new(alloc);
                 self.to_fixed_bytes_with(&cx, value)
             })
@@ -450,7 +450,7 @@ macro_rules! encoding_impls {
             R: $reader_trait<'de>,
             T: $crate::Decode<'de, $mode>,
         {
-            $crate::allocator::default!(|alloc| {
+            $crate::alloc::default!(|alloc| {
                 let cx = $crate::context::Same::new(alloc);
                 self.decode_with(&cx, reader)
             })
@@ -489,7 +489,7 @@ macro_rules! encoding_impls {
         where
             T: $crate::Decode<'de, $mode>,
         {
-            $crate::allocator::default!(|alloc| {
+            $crate::alloc::default!(|alloc| {
                 let cx = $crate::context::Same::new(alloc);
                 self.from_slice_with(&cx, bytes)
             })
@@ -521,7 +521,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::allocator::System;
+        /// use musli::alloc::System;
         /// use musli::context::Same;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -566,13 +566,13 @@ macro_rules! encoding_impls {
         /// configurable [`Context`].
         ///
         /// [`Context`]: crate::Context
-        /// [`Vec`]: alloc::vec::Vec
+        /// [`Vec`]: rust_alloc::vec::Vec
         ///
         /// # Examples
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::allocator::System;
+        /// use musli::alloc::System;
         /// use musli::context::Same;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -601,12 +601,16 @@ macro_rules! encoding_impls {
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
-        pub fn to_vec_with<C, T>(self, cx: &C, value: &T) -> Result<alloc::vec::Vec<u8>, C::Error>
+        pub fn to_vec_with<C, T>(
+            self,
+            cx: &C,
+            value: &T,
+        ) -> Result<rust_alloc::vec::Vec<u8>, C::Error>
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
             T: ?Sized + $crate::Encode<C::Mode>,
         {
-            let mut vec = alloc::vec::Vec::new();
+            let mut vec = rust_alloc::vec::Vec::new();
             self.encode_with(cx, &mut vec, value)?;
             Ok(vec)
         }
@@ -618,7 +622,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode, FixedBytes};
-        /// use musli::allocator::System;
+        /// use musli::alloc::System;
         /// use musli::context::Same;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -668,7 +672,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::allocator::System;
+        /// use musli::alloc::System;
         /// use musli::context::Same;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -721,7 +725,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::allocator::System;
+        /// use musli::alloc::System;
         /// use musli::context::Same;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -772,7 +776,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::allocator::System;
+        /// use musli::alloc::System;
         /// use musli::context::Same;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]

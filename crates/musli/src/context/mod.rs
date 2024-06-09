@@ -20,10 +20,10 @@ use core::cell::{Cell, UnsafeCell};
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::buf::{self, BufString};
+use crate::alloc::{self, Allocator, String};
 use crate::mode::Binary;
 use crate::no_std;
-use crate::{Allocator, Context};
+use crate::Context;
 
 /// A simple non-diagnostical capturing context which simply emits the original
 /// error.
@@ -76,23 +76,23 @@ where
     type Mode = M;
     type Error = E;
     type Mark = ();
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
-    type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
+    type Allocator = A;
+    type String<'this> = String<'this, A> where Self: 'this;
 
     #[inline]
     fn clear(&self) {}
 
     #[inline]
-    fn alloc<T>(&self) -> Self::Buf<'_, T> {
-        self.alloc.alloc()
+    fn alloc(&self) -> &Self::Allocator {
+        &self.alloc
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
-        buf::collect_string(self, value)
+        alloc::collect_string(self, value)
     }
 
     #[inline]
@@ -176,23 +176,23 @@ where
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = ();
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
-    type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
+    type Allocator = A;
+    type String<'this> = String<'this, A> where Self: 'this;
 
     #[inline]
     fn clear(&self) {}
 
     #[inline]
-    fn alloc<T>(&self) -> Self::Buf<'_, T> {
-        self.alloc.alloc()
+    fn alloc(&self) -> &Self::Allocator {
+        &self.alloc
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
-        buf::collect_string(self, value)
+        alloc::collect_string(self, value)
     }
 
     #[inline]
@@ -250,8 +250,8 @@ where
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = ();
-    type Buf<'this, T> = A::Buf<'this, T> where Self: 'this, T: 'this;
-    type BufString<'this> = BufString<A::Buf<'this, u8>> where Self: 'this;
+    type Allocator = A;
+    type String<'this> = String<'this, A> where Self: 'this;
 
     #[inline]
     fn clear(&self) {
@@ -263,16 +263,16 @@ where
     }
 
     #[inline]
-    fn alloc<T>(&self) -> Self::Buf<'_, T> {
-        self.alloc.alloc()
+    fn alloc(&self) -> &Self::Allocator {
+        &self.alloc
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
-        buf::collect_string(self, value)
+        alloc::collect_string(self, value)
     }
 
     #[inline]

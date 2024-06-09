@@ -398,7 +398,7 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
-extern crate alloc;
+extern crate alloc as rust_alloc;
 
 #[cfg(feature = "std")]
 extern crate std;
@@ -556,14 +556,12 @@ pub use musli_core::decoder;
 pub use musli_core::visitor;
 
 #[doc(inline)]
-pub use musli_core::{Buf, Context, Decode, Decoder, Encode, Encoder};
+pub use musli_core::{Context, Decode, Decoder, Encode, Encoder};
 
 #[doc(hidden)]
 pub use musli_core::__priv;
 
-pub mod allocator;
-#[doc(inline)]
-pub use self::allocator::Allocator;
+pub mod alloc;
 
 pub mod descriptive;
 pub mod json;
@@ -583,8 +581,6 @@ pub use self::fixed::FixedBytes;
 pub mod options;
 #[doc(inline)]
 pub use self::options::Options;
-
-pub mod buf;
 
 pub mod reader;
 #[doc(inline)]

@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 
-use alloc::format;
+use rust_alloc::format;
 
 use crate::context;
 use crate::json::error::Error;
@@ -10,7 +10,7 @@ use crate::mode::Binary;
 
 #[test]
 fn test_decode_exponent() {
-    crate::allocator::default!(|alloc| {
+    crate::alloc::default!(|alloc| {
         let cx = context::Same::<_, Binary, Error>::new(alloc);
 
         macro_rules! test_number {
@@ -47,7 +47,7 @@ fn test_decode_exponent() {
 
 #[test]
 fn test_decode_unsigned() {
-    crate::allocator::default!(|alloc| {
+    crate::alloc::default!(|alloc| {
         let cx = context::Same::<_, Binary, Error>::new(alloc);
 
         macro_rules! test_number {
@@ -115,7 +115,7 @@ fn test_decode_unsigned() {
 
 #[test]
 fn test_decode_signed() {
-    crate::allocator::default!(|alloc| {
+    crate::alloc::default!(|alloc| {
         let cx = context::Same::<_, Binary, Error>::new(alloc);
 
         macro_rules! test_number {

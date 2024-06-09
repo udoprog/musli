@@ -12,6 +12,7 @@ use core::marker;
 
 use crate::no_std::ToOwned;
 
+use crate::alloc::Buf;
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder,
     MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
@@ -19,7 +20,7 @@ use crate::de::{
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
-use crate::{Buf, Context};
+use crate::Context;
 
 /// Marker type used for the [`Never`] type.
 #[doc(hidden)]
@@ -67,31 +68,26 @@ pub struct Never<A = NeverMarker, B: ?Sized = NeverMarker> {
     _marker: marker::PhantomData<(A, B)>,
 }
 
-impl<T> Buf for Never<T>
-where
-    T: 'static,
-{
-    type Item = T;
-
+impl<T> Buf<T> for Never<T> {
     #[inline]
     fn resize(&mut self, _: usize, _: usize) -> bool {
         match self._never {}
     }
 
     #[inline]
-    fn as_ptr(&self) -> *const Self::Item {
+    fn as_ptr(&self) -> *const T {
         match self._never {}
     }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut Self::Item {
+    fn as_mut_ptr(&mut self) -> *mut T {
         match self._never {}
     }
 
     #[inline]
     fn try_merge<B>(&mut self, _: usize, _: B, _: usize) -> Result<(), B>
     where
-        B: Buf<Item = Self::Item>,
+        B: Buf<T>,
     {
         match self._never {}
     }

@@ -4,9 +4,9 @@
 //! adapter around an I/O type to work with musli.
 
 #[cfg(feature = "std")]
-use crate::buf::BufVec;
+use crate::alloc::Vec;
 #[cfg(feature = "std")]
-use crate::{Buf, Context};
+use crate::Context;
 
 /// Wrap a type so that it implements [`Reader`] and [`Writer`].
 ///
@@ -40,10 +40,9 @@ where
     }
 
     #[inline]
-    fn extend<C, B>(&mut self, cx: &C, buffer: BufVec<B>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
-        B: Buf<Item = u8>,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())

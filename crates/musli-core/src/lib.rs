@@ -11,18 +11,16 @@
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
-extern crate alloc;
+extern crate alloc as rust_alloc;
 
 #[cfg(feature = "std")]
 extern crate std;
 
+pub mod alloc;
+
 mod context;
 #[doc(inline)]
 pub use self::context::Context;
-
-pub mod buf;
-#[doc(inline)]
-pub use self::buf::Buf;
 
 pub mod de;
 #[doc(inline)]

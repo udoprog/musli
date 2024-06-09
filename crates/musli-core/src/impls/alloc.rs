@@ -3,14 +3,14 @@ use core::fmt;
 #[cfg(feature = "std")]
 use core::hash::{BuildHasher, Hash};
 
-use alloc::borrow::{Cow, ToOwned};
-use alloc::boxed::Box;
-use alloc::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
-use alloc::ffi::CString;
-use alloc::rc::Rc;
-use alloc::string::String;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
+use rust_alloc::borrow::{Cow, ToOwned};
+use rust_alloc::boxed::Box;
+use rust_alloc::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
+use rust_alloc::ffi::CString;
+use rust_alloc::rc::Rc;
+use rust_alloc::string::String;
+use rust_alloc::sync::Arc;
+use rust_alloc::vec::Vec;
 
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
@@ -618,11 +618,11 @@ where
     {
         use std::os::windows::ffi::OsStrExt;
 
+        use crate::alloc::{Allocator, Buf};
         use crate::en::VariantEncoder;
-        use crate::Buf;
 
         encoder.encode_variant_fn(|variant| {
-            let mut buf = cx.alloc::<u8>();
+            let mut buf = cx.alloc().alloc::<u8>();
             let mut len = 0;
 
             for w in self.encode_wide() {

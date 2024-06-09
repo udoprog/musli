@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use musli::allocator::System;
+use musli::alloc::System;
 use musli::context::RichContext;
 use musli::{Decode, Encode};
 
@@ -19,7 +19,7 @@ struct Collection {
 
 #[test]
 fn trace_collection() {
-    musli::allocator::default!(|alloc| {
+    musli::alloc::default!(|alloc| {
         let cx = RichContext::with_alloc(alloc);
 
         let mut values = HashMap::new();

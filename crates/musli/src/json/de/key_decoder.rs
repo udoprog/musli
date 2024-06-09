@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::buf::BufVec;
+use crate::alloc::Vec;
 use crate::de::{Decode, DecodeUnsized, Decoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 use crate::Context;
 
@@ -29,7 +29,7 @@ where
     where
         V: UnsizedVisitor<'de, C, [u8]>,
     {
-        let mut scratch = BufVec::new(self.cx.alloc());
+        let mut scratch = Vec::new_in(self.cx.alloc());
 
         match self.parser.parse_string(self.cx, true, &mut scratch)? {
             StringReference::Borrowed(string) => visitor.visit_borrowed(self.cx, string.as_bytes()),

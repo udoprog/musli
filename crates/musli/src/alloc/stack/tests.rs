@@ -1,10 +1,9 @@
 use std::collections::{BTreeSet, HashMap};
 use std::fmt::{self, Write};
 use std::string::String;
-use std::vec::Vec;
+use std::vec::Vec as StdVec;
 
-use crate::buf::BufVec;
-use crate::Allocator;
+use crate::alloc::{Allocator, Vec};
 
 use super::{Header, HeaderId, Stack, StackBuffer, State};
 
@@ -46,17 +45,17 @@ fn collect<E, N>(
     mut current: Option<HeaderId>,
     expected: E,
     mut next: N,
-) -> Vec<HeaderId>
+) -> StdVec<HeaderId>
 where
     E: IntoIterator<Item = (&'static str, HeaderId)>,
     N: FnMut(HeaderId) -> Option<HeaderId>,
 {
-    let mut actual = Vec::new();
-    let mut actual_idents = Vec::new();
-    let mut expected_idents = Vec::new();
+    let mut actual = StdVec::new();
+    let mut actual_idents = StdVec::new();
+    let mut expected_idents = StdVec::new();
     let mut it = expected.into_iter();
 
-    let mut errors = Vec::new();
+    let mut errors = StdVec::new();
 
     loop {
         let expected = it.next();
@@ -193,9 +192,9 @@ fn grow_last() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let a = BufVec::new_in::<u8>(&alloc);
+    let a = Vec::<u8, _>::new_in(&alloc);
 
-    let mut b = BufVec::new_in::<u8>(&alloc);
+    let mut b = Vec::<u8, _>::new_in(&alloc);
     b.write(&[1, 2, 3, 4, 5, 6]);
     b.write(&[7, 8]);
 
@@ -226,15 +225,15 @@ fn realloc() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc);
+    let mut a = Vec::<u8, _>::new_in(&alloc);
     a.write(&[1, 2, 3, 4]);
     assert_eq!(a.region, Some(A));
 
-    let mut b = BufVec::new_in::<u8>(&alloc);
+    let mut b = Vec::<u8, _>::new_in(&alloc);
     b.write(&[1, 2, 3, 4]);
     assert_eq!(b.region, Some(B));
 
-    let mut c = BufVec::new_in::<u8>(&alloc);
+    let mut c = Vec::<u8, _>::new_in(&alloc);
     c.write(&[1, 2, 3, 4]);
     assert_eq!(c.region, Some(C));
 
@@ -266,7 +265,7 @@ fn realloc() {
         C => { 8, 4, 4, Used },
     };
 
-    let mut d = BufVec::new_in::<u8>(&alloc);
+    let mut d = Vec::<u8, _>::new_in(&alloc);
     assert_eq!(d.region, Some(A));
 
     assert_structure! {
@@ -302,9 +301,9 @@ fn grow_empty_moved() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc);
-    let b = BufVec::new_in::<u8>(&alloc);
-    let mut c = BufVec::new_in::<u8>(&alloc);
+    let mut a = Vec::<u8, _>::new_in(&alloc);
+    let b = Vec::<u8, _>::new_in(&alloc);
+    let mut c = Vec::<u8, _>::new_in(&alloc);
 
     c.write(&[0]);
     a.write(&[1, 2, 3, 4]);
@@ -351,8 +350,8 @@ fn extend() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc);
-    let mut b = BufVec::new_in::<u8>(&alloc);
+    let mut a = Vec::<u8, _>::new_in(&alloc);
+    let mut b = Vec::<u8, _>::new_in(&alloc);
 
     a.write(&[1, 2]);
     b.write(&[1, 2, 3, 4]);
@@ -379,9 +378,9 @@ fn extend_middle() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc);
-    let mut b = BufVec::new_in::<u8>(&alloc);
-    let mut c = BufVec::new_in::<u8>(&alloc);
+    let mut a = Vec::<u8, _>::new_in(&alloc);
+    let mut b = Vec::<u8, _>::new_in(&alloc);
+    let mut c = Vec::<u8, _>::new_in(&alloc);
 
     a.write(&[1, 2]);
     b.write(&[1, 2, 3, 4]);
@@ -411,9 +410,9 @@ fn extend_gap() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc);
-    let mut b = BufVec::new_in::<u8>(&alloc);
-    let mut c = BufVec::new_in::<u8>(&alloc);
+    let mut a = Vec::<u8, _>::new_in(&alloc);
+    let mut b = Vec::<u8, _>::new_in(&alloc);
+    let mut c = Vec::<u8, _>::new_in(&alloc);
 
     a.write(&[1, 2]);
     b.write(&[7, 8, 9, 10]);
@@ -446,11 +445,11 @@ fn test_overlapping_slice_miri() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc);
+    let mut a = Vec::<u8, _>::new_in(&alloc);
     a.write(&[1, 2, 3, 4]);
     let a_slice = a.as_slice();
 
-    let mut b = BufVec::new_in::<u8>(&alloc);
+    let mut b = Vec::<u8, _>::new_in(&alloc);
     b.write(&[5, 6, 7, 8]);
     let b_slice = b.as_slice();
 
@@ -464,16 +463,16 @@ fn grow_into_preceeding() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc);
+    let mut a = Vec::<u8, _>::new_in(&alloc);
     a.write(&[0]);
 
-    let mut b = BufVec::new_in::<u8>(&alloc);
+    let mut b = Vec::<u8, _>::new_in(&alloc);
     b.write(&[1]);
 
-    let mut c = BufVec::new_in::<u8>(&alloc);
+    let mut c = Vec::<u8, _>::new_in(&alloc);
     c.write(&[2]);
 
-    let mut d = BufVec::new_in::<u8>(&alloc);
+    let mut d = Vec::<u8, _>::new_in(&alloc);
     d.write(&[3]);
 
     drop(a);
@@ -502,8 +501,8 @@ fn flip_flop() {
     let mut buf = StackBuffer::<4096>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc);
-    let mut b = BufVec::new_in::<u8>(&alloc);
+    let mut a = Vec::<u8, _>::new_in(&alloc);
+    let mut b = Vec::<u8, _>::new_in(&alloc);
 
     a.write(&[0]);
     b.write(&[0]);
@@ -584,7 +583,7 @@ fn limits() {
     let mut buf = StackBuffer::<32>::new();
     let alloc = Stack::new(&mut buf);
 
-    let mut a = BufVec::new_in::<u8>(&alloc);
+    let mut a = Vec::<u8, _>::new_in(&alloc);
     assert!(a.write(&[0, 1, 2, 3, 4, 5, 6, 7]));
 
     assert_structure! {

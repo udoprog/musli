@@ -36,7 +36,7 @@ where
 {
     cx: &'a C,
     writer: W,
-    buffer: BufWriter<C::Buf<'a, u8>>,
+    buffer: BufWriter<'a, C::Allocator>,
 }
 
 impl<'a, W, const OPT: Options, C> SelfPackEncoder<'a, W, OPT, C>
@@ -332,7 +332,7 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a, u8>>, OPT, C> where Self: 'this;
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<'a, C::Allocator>, OPT, C> where Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {

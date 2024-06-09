@@ -1,9 +1,9 @@
 use core::fmt;
 
 #[cfg(feature = "alloc")]
-use alloc::boxed::Box;
+use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
-use alloc::string::ToString;
+use rust_alloc::string::ToString;
 
 /// Error raised during storage encoding.
 #[derive(Debug)]

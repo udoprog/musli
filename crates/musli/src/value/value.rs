@@ -1,11 +1,11 @@
 #[cfg(feature = "alloc")]
-use alloc::borrow::ToOwned;
+use rust_alloc::borrow::ToOwned;
 #[cfg(feature = "alloc")]
-use alloc::boxed::Box;
+use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
-use alloc::string::String;
+use rust_alloc::string::String;
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use rust_alloc::vec::Vec;
 
 use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 #[cfg(feature = "alloc")]

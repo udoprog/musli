@@ -102,7 +102,7 @@ use serde::{Deserialize, Serialize};
 use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
-use crate::buf::{self, BufString};
+use crate::alloc::{self, String};
 use crate::no_std;
 use crate::{Context, Decoder, Encoder};
 
@@ -121,11 +121,8 @@ where
     type Mode = C::Mode;
     type Error = error::SerdeError;
     type Mark = C::Mark;
-    type Buf<'this, T> = C::Buf<'this, T>
-    where
-        Self: 'this,
-        T: 'this;
-    type BufString<'this> = BufString<C::Buf<'this, u8>>
+    type Allocator = C::Allocator;
+    type String<'this> = String<'this, C::Allocator>
     where
         Self: 'this;
 
@@ -141,16 +138,16 @@ where
     }
 
     #[inline]
-    fn alloc<T>(&self) -> Self::Buf<'_, T> {
+    fn alloc(&self) -> &Self::Allocator {
         self.inner.alloc()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::BufString<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
-        buf::collect_string(self, value)
+        alloc::collect_string(self, value)
     }
 
     #[inline]

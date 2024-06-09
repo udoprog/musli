@@ -4,9 +4,9 @@
 use core::marker;
 
 #[cfg(feature = "alloc")]
-use alloc::string::String;
+use rust_alloc::string::String;
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use rust_alloc::vec::Vec;
 
 use crate::mode::Text;
 use crate::Decode;
@@ -211,7 +211,7 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        crate::allocator::default!(|alloc| {
+        crate::alloc::default!(|alloc| {
             let cx = crate::context::Same::new(alloc);
             self.to_string_with(&cx, value)
         })
@@ -228,7 +228,7 @@ where
     /// ```
     /// use musli::{Decode, Encode};
     /// use musli::json;
-    /// use musli::allocator::System;
+    /// use musli::alloc::System;
     /// use musli::context::Same;
     /// # use musli::json::Error;
     ///

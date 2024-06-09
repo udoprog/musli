@@ -44,7 +44,7 @@ macro_rules! test_fns {
                 }
             }
 
-            $crate::allocator::default!(|alloc| {
+            $crate::alloc::default!(|alloc| {
                 let mut cx = $crate::context::RichContext::with_alloc(alloc);
                 cx.include_type();
 
@@ -97,7 +97,7 @@ macro_rules! test_fns {
         /// Encode and then decode the given value once.
         #[doc(hidden)]
         #[track_caller]
-        pub fn decode<'de, T, U, M>(value: T, out: &'de mut ::alloc::vec::Vec<u8>, expected: &U) -> U
+        pub fn decode<'de, T, U, M>(value: T, out: &'de mut rust_alloc::vec::Vec<u8>, expected: &U) -> U
         where
             T: $crate::en::Encode<M>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
@@ -130,7 +130,7 @@ macro_rules! test_fns {
                 }
             }
 
-            $crate::allocator::default!(|alloc| {
+            $crate::alloc::default!(|alloc| {
                 let mut cx = $crate::context::RichContext::with_alloc(alloc);
                 cx.include_type();
 
@@ -167,7 +167,7 @@ macro_rules! test_fns {
         /// Encode a value to bytes.
         #[doc(hidden)]
         #[track_caller]
-        pub fn to_vec<T, M>(value: T) -> ::alloc::vec::Vec<u8>
+        pub fn to_vec<T, M>(value: T) -> rust_alloc::vec::Vec<u8>
         where
             T: $crate::en::Encode<M>,
             M: 'static,
@@ -178,7 +178,7 @@ macro_rules! test_fns {
 
             use ::core::any::type_name;
 
-            $crate::allocator::default!(|alloc| {
+            $crate::alloc::default!(|alloc| {
                 let mut cx = $crate::context::RichContext::with_alloc(alloc);
                 cx.include_type();
 
@@ -429,7 +429,7 @@ pub use __test_matrix;
 
 #[doc(hidden)]
 pub mod support {
-    pub use alloc::vec::Vec;
+    pub use rust_alloc::vec::Vec;
 
     use crate::mode::Binary;
     use crate::value::{self, Value};

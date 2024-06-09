@@ -1,9 +1,9 @@
 use core::fmt;
 
 #[cfg(feature = "alloc")]
-use alloc::boxed::Box;
+use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use rust_alloc::vec::Vec;
 
 use crate::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
@@ -426,7 +426,7 @@ where
 {
     cx: &'a C,
     output: O,
-    writer: BufWriter<C::Buf<'a, u8>>,
+    writer: BufWriter<'a, C::Allocator>,
 }
 
 #[cfg(feature = "alloc")]
@@ -452,7 +452,7 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<C::Buf<'a, u8>>, OPT, C>
+    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<'a, C::Allocator>, OPT, C>
     where
         Self: 'this;
 
