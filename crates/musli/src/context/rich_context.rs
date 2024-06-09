@@ -12,14 +12,17 @@ use super::access::{Access, Shared};
 use super::rich_error::{RichError, Step};
 use super::ErrorMarker;
 
+#[cfg(all(not(loom), feature = "alloc"))]
+use crate::allocator::System;
+
 type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a, u8>>);
 
 /// A rich context which uses allocations and tracks the exact location of
 /// errors.
 ///
 /// This will only store 4 errors by default, and support a path up to 16. To
-/// control this, use the [`new_with`][StackContext::new_with] constructor.
-pub struct StackContext<'a, A, M>
+/// control this, use the [`new_with`][RichContext::new_with] constructor.
+pub struct RichContext<'a, A, M>
 where
     A: ?Sized + Allocator,
 {
@@ -34,13 +37,24 @@ where
     _marker: PhantomData<M>,
 }
 
-impl<'a, A, M> StackContext<'a, A, M>
+impl<'a, A, M> RichContext<'a, A, M> where A: ?Sized + Allocator {}
+
+#[cfg(all(not(loom), feature = "alloc"))]
+impl<M> RichContext<'static, System, M> {
+    /// Construct a new context which uses the system allocator for memory.
+    #[inline]
+    pub fn new() -> Option<Self> {
+        Self::with_alloc(&crate::allocator::SYSTEM)
+    }
+}
+
+impl<'a, A, M> RichContext<'a, A, M>
 where
     A: ?Sized + Allocator,
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
-    pub fn new(alloc: &'a A) -> Option<Self> {
+    pub fn with_alloc(alloc: &'a A) -> Option<Self> {
         let errors = BufVec::new_in(alloc)?;
         let path = BufVec::new_in(alloc)?;
 
@@ -132,7 +146,7 @@ where
     }
 }
 
-impl<'a, A, M> Context for StackContext<'a, A, M>
+impl<'a, A, M> Context for RichContext<'a, A, M>
 where
     A: ?Sized + Allocator,
     M: 'static,

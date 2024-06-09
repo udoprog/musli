@@ -3,12 +3,16 @@
 //! [`Context`]: crate::Context
 
 mod access;
+
 mod error_marker;
-mod rich_error;
-mod stack_context;
-#[cfg(feature = "alloc")]
-mod system_context;
 pub use self::error_marker::ErrorMarker;
+
+mod rich_error;
+pub use self::rich_error::RichError;
+
+mod rich_context;
+pub use self::rich_context::RichContext;
+
 mod error;
 pub use self::error::Error;
 
@@ -20,13 +24,6 @@ use crate::buf::{self, BufString};
 use crate::mode::Binary;
 use crate::no_std;
 use crate::{Allocator, Context};
-
-#[cfg(feature = "alloc")]
-pub use self::system_context::SystemContext;
-
-pub use self::stack_context::StackContext;
-
-pub use self::rich_error::RichError;
 
 /// A simple non-diagnostical capturing context which simply emits the original
 /// error.

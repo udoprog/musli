@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use musli::allocator::System;
-use musli::context::SystemContext;
+use musli::context::RichContext;
 use musli::{Decode, Encode};
 
 #[derive(Encode)]
@@ -31,7 +31,7 @@ struct To {
 #[test]
 fn storage_trace() {
     musli::allocator::default!(|alloc| {
-        let cx = SystemContext::with_alloc(alloc);
+        let cx = RichContext::with_alloc(alloc);
 
         let from = From {
             ok: 10,
