@@ -190,11 +190,6 @@ where
     /// });
     /// ```
     pub fn clear(&mut self) {
-        if (self.buf.as_mut_ptr() as usize) % std::mem::align_of::<B::Item>() != 0 {
-            std::println!("{}: {}", self.len, std::any::type_name::<B::Item>());
-            panic!("Unaligned pointer: {:p}", self.buf.as_mut_ptr());
-        }
-
         // SAFETY: We know that the buffer is initialized up to `len`.
         unsafe { ptr::drop_in_place(slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len)) }
         self.len = 0;
