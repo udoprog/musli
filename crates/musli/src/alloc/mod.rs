@@ -15,7 +15,6 @@
 //! ## Examples
 //!
 //! ```
-//! use musli::Buf;
 //! use musli::alloc::Vec;
 //!
 //! musli::alloc::default!(|alloc| {

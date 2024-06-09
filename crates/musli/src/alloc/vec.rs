@@ -303,6 +303,8 @@ where
 /// ## Examples
 ///
 /// ```
+/// use core::fmt::Write;
+///
 /// use musli::alloc::Vec;
 ///
 /// musli::alloc::default!(|alloc| {

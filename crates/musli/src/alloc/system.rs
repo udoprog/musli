@@ -34,9 +34,7 @@ const MAX_REGIONS: usize = 2;
 /// # Examples
 ///
 /// ```
-/// use musli::{Allocator, Buf};
-/// use musli::alloc::System;
-/// use musli::alloc::Vec;
+/// use musli::alloc::{System, Vec};
 ///
 /// let alloc = System::new();
 ///
