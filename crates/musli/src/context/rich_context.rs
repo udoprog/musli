@@ -20,8 +20,12 @@ type BufPair<'a, A> = (Range<usize>, BufString<<A as Allocator>::Buf<'a, u8>>);
 /// A rich context which uses allocations and tracks the exact location of
 /// errors.
 ///
-/// This will only store 4 errors by default, and support a path up to 16. To
-/// control this, use the [`new_with`][RichContext::new_with] constructor.
+/// This uses the provided allocator to allocate memory for the collected
+/// diagnostics. The allocator to use can be provided using
+/// [`RichContext::with_alloc`].
+///
+/// The default constructor is only available when the `alloc` feature is
+/// enabled, and will use the [`System`] allocator.
 pub struct RichContext<'a, A, M>
 where
     A: ?Sized + Allocator,
