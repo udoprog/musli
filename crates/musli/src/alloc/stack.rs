@@ -10,56 +10,11 @@ use core::ptr;
 
 use super::{Allocator, RawVec};
 
-use super::DEFAULT_STACK_BUFFER;
-
 // We keep max bytes to 2^31, since that ensures that addition between two
 // magnitutes never overflow.
 const MAX_BYTES: usize = i32::MAX as usize;
 
-/// A buffer that can be used to store data on the stack.
-///
-/// See the [module level documentation][super] for more information.
-#[repr(align(8))]
-pub struct StackBuffer<const N: usize = DEFAULT_STACK_BUFFER> {
-    data: [MaybeUninit<u8>; N],
-}
-
-impl<const C: usize> StackBuffer<C> {
-    /// Construct a new buffer with the default size of
-    /// [`DEFAULT_STACK_BUFFER`].
-    pub const fn new() -> Self {
-        Self {
-            // SAFETY: This is safe to initialize, since it's just an array of
-            // contiguous uninitialized memory.
-            data: unsafe { MaybeUninit::uninit().assume_init() },
-        }
-    }
-}
-
-impl<const C: usize> Default for StackBuffer<C> {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<const C: usize> Deref for StackBuffer<C> {
-    type Target = [MaybeUninit<u8>];
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl<const C: usize> DerefMut for StackBuffer<C> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
-    }
-}
-
-/// A no-std compatible fixed-memory allocator that can be used with the `musli`
+/// A no-std compatible slice-based allocator that can be used with the `musli`
 /// crate.
 ///
 /// It is geared towards handling few allocations, but they can be arbitrarily
@@ -76,7 +31,37 @@ impl<const C: usize> DerefMut for StackBuffer<C> {
 /// is fine for use with the `musli` crate, but might be a limitation for other
 /// use-cases.
 ///
-/// # Design
+/// ## Examples
+///
+/// ```
+/// use musli::alloc::{ArrayBuffer, Slice, Vec};
+///
+/// let mut buf = ArrayBuffer::new();
+/// let alloc = Slice::new(&mut buf);
+///
+/// let mut a = Vec::new_in(&alloc);
+/// let mut b = Vec::new_in(&alloc);
+///
+/// b.write(b"He11o");
+/// a.write(b.as_slice());
+///
+/// assert_eq!(a.as_slice(), b"He11o");
+/// assert_eq!(a.len(), 5);
+///
+/// a.write(b" W0rld");
+///
+/// assert_eq!(a.as_slice(), b"He11o W0rld");
+/// assert_eq!(a.len(), 11);
+///
+/// let mut c = Vec::new_in(&alloc);
+/// c.write(b"!");
+/// a.write(c.as_slice());
+///
+/// assert_eq!(a.as_slice(), b"He11o W0rld!");
+/// assert_eq!(a.len(), 12);
+/// ```
+///
+/// ## Design
 ///
 /// The allocator takes a buffer of contiguous memory. This is dynamically
 /// diviced into two parts:
@@ -123,7 +108,7 @@ impl<const C: usize> DerefMut for StackBuffer<C> {
 /// # bbbbb moved to 0
 /// bbbbbbxxxxaaaaaa
 /// ```
-pub struct Stack<'a> {
+pub struct Slice<'a> {
     // This must be an unsafe cell, since it's mutably accessed through an
     // immutable pointers. We simply make sure that those accesses do not
     // clobber each other, which we can do since the API is restricted through
@@ -133,19 +118,14 @@ pub struct Stack<'a> {
     _marker: PhantomData<&'a mut [MaybeUninit<u8>]>,
 }
 
-impl<'a> Stack<'a> {
-    /// Build a new no-std allocator.
+impl<'a> Slice<'a> {
+    /// Construct a new slice allocator.
     ///
-    /// The buffer must be aligned by 8 bytes, and should be a multiple of 8 bytes.
-    ///
-    /// See [type-level documentation][Stack] for more information.
+    /// See [type-level documentation][Slice] for more information.
     ///
     /// # Panics
     ///
     /// This panics if called with a buffer larger than `2^31` bytes.
-    ///
-    /// An easy way to align a buffer is to use [`StackBuffer`] when
-    /// constructing it.
     pub fn new(buffer: &'a mut [MaybeUninit<u8>]) -> Self {
         let size = buffer.len();
         assert!(
@@ -188,8 +168,8 @@ impl<'a> Stack<'a> {
     }
 }
 
-impl Allocator for Stack<'_> {
-    type RawVec<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'this;
+impl Allocator for Slice<'_> {
+    type RawVec<'this, T> = SliceBuf<'this, T> where Self: 'this, T: 'this;
 
     #[inline]
     fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
@@ -208,7 +188,7 @@ impl Allocator for Stack<'_> {
             }
         };
 
-        StackBuf {
+        SliceBuf {
             region,
             internal: &self.internal,
             _marker: PhantomData,
@@ -216,14 +196,16 @@ impl Allocator for Stack<'_> {
     }
 }
 
-/// A no-std allocated buffer.
-pub struct StackBuf<'a, T> {
+/// A slice allocated buffer.
+///
+/// See [`Slice`].
+pub struct SliceBuf<'a, T> {
     region: Option<HeaderId>,
     internal: &'a UnsafeCell<Internal>,
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> RawVec<T> for StackBuf<'a, T> {
+impl<'a, T> RawVec<T> for SliceBuf<'a, T> {
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {
         if additional == 0 || size_of::<T>() == 0 {
@@ -352,7 +334,7 @@ impl<'a, T> RawVec<T> for StackBuf<'a, T> {
     }
 }
 
-impl<T> Drop for StackBuf<'_, T> {
+impl<T> Drop for SliceBuf<'_, T> {
     fn drop(&mut self) {
         if let Some(region) = self.region.take() {
             // SAFETY: We have exclusive access to the internal state.
@@ -424,7 +406,7 @@ struct Range {
 }
 
 impl Range {
-    fn new(range: std::ops::Range<*mut MaybeUninit<u8>>) -> Self {
+    fn new(range: core::ops::Range<*mut MaybeUninit<u8>>) -> Self {
         Self {
             start: range.start,
             end: range.end,
@@ -538,7 +520,7 @@ impl Internal {
 
     /// Free a region.
     unsafe fn free_region(&mut self, region: Region) -> Header {
-        self.unlink(&*region);
+        self.unlink(&region);
 
         region.ptr.replace(Header {
             range: self.full.head(),

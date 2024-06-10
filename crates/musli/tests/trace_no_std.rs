@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use musli::alloc::{Stack, StackBuffer};
+use musli::alloc::{ArrayBuffer, Slice};
 use musli::context;
 use musli::{Decode, Encode};
 
@@ -19,8 +19,8 @@ struct Collection {
 
 #[test]
 fn trace_no_std() {
-    let mut buf = StackBuffer::<1024>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::<1024>::with_size();
+    let alloc = Slice::new(&mut buf);
     let cx = context::with_alloc(&alloc);
 
     let mut values = HashMap::new();

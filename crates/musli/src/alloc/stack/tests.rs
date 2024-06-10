@@ -3,9 +3,9 @@ use std::fmt::{self, Write};
 use std::string::String;
 use std::vec::Vec as StdVec;
 
-use crate::alloc::{Allocator, Vec};
+use crate::alloc::{Allocator, ArrayBuffer, Vec};
 
-use super::{Header, HeaderId, Range, Stack, StackBuffer};
+use super::{Header, HeaderId, Range, Slice};
 
 const A: HeaderId = unsafe { HeaderId::new_unchecked(1) };
 const B: HeaderId = unsafe { HeaderId::new_unchecked(2) };
@@ -192,8 +192,8 @@ macro_rules! assert_structure {
 
 #[test]
 fn grow_last() {
-    let mut buf = StackBuffer::<4096>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
 
     let a = Vec::<u8, _>::new_in(&alloc);
 
@@ -225,8 +225,8 @@ fn grow_last() {
 
 #[test]
 fn realloc() {
-    let mut buf = StackBuffer::<4096>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
     a.write(&[1, 2, 3, 4]);
@@ -301,8 +301,8 @@ fn realloc() {
 /// they're being written to.
 #[test]
 fn grow_empty_moved() {
-    let mut buf = StackBuffer::<4096>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
     let b = Vec::<u8, _>::new_in(&alloc);
@@ -350,8 +350,8 @@ fn grow_empty_moved() {
 /// merging of buffers.
 #[test]
 fn extend() {
-    let mut buf = StackBuffer::<4096>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
     let mut b = Vec::<u8, _>::new_in(&alloc);
@@ -378,8 +378,8 @@ fn extend() {
 /// merging of buffers.
 #[test]
 fn extend_middle() {
-    let mut buf = StackBuffer::<4096>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
     let mut b = Vec::<u8, _>::new_in(&alloc);
@@ -410,8 +410,8 @@ fn extend_middle() {
 /// merging of buffers.
 #[test]
 fn extend_gap() {
-    let mut buf = StackBuffer::<4096>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
     let mut b = Vec::<u8, _>::new_in(&alloc);
@@ -445,8 +445,8 @@ fn extend_gap() {
 /// unhappy about it.
 #[test]
 fn test_overlapping_slice_miri() {
-    let mut buf = StackBuffer::<4096>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
     a.write(&[1, 2, 3, 4]);
@@ -463,8 +463,8 @@ fn test_overlapping_slice_miri() {
 /// Test when we have a prior allocation that has been freed and we can grow into it.
 #[test]
 fn grow_into_preceeding() {
-    let mut buf = StackBuffer::<4096>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
     a.write(&[0]);
@@ -501,8 +501,8 @@ fn grow_into_preceeding() {
 /// Test when we have a prior allocation that has been freed and we can grow into it.
 #[test]
 fn flip_flop() {
-    let mut buf = StackBuffer::<4096>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
     let mut b = Vec::<u8, _>::new_in(&alloc);
@@ -579,12 +579,12 @@ fn flip_flop() {
 /// Test when we have a prior allocation that has been freed and we can grow into it.
 #[test]
 fn limits() {
-    let mut buf = StackBuffer::<8>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::<8>::with_size();
+    let alloc = Slice::new(&mut buf);
     assert!(alloc.new_raw_vec::<u8>().region.is_none());
 
-    let mut buf = StackBuffer::<32>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::<32>::with_size();
+    let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
     assert!(a.write(&[0, 1, 2, 3, 4, 5, 6, 7]));
