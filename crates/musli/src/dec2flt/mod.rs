@@ -34,7 +34,7 @@
 //! a large-decimal representation, shifting the digits into range, calculating
 //! the upper significant bits and exactly round to the nearest representation.
 //!
-//! Another aspect that needs attention is the ``RawFloat`` trait by which almost all functions
+//! Another aspect that needs attention is the `RawFloat` trait by which almost all functions
 //! are parametrized. One might think that it's enough to parse to `f64` and cast the result to
 //! `f32`. Unfortunately this is not the world we live in, and this has nothing to do with using
 //! base two or half-to-even rounding.
