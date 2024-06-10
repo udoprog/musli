@@ -5,7 +5,7 @@ use std::vec::Vec as StdVec;
 
 use crate::alloc::{Allocator, Vec};
 
-use super::{Header, HeaderId, Stack, StackBuffer};
+use super::{Header, HeaderId, Range, Stack, StackBuffer};
 
 const A: HeaderId = unsafe { HeaderId::new_unchecked(1) };
 const B: HeaderId = unsafe { HeaderId::new_unchecked(2) };
@@ -98,7 +98,7 @@ where
 macro_rules! assert_free {
     ($i:expr $(, $free:expr)* $(,)?) => {{
         let expected: &'static [(&str, HeaderId)] = &[$((stringify!($free), $free)),*];
-        let actual = collect("free", $i.free, expected.iter().copied(), |c| $i.header(c).next);
+        let actual = collect("free", $i.free_head, expected.iter().copied(), |c| $i.header(c).next);
         assert_eq!(actual, [$($free),*], "Expected `free` list");
 
         let expected: &'static [HeaderId] = &[$($free),*];
@@ -161,8 +161,7 @@ macro_rules! assert_structure {
             assert_eq! {
                 *i.header($region),
                 Header {
-                    start: unsafe { i.start.add($start) },
-                    end: unsafe { i.start.add($start + $cap) },
+                    range: Range::new(unsafe { i.full.start.add($start)..i.full.start.add($start + $cap) }),
                     next: forward.get(&$region).copied(),
                     prev: backward.get(&$region).copied(),
                 },
@@ -181,8 +180,7 @@ macro_rules! assert_structure {
             assert_eq! {
                 *i.header(node),
                 Header {
-                    start: i.start,
-                    end: i.start,
+                    range: i.full.head(),
                     next: forward.get(&node).copied(),
                     prev: backward.get(&node).copied(),
                 },
