@@ -133,7 +133,7 @@ impl OwnedBuf {
         }
     }
 
-    /// Allocate a new buffer with the given `capacity`` and an alignment
+    /// Allocate a new buffer with the given `capacity` and an alignment
     /// matching that of `T`.
     ///
     /// The buffer must allocate for at least the given `capacity`, but might

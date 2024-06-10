@@ -813,7 +813,7 @@ pub use musli_zerocopy_macros::Visit;
 ///
 /// ### `#[zero_copy(crate = <path>)]`
 ///
-/// Allows for specifying a custom path to the `musli_zerocopy`` crate
+/// Allows for specifying a custom path to the `musli_zerocopy` crate
 /// (default).
 ///
 /// ```

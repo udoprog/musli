@@ -129,7 +129,7 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed + Pointee {
 ///
 /// # Examples
 ///
-/// Using `#[zero_copy(ignore)]`` on generic fields that implements
+/// Using `#[zero_copy(ignore)]` on generic fields that implements
 /// [`ZeroSized`]:
 ///
 /// ```
