@@ -1,15 +1,15 @@
 //! Serialization options.
 
 /// [`Options`] builder.
-pub struct OptionsBuilder(Options);
+pub struct Builder(Options);
 
 const DEFAULT: Options = (ByteOrder::NATIVE as Options) << BYTEORDER_BIT;
 
 /// Start building new options.
 ///
-/// Call [`OptionsBuilder::build`] to construct them.
-pub const fn new() -> OptionsBuilder {
-    OptionsBuilder(DEFAULT)
+/// Call [`Builder::build`] to construct them.
+pub const fn new() -> Builder {
+    Builder(DEFAULT)
 }
 
 /// Type encapsulating a static options for an encoding.
@@ -31,7 +31,7 @@ const MAP_KEYS_AS_NUMBERS_BIT: Options = 3;
 const FLOAT_BIT: Options = 8;
 const LENGTH_WIDTH_BIT: Options = 16;
 
-impl OptionsBuilder {
+impl Builder {
     /// Indicates if an integer serialization should be variable.
     #[inline(always)]
     pub const fn with_integer(self, integer: Integer) -> Self {
@@ -83,16 +83,24 @@ impl OptionsBuilder {
     }
 }
 
-#[doc(hidden)]
-pub const fn integer<const OPT: Options>() -> Integer {
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "json",
+    feature = "value"
+))]
+#[inline(always)]
+pub(crate) const fn integer<const OPT: Options>() -> Integer {
     match (OPT >> INTEGER_BIT) & 0b1 {
         0 => Integer::Variable,
         _ => Integer::Fixed,
     }
 }
 
-#[doc(hidden)]
-pub const fn float<const OPT: Options>() -> Float {
+#[cfg(test)]
+#[inline(always)]
+pub(crate) const fn float<const OPT: Options>() -> Float {
     match (OPT >> FLOAT_BIT) & 0b11 {
         0 => Float::Integer,
         1 => Float::Variable,
@@ -100,16 +108,30 @@ pub const fn float<const OPT: Options>() -> Float {
     }
 }
 
-#[doc(hidden)]
-pub const fn length<const OPT: Options>() -> Integer {
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "json",
+    feature = "value"
+))]
+#[inline(always)]
+pub(crate) const fn length<const OPT: Options>() -> Integer {
     match (OPT >> LENGTH_BIT) & 0b1 {
         0 => Integer::Variable,
         _ => Integer::Fixed,
     }
 }
 
-#[doc(hidden)]
-pub const fn length_width<const OPT: Options>() -> Width {
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "json",
+    feature = "value"
+))]
+#[inline(always)]
+pub(crate) const fn length_width<const OPT: Options>() -> Width {
     match (OPT >> LENGTH_WIDTH_BIT) & 0b11 {
         0 => Width::U8,
         1 => Width::U16,
@@ -118,16 +140,24 @@ pub const fn length_width<const OPT: Options>() -> Width {
     }
 }
 
-#[doc(hidden)]
-pub const fn byteorder<const OPT: Options>() -> ByteOrder {
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "json",
+    feature = "value"
+))]
+#[inline(always)]
+pub(crate) const fn byteorder<const OPT: Options>() -> ByteOrder {
     match (OPT >> BYTEORDER_BIT) & 0b1 {
-        0 => ByteOrder::LittleEndian,
-        _ => ByteOrder::BigEndian,
+        0 => ByteOrder::Little,
+        _ => ByteOrder::Big,
     }
 }
 
-#[doc(hidden)]
-pub const fn is_map_keys_as_numbers<const OPT: Options>() -> bool {
+#[cfg(all(feature = "alloc", feature = "value"))]
+#[inline(always)]
+pub(crate) const fn is_map_keys_as_numbers<const OPT: Options>() -> bool {
     ((OPT >> MAP_KEYS_AS_NUMBERS_BIT) & 0b1) == 1
 }
 
@@ -156,28 +186,40 @@ pub enum Float {
     Fixed = 2,
 }
 
-/// Byte order.
+/// Byte order to use when encoding numbers.
+///
+/// By default, this is the [`ByteOrder::NATIVE`] byte order of the target
+/// platform.
 #[derive(PartialEq, Eq)]
 #[cfg_attr(test, derive(Debug))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum ByteOrder {
     /// Little endian byte order.
-    LittleEndian = 0,
+    Little = 0,
     /// Big endian byte order.
-    BigEndian = 1,
+    Big = 1,
 }
 
 impl ByteOrder {
     /// The native byte order.
+    ///
+    /// [`Little`] for little and [`Big`] for big endian platforms.
+    ///
+    /// [`Little`]: ByteOrder::Little
+    /// [`Big`]: ByteOrder::Big
     pub const NATIVE: Self = if cfg!(target_endian = "little") {
-        Self::LittleEndian
+        Self::Little
     } else {
-        Self::BigEndian
+        Self::Big
     };
 
     /// The network byte order.
-    pub const NETWORK: Self = Self::BigEndian;
+    ///
+    /// This is the same as [`Big`].
+    ///
+    /// [`Big`]: ByteOrder::Big
+    pub const NETWORK: Self = Self::Big;
 }
 
 #[doc(hidden)]
@@ -307,14 +349,14 @@ fn test_builds() {
     }
 
     test_case! {
-        self::new().with_byte_order(ByteOrder::BigEndian) => {
-            byteorder = ByteOrder::BigEndian,
+        self::new().with_byte_order(ByteOrder::Big) => {
+            byteorder = ByteOrder::Big,
         }
     }
 
     test_case! {
-        self::new().with_byte_order(ByteOrder::LittleEndian) => {
-            byteorder = ByteOrder::LittleEndian,
+        self::new().with_byte_order(ByteOrder::Little) => {
+            byteorder = ByteOrder::Little,
         }
     }
 
