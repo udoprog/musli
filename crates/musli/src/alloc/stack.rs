@@ -10,30 +10,6 @@ use core::ptr;
 
 use super::{Allocator, RawVec};
 
-#[cfg(test)]
-macro_rules! let_mut {
-    (let mut $decl:ident = $expr:expr;) => {
-        let mut $decl = $expr;
-    };
-}
-
-#[cfg(not(test))]
-macro_rules! let_mut {
-    (let mut $decl:ident = $expr:expr;) => {
-        let $decl = $expr;
-    };
-}
-
-#[cfg(test)]
-macro_rules! if_test {
-    ($($tt:tt)*) => { $($tt)* };
-}
-
-#[cfg(not(test))]
-macro_rules! if_test {
-    ($($tt:tt)*) => {};
-}
-
 use super::DEFAULT_STACK_BUFFER;
 
 // We keep max bytes to 2^31, since that ensures that addition between two
@@ -202,8 +178,6 @@ impl<'a> Stack<'a> {
         Self {
             internal: UnsafeCell::new(Internal {
                 free: None,
-                #[cfg(test)]
-                head: None,
                 tail: None,
                 occupied: None,
                 start: data.start,
@@ -440,17 +414,14 @@ impl HeaderId {
 
     /// Get the value of the region identifier.
     #[inline]
-    fn get(self) -> u16 {
-        self.0.get()
+    fn get(self) -> usize {
+        self.0.get() as usize
     }
 }
 
 struct Internal {
     // The first free region.
     free: Option<HeaderId>,
-    // Pointer to the head region.
-    #[cfg(test)]
-    head: Option<HeaderId>,
     // Pointer to the tail region.
     tail: Option<HeaderId>,
     // The occupied header region
@@ -492,13 +463,13 @@ impl Internal {
     fn header(&self, at: HeaderId) -> &Header {
         // SAFETY: Once we've coerced to `&self`, then we guarantee that we can
         // get a header immutably.
-        unsafe { &*self.end.cast::<Header>().wrapping_sub(at.get() as usize) }
+        unsafe { &*self.end.cast::<Header>().wrapping_sub(at.get()) }
     }
 
     /// Get the mutable header pointer corresponding to the given id.
     #[inline]
     fn header_mut(&mut self, at: HeaderId) -> *mut Header {
-        self.end.cast::<Header>().wrapping_sub(at.get() as usize)
+        self.end.cast::<Header>().wrapping_sub(at.get())
     }
 
     /// Get the mutable region corresponding to the given id.
@@ -519,10 +490,6 @@ impl Internal {
 
         if let Some(prev) = header.prev {
             (*self.header_mut(prev)).next = header.next;
-        } else {
-            if_test! {
-                self.head = header.next;
-            };
         }
     }
 
@@ -538,22 +505,10 @@ impl Internal {
             (*self.header_mut(next)).prev = prev;
         }
 
-        if_test! {
-            if self.head == Some(region.id) {
-                self.head = next;
-            }
-        };
-
         self.push_back(region);
     }
 
     unsafe fn push_back(&mut self, region: &mut Region) {
-        if_test! {
-            if self.head.is_none() {
-                self.head = Some(region.id);
-            }
-        }
-
         if let Some(tail) = self.tail.replace(region.id) {
             region.prev = Some(tail);
             (*self.region(tail).ptr).next = Some(region.id);
@@ -565,8 +520,6 @@ impl Internal {
         let old = region.ptr.replace(Header {
             start: self.start,
             end: self.start,
-            #[cfg(test)]
-            state: State::Free,
             next: self.free.replace(region.id),
             prev: None,
         });
@@ -581,18 +534,12 @@ impl Internal {
     ///
     /// The caller msut ensure that there is enough space for the region and
     /// that the end pointer has been aligned to the requirements of `Header`.
-    unsafe fn alloc_header(
-        &mut self,
-        end: *mut MaybeUninit<u8>,
-        #[cfg(test)] state: State,
-    ) -> Option<Region> {
-        if let Some(mut region) = self.pop_free() {
+    unsafe fn alloc_header(&mut self, end: *mut MaybeUninit<u8>) -> Option<Region> {
+        if let Some(region) = self.free.take() {
+            let mut region = self.region(region);
+
             region.start = self.free_start;
             region.end = end;
-
-            if_test! {
-                region.state = state;
-            };
 
             return Some(region);
         }
@@ -610,8 +557,6 @@ impl Internal {
         region.ptr.write(Header {
             start: self.free_start,
             end,
-            #[cfg(test)]
-            state,
             prev: None,
             next: None,
         });
@@ -627,15 +572,9 @@ impl Internal {
     /// The caller must ensure that `this` is exclusively available.
     unsafe fn alloc(&mut self, requested: usize, align: usize) -> Option<Region> {
         if let Some(occupied) = self.occupied {
-            let_mut! {
-                let mut region = self.region(occupied);
-            };
+            let region = self.region(occupied);
 
             if region.capacity() >= requested && region.is_aligned(align) {
-                if_test! {
-                    region.state = State::Used;
-                };
-
                 self.occupied = None;
                 return Some(region);
             }
@@ -649,11 +588,7 @@ impl Internal {
 
         let end = self.free_start.wrapping_add(requested);
 
-        let mut region = self.alloc_header(
-            end,
-            #[cfg(test)]
-            State::Used,
-        )?;
+        let mut region = self.alloc_header(end)?;
 
         self.free_start = end;
         debug_assert!(self.free_start <= self.free_end);
@@ -686,11 +621,7 @@ impl Internal {
             // We need to construct a new occupied header to fill in the gap
             // which we just aligned from since there is no previous region to
             // expand.
-            let mut region = self.alloc_header(
-                aligned_start,
-                #[cfg(test)]
-                State::Occupy,
-            )?;
+            let mut region = self.alloc_header(aligned_start)?;
 
             self.push_back(&mut region);
         }
@@ -700,12 +631,7 @@ impl Internal {
     }
 
     unsafe fn free(&mut self, region: HeaderId) {
-        let_mut! {
-            let mut region = self.region(region);
-        }
-
-        #[cfg(test)]
-        debug_assert_eq!(region.state, State::Used);
+        let region = self.region(region);
 
         // Just free up the last region in the slab.
         if region.next.is_none() {
@@ -719,10 +645,6 @@ impl Internal {
                 self.occupied.is_none(),
                 "There can only be one occupied region"
             );
-
-            if_test! {
-                region.state = State::Occupy;
-            };
 
             self.occupied = Some(region.id);
             return;
@@ -825,11 +747,6 @@ impl Internal {
             let from = self.free_region(from);
 
             from.start.copy_to(prev.start, len);
-
-            if_test! {
-                prev.state = State::Used;
-            };
-
             prev.end = from.end;
             self.occupied = None;
             return Some(prev);
@@ -840,37 +757,6 @@ impl Internal {
         self.free(from.id);
         Some(to)
     }
-
-    unsafe fn pop_free(&mut self) -> Option<Region> {
-        let id = self.free.take()?;
-        let ptr = self.header_mut(id);
-        self.free = (*ptr).next.take();
-        Some(Region { id, ptr })
-    }
-}
-
-/// The state of an allocated region.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg(test)]
-enum State {
-    /// The region is fully free and doesn't occupy any memory.
-    ///
-    /// # Requirements
-    ///
-    /// - The range must be zero-sized at offset 0.
-    /// - The region must not be linked.
-    /// - The region must be in the free list.
-    Free = 0,
-    /// The region is occupied (only used during tests).
-    ///
-    /// # Requirements
-    ///
-    /// - The range must point to a non-zero slice of memory.,
-    /// - The region must be linked.
-    /// - The region must be in the occupied list.
-    Occupy,
-    /// The region is used by an active allocation.
-    Used,
 }
 
 /// The header of a region.
@@ -884,9 +770,6 @@ struct Header {
     prev: Option<HeaderId>,
     // The next region.
     next: Option<HeaderId>,
-    // The state of the region.
-    #[cfg(test)]
-    state: State,
 }
 
 impl Header {
