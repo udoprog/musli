@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use musli::alloc::System;
-use musli::context::RichContext;
+use musli::context;
 use musli::{Decode, Encode};
 
 #[derive(Encode)]
@@ -34,7 +34,7 @@ struct To {
 #[test]
 fn trace_complex() {
     musli::alloc::default!(|alloc| {
-        let cx = RichContext::with_alloc(alloc);
+        let cx = context::with_alloc(alloc);
 
         let mut field = HashMap::new();
 
@@ -58,7 +58,7 @@ fn trace_complex() {
             unreachable!()
         };
 
-        let cx = RichContext::with_alloc(alloc);
+        let cx = context::with_alloc(alloc);
 
         let Ok(..) = encoding.from_slice_with::<_, To>(&cx, &bytes) else {
             if let Some(error) = cx.errors().next() {

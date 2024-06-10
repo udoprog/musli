@@ -5,12 +5,12 @@
 /// ## Examples
 ///
 /// ```
-/// use musli::alloc::{Allocator, Buf, Vec};
+/// use musli::alloc::{Allocator, RawVec};
 ///
 /// let values: [u32; 4] = [1, 2, 3, 4];
 ///
 /// musli::alloc::default!(|alloc| {
-///     let mut buf = alloc.alloc::<u32>();
+///     let mut buf = alloc.new_raw_vec::<u32>();
 ///     let mut len = 0;
 ///
 ///     for value in values {
@@ -31,7 +31,7 @@
 ///     assert_eq!(bytes, values);
 /// });
 /// ```
-pub trait Buf<T> {
+pub trait RawVec<T> {
     /// Resize the buffer.
     fn resize(&mut self, len: usize, additional: usize) -> bool;
 
@@ -49,5 +49,5 @@ pub trait Buf<T> {
     /// If this returns `Err(B)` if merging was not possible.
     fn try_merge<B>(&mut self, this_len: usize, other: B, other_len: usize) -> Result<(), B>
     where
-        B: Buf<T>;
+        B: RawVec<T>;
 }

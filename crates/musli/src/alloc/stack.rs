@@ -8,7 +8,7 @@ use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
-use super::{Allocator, Buf};
+use super::{Allocator, RawVec};
 
 #[cfg(test)]
 macro_rules! let_mut {
@@ -151,7 +151,7 @@ pub struct Stack<'a> {
     // This must be an unsafe cell, since it's mutably accessed through an
     // immutable pointers. We simply make sure that those accesses do not
     // clobber each other, which we can do since the API is restricted through
-    // the `Buf` trait.
+    // the `RawVec` trait.
     internal: UnsafeCell<Internal>,
     // The underlying vector being borrowed.
     _marker: PhantomData<&'a mut [MaybeUninit<u8>]>,
@@ -217,10 +217,10 @@ impl<'a> Stack<'a> {
 }
 
 impl Allocator for Stack<'_> {
-    type Buf<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'this;
+    type RawVec<'this, T> = StackBuf<'this, T> where Self: 'this, T: 'this;
 
     #[inline]
-    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
+    fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
     where
         T: 'a,
     {
@@ -251,7 +251,7 @@ pub struct StackBuf<'a, T> {
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> Buf<T> for StackBuf<'a, T> {
+impl<'a, T> RawVec<T> for StackBuf<'a, T> {
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {
         if additional == 0 || size_of::<T>() == 0 {
@@ -328,7 +328,7 @@ impl<'a, T> Buf<T> for StackBuf<'a, T> {
     #[inline]
     fn try_merge<B>(&mut self, this_len: usize, buf: B, other_len: usize) -> Result<(), B>
     where
-        B: Buf<T>,
+        B: RawVec<T>,
     {
         let Some(region) = self.region else {
             return Err(buf);

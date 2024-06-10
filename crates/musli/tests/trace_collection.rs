@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use musli::alloc::System;
-use musli::context::RichContext;
+use musli::context;
 use musli::{Decode, Encode};
 
 #[derive(Encode)]
@@ -20,7 +20,7 @@ struct Collection {
 #[test]
 fn trace_collection() {
     musli::alloc::default!(|alloc| {
-        let cx = RichContext::with_alloc(alloc);
+        let cx = context::with_alloc(alloc);
 
         let mut values = HashMap::new();
 
@@ -38,7 +38,7 @@ fn trace_collection() {
             unreachable!()
         };
 
-        let cx = RichContext::with_alloc(alloc);
+        let cx = context::with_alloc(alloc);
 
         let Ok(..) = encoding.from_slice_with::<_, Collection>(&cx, &bytes) else {
             if let Some(error) = cx.errors().next() {

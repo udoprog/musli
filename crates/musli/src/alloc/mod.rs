@@ -48,7 +48,7 @@
 mod tests;
 
 #[doc(inline)]
-pub use musli_core::alloc::{Allocator, Buf};
+pub use musli_core::alloc::{Allocator, RawVec};
 
 #[cfg(feature = "alloc")]
 mod system;
@@ -58,7 +58,7 @@ mod system;
 pub use self::system::System;
 
 /// The static system allocator instance.
-#[cfg(all(not(loom), feature = "alloc"))]
+#[cfg(feature = "alloc")]
 pub static SYSTEM: System = System::new();
 
 mod disabled;
@@ -130,23 +130,12 @@ macro_rules! __default {
 #[doc(inline)]
 pub use __default as default;
 
-#[cfg(all(not(loom), feature = "alloc"))]
+#[cfg(feature = "alloc")]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __default_allocator_impl {
     (|$alloc:ident| $body:block) => {{
         let $alloc = &$crate::alloc::SYSTEM;
-        $body
-    }};
-}
-
-#[cfg(all(feature = "alloc", loom))]
-#[macro_export]
-#[doc(hidden)]
-macro_rules! __default_allocator_impl {
-    (|$alloc:ident| $body:block) => {{
-        let $alloc = $crate::alloc::System::new();
-        let $alloc = &$alloc;
         $body
     }};
 }

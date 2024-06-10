@@ -38,11 +38,11 @@ where
 {
     /// Construct a new string buffer in the provided allocator.
     pub fn new_in(alloc: &'a A) -> Self {
-        Self::new(alloc.alloc::<u8>())
+        Self::new(alloc.new_raw_vec::<u8>())
     }
 
     /// Construct a new fixed string.
-    pub(crate) const fn new(buf: A::Buf<'a, u8>) -> Self {
+    pub(crate) const fn new(buf: A::RawVec<'a, u8>) -> Self {
         Self { buf: Vec::new(buf) }
     }
 
@@ -96,6 +96,16 @@ where
 }
 
 impl<'a, A> fmt::Display for String<'a, A>
+where
+    A: 'a + ?Sized + Allocator,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl<'a, A> fmt::Debug for String<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {

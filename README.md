@@ -376,7 +376,7 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [completely uses visitors]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_u32
 [detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
 [musli-name-type]: <https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type-->
-[no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/no-std-json.rs>
+[no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/>
 [scoped allocations]: <https://docs.rs/musli/latest/musli/trait.Context.html#tymethod.alloc>
 [size comparisons]: <https://udoprog.github.io/musli/benchmarks/#size-comparisons>
 [zerocopy]: <https://docs.rs/musli-zerocopy>

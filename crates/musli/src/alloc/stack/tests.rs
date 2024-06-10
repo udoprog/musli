@@ -578,7 +578,7 @@ fn flip_flop() {
 fn limits() {
     let mut buf = StackBuffer::<8>::new();
     let alloc = Stack::new(&mut buf);
-    assert!(alloc.alloc::<u8>().region.is_none());
+    assert!(alloc.new_raw_vec::<u8>().region.is_none());
 
     let mut buf = StackBuffer::<32>::new();
     let alloc = Stack::new(&mut buf);

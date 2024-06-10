@@ -1,14 +1,14 @@
 use core::marker::PhantomData;
 use core::ptr;
 
-use super::{Allocator, Buf};
+use super::{Allocator, RawVec};
 
 /// An empty buffer.
 pub struct EmptyBuf<T> {
     _marker: PhantomData<T>,
 }
 
-impl<T> Buf<T> for EmptyBuf<T> {
+impl<T> RawVec<T> for EmptyBuf<T> {
     #[inline]
     fn resize(&mut self, _: usize, _: usize) -> bool {
         false
@@ -27,7 +27,7 @@ impl<T> Buf<T> for EmptyBuf<T> {
     #[inline]
     fn try_merge<B>(&mut self, _: usize, other: B, _: usize) -> Result<(), B>
     where
-        B: Buf<T>,
+        B: RawVec<T>,
     {
         Err(other)
     }
@@ -55,10 +55,10 @@ impl Default for Disabled {
 }
 
 impl Allocator for Disabled {
-    type Buf<'this, T> = EmptyBuf<T> where T: 'this;
+    type RawVec<'this, T> = EmptyBuf<T> where T: 'this;
 
     #[inline(always)]
-    fn alloc<'a, T>(&'a self) -> Self::Buf<'a, T>
+    fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
     where
         T: 'a,
     {

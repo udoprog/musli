@@ -5,7 +5,7 @@
 mod prelude;
 
 use musli::alloc::{Stack, StackBuffer};
-use musli::context::RichContext;
+use musli::context;
 use musli::{Decode, Encode};
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +26,7 @@ struct Value<'a> {
 fn main(_argc: isize, _argv: *const *const u8) -> isize {
     let mut buf = StackBuffer::<1024>::new();
     let alloc = Stack::new(&mut buf);
-    let cx = RichContext::with_alloc(&alloc);
+    let cx = context::with_alloc(&alloc);
 
     let encoding = musli::json::Encoding::new();
 

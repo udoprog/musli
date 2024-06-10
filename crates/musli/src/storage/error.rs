@@ -5,6 +5,8 @@ use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use rust_alloc::string::ToString;
 
+use crate::context::ContextError;
+
 /// Error raised during storage encoding.
 #[derive(Debug)]
 pub struct Error {
@@ -40,7 +42,7 @@ impl fmt::Display for ErrorImpl {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-impl crate::context::Error for Error {
+impl ContextError for Error {
     #[inline]
     fn custom<T>(error: T) -> Self
     where

@@ -1,0 +1,51 @@
+error[E0599]: the function or associated item `new` exists for struct `Capture<Binary, MyError, _>`, but its trait bounds were not satisfied
+  --> tests/ui/context_error_hint_error.rs:16:46
+   |
+7  | struct MyError;
+   | -------------- doesn't satisfy `MyError: ContextError`
+...
+16 |     let _cx = Capture::<Binary, MyError, _>::new();
+   |                                              ^^^ function or associated item cannot be called on `Capture<Binary, MyError, _>` due to unsatisfied trait bounds
+   |
+note: if you're trying to build a new `musli::context::Capture<musli::mode::Binary, MyError, _>` consider using one of the following associated functions:
+      musli::context::Capture::<M, E, &'static musli::alloc::System>::new
+      musli::context::Capture::<M, E, A>::with_alloc
+  --> src/context/capture.rs
+   |
+   |     pub fn new() -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^
+...
+   |     pub fn with_alloc(alloc: A) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: the following trait bounds were not satisfied:
+           `MyError: ContextError`
+note: the trait `ContextError` must be implemented
+  --> src/context/context_error.rs
+   |
+   | pub trait ContextError: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: `ContextError` must be implemented for `MyError`, or any error type captured by custom contexts
+  --> tests/ui/context_error_hint_error.rs:16:15
+   |
+16 |     let _cx = Capture::<Binary, MyError, _>::new();
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `ContextError` is not implemented for `MyError`
+   |
+   = note: use `musli::context::ErrorMarker` to ignore errors
+   = note: use `std::io::Error` and `std::string::String`, if the `std` or `alloc` features are enabled for `musli`
+   = help: the following other types implement trait `ContextError`:
+             std::io::Error
+             musli::descriptive::Error
+             musli::json::Error
+             musli::storage::Error
+             musli::value::Error
+             musli::wire::Error
+             std::string::String
+note: required by a bound in `musli::context::Capture`
+  --> src/context/capture.rs
+   |
+   | pub struct Capture<M, E, A>
+   |            ------- required by a bound in this struct
+   | where
+   |     E: ContextError,
+   |        ^^^^^^^^^^^^ required by this bound in `Capture`

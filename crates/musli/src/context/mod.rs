@@ -3,313 +3,81 @@
 //! [`Context`]: crate::Context
 
 mod access;
+use self::access::{Access, Shared};
 
 mod error_marker;
+#[doc(inline)]
 pub use self::error_marker::ErrorMarker;
 
-mod rich_error;
-pub use self::rich_error::RichError;
+mod default_context;
+#[doc(inline)]
+pub use self::default_context::{DefaultContext, Error};
 
-mod rich_context;
-pub use self::rich_context::RichContext;
+mod context_error;
+#[doc(inline)]
+pub use self::context_error::ContextError;
 
-mod error;
-pub use self::error::Error;
+mod same;
+#[doc(inline)]
+pub use self::same::Same;
 
-use core::cell::{Cell, UnsafeCell};
-use core::fmt;
-use core::marker::PhantomData;
+mod capture;
+#[doc(inline)]
+pub use self::capture::Capture;
 
-use crate::alloc::{self, Allocator, String};
-use crate::mode::Binary;
-use crate::no_std;
-use crate::Context;
+mod ignore;
+#[doc(inline)]
+pub use self::ignore::Ignore;
 
-/// A simple non-diagnostical capturing context which simply emits the original
-/// error.
+use crate::alloc::Allocator;
+#[cfg(feature = "alloc")]
+use crate::alloc::System;
+
+/// Construct a new default context using the provided allocator.
 ///
-/// Using this should result in code which essentially just uses the emitted
-/// error type directly.
-pub struct Same<A, M, E> {
-    alloc: A,
-    _marker: PhantomData<(M, E)>,
-}
-
-impl<A, M, E> Same<A, M, E> {
-    /// Construct a new `Same` capturing context.
-    pub fn new(alloc: A) -> Self {
-        Self {
-            alloc,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<A> Same<A, Binary, ErrorMarker> {
-    /// Construct a new `Same` capturing context.
-    #[inline]
-    #[doc(hidden)]
-    pub fn marker(alloc: A) -> Self {
-        Self::new(alloc)
-    }
-}
-
-impl<A, M, E> Default for Same<A, M, E>
+/// # Examples
+///
+/// ```
+/// use musli::context;
+///
+/// musli::alloc::default!(|alloc| {
+///     let cx = context::with_alloc(alloc);
+///     let encoding = musli::json::Encoding::new();
+///     let string = encoding.to_string_with(&cx, &42)?;
+///     assert_eq!(string, "42");
+/// });
+/// # Ok::<(), musli::context::ErrorMarker>(())
+/// ```
+pub fn with_alloc<'a, A, M>(alloc: &'a A) -> DefaultContext<'a, A, M>
 where
-    A: Default,
-{
-    #[inline]
-    fn default() -> Self {
-        Self {
-            alloc: A::default(),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<A, M, E> Context for Same<A, M, E>
-where
-    A: Allocator,
-    M: 'static,
-    E: Error,
-{
-    type Mode = M;
-    type Error = E;
-    type Mark = ();
-    type Allocator = A;
-    type String<'this> = String<'this, A> where Self: 'this;
-
-    #[inline]
-    fn clear(&self) {}
-
-    #[inline]
-    fn alloc(&self) -> &Self::Allocator {
-        &self.alloc
-    }
-
-    #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
-    where
-        T: ?Sized + fmt::Display,
-    {
-        alloc::collect_string(self, value)
-    }
-
-    #[inline]
-    fn custom<T>(&self, message: T) -> Self::Error
-    where
-        T: 'static + Send + Sync + no_std::Error,
-    {
-        E::custom(message)
-    }
-
-    #[inline]
-    fn message<T>(&self, message: T) -> Self::Error
-    where
-        T: fmt::Display,
-    {
-        E::message(message)
-    }
-}
-
-/// A simple non-diagnostical capturing context which ignores the error and
-/// loses all information about it (except that it happened).
-pub struct Ignore<A, M, E> {
-    alloc: A,
-    error: Cell<bool>,
-    _marker: PhantomData<(M, E)>,
-}
-
-impl<A, M, E> Default for Ignore<A, M, E>
-where
-    A: Default,
-{
-    #[inline]
-    fn default() -> Self {
-        Self {
-            alloc: A::default(),
-            error: Cell::new(false),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<A, M, E> Ignore<A, M, E> {
-    /// Construct a new ignoring context.
-    pub fn new(alloc: A) -> Self {
-        Self {
-            alloc,
-            error: Cell::new(false),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<A> Ignore<A, Binary, ErrorMarker> {
-    /// Construct a new ignoring context which collects an error marker.
-    #[doc(hidden)]
-    pub fn marker(alloc: A) -> Self {
-        Self::new(alloc)
-    }
-}
-
-impl<A, M, E> Ignore<A, M, E>
-where
-    E: Error,
-{
-    /// Construct an error or panic.
-    pub fn unwrap(self) -> E {
-        if self.error.get() {
-            return E::message("error");
-        }
-
-        panic!("did not error")
-    }
-}
-
-impl<A, M, E> Context for Ignore<A, M, E>
-where
-    A: Allocator,
-    M: 'static,
-    E: 'static,
-{
-    type Mode = M;
-    type Error = ErrorMarker;
-    type Mark = ();
-    type Allocator = A;
-    type String<'this> = String<'this, A> where Self: 'this;
-
-    #[inline]
-    fn clear(&self) {}
-
-    #[inline]
-    fn alloc(&self) -> &Self::Allocator {
-        &self.alloc
-    }
-
-    #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
-    where
-        T: ?Sized + fmt::Display,
-    {
-        alloc::collect_string(self, value)
-    }
-
-    #[inline]
-    fn custom<T>(&self, _: T) -> ErrorMarker
-    where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
-    {
-        self.error.set(true);
-        ErrorMarker
-    }
-
-    #[inline]
-    fn message<T>(&self, _: T) -> ErrorMarker
-    where
-        T: fmt::Display,
-    {
-        self.error.set(true);
-        ErrorMarker
-    }
-}
-
-/// A simple non-diagnostical capturing context.
-pub struct Capture<A, M, E> {
-    alloc: A,
-    error: UnsafeCell<Option<E>>,
-    _marker: PhantomData<M>,
-}
-
-impl<A, M, E> Capture<A, M, E> {
-    /// Construct a new capturing allocator.
-    pub fn new(alloc: A) -> Self {
-        Self {
-            alloc,
-            error: UnsafeCell::new(None),
-            _marker: PhantomData,
-        }
-    }
-
-    /// Construct an error or panic.
-    pub fn unwrap(self) -> E {
-        if let Some(error) = self.error.into_inner() {
-            return error;
-        }
-
-        panic!("no error captured")
-    }
-}
-
-impl<A, M, E> Context for Capture<A, M, E>
-where
-    A: Allocator,
-    E: Error,
+    A: 'a + ?Sized + Allocator,
     M: 'static,
 {
-    type Mode = M;
-    type Error = ErrorMarker;
-    type Mark = ();
-    type Allocator = A;
-    type String<'this> = String<'this, A> where Self: 'this;
-
-    #[inline]
-    fn clear(&self) {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            (*self.error.get()) = None;
-        }
-    }
-
-    #[inline]
-    fn alloc(&self) -> &Self::Allocator {
-        &self.alloc
-    }
-
-    #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
-    where
-        T: ?Sized + fmt::Display,
-    {
-        alloc::collect_string(self, value)
-    }
-
-    #[inline]
-    fn custom<T>(&self, error: T) -> ErrorMarker
-    where
-        T: 'static + Send + Sync + no_std::Error,
-    {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            self.error.get().replace(Some(E::custom(error)));
-        }
-
-        ErrorMarker
-    }
-
-    #[inline]
-    fn message<T>(&self, message: T) -> ErrorMarker
-    where
-        T: fmt::Display,
-    {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            self.error.get().replace(Some(E::message(message)));
-        }
-
-        ErrorMarker
-    }
+    DefaultContext::with_alloc(alloc)
 }
 
-impl<A, M, E> Default for Capture<A, M, E>
+/// Construct a new default context using the static [`System`] allocator.
+///
+/// [`System`]: crate::alloc::System
+///
+/// # Examples
+///
+/// ```
+/// use musli::context;
+///
+/// musli::alloc::default!(|alloc| {
+///     let cx = context::new();
+///     let encoding = musli::json::Encoding::new();
+///     let string = encoding.to_string_with(&cx, &42)?;
+///     assert_eq!(string, "42");
+/// });
+/// # Ok::<(), musli::context::ErrorMarker>(())
+/// ```
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+pub fn new<M>() -> DefaultContext<'static, System, M>
 where
-    A: Default,
+    M: 'static,
 {
-    #[inline]
-    fn default() -> Self {
-        Self::new(A::default())
-    }
+    DefaultContext::new()
 }

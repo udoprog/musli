@@ -5,7 +5,7 @@ use core::fmt;
 ///
 /// Error details are expected to be reported to the corresponding [`Context`].
 ///
-/// [`Context`]: crate::context::Context
+/// [`Context`]: crate::Context
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct ErrorMarker;
@@ -21,7 +21,7 @@ impl fmt::Display for ErrorMarker {
 impl std::error::Error for ErrorMarker {}
 
 #[cfg(test)]
-impl crate::context::error::Error for ErrorMarker {
+impl crate::context::ContextError for ErrorMarker {
     #[inline]
     fn custom<T>(_: T) -> Self
     where
