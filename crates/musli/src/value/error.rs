@@ -5,6 +5,8 @@ use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use rust_alloc::string::ToString;
 
+use crate::context::ContextError;
+
 use super::type_hint::{NumberHint, TypeHint};
 
 /// An error raised when encoding or decoding [`Value`].
@@ -46,7 +48,7 @@ impl fmt::Display for ErrorImpl {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
-impl crate::context::Error for Error {
+impl ContextError for Error {
     #[inline]
     fn custom<T>(error: T) -> Self
     where

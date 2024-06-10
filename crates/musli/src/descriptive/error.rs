@@ -5,6 +5,7 @@ use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use rust_alloc::string::ToString;
 
+use crate::context::ContextError;
 use crate::no_std;
 
 /// Error raised during descriptive encoding.
@@ -54,7 +55,7 @@ impl std::error::Error for Error {
     }
 }
 
-impl crate::context::Error for Error {
+impl ContextError for Error {
     #[inline]
     #[allow(unused_variables)]
     fn custom<T>(error: T) -> Self

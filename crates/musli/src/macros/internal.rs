@@ -276,7 +276,7 @@ macro_rules! encoding_impls {
             T: ?Sized + $crate::Encode<$mode>,
         {
             $crate::alloc::default!(|alloc| {
-                let cx = $crate::context::Same::new(alloc);
+                let cx = $crate::context::Same::with_alloc(alloc);
                 self.encode_with(&cx, writer, value)
             })
         }
@@ -359,7 +359,7 @@ macro_rules! encoding_impls {
             T: ?Sized + $crate::Encode<$mode>,
         {
             $crate::alloc::default!(|alloc| {
-                let cx = $crate::context::Same::new(alloc);
+                let cx = $crate::context::Same::with_alloc(alloc);
                 self.to_fixed_bytes_with(&cx, value)
             })
         }
@@ -451,7 +451,7 @@ macro_rules! encoding_impls {
             T: $crate::Decode<'de, $mode>,
         {
             $crate::alloc::default!(|alloc| {
-                let cx = $crate::context::Same::new(alloc);
+                let cx = $crate::context::Same::with_alloc(alloc);
                 self.decode_with(&cx, reader)
             })
         }
@@ -490,7 +490,7 @@ macro_rules! encoding_impls {
             T: $crate::Decode<'de, $mode>,
         {
             $crate::alloc::default!(|alloc| {
-                let cx = $crate::context::Same::new(alloc);
+                let cx = $crate::context::Same::with_alloc(alloc);
                 self.from_slice_with(&cx, bytes)
             })
         }
@@ -534,8 +534,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let alloc = System::new();
-        /// let cx = Same::new(&alloc);
+        /// let cx = Same::new();
         ///
         /// let mut data = Vec::new();
         ///
@@ -585,8 +584,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let alloc = System::new();
-        /// let cx = Same::new(&alloc);
+        /// let cx = Same::new();
         ///
         /// let data = ENCODING.to_vec_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
@@ -635,8 +633,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let alloc = System::new();
-        /// let cx = Same::new(&alloc);
+        /// let cx = Same::new();
         ///
         /// let data: FixedBytes<128> = ENCODING.to_fixed_bytes_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
@@ -685,8 +682,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let alloc = System::new();
-        /// let cx = Same::new(&alloc);
+        /// let cx = Same::new();
         ///
         /// let mut data = Vec::new();
         ///
@@ -738,8 +734,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let alloc = System::new();
-        /// let cx = Same::new(&alloc);
+        /// let cx = Same::new();
         ///
         /// let buf = ENCODING.to_vec_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
@@ -789,8 +784,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let alloc = System::new();
-        /// let cx = Same::new(&alloc);
+        /// let cx = Same::new();
         ///
         /// let buf = ENCODING.to_vec_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),

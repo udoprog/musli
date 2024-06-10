@@ -13,7 +13,12 @@ use crate::no_std;
 use rust_alloc::string::{String, ToString};
 
 /// Trait governing errors raised during encodeing or decoding.
-pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
+#[diagnostic::on_unimplemented(
+    message = "`ContextError` must be implemented for `{Self}`, or any error type captured by custom contexts",
+    note = "use `musli::context::ErrorMarker` to ignore errors",
+    note = "use `std::io::Error` and `std::string::String`, if the `std` or `alloc` features are enabled for `musli`"
+)]
+pub trait ContextError: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
     /// Construct a custom error.
     fn custom<T>(error: T) -> Self
     where
@@ -29,7 +34,7 @@ pub trait Error: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
 }
 
 #[cfg(all(feature = "std", feature = "alloc"))]
-impl Error for std::io::Error {
+impl ContextError for std::io::Error {
     fn custom<T>(message: T) -> Self
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -46,7 +51,7 @@ impl Error for std::io::Error {
 }
 
 #[cfg(feature = "alloc")]
-impl Error for String {
+impl ContextError for String {
     #[inline]
     fn custom<T>(message: T) -> Self
     where

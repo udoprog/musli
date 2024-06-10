@@ -3,70 +3,68 @@
 use core::cell::{Cell, UnsafeCell};
 use core::fmt::{self, Write};
 use core::marker::PhantomData;
+use core::mem::take;
 use core::ops::Range;
+use core::slice;
 
+#[cfg(feature = "alloc")]
+use crate::alloc::System;
 use crate::alloc::{self, Allocator, String, Vec};
 use crate::Context;
 
-use super::access::{Access, Shared};
-use super::rich_error::{RichError, Step};
-use super::ErrorMarker;
+use super::{Access, ErrorMarker, Shared};
 
-#[cfg(all(not(loom), feature = "alloc"))]
-use crate::alloc::System;
-
-type BufPair<'a, A> = (Range<usize>, String<'a, A>);
-
-/// A rich context which uses allocations and tracks the exact location of
-/// errors.
+/// The default context which uses an allocator to track the location of errors.
 ///
 /// This uses the provided allocator to allocate memory for the collected
-/// diagnostics. The allocator to use can be provided using
-/// [`RichContext::with_alloc`].
+/// diagnostics. The allocator to use can be provided using [`with_alloc`].
 ///
 /// The default constructor is only available when the `alloc` feature is
 /// enabled, and will use the [`System`] allocator.
-pub struct RichContext<'a, A, M>
+///
+/// [`with_alloc`]: super::with_alloc
+pub struct DefaultContext<'a, A, M>
 where
     A: 'a + ?Sized + Allocator,
 {
     alloc: &'a A,
     mark: Cell<usize>,
-    errors: UnsafeCell<Vec<'a, BufPair<'a, A>, A>>,
-    path: UnsafeCell<Vec<'a, Step<String<'a, A>>, A>>,
+    errors: UnsafeCell<Vec<'a, (Range<usize>, String<'a, A>), A>>,
+    path: UnsafeCell<Vec<'a, Step<'a, A>, A>>,
     // How many elements of `path` we've gone over capacity.
-    path_cap: Cell<usize>,
+    cap: Cell<usize>,
     include_type: bool,
     access: Access,
     _marker: PhantomData<M>,
 }
 
-impl<'a, A, M> RichContext<'a, A, M> where A: ?Sized + Allocator {}
+impl<'a, A, M> DefaultContext<'a, A, M> where A: ?Sized + Allocator {}
 
-#[cfg(all(not(loom), feature = "alloc"))]
-impl<M> RichContext<'static, System, M> {
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl<M> DefaultContext<'static, System, M> {
     /// Construct a new context which uses the system allocator for memory.
     #[inline]
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self::with_alloc(&crate::alloc::SYSTEM)
     }
 }
 
-#[cfg(all(not(loom), feature = "alloc"))]
-impl<M> Default for RichContext<'static, System, M> {
+#[cfg(feature = "alloc")]
+impl<M> Default for DefaultContext<'static, System, M> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, A, M> RichContext<'a, A, M>
+impl<'a, A, M> DefaultContext<'a, A, M>
 where
     A: 'a + ?Sized + Allocator,
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
-    pub fn with_alloc(alloc: &'a A) -> Self {
+    pub(super) fn with_alloc(alloc: &'a A) -> Self {
         let errors = Vec::new_in(alloc);
         let path = Vec::new_in(alloc);
 
@@ -75,7 +73,7 @@ where
             mark: Cell::new(0),
             errors: UnsafeCell::new(errors),
             path: UnsafeCell::new(path),
-            path_cap: Cell::new(0),
+            cap: Cell::new(0),
             include_type: false,
             access: Access::new(),
             _marker: PhantomData,
@@ -102,9 +100,8 @@ where
 
         Errors {
             path: unsafe { (*self.path.get()).as_slice() },
-            errors: unsafe { (*self.errors.get()).as_slice() },
-            index: 0,
-            path_cap: self.path_cap.get(),
+            errors: unsafe { (*self.errors.get()).as_slice().iter() },
+            cap: self.cap.get(),
             _access: access,
         }
     }
@@ -120,23 +117,23 @@ where
     }
 
     /// Push a path.
-    fn push_path(&self, step: Step<String<'a, A>>) {
+    fn push_path(&self, step: Step<'a, A>) {
         let _access = self.access.exclusive();
 
         // SAFETY: We've checked that we have exclusive access just above.
         let path = unsafe { &mut (*self.path.get()) };
 
         if !path.push(step) {
-            self.path_cap.set(self.path_cap.get() + 1);
+            self.cap.set(self.cap.get() + 1);
         }
     }
 
     /// Pop the last path.
     fn pop_path(&self) {
-        let cap = self.path_cap.get();
+        let cap = self.cap.get();
 
         if cap > 0 {
-            self.path_cap.set(cap - 1);
+            self.cap.set(cap - 1);
             return;
         }
 
@@ -158,7 +155,7 @@ where
     }
 }
 
-impl<'a, A, M> Context for RichContext<'a, A, M>
+impl<'a, A, M> Context for DefaultContext<'a, A, M>
 where
     A: 'a + ?Sized + Allocator,
     M: 'static,
@@ -338,16 +335,16 @@ where
 }
 
 /// A line-separated report of all errors.
-pub struct Report<'a, 'buf, A>
+pub struct Report<'b, 'a, A>
 where
-    A: 'buf + ?Sized + Allocator,
+    A: 'a + ?Sized + Allocator,
 {
-    errors: Errors<'a, 'buf, A>,
+    errors: Errors<'b, 'a, A>,
 }
 
-impl<'a, 'buf, A> fmt::Display for Report<'a, 'buf, A>
+impl<'b, 'a, A> fmt::Display for Report<'b, 'a, A>
 where
-    A: 'buf + ?Sized + Allocator,
+    A: 'a + ?Sized + Allocator,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for error in self.errors.clone() {
@@ -359,48 +356,210 @@ where
 }
 
 /// An iterator over available errors.
-pub struct Errors<'a, 'buf, A>
+///
+/// See [`DefaultContext::errors`].
+pub struct Errors<'b, 'a, A>
 where
-    A: 'buf + ?Sized + Allocator,
+    A: 'a + ?Sized + Allocator,
 {
-    path: &'a [Step<String<'buf, A>>],
-    errors: &'a [(Range<usize>, String<'buf, A>)],
-    index: usize,
-    path_cap: usize,
-    _access: Shared<'a>,
+    path: &'b [Step<'a, A>],
+    cap: usize,
+    errors: slice::Iter<'b, (Range<usize>, String<'a, A>)>,
+    _access: Shared<'b>,
 }
 
-impl<'a, 'buf, A> Iterator for Errors<'a, 'buf, A>
+impl<'b, 'a, A> Iterator for Errors<'b, 'a, A>
 where
-    A: 'buf + ?Sized + Allocator,
+    A: 'a + ?Sized + Allocator,
 {
-    type Item = RichError<'a, String<'buf, A>, String<'buf, A>>;
+    type Item = Error<'b, 'a, A>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let (range, error) = self.errors.get(self.index)?;
-        self.index += 1;
-
-        Some(RichError::new(
-            self.path,
-            self.path_cap,
-            range.clone(),
-            error,
-        ))
+        let (range, error) = self.errors.next()?;
+        Some(Error::new(self.path, self.cap, range.clone(), error))
     }
 }
 
-impl<'a, 'buf, A> Clone for Errors<'a, 'buf, A>
+impl<'b, 'a, A> Clone for Errors<'b, 'a, A>
 where
     A: ?Sized + Allocator,
 {
     fn clone(&self) -> Self {
         Self {
             path: self.path,
-            errors: self.errors,
-            index: self.index,
-            path_cap: self.path_cap,
+            cap: self.cap,
+            errors: self.errors.clone(),
             _access: self._access.clone(),
         }
+    }
+}
+
+/// A collected error which has been context decorated.
+pub struct Error<'b, 'a, A>
+where
+    A: 'a + ?Sized + Allocator,
+{
+    path: &'b [Step<'a, A>],
+    cap: usize,
+    range: Range<usize>,
+    error: &'b str,
+}
+
+impl<'b, 'a, A> Error<'b, 'a, A>
+where
+    A: 'a + ?Sized + Allocator,
+{
+    fn new(path: &'b [Step<'a, A>], cap: usize, range: Range<usize>, error: &'b str) -> Self {
+        Self {
+            path,
+            cap,
+            range,
+            error,
+        }
+    }
+}
+
+impl<'a, A> fmt::Display for Error<'_, 'a, A>
+where
+    A: 'a + ?Sized + Allocator,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let path = FormatPath::new(self.path, self.cap);
+
+        if self.range.start != 0 || self.range.end != 0 {
+            if self.range.start == self.range.end {
+                write!(f, "{path}: {} (at byte {})", self.error, self.range.start)?;
+            } else {
+                write!(
+                    f,
+                    "{path}: {} (at bytes {}-{})",
+                    self.error, self.range.start, self.range.end
+                )?;
+            }
+        } else {
+            write!(f, "{path}: {}", self.error)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// A single traced step.
+#[derive(Debug)]
+pub(crate) enum Step<'a, A>
+where
+    A: 'a + ?Sized + Allocator,
+{
+    Struct(&'static str),
+    Enum(&'static str),
+    Variant(&'static str),
+    Named(&'static str),
+    Unnamed(u32),
+    Index(usize),
+    Key(String<'a, A>),
+}
+
+struct FormatPath<'b, 'a, A>
+where
+    A: 'a + ?Sized + Allocator,
+{
+    path: &'b [Step<'a, A>],
+    cap: usize,
+}
+
+impl<'b, 'a, A> FormatPath<'b, 'a, A>
+where
+    A: 'a + ?Sized + Allocator,
+{
+    pub(crate) fn new(path: &'b [Step<'a, A>], cap: usize) -> Self {
+        Self { path, cap }
+    }
+}
+
+impl<'a, A> fmt::Display for FormatPath<'_, 'a, A>
+where
+    A: 'a + ?Sized + Allocator,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut has_type = false;
+        let mut has_field = false;
+        let mut level = 0;
+
+        for step in self.path {
+            match step {
+                Step::Struct(name) => {
+                    if take(&mut has_field) {
+                        write!(f, " = ")?;
+                    }
+
+                    write!(f, "{name}")?;
+                    has_type = true;
+                }
+                Step::Enum(name) => {
+                    if take(&mut has_field) {
+                        write!(f, " = ")?;
+                    }
+
+                    write!(f, "{name}::")?;
+                }
+                Step::Variant(name) => {
+                    if take(&mut has_field) {
+                        write!(f, " = ")?;
+                    }
+
+                    write!(f, "{name}")?;
+                    has_type = true;
+                }
+                Step::Named(name) => {
+                    if take(&mut has_type) {
+                        write!(f, " {{ ")?;
+                        level += 1;
+                    }
+
+                    write!(f, ".{name}")?;
+                    has_field = true;
+                }
+                Step::Unnamed(index) => {
+                    if take(&mut has_type) {
+                        write!(f, " {{ ")?;
+                        level += 1;
+                    }
+
+                    write!(f, ".{index}")?;
+                    has_field = true;
+                }
+                Step::Index(index) => {
+                    if take(&mut has_type) {
+                        write!(f, " {{ ")?;
+                        level += 1;
+                    }
+
+                    write!(f, "[{index}]")?;
+                    has_field = true;
+                }
+                Step::Key(key) => {
+                    if take(&mut has_type) {
+                        write!(f, " {{ ")?;
+                        level += 1;
+                    }
+
+                    write!(f, "[{}]", key)?;
+                    has_field = true;
+                }
+            }
+        }
+
+        for _ in 0..level {
+            write!(f, " }}")?;
+        }
+
+        match self.cap {
+            0 => {}
+            1 => write!(f, " .. *one capped step*")?,
+            n => write!(f, " .. *{n} capped steps*")?,
+        }
+
+        Ok(())
     }
 }

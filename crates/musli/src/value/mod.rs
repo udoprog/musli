@@ -39,7 +39,7 @@ where
     let mut output = Value::Unit;
 
     alloc::default!(|alloc| {
-        let cx = crate::context::Same::<_, Binary, Error>::new(&alloc);
+        let cx = crate::context::Same::<Binary, Error, _>::with_alloc(alloc);
         ValueEncoder::<OPTIONS, _, _>::new(&cx, &mut output).encode(value)?;
         Ok(output)
     })
@@ -53,7 +53,7 @@ where
     use crate::de::Decoder;
 
     alloc::default!(|alloc| {
-        let cx = crate::context::Same::<_, Binary, Error>::new(&alloc);
+        let cx = crate::context::Same::<Binary, Error, _>::with_alloc(alloc);
         value.decoder::<OPTIONS, _>(&cx).decode()
     })
 }

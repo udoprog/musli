@@ -212,7 +212,7 @@ where
         T: ?Sized + Encode<M>,
     {
         crate::alloc::default!(|alloc| {
-            let cx = crate::context::Same::new(alloc);
+            let cx = crate::context::Same::with_alloc(alloc);
             self.to_string_with(&cx, value)
         })
     }
@@ -240,8 +240,7 @@ where
     ///     age: u32,
     /// }
     ///
-    /// let alloc = System::new();
-    /// let cx = Same::new(&alloc);
+    /// let cx = Same::new();
     ///
     /// let mut data = ENCODING.to_string_with(&cx, &Person {
     ///     name: "Aristotle".to_string(),

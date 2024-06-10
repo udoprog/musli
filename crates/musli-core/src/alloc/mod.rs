@@ -4,6 +4,6 @@ mod allocator;
 #[doc(inline)]
 pub use self::allocator::Allocator;
 
-mod buf;
+mod raw_vec;
 #[doc(inline)]
-pub use self::buf::Buf;
+pub use self::raw_vec::RawVec;

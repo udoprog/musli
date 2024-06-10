@@ -1,7 +1,7 @@
 [package]
 name = "tests-macros"
 edition = "2021"
-rust-version = "1.76"
+rust-version = "1.78"
 publish = false
 
 [lib]

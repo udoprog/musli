@@ -5,15 +5,15 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use super::{Allocator, Buf};
+use super::{Allocator, RawVec};
 
-/// A vector backed by an [`Allocator`] [`Buf`].
+/// A vector backed by an [`Allocator`].
 pub struct Vec<'a, T, A>
 where
     A: 'a + ?Sized + Allocator,
     T: 'a,
 {
-    buf: A::Buf<'a, T>,
+    buf: A::RawVec<'a, T>,
     len: usize,
 }
 
@@ -23,7 +23,7 @@ where
     T: 'a,
 {
     /// Construct a buffer vector from raw parts.
-    const unsafe fn from_raw_parts(buf: A::Buf<'a, T>, len: usize) -> Self {
+    const unsafe fn from_raw_parts(buf: A::RawVec<'a, T>, len: usize) -> Self {
         Self { buf, len }
     }
 
@@ -45,14 +45,14 @@ where
     /// ```
     pub fn new_in(alloc: &'a A) -> Self {
         Self {
-            buf: alloc.alloc::<T>(),
+            buf: alloc.new_raw_vec::<T>(),
             len: 0,
         }
     }
 
     /// Construct a new buffer vector.
     #[inline]
-    pub const fn new(buf: A::Buf<'a, T>) -> Self {
+    pub const fn new(buf: A::RawVec<'a, T>) -> Self {
         Self { buf, len: 0 }
     }
 
@@ -212,7 +212,7 @@ where
     }
 
     #[inline]
-    fn into_raw_parts(self) -> (A::Buf<'a, T>, usize) {
+    fn into_raw_parts(self) -> (A::RawVec<'a, T>, usize) {
         let this = ManuallyDrop::new(self);
 
         // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
@@ -337,7 +337,7 @@ where
     A: 'a + ?Sized + Allocator,
     T: 'a,
 {
-    type Target = A::Buf<'a, T>;
+    type Target = A::RawVec<'a, T>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
