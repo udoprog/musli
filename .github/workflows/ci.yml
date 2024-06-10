@@ -127,11 +127,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
-    - run: cargo build -p musli --no-default-features --features ${{matrix.base}}
-    - run: cargo build -p musli --no-default-features --features ${{matrix.base}},alloc
-    - run: cargo build -p musli --no-default-features --features ${{matrix.base}},std
-    - run: cargo build -p musli --no-default-features --features ${{matrix.base}},simdutf8
-    - run: cargo build -p musli --no-default-features --features ${{matrix.base}},parse-full
+    - run: cargo check -p musli --no-default-features --features ${{matrix.base}}
+    - run: cargo check -p musli --no-default-features --features ${{matrix.base}},alloc
+    - run: cargo check -p musli --no-default-features --features ${{matrix.base}},std
+    - run: cargo check -p musli --no-default-features --features ${{matrix.base}},simdutf8
+    - run: cargo check -p musli --no-default-features --features ${{matrix.base}},parse-full
 
   recursive:
     runs-on: ubuntu-latest
