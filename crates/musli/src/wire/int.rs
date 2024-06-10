@@ -120,7 +120,7 @@ where
                 c::encode(cx, writer, value)
             }
         }
-        _ => {
+        crate::options::Integer::Fixed => {
             let bo = crate::options::byteorder::<OPT>();
             writer.write_byte(cx, Tag::new(Kind::Prefix, T::BYTES).byte())?;
             value.write_bytes(cx, writer, bo)
@@ -153,7 +153,7 @@ where
                 c::decode(cx, reader)
             }
         }
-        _ => {
+        crate::options::Integer::Fixed => {
             let bo = crate::options::byteorder::<OPT>();
 
             if Tag::from_byte(reader.read_byte(cx)?) != Tag::new(Kind::Prefix, T::BYTES) {
