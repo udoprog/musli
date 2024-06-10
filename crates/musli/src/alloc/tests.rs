@@ -75,8 +75,8 @@ fn system_basic() {
 
 #[test]
 fn nostd_basic() {
-    let mut buf = super::StackBuffer::<4096>::new();
-    let alloc = super::Stack::new(&mut buf);
+    let mut buf = super::ArrayBuffer::<4096>::new();
+    let alloc = super::Slice::new(&mut buf);
     basic_allocations(&alloc);
 }
 
@@ -110,7 +110,7 @@ fn system_zst() {
 
 #[test]
 fn stack_zst() {
-    let mut buf = super::StackBuffer::<4096>::new();
-    let alloc = super::Stack::new(&mut buf);
+    let mut buf = super::ArrayBuffer::<4096>::new();
+    let alloc = super::Slice::new(&mut buf);
     zst_allocations(&alloc);
 }

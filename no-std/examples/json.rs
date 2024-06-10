@@ -4,7 +4,7 @@
 
 mod prelude;
 
-use musli::alloc::{Stack, StackBuffer};
+use musli::alloc::{ArrayBuffer, Slice};
 use musli::context;
 use musli::{Decode, Encode};
 
@@ -16,8 +16,8 @@ struct Value<'a> {
 
 #[start]
 fn main(_argc: isize, _argv: *const *const u8) -> isize {
-    let mut buf = StackBuffer::<1024>::new();
-    let alloc = Stack::new(&mut buf);
+    let mut buf = ArrayBuffer::new();
+    let alloc = Slice::new(&mut buf);
     let cx = context::with_alloc(&alloc);
 
     let encoding = musli::json::Encoding::new();

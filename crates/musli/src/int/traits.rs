@@ -16,6 +16,7 @@ pub(crate) trait Unsigned:
     const ONE: Self;
 
     /// Number of bytes.
+    #[cfg(feature = "wire")]
     const BYTES: u8;
 
     /// Number of bits.
@@ -95,6 +96,7 @@ macro_rules! implement {
 
         impl Unsigned for $unsigned {
             const ONE: Self = 1;
+            #[cfg(feature = "wire")]
             const BYTES: u8 = (<$unsigned>::BITS / 8) as u8;
             const BITS: u32 = <$signed>::BITS;
 

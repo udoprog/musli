@@ -17,7 +17,7 @@ where
 {
     match crate::options::integer::<OPT>() {
         crate::options::Integer::Variable => c::encode(cx, writer, value),
-        _ => {
+        crate::options::Integer::Fixed => {
             let bo = crate::options::byteorder::<OPT>();
             value.write_bytes(cx, writer, bo)
         }
@@ -57,7 +57,7 @@ where
 {
     match crate::options::integer::<OPT>() {
         crate::options::Integer::Variable => c::encode(cx, writer, zig::encode(value)),
-        _ => {
+        crate::options::Integer::Fixed => {
             let bo = crate::options::byteorder::<OPT>();
             value.unsigned().write_bytes(cx, writer, bo)
         }
@@ -78,7 +78,7 @@ where
             let value: T::Unsigned = c::decode(cx, reader)?;
             Ok(zig::decode(value))
         }
-        _ => {
+        crate::options::Integer::Fixed => {
             let bo = crate::options::byteorder::<OPT>();
             Ok(T::Unsigned::read_bytes(cx, reader, bo)?.signed())
         }

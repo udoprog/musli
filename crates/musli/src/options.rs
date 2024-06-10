@@ -199,7 +199,7 @@ macro_rules! width_arm {
             $crate::options::Width::U32 => {
                 $macro!(u32)
             }
-            _ => {
+            $crate::options::Width::U64 => {
                 $macro!(u64)
             }
         }
