@@ -34,12 +34,12 @@ error[E0277]: `ContextError` must be implemented for `MyError`, or any error typ
    = note: use `musli::context::ErrorMarker` to ignore errors
    = note: use `std::io::Error` and `std::string::String`, if the `std` or `alloc` features are enabled for `musli`
    = help: the following other types implement trait `ContextError`:
-             std::io::Error
              musli::descriptive::Error
              musli::json::Error
              musli::storage::Error
              musli::value::Error
              musli::wire::Error
+             std::io::Error
              std::string::String
 note: required by a bound in `musli::context::Capture`
   --> src/context/capture.rs

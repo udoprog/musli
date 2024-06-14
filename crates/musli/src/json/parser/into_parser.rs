@@ -52,6 +52,6 @@ impl<'a, 'de> IntoParser<'de> for &'a mut &'de str {
     #[inline]
     fn into_parser(self) -> Self::Parser {
         // SAFETY: Parsing ensures that the slice being processes keeps being valid UTF-8.
-        MutSliceParser::new(unsafe { transmute(self) })
+        MutSliceParser::new(unsafe { transmute::<Self, &'a mut &'de [u8]>(self) })
     }
 }

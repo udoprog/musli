@@ -1052,9 +1052,10 @@ macro_rules! impl_nonzero_number {
                 // SAFETY: All bit-patterns are habitable, zero we can rely on
                 // byte-order conversion from the inner type.
                 unsafe {
-                    transmute(<$inner as ZeroCopy>::swap_bytes::<E>(
-                        transmute::<_, $inner>(self),
-                    ))
+                    transmute(<$inner as ZeroCopy>::swap_bytes::<E>(transmute::<
+                        Self,
+                        $inner,
+                    >(self)))
                 }
             }
         }
