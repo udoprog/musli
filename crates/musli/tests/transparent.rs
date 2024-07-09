@@ -24,6 +24,7 @@ enum TransparentEnum {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(packed)]
+#[allow(dead_code)]
 struct TransparentEnumUnpacked {
     type_tag: u8,
     variant_tag_type: u8,

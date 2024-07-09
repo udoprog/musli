@@ -284,6 +284,7 @@ mod tests {
 
     #[derive(Encode, Decode)]
     #[musli(crate)]
+    #[allow(dead_code)]
     struct Container {
         ip_addr: IpAddr,
         sock_addr: SocketAddr,

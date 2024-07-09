@@ -27,6 +27,7 @@ fn container() {
 }
 
 #[derive(Debug, PartialEq, Decode, Encode)]
+#[allow(dead_code)]
 struct ContainerBorrowed<'de> {
     #[musli(bytes)]
     bytes: &'de [u8],

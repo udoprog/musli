@@ -825,6 +825,82 @@ pub use musli_zerocopy_macros::Visit;
 /// #[zero_copy(crate = zerocopy)]
 /// struct Custom { field: u32 }
 /// ```
+///
+/// <br>
+///
+/// ### `#[zero_copy(swap_bytes)]`
+///
+/// Allows enums to be byte-ordered swap with some extra work.
+///
+/// This requires that an even number of fields is specified, and that each
+/// field has a discriminant which is the byte-swapped variant of the other. If
+/// a variant contains a `_` suffix, it will automatically be considered as the
+/// byte-swapped variant for the variant without the suffix. The
+/// `#[zero_copy(swap = <variant>)]` field attribute can be used to explicitly
+/// specify which variant is the byte-swapped equivalent of this one.
+///
+/// ```
+/// # use musli_zerocopy as zerocopy;
+/// use zerocopy::ZeroCopy;
+/// use zerocopy::endian::{Other, Native};
+///
+/// #[derive(ZeroCopy, PartialEq, Debug, Clone, Copy)]
+/// #[zero_copy(swap_bytes)]
+/// #[repr(u32)]
+/// enum Enum {
+///     A { field: u32 } = 1,
+///     A_ { field: u32 } = u32::swap_bytes(1),
+///     B = 2,
+///     B_ = u32::swap_bytes(2),
+/// }
+///
+/// const _: () = assert!(Enum::CAN_SWAP_BYTES);
+///
+/// let a = Enum::A { field: 42 };
+/// let a2 = a.swap_bytes::<Native>();
+/// let a_ = a.swap_bytes::<Other>();
+///
+/// assert_eq!(a2, Enum::A { field: 42 });
+/// assert_eq!(a_, Enum::A_ { field: u32::swap_bytes(42) });
+/// ```
+///
+/// If the discriminant value does not involved a method called `swap_bytes`,
+/// the field being swapped with can be specified with the `#[zero_copy(swap =
+/// <field>)]` attribute.
+///
+/// ```
+/// # use musli_zerocopy as zerocopy;
+/// use zerocopy::ZeroCopy;
+/// use zerocopy::endian::{Other, Native};
+///
+/// #[derive(ZeroCopy, PartialEq, Debug, Clone, Copy)]
+/// #[zero_copy(swap_bytes)]
+/// #[repr(u32)]
+/// enum Enum {
+///     A = 0x00000001,
+///     #[zero_copy(swap = A)]
+///     B = 0x01000000,
+///     C = 0x00000002,
+///     #[zero_copy(swap = C)]
+///     D = 0x02000000,
+/// }
+///
+/// const _: () = assert!(Enum::CAN_SWAP_BYTES);
+///
+/// let v = Enum::A;
+/// let v2 = v.swap_bytes::<Native>();
+/// let v3 = v.swap_bytes::<Other>();
+///
+/// assert_eq!(v2, Enum::A);
+/// assert_eq!(v3, Enum::B);
+///
+/// let v = Enum::C;
+/// let v2 = v.swap_bytes::<Native>();
+/// let v3 = v.swap_bytes::<Other>();
+///
+/// assert_eq!(v2, Enum::C);
+/// assert_eq!(v3, Enum::D);
+/// ```
 #[doc(inline)]
 pub use musli_zerocopy_macros::ZeroCopy;
 

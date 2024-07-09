@@ -48,7 +48,7 @@ use crate::ZeroCopy;
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 #[derive(ZeroCopy)]
-#[zero_copy(crate, swap_bytes, bounds = {T: ZeroCopy})]
+#[zero_copy(crate, swap_bytes_self, bounds = {T: ZeroCopy})]
 #[repr(transparent)]
 pub struct Endian<T, E: ByteOrder> {
     value: T,
@@ -100,7 +100,7 @@ impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     /// Panics if we try to use this with a `ZeroCopy` type that cannot be
     /// byte-ordered.
     ///
-    /// ```should_panic
+    /// ```compile_fail
     /// use musli_zerocopy::{endian, Endian};
     ///
     /// let _: Endian<_, endian::Little> = Endian::new('a');
@@ -121,12 +121,11 @@ impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     /// assert_eq!(b.to_bytes(), &[97, 0, 0, 0]);
     /// ```
     #[inline]
+    #[track_caller]
     pub fn new(value: T) -> Self {
-        assert!(
-            T::CAN_SWAP_BYTES,
-            "Type `{}` cannot be byte-ordered since it would not inhabit valid types",
-            any::type_name::<T>()
-        );
+        const {
+            assert!(T::CAN_SWAP_BYTES, "Type does not support byte-swapping");
+        }
 
         Self {
             value: T::swap_bytes::<E>(value),
@@ -146,7 +145,12 @@ impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     /// assert_eq!(value.to_raw(), 42u32.to_le());
     /// ```
     #[inline]
+    #[track_caller]
     pub fn to_ne(self) -> T {
+        const {
+            assert!(T::CAN_SWAP_BYTES, "Type does not support byte-swapping");
+        }
+
         T::swap_bytes::<E>(self.value)
     }
 

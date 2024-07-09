@@ -42,7 +42,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, swap_bytes, bounds = {<T::Metadata as Packable>::Packed<O>: ZeroCopy})]
+#[zero_copy(crate, swap_bytes_self, bounds = {<T::Metadata as Packable>::Packed<O>: ZeroCopy})]
 pub struct Ref<T, E = Native, O = DefaultSize>
 where
     T: ?Sized + Pointee,

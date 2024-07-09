@@ -2,6 +2,7 @@ use self::num::{Enumerator, NumericalRepr};
 mod num;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
@@ -55,6 +56,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
     let mut r = ReprAttr::default();
     let mut krate: syn::Path = syn::parse_quote!(musli_zerocopy);
     let mut swap_bytes_self = false;
+    let mut swap_bytes = None;
 
     for attr in &attrs {
         if attr.path().is_ident("repr") {
@@ -85,8 +87,13 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     return Ok(());
                 }
 
-                if meta.path.is_ident("swap_bytes") {
+                if meta.path.is_ident("swap_bytes_self") {
                     swap_bytes_self = true;
+                    return Ok(());
+                }
+
+                if meta.path.is_ident("swap_bytes") {
+                    swap_bytes = Some(meta.path.span());
                     return Ok(());
                 }
 
@@ -140,6 +147,15 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
     match &data {
         syn::Data::Struct(st) => {
+            if let Some(span) = swap_bytes {
+                cx.error(syn::Error::new(
+                    span,
+                    "ZeroCopy: zero_copy(swap_bytes) is only supported on enums",
+                ));
+
+                return Err(());
+            }
+
             // Field types.
             let mut output = process_fields(cx, &st.fields);
             check_zero_sized.append(&mut output.check_zero_sized);
@@ -259,6 +275,17 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             type_impls = None;
         }
         syn::Data::Enum(en) => {
+            if let Some(span) = swap_bytes {
+                if en.variants.len() % 2 != 0 {
+                    cx.error(syn::Error::new(
+                        span,
+                        "ZeroCopy: zero_copy(swap_bytes) is only supported on variants with an even number of fields",
+                    ));
+
+                    return Err(());
+                }
+            }
+
             if let Some((span, _)) = r.repr_packed {
                 cx.error(syn::Error::new(
                     span,
@@ -281,7 +308,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
             let mut discriminants = Vec::new();
             let mut validate_variants = Vec::new();
-            let mut load_variants = Vec::new();
             let mut pad_variants = Vec::new();
             let mut padded_variants = Vec::new();
             let mut byte_ordered_variants = Vec::new();
@@ -289,7 +315,43 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
             let mut enumerator = Enumerator::new(num, ty.span());
 
+            let mut discriminant_consts = Vec::new();
+            let mut forward = HashMap::new();
+            let mut reverse = HashMap::new();
+            let mut defer_variants = Vec::new();
+
             for (index, variant) in en.variants.iter().enumerate() {
+                let mut swap = None::<syn::Ident>;
+
+                for attr in &variant.attrs {
+                    if attr.path().is_ident("zero_copy") {
+                        let result = attr.parse_nested_meta(|meta: ParseNestedMeta| {
+                            if meta.path.is_ident("swap") {
+                                meta.input.parse::<Token![=]>()?;
+
+                                if let Some(existing) = &swap {
+                                    return Err(syn::Error::new(
+                                        existing.span(),
+                                        "ZeroCopy: only one swap attribute on variants is allowed",
+                                    ));
+                                }
+
+                                swap = Some(meta.input.parse::<syn::Ident>()?);
+                                return Ok(());
+                            }
+
+                            Err(syn::Error::new(
+                                meta.input.span(),
+                                "ZeroCopy: Unsupported attribute",
+                            ))
+                        });
+
+                        if let Err(error) = result {
+                            cx.error(error);
+                        }
+                    }
+                }
+
                 let mut output = process_fields(cx, &variant.fields);
                 check_zero_sized.append(&mut output.check_zero_sized);
 
@@ -302,10 +364,18 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                         }
                     };
 
+                if swap.is_none() && swap_bytes.is_some() {
+                    if let Some(ident) = unpad_variant(&variant.ident) {
+                        swap = Some(ident);
+                    }
+                }
+
                 let types = &output.types;
 
                 let discriminant_const =
                     syn::Ident::new(&format!("DISCRIMINANT{}", index), variant.ident.span());
+
+                discriminant_consts.push(discriminant_const.clone());
 
                 discriminants.push(quote! {
                     const #discriminant_const: #ty = #discriminant;
@@ -319,24 +389,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
                 let ident = &variant.ident;
 
-                let Fields {
-                    assigns,
-                    members,
-                    types,
-                    variables,
-                    ignored_variables,
-                    ignored_members,
-                    ..
-                } = &output;
-
-                load_variants.push(quote! {
-                    Self::#ident { #(#assigns),* } => {
-                        Self::#ident {
-                            #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(#variables),)*
-                            #(#ignored_members: #ignored_variables,)*
-                        }
-                    }
-                });
+                let Fields { types, .. } = &output;
 
                 pad_variants.push(quote! {
                     #discriminant_const => {
@@ -370,7 +423,118 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     );
                     quote!(#pat => ())
                 });
+
+                if let Some(ident) = &swap {
+                    if forward
+                        .insert(ident.clone(), defer_variants.len())
+                        .is_some()
+                    {
+                        cx.error(syn::Error::new(
+                            ident.span(),
+                            format!("ZeroCopy: multiple {ident} variants specified for swap_bytes"),
+                        ));
+                    }
+                }
+
+                reverse.insert(ident, defer_variants.len());
+                defer_variants.push((output, ident, swap));
             }
+
+            let mut load_variants = Vec::new();
+
+            let can_swap_bytes_base = if swap_bytes.is_some() {
+                let mut to_process = Vec::new();
+                let mut conditions = Vec::new();
+
+                for (n, (fields, from, swap)) in defer_variants.iter().enumerate() {
+                    let index = if let Some(to) = swap {
+                        let Some(index) = reverse.get(to) else {
+                            cx.error(syn::Error::new(
+                                to.span(),
+                                "ZeroCopy: swap does not correspond to an existing identifier",
+                            ));
+
+                            continue;
+                        };
+
+                        let a = &discriminant_consts[n];
+                        let b = &discriminant_consts[*index];
+                        conditions.push(quote!(#a == <#ty>::swap_bytes(#b)));
+                        *index
+                    } else {
+                        let Some(index) = forward.get(*from) else {
+                            cx.error(syn::Error::new(
+                                from.span(),
+                                "ZeroCopy: no matching swap field found on another variant",
+                            ));
+
+                            continue;
+                        };
+
+                        *index
+                    };
+
+                    let &(_, to, _) = &defer_variants[index];
+                    to_process.push((fields, from, to));
+                }
+
+                for (output, from, to) in to_process {
+                    let Fields {
+                        assigns,
+                        members,
+                        types,
+                        variables,
+                        ignored_variables,
+                        ignored_members,
+                        ..
+                    } = &output;
+
+                    load_variants.push(quote! {
+                        Self::#from { #(#assigns),* } => {
+                            Self::#to {
+                                #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(#variables),)*
+                                #(#ignored_members: #ignored_variables,)*
+                            }
+                        }
+                    });
+                }
+
+                quote!(const {
+                    #(#discriminants)*
+
+                    #(#conditions)&&*
+                })
+            } else {
+                for (output, ident, swap_bytes) in defer_variants {
+                    if let Some(ident) = swap_bytes {
+                        cx.error(syn::Error::new(
+                            ident.span(),
+                            "ZeroCopy: swap_bytes field is not supported without swap_bytes attribute on the enum",
+                        ));
+                    }
+
+                    let Fields {
+                        assigns,
+                        members,
+                        types,
+                        variables,
+                        ignored_variables,
+                        ignored_members,
+                        ..
+                    } = &output;
+
+                    load_variants.push(quote! {
+                        Self::#ident { #(#assigns),* } => {
+                            Self::#ident {
+                                #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(#variables),)*
+                                #(#ignored_members: #ignored_variables,)*
+                            }
+                        }
+                    });
+                }
+
+                quote!(false)
+            };
 
             pad = quote! {
                 #(#discriminants)*
@@ -403,7 +567,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             impl_zero_sized = None;
             any_bits = quote!(false);
             padded = quote!(false #(|| #padded_variants)*);
-            can_swap_bytes = quote!(true #(&& #byte_ordered_variants)*);
+            can_swap_bytes = quote!(#can_swap_bytes_base #(&& #byte_ordered_variants)*);
 
             let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -635,6 +799,17 @@ fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
     }
 
     output
+}
+
+fn unpad_variant(ident: &syn::Ident) -> Option<syn::Ident> {
+    let s = ident.to_string();
+    let trimmed = s.trim_matches('_');
+
+    if trimmed == s && !trimmed.is_empty() {
+        return None;
+    }
+
+    Some(syn::Ident::new(trimmed, ident.span()))
 }
 
 #[derive(Default)]
