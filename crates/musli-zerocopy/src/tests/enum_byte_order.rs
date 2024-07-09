@@ -53,16 +53,16 @@ fn test_from_bytes_le() {
 }
 
 #[derive(ZeroCopy, PartialEq, Debug, Clone, Copy)]
-#[zero_copy(crate, swap_bytes)]
+#[zero_copy(crate)]
 #[repr(u32)]
 enum EnumNonSwapBytes {
     A = 1,
-    #[zero_copy(swap = A)]
     A_ = u32::swap_bytes(1),
     B = 2,
-    #[zero_copy(swap = B)]
     B_ = u32::swap_bytes(3),
 }
+
+const _: () = assert!(!EnumNonSwapBytes::CAN_SWAP_BYTES);
 
 #[derive(ZeroCopy, PartialEq, Debug, Clone, Copy)]
 #[zero_copy(crate, swap_bytes)]
@@ -76,7 +76,6 @@ enum EnumSwapBytesMismatch {
     B_ = u32::swap_bytes(3),
 }
 
-const _: () = assert!(!EnumNonSwapBytes::CAN_SWAP_BYTES);
 const _: () = assert!(!EnumSwapBytesMismatch::CAN_SWAP_BYTES);
 
 #[test]
@@ -116,4 +115,34 @@ fn test_field_enum() {
     );
 
     assert_eq!(b_, FieldEnum::B_);
+}
+
+#[derive(ZeroCopy, PartialEq, Debug, Clone, Copy)]
+#[zero_copy(crate, swap_bytes)]
+#[repr(u32)]
+enum FieldEnumImplicit {
+    A { field: u32 } = 1,
+    A_ { field: u32 } = u32::swap_bytes(1),
+    B = 2,
+    B_ = u32::swap_bytes(2),
+}
+
+const _: () = assert!(FieldEnumImplicit::CAN_SWAP_BYTES);
+
+#[test]
+fn test_field_enum_implicit() {
+    let a = FieldEnumImplicit::A { field: 42 };
+    let a_ = a.swap_bytes::<Other>();
+
+    let b = FieldEnumImplicit::B;
+    let b_ = b.swap_bytes::<Other>();
+
+    assert_eq!(
+        a_,
+        FieldEnumImplicit::A_ {
+            field: u32::swap_bytes(42)
+        }
+    );
+
+    assert_eq!(b_, FieldEnumImplicit::B_);
 }

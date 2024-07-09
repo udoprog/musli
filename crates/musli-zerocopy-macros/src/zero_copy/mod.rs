@@ -364,6 +364,12 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                         }
                     };
 
+                if swap.is_none() && swap_bytes.is_some() {
+                    if let Some(ident) = unpad_variant(&variant.ident) {
+                        swap = Some(ident);
+                    }
+                }
+
                 let types = &output.types;
 
                 let discriminant_const =
@@ -419,7 +425,15 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                 });
 
                 if let Some(ident) = &swap {
-                    forward.insert(ident.clone(), defer_variants.len());
+                    if forward
+                        .insert(ident.clone(), defer_variants.len())
+                        .is_some()
+                    {
+                        cx.error(syn::Error::new(
+                            ident.span(),
+                            format!("ZeroCopy: multiple {ident} variants specified for swap_bytes"),
+                        ));
+                    }
                 }
 
                 reverse.insert(ident, defer_variants.len());
@@ -785,6 +799,17 @@ fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
     }
 
     output
+}
+
+fn unpad_variant(ident: &syn::Ident) -> Option<syn::Ident> {
+    let s = ident.to_string();
+    let trimmed = s.trim_matches('_');
+
+    if trimmed == s && !trimmed.is_empty() {
+        return None;
+    }
+
+    Some(syn::Ident::new(trimmed, ident.span()))
 }
 
 #[derive(Default)]
