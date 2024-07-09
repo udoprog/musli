@@ -9,9 +9,11 @@ struct Align<A, T: ?Sized>([A; 0], T);
 #[repr(u32)]
 enum SomeEnum {
     A = 1,
+    #[zero_copy(swap = A)]
+    A_ = u32::swap_bytes(1),
     B = 2,
-    A_ = 1u32.swap_bytes(),
-    B_ = 2u32.swap_bytes(),
+    #[zero_copy(swap = B)]
+    B_ = u32::swap_bytes(2),
 }
 
 #[derive(ZeroCopy, Debug, Clone, Copy)]
@@ -51,13 +53,15 @@ fn test_from_bytes_le() {
 }
 
 #[derive(ZeroCopy, PartialEq, Debug, Clone, Copy)]
-#[zero_copy(crate)]
+#[zero_copy(crate, swap_bytes)]
 #[repr(u32)]
 enum EnumNonSwapBytes {
     A = 1,
+    #[zero_copy(swap = A)]
+    A_ = u32::swap_bytes(1),
     B = 2,
-    A_ = 1u32.swap_bytes(),
-    B_ = 3u32.swap_bytes(),
+    #[zero_copy(swap = B)]
+    B_ = u32::swap_bytes(3),
 }
 
 #[derive(ZeroCopy, PartialEq, Debug, Clone, Copy)]
@@ -65,9 +69,11 @@ enum EnumNonSwapBytes {
 #[repr(u32)]
 enum EnumSwapBytesMismatch {
     A = 1,
+    #[zero_copy(swap = A)]
+    A_ = u32::swap_bytes(1),
     B = 2,
-    A_ = 1u32.swap_bytes(),
-    B_ = 3u32.swap_bytes(),
+    #[zero_copy(swap = B)]
+    B_ = u32::swap_bytes(3),
 }
 
 const _: () = assert!(!EnumNonSwapBytes::CAN_SWAP_BYTES);
@@ -80,10 +86,16 @@ fn test_enum_unsupported_swap_bytes() {}
 #[zero_copy(crate, swap_bytes)]
 #[repr(u32)]
 enum FieldEnum {
-    A { field: u32 } = 1,
+    A {
+        field: u32,
+    } = 1,
+    #[zero_copy(swap = A)]
+    A_ {
+        field: u32,
+    } = u32::swap_bytes(1),
     B = 2,
-    A_ { field: u32 } = 1u32.swap_bytes(),
-    B_ = 2u32.swap_bytes(),
+    #[zero_copy(swap = B)]
+    B_ = u32::swap_bytes(2),
 }
 
 const _: () = assert!(FieldEnum::CAN_SWAP_BYTES);
@@ -99,7 +111,7 @@ fn test_field_enum() {
     assert_eq!(
         a_,
         FieldEnum::A_ {
-            field: 42u32.swap_bytes()
+            field: u32::swap_bytes(42)
         }
     );
 

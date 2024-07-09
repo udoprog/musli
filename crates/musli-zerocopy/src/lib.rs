@@ -847,24 +847,22 @@ pub use musli_zerocopy_macros::Visit;
 /// #[zero_copy(swap_bytes)]
 /// #[repr(u32)]
 /// enum Enum {
-///     A {
-///         field: u32,
-///     } = 1,
+///     A { field: u32 } = 1,
+///     #[zero_copy(swap = A)]
+///     A_ { field: u32 } = u32::swap_bytes(1),
 ///     B = 2,
-///     A_ {
-///         field: u32,
-///     } = 1u32.swap_bytes(),
-///     B_ = 2u32.swap_bytes(),
+///     #[zero_copy(swap = B)]
+///     B_ = u32::swap_bytes(2),
 /// }
 ///
-/// assert!(Enum::CAN_SWAP_BYTES);
+/// const _: () = assert!(Enum::CAN_SWAP_BYTES);
 ///
 /// let a = Enum::A { field: 42 };
 /// let a2 = a.swap_bytes::<Native>();
 /// let a_ = a.swap_bytes::<Other>();
 ///
 /// assert_eq!(a2, Enum::A { field: 42 });
-/// assert_eq!(a_, Enum::A_ { field: 42u32.swap_bytes() });
+/// assert_eq!(a_, Enum::A_ { field: u32::swap_bytes(42) });
 /// ```
 #[doc(inline)]
 pub use musli_zerocopy_macros::ZeroCopy;
