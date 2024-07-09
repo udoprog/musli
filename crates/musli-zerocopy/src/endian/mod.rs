@@ -139,12 +139,10 @@ pub type Native = Big;
 
 /// Alias for the opposite endian [`ByteOrder`].
 #[cfg(target_endian = "little")]
-#[cfg(test)]
 pub type Other = Big;
 
 /// Alias for the opposite endian [`ByteOrder`].
 #[cfg(target_endian = "big")]
-#[cfg(test)]
 pub type Other = Little;
 
 /// Marker type indicating that the big endian [`ByteOrder`] is in use.

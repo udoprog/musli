@@ -3,6 +3,7 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[allow(dead_code)]
 struct SignedIntegers {
     a: i8,
     b: i16,
@@ -13,6 +14,7 @@ struct SignedIntegers {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
+#[allow(dead_code)]
 struct UnsignedIntegers {
     a: u8,
     b: u16,

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use bstr::BStr;
 use musli::{Decode, Encode};
 

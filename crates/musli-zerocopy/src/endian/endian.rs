@@ -124,7 +124,7 @@ impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     #[track_caller]
     pub fn new(value: T) -> Self {
         const {
-            assert!(T::CAN_SWAP_BYTES);
+            assert!(T::CAN_SWAP_BYTES, "Type does not support byte-swapping");
         }
 
         Self {
@@ -148,7 +148,7 @@ impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     #[track_caller]
     pub fn to_ne(self) -> T {
         const {
-            assert!(T::CAN_SWAP_BYTES);
+            assert!(T::CAN_SWAP_BYTES, "Type does not support byte-swapping");
         }
 
         T::swap_bytes::<E>(self.value)

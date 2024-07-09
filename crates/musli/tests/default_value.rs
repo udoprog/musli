@@ -3,6 +3,7 @@
 use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
+#[allow(dead_code)]
 struct Struct<'a> {
     name: &'a str,
     age: u32,

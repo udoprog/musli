@@ -30,6 +30,8 @@ where
 
 #[test]
 fn big_model() {
+    #![allow(dead_code)]
+
     use std::ffi::OsString;
     use std::ops::Range;
     use std::path::PathBuf;
