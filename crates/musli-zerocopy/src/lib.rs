@@ -825,6 +825,47 @@ pub use musli_zerocopy_macros::Visit;
 /// #[zero_copy(crate = zerocopy)]
 /// struct Custom { field: u32 }
 /// ```
+///
+/// <br>
+///
+/// ### `#[zero_copy(swap_bytes)]`
+///
+/// Allows enums to be byte-ordered swap with some extra work.
+///
+/// For this to work the enum has to have an enum number of fields, and the last
+/// half of fields must have a discriminant which is byte-swapped variant of the
+/// first half of fields.
+///
+/// The second half of fields also must have an identical field layout.
+///
+/// ```
+/// # use musli_zerocopy as zerocopy;
+/// use zerocopy::ZeroCopy;
+/// use zerocopy::endian::{Other, Native};
+///
+/// #[derive(ZeroCopy, PartialEq, Debug, Clone, Copy)]
+/// #[zero_copy(swap_bytes)]
+/// #[repr(u32)]
+/// enum Enum {
+///     A {
+///         field: u32,
+///     } = 1,
+///     B = 2,
+///     A_ {
+///         field: u32,
+///     } = 1u32.swap_bytes(),
+///     B_ = 2u32.swap_bytes(),
+/// }
+///
+/// assert!(Enum::CAN_SWAP_BYTES);
+///
+/// let a = Enum::A { field: 42 };
+/// let a2 = a.swap_bytes::<Native>();
+/// let a_ = a.swap_bytes::<Other>();
+///
+/// assert_eq!(a2, Enum::A { field: 42 });
+/// assert_eq!(a_, Enum::A_ { field: 42u32.swap_bytes() });
+/// ```
 #[doc(inline)]
 pub use musli_zerocopy_macros::ZeroCopy;
 

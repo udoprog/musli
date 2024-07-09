@@ -55,6 +55,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
     let mut r = ReprAttr::default();
     let mut krate: syn::Path = syn::parse_quote!(musli_zerocopy);
     let mut swap_bytes_self = false;
+    let mut swap_bytes = None;
 
     for attr in &attrs {
         if attr.path().is_ident("repr") {
@@ -85,8 +86,13 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     return Ok(());
                 }
 
-                if meta.path.is_ident("swap_bytes") {
+                if meta.path.is_ident("swap_bytes_self") {
                     swap_bytes_self = true;
+                    return Ok(());
+                }
+
+                if meta.path.is_ident("swap_bytes") {
+                    swap_bytes = Some(meta.path.span());
                     return Ok(());
                 }
 
@@ -140,6 +146,15 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
     match &data {
         syn::Data::Struct(st) => {
+            if let Some(span) = swap_bytes {
+                cx.error(syn::Error::new(
+                    span,
+                    "ZeroCopy: zero_copy(swap_bytes) is only supported on enums",
+                ));
+
+                return Err(());
+            }
+
             // Field types.
             let mut output = process_fields(cx, &st.fields);
             check_zero_sized.append(&mut output.check_zero_sized);
@@ -259,6 +274,17 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             type_impls = None;
         }
         syn::Data::Enum(en) => {
+            if let Some(span) = swap_bytes {
+                if en.variants.len() % 2 != 0 {
+                    cx.error(syn::Error::new(
+                        span,
+                        "ZeroCopy: zero_copy(swap_bytes) is only supported on variants with an even number of fields",
+                    ));
+
+                    return Err(());
+                }
+            }
+
             if let Some((span, _)) = r.repr_packed {
                 cx.error(syn::Error::new(
                     span,
@@ -281,13 +307,15 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
             let mut discriminants = Vec::new();
             let mut validate_variants = Vec::new();
-            let mut load_variants = Vec::new();
             let mut pad_variants = Vec::new();
             let mut padded_variants = Vec::new();
             let mut byte_ordered_variants = Vec::new();
             let mut variant_fields = Vec::new();
 
             let mut enumerator = Enumerator::new(num, ty.span());
+
+            let mut discriminant_consts = Vec::new();
+            let mut defer_variants = Vec::new();
 
             for (index, variant) in en.variants.iter().enumerate() {
                 let mut output = process_fields(cx, &variant.fields);
@@ -307,6 +335,8 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                 let discriminant_const =
                     syn::Ident::new(&format!("DISCRIMINANT{}", index), variant.ident.span());
 
+                discriminant_consts.push(discriminant_const.clone());
+
                 discriminants.push(quote! {
                     const #discriminant_const: #ty = #discriminant;
                 });
@@ -319,24 +349,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
                 let ident = &variant.ident;
 
-                let Fields {
-                    assigns,
-                    members,
-                    types,
-                    variables,
-                    ignored_variables,
-                    ignored_members,
-                    ..
-                } = &output;
-
-                load_variants.push(quote! {
-                    Self::#ident { #(#assigns),* } => {
-                        Self::#ident {
-                            #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(#variables),)*
-                            #(#ignored_members: #ignored_variables,)*
-                        }
-                    }
-                });
+                let Fields { types, .. } = &output;
 
                 pad_variants.push(quote! {
                     #discriminant_const => {
@@ -370,7 +383,74 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     );
                     quote!(#pat => ())
                 });
+
+                defer_variants.push((output, ident));
             }
+
+            let mut load_variants = Vec::new();
+
+            let can_swap_bytes_base = if swap_bytes.is_some() {
+                let (a, b) = discriminant_consts.split_at(discriminant_consts.len() / 2);
+                let (var_a, var_b) = defer_variants.split_at(defer_variants.len() / 2);
+
+                let mut conditions = Vec::new();
+
+                for (a, b) in a.iter().zip(b) {
+                    conditions.push(quote!(#a == <#ty>::swap_bytes(#b)));
+                }
+
+                let iter = var_a.iter().zip(var_b).chain(var_b.iter().zip(var_a));
+
+                for ((output, from), (_, to)) in iter {
+                    let Fields {
+                        assigns,
+                        members,
+                        types,
+                        variables,
+                        ignored_variables,
+                        ignored_members,
+                        ..
+                    } = &output;
+
+                    load_variants.push(quote! {
+                        Self::#from { #(#assigns),* } => {
+                            Self::#to {
+                                #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(#variables),)*
+                                #(#ignored_members: #ignored_variables,)*
+                            }
+                        }
+                    });
+                }
+
+                quote!(const {
+                    #(#discriminants)*
+
+                    #(#conditions)&&*
+                })
+            } else {
+                for (output, ident) in defer_variants {
+                    let Fields {
+                        assigns,
+                        members,
+                        types,
+                        variables,
+                        ignored_variables,
+                        ignored_members,
+                        ..
+                    } = &output;
+
+                    load_variants.push(quote! {
+                        Self::#ident { #(#assigns),* } => {
+                            Self::#ident {
+                                #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(#variables),)*
+                                #(#ignored_members: #ignored_variables,)*
+                            }
+                        }
+                    });
+                }
+
+                quote!(false)
+            };
 
             pad = quote! {
                 #(#discriminants)*
@@ -403,7 +483,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
             impl_zero_sized = None;
             any_bits = quote!(false);
             padded = quote!(false #(|| #padded_variants)*);
-            can_swap_bytes = quote!(true #(&& #byte_ordered_variants)*);
+            can_swap_bytes = quote!(#can_swap_bytes_base #(&& #byte_ordered_variants)*);
 
             let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
