@@ -122,11 +122,9 @@ impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     /// ```
     #[inline]
     pub fn new(value: T) -> Self {
-        assert!(
-            T::CAN_SWAP_BYTES,
-            "Type `{}` cannot be byte-ordered since it would not inhabit valid types",
-            any::type_name::<T>()
-        );
+        const {
+            assert!(T::CAN_SWAP_BYTES);
+        }
 
         Self {
             value: T::swap_bytes::<E>(value),
@@ -147,6 +145,10 @@ impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     /// ```
     #[inline]
     pub fn to_ne(self) -> T {
+        const {
+            assert!(T::CAN_SWAP_BYTES);
+        }
+
         T::swap_bytes::<E>(self.value)
     }
 
