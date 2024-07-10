@@ -773,7 +773,7 @@ where
     #[cfg(test)]
     pub(crate) fn cast<U>(self) -> Ref<U, E, O>
     where
-        U: ?Sized + Pointee<Metadata = T::Metadata>,
+        U: ?Sized + Pointee<Stored<O> = T::Stored<O>>,
     {
         Ref {
             offset: self.offset,
