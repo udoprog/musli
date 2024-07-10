@@ -183,10 +183,12 @@ where
 }
 
 /// Bind a [`MapRef`] into a [`Map`].
-impl<K, V, E: ByteOrder, O: Size> Bindable for MapRef<K, V, E, O>
+impl<K, V, E, O> Bindable for MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     type Bound<'a> = Map<'a, K, V> where Self: 'a;
 
@@ -233,19 +235,23 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct MapRef<K, V, E: ByteOrder = Native, O: Size = DefaultSize>
+pub struct MapRef<K, V, E = Native, O = DefaultSize>
 where
     K: ZeroCopy,
     V: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     key: Endian<u64, E>,
     table: RawTableRef<Entry<K, V>, E, O>,
 }
 
-impl<K, V, E: ByteOrder, O: Size> MapRef<K, V, E, O>
+impl<K, V, E, O> MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     #[cfg(feature = "alloc")]
     pub(crate) fn new(key: u64, table: RawTableRef<Entry<K, V>, E, O>) -> Self {
@@ -376,20 +382,24 @@ where
     }
 }
 
-impl<K, V, E: ByteOrder, O: Size> Clone for MapRef<K, V, E, O>
+impl<K, V, E, O> Clone for MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<K, V, E: ByteOrder, O: Size> Copy for MapRef<K, V, E, O>
+impl<K, V, E, O> Copy for MapRef<K, V, E, O>
 where
     K: ZeroCopy,
     V: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
 }
 
@@ -477,9 +487,11 @@ impl<'a, T> RawTable<'a, T> {
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub(crate) struct RawTableRef<T, E: ByteOrder = Native, O: Size = DefaultSize>
+pub(crate) struct RawTableRef<T, E = Native, O = DefaultSize>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     ctrl: Ref<[u8], E, O>,
     entries: Ref<[T], E, O>,
@@ -487,9 +499,11 @@ where
     len: Endian<usize, E>,
 }
 
-impl<T, E: ByteOrder, O: Size> RawTableRef<T, E, O>
+impl<T, E, O> RawTableRef<T, E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     #[cfg(feature = "alloc")]
     #[inline]
@@ -589,13 +603,21 @@ where
     }
 }
 
-impl<T, E: ByteOrder, O: Size> Clone for RawTableRef<T, E, O>
+impl<T, E, O> Clone for RawTableRef<T, E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T, E: ByteOrder, O: Size> Copy for RawTableRef<T, E, O> where T: ZeroCopy {}
+impl<T, E, O> Copy for RawTableRef<T, E, O>
+where
+    T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
+{
+}

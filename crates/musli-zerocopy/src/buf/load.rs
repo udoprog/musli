@@ -33,9 +33,11 @@ pub trait LoadMut: Load {
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error>;
 }
 
-impl<T, E: ByteOrder, O: Size> Load for Ref<T, E, O>
+impl<T, E, O> Load for Ref<T, E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     type Target = T;
 
@@ -45,9 +47,11 @@ where
     }
 }
 
-impl<T, E: ByteOrder, O: Size> Load for Ref<[T], E, O>
+impl<T, E, O> Load for Ref<[T], E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     type Target = [T];
 
@@ -57,7 +61,11 @@ where
     }
 }
 
-impl<E: ByteOrder, O: Size> Load for Ref<str, E, O> {
+impl<E, O> Load for Ref<str, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     type Target = str;
 
     #[inline]
@@ -66,9 +74,11 @@ impl<E: ByteOrder, O: Size> Load for Ref<str, E, O> {
     }
 }
 
-impl<T, E: ByteOrder, O: Size> LoadMut for Ref<T, E, O>
+impl<T, E, O> LoadMut for Ref<T, E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
@@ -76,9 +86,11 @@ where
     }
 }
 
-impl<T, E: ByteOrder, O: Size> LoadMut for Ref<[T], E, O>
+impl<T, E, O> LoadMut for Ref<[T], E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
@@ -86,7 +98,11 @@ where
     }
 }
 
-impl<E: ByteOrder, O: Size> LoadMut for Ref<str, E, O> {
+impl<E, O> LoadMut for Ref<str, E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     #[inline]
     fn load_mut<'buf>(&self, buf: &'buf mut Buf) -> Result<&'buf mut Self::Target, Error> {
         buf.load_unsized_mut(*self)

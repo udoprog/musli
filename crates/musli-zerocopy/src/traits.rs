@@ -86,11 +86,14 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed + Pointee {
 
     /// Validate the buffer with the given capacity and return the decoded
     /// metadata.
-    unsafe fn validate_unsized<E: ByteOrder, O: Size>(
+    unsafe fn validate_unsized<E, O>(
         data: NonNull<u8>,
         len: usize,
         metadata: <Self::Metadata as Packable>::Packed<O>,
-    ) -> Result<Self::Metadata, Error>;
+    ) -> Result<Self::Metadata, Error>
+    where
+        E: ByteOrder,
+        O: Size;
 
     /// Construct a wide pointer from a pointer and its associated metadata.
     ///
@@ -226,7 +229,10 @@ where
     }
 
     #[inline]
-    fn swap_bytes<E: ByteOrder>(self) -> Self {
+    fn swap_bytes<E>(self) -> Self
+    where
+        E: ByteOrder,
+    {
         Wrapping(T::swap_bytes::<E>(self.0))
     }
 }
@@ -613,7 +619,9 @@ pub unsafe trait ZeroCopy: Sized {
     /// constant should be advised.
     ///
     /// [`CAN_SWAP_BYTES`]: Self::CAN_SWAP_BYTES
-    fn swap_bytes<E: ByteOrder>(self) -> Self;
+    fn swap_bytes<E>(self) -> Self
+    where
+        E: ByteOrder;
 }
 
 unsafe impl UnsizedZeroCopy for str {
@@ -634,11 +642,15 @@ unsafe impl UnsizedZeroCopy for str {
     unsafe fn pad(&self, _: &mut Padder<'_, Self>) {}
 
     #[inline]
-    unsafe fn validate_unsized<E: ByteOrder, O: Size>(
+    unsafe fn validate_unsized<E, O>(
         data: NonNull<u8>,
         len: usize,
         metadata: <Self::Metadata as Packable>::Packed<O>,
-    ) -> Result<Self::Metadata, Error> {
+    ) -> Result<Self::Metadata, Error>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
         let metadata = metadata.as_usize::<E>();
 
         if metadata > len {
@@ -691,11 +703,15 @@ where
     }
 
     #[inline]
-    unsafe fn validate_unsized<E: ByteOrder, O: Size>(
+    unsafe fn validate_unsized<E, O>(
         data: NonNull<u8>,
         len: usize,
         metadata: <Self::Metadata as Packable>::Packed<O>,
-    ) -> Result<Self::Metadata, Error> {
+    ) -> Result<Self::Metadata, Error>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
         let metadata = metadata.as_usize::<E>();
 
         let Some(size) = metadata.checked_mul(size_of::<T>()) else {
@@ -780,7 +796,10 @@ macro_rules! impl_number {
             }
 
             #[inline]
-            fn swap_bytes<E: ByteOrder>(self) -> Self {
+            fn swap_bytes<E>(self) -> Self
+            where
+                E: ByteOrder,
+            {
                 $from_be(self)
             }
         }
@@ -827,7 +846,10 @@ macro_rules! impl_float {
                 Ok(())
             }
 
-            fn swap_bytes<E: ByteOrder>(self) -> Self {
+            fn swap_bytes<E>(self) -> Self
+            where
+                E: ByteOrder,
+            {
                 $from_fn(self)
             }
         }
@@ -873,7 +895,10 @@ unsafe impl ZeroCopy for char {
     }
 
     #[inline]
-    fn swap_bytes<E: ByteOrder>(self) -> Self {
+    fn swap_bytes<E>(self) -> Self
+    where
+        E: ByteOrder,
+    {
         self
     }
 }
@@ -909,7 +934,10 @@ unsafe impl ZeroCopy for bool {
     }
 
     #[inline]
-    fn swap_bytes<E: ByteOrder>(self) -> Self {
+    fn swap_bytes<E>(self) -> Self
+    where
+        E: ByteOrder,
+    {
         self
     }
 }
@@ -978,7 +1006,10 @@ macro_rules! impl_nonzero_number {
             }
 
             #[inline]
-            fn swap_bytes<E: ByteOrder>(self) -> Self {
+            fn swap_bytes<E>(self) -> Self
+            where
+                E: ByteOrder,
+            {
                 // SAFETY: a value inhabiting zero is byte-order independent.
                 unsafe {
                     ::core::num::$ty::new_unchecked(<$inner as ZeroCopy>::swap_bytes::<E>(
@@ -1042,7 +1073,10 @@ macro_rules! impl_nonzero_number {
             }
 
             #[inline]
-            fn swap_bytes<E: ByteOrder>(self) -> Self {
+            fn swap_bytes<E>(self) -> Self
+            where
+                E: ByteOrder,
+            {
                 // SAFETY: All bit-patterns are habitable, zero we can rely on
                 // byte-order conversion from the inner type.
                 unsafe {
@@ -1122,7 +1156,10 @@ macro_rules! impl_zst {
             }
 
             #[inline]
-            fn swap_bytes<E: ByteOrder>(self) -> Self {
+            fn swap_bytes<E>(self) -> Self
+            where
+                E: ByteOrder,
+            {
                 self
             }
         }
@@ -1195,7 +1232,10 @@ where
     }
 
     #[inline]
-    fn swap_bytes<E: ByteOrder>(self) -> Self {
+    fn swap_bytes<E>(self) -> Self
+    where
+        E: ByteOrder,
+    {
         let mut iter = self.into_iter();
         array::from_fn(move |_| T::swap_bytes::<E>(iter.next().unwrap()))
     }

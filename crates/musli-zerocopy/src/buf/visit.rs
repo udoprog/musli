@@ -36,10 +36,12 @@ impl<T: ?Sized> Visit for &T {
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Visit for Ref<T, E, O>
+impl<T, E, O> Visit for Ref<T, E, O>
 where
-    T: Pointee,
+    T: ?Sized + Pointee,
     Self: Load,
+    E: ByteOrder,
+    O: Size,
 {
     type Target = <Ref<T, E, O> as Load>::Target;
 

@@ -335,7 +335,11 @@
 //!
 //! #[derive(ZeroCopy)]
 //! #[repr(C)]
-//! struct Archive<E, O> where E: ByteOrder, O: Size {
+//! struct Archive<E, O>
+//! where
+//!     E: ByteOrder,
+//!     O: Size
+//! {
 //!     string: Ref<str, E, O>,
 //!     number: Endian<u32, E>,
 //! }

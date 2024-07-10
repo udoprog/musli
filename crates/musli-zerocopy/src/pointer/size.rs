@@ -78,7 +78,9 @@ pub trait Size:
 
     /// Convert the pointer to a usize.
     #[doc(hidden)]
-    fn as_usize<E: ByteOrder>(self) -> usize;
+    fn as_usize<E>(self) -> usize
+    where
+        E: ByteOrder;
 
     /// Test if the value is zero.
     #[doc(hidden)]
@@ -126,7 +128,10 @@ macro_rules! impl_size {
             }
 
             #[inline]
-            fn as_usize<E: ByteOrder>(self) -> usize {
+            fn as_usize<E>(self) -> usize
+            where
+                E: ByteOrder,
+            {
                 if self > usize::MAX as $ty {
                     usize::MAX
                 } else {

@@ -820,9 +820,9 @@ where
 impl<T, E, O> fmt::Debug for Ref<T, E, O>
 where
     T: ?Sized + Pointee,
-    <T::Metadata as Packable>::Packed<O>: fmt::Debug,
     E: ByteOrder,
     O: Size + fmt::Debug,
+    <T::Metadata as Packable>::Packed<O>: fmt::Debug,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -836,9 +836,11 @@ where
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Clone for Ref<T, E, O>
+impl<T, E, O> Clone for Ref<T, E, O>
 where
-    T: Pointee,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Size,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -846,12 +848,19 @@ where
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Copy for Ref<T, E, O> where T: Pointee {}
-
-impl<T: ?Sized, E: ByteOrder, O: Size> PartialEq for Ref<T, E, O>
+impl<T, E, O> Copy for Ref<T, E, O>
 where
-    T: Pointee,
-    O: PartialEq,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Size,
+{
+}
+
+impl<T, E, O> PartialEq for Ref<T, E, O>
+where
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: PartialEq + Size,
     <T::Metadata as Packable>::Packed<O>: PartialEq,
 {
     #[inline]
@@ -860,18 +869,20 @@ where
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Eq for Ref<T, E, O>
+impl<T, E, O> Eq for Ref<T, E, O>
 where
-    T: Pointee,
-    O: Eq,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Eq + Size,
     <T::Metadata as Packable>::Packed<O>: Eq,
 {
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> PartialOrd for Ref<T, E, O>
+impl<T, E, O> PartialOrd for Ref<T, E, O>
 where
-    T: Pointee,
-    O: Ord,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Ord + Size,
     <T::Metadata as Packable>::Packed<O>: PartialOrd,
 {
     #[inline]
@@ -885,10 +896,11 @@ where
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Ord for Ref<T, E, O>
+impl<T, E, O> Ord for Ref<T, E, O>
 where
-    T: Pointee,
-    O: Ord,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Ord + Size,
     <T::Metadata as Packable>::Packed<O>: Ord,
 {
     #[inline]
@@ -902,10 +914,11 @@ where
     }
 }
 
-impl<T: ?Sized, E: ByteOrder, O: Size> Hash for Ref<T, E, O>
+impl<T, E, O> Hash for Ref<T, E, O>
 where
-    T: Pointee,
-    O: Hash,
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Hash + Size,
     <T::Metadata as Packable>::Packed<O>: Hash,
 {
     #[inline]

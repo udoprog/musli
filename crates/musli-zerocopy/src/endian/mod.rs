@@ -190,7 +190,10 @@ use crate::ZeroCopy;
 ///     bits64: 0x5060708090a0b0c0,
 /// });
 /// ```
-pub fn from_be<T: ZeroCopy>(value: T) -> T {
+pub fn from_be<T>(value: T) -> T
+where
+    T: ZeroCopy,
+{
     from_endian::<_, Big>(value)
 }
 
@@ -230,7 +233,10 @@ pub fn from_be<T: ZeroCopy>(value: T) -> T {
 /// });
 /// ```
 #[inline]
-pub fn from_le<T: ZeroCopy>(value: T) -> T {
+pub fn from_le<T>(value: T) -> T
+where
+    T: ZeroCopy,
+{
     from_endian::<_, Little>(value)
 }
 
@@ -271,7 +277,11 @@ pub fn from_le<T: ZeroCopy>(value: T) -> T {
 /// });
 /// ```
 #[inline]
-pub fn from_endian<T: ZeroCopy, E: ByteOrder>(value: T) -> T {
+pub fn from_endian<T, E>(value: T) -> T
+where
+    T: ZeroCopy,
+    E: ByteOrder,
+{
     value.swap_bytes::<E>().swap_bytes::<Native>()
 }
 

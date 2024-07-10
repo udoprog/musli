@@ -11,10 +11,20 @@ mod sealed {
 
     pub trait Sealed {}
 
-    impl<'a, E: ByteOrder, O: Size> Sealed for SliceMut<'a, E, O> {}
+    impl<'a, E, O> Sealed for SliceMut<'a, E, O>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+    }
 
     #[cfg(feature = "alloc")]
-    impl<E: ByteOrder, O: Size> Sealed for OwnedBuf<E, O> {}
+    impl<E, O> Sealed for OwnedBuf<E, O>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+    }
 }
 
 /// A buffer that we can store things into.

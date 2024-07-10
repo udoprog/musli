@@ -140,7 +140,10 @@ where
     ///     .with_byte_order::<endian::Little>();
     /// ```
     #[inline]
-    pub fn with_byte_order<U: ByteOrder>(self) -> SliceMut<'a, U, O> {
+    pub fn with_byte_order<U>(self) -> SliceMut<'a, U, O>
+    where
+        U: ByteOrder,
+    {
         let this = ManuallyDrop::new(self);
 
         SliceMut {
@@ -436,12 +439,14 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn load_uninit_mut<T, U: ByteOrder, I: Size>(
+    pub fn load_uninit_mut<T, U, I>(
         &mut self,
         reference: Ref<MaybeUninit<T>, U, I>,
     ) -> &mut MaybeUninit<T>
     where
         T: ZeroCopy,
+        U: ByteOrder,
+        I: Size,
     {
         let at = reference.offset();
 

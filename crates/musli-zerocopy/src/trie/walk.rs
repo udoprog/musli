@@ -8,9 +8,11 @@ use crate::{Buf, Error, Ref, ZeroCopy};
 
 use super::{prefix, Flavor, LinksRef, StackEntry};
 
-pub(super) struct Walk<'a, 'buf, T, F: Flavor, S: Stack<StackEntry<'buf, T, F>>>
+pub(super) struct Walk<'a, 'buf, T, F, S>
 where
     T: ZeroCopy,
+    F: Flavor,
+    S: Stack<StackEntry<'buf, T, F>>,
 {
     // Buffer being walked.
     buf: &'buf Buf,
@@ -21,9 +23,10 @@ where
     stack: S,
 }
 
-impl<'a, 'buf, T, F: Flavor, S> Walk<'a, 'buf, T, F, S>
+impl<'a, 'buf, T, F, S> Walk<'a, 'buf, T, F, S>
 where
     T: ZeroCopy,
+    F: Flavor,
     S: Stack<StackEntry<'buf, T, F>>,
 {
     pub(super) fn find(buf: &'buf Buf, links: LinksRef<T, F>, prefix: &'a [u8]) -> Self {
@@ -196,9 +199,10 @@ where
     Ref::try_with_metadata(real_start, real_end - real_start)
 }
 
-enum WalkState<'a, 'buf, T, F: Flavor>
+enum WalkState<'a, 'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     // Initial state where we need to lookup the specified prefix in the trie.
     Find(LinksRef<T, F>, &'a [u8]),

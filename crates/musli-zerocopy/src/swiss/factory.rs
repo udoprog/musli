@@ -104,7 +104,7 @@ const FIXED_SEED: u64 = 1234567890;
 /// assert_eq!(map.get(&())?, Some(&()));
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn store_map<K, V, I, E: ByteOrder, O: Size>(
+pub fn store_map<K, V, I, E, O>(
     buf: &mut OwnedBuf<E, O>,
     entries: I,
 ) -> Result<MapRef<K, V, E, O>, Error>
@@ -114,6 +114,8 @@ where
     K::Target: Hash,
     I: IntoIterator<Item = (K, V)>,
     I::IntoIter: ExactSizeIterator,
+    E: ByteOrder,
+    O: Size,
 {
     let (key, ctrl, buckets, bucket_mask, len) = store_raw(entries, buf, |buf, (k, v), hasher| {
         k.visit(buf, |key| key.hash(hasher))?;

@@ -827,13 +827,11 @@ impl Buf {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn swap<T, E: ByteOrder, O: Size>(
-        &mut self,
-        a: Ref<T, E, O>,
-        b: Ref<T, E, O>,
-    ) -> Result<(), Error>
+    pub fn swap<T, E, O>(&mut self, a: Ref<T, E, O>, b: Ref<T, E, O>) -> Result<(), Error>
     where
         T: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
     {
         let a = a.offset();
         let b = b.offset();

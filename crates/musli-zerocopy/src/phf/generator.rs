@@ -25,7 +25,7 @@ pub(crate) fn displacements_len(len: usize) -> usize {
     (len + DEFAULT_LAMBDA - 1) / DEFAULT_LAMBDA
 }
 
-pub(crate) fn generate_hash<K, T, F, E: ByteOrder, O: Size>(
+pub(crate) fn generate_hash<K, T, F, E, O>(
     buf: &mut Buf,
     entries: &Ref<[T], E, O>,
     displacements: &Ref<[Entry<u32, u32>], E, O>,
@@ -37,6 +37,8 @@ where
     K::Target: Hash,
     F: Fn(&T) -> &K,
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
         if let Some(hash) = try_generate_hash(buf, entries, displacements, map, key, &access)? {
@@ -56,7 +58,7 @@ where
     Err(Error::new(ErrorKind::FailedPhf))
 }
 
-fn try_generate_hash<K, T, F, E: ByteOrder, O: Size>(
+fn try_generate_hash<K, T, F, E, O>(
     buf: &mut Buf,
     entries: &Ref<[T], E, O>,
     displacements: &Ref<[Entry<u32, u32>], E, O>,
@@ -69,6 +71,8 @@ where
     K::Target: Hash,
     F: ?Sized + Fn(&T) -> &K,
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     let mut hashes = Vec::new();
 
