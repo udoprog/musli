@@ -445,11 +445,11 @@ pub unsafe trait ZeroCopy: Sized {
     /// [`to_bytes_unchecked()`]: Self::to_bytes_unchecked
     /// [`to_bytes()`]: Self::to_bytes
     /// [type level documentation]: Self
+    #[inline]
     fn initialize_padding(&mut self) {
         unsafe {
-            let ptr = NonNull::new_unchecked((self as *mut Self).cast::<u8>());
-
             if Self::PADDED {
+                let ptr = NonNull::new_unchecked((self as *mut Self).cast::<u8>());
                 let mut padder = Padder::new(ptr);
                 Self::pad(&mut padder);
                 padder.remaining();
@@ -543,8 +543,8 @@ pub unsafe trait ZeroCopy: Sized {
     /// # Errors
     ///
     /// This will ensure that `bytes` is aligned, appropriately sized, and valid
-    /// to inhabit `&Self`. Anything else will cause an [`Error`] detailing why
-    /// the conversion failed.
+    /// to inhabit `&mut Self`. Anything else will cause an [`Error`] detailing
+    /// why the conversion failed.
     ///
     /// # Examples
     ///
@@ -614,12 +614,6 @@ pub unsafe trait ZeroCopy: Sized {
     ///
     /// [`CAN_SWAP_BYTES`]: Self::CAN_SWAP_BYTES
     fn swap_bytes<E: ByteOrder>(self) -> Self;
-
-    /// Transpose a type from one byte order `F` to another `T`.
-    #[inline]
-    fn transpose_bytes<F: ByteOrder, T: ByteOrder>(self) -> Self {
-        self.swap_bytes::<F>().swap_bytes::<T>()
-    }
 }
 
 unsafe impl UnsizedZeroCopy for str {

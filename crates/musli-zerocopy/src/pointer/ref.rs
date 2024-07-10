@@ -143,8 +143,8 @@ where
     #[inline]
     pub fn to_endian<U: ByteOrder>(self) -> Ref<T, U, O> {
         Ref {
-            offset: self.offset.transpose_bytes::<E, U>(),
-            metadata: self.metadata.transpose_bytes::<E, U>(),
+            offset: self.offset.swap_bytes::<E>().swap_bytes::<U>(),
+            metadata: self.metadata.swap_bytes::<E>().swap_bytes::<U>(),
             _marker: PhantomData,
         }
     }

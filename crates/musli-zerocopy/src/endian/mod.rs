@@ -272,7 +272,7 @@ pub fn from_le<T: ZeroCopy>(value: T) -> T {
 /// ```
 #[inline]
 pub fn from_endian<T: ZeroCopy, E: ByteOrder>(value: T) -> T {
-    value.transpose_bytes::<E, Native>()
+    value.swap_bytes::<E>().swap_bytes::<Native>()
 }
 
 mod sealed {
