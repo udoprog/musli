@@ -1,4 +1,4 @@
-use crate::pointer::{CoerceSlice, Packable, Pointee, Size};
+use crate::pointer::{CoerceSlice, Pointee, Size};
 use crate::traits::ZeroCopy;
 
 /// A trait indicating that a coercion from `Self` to `U` is correct from a size
@@ -7,16 +7,12 @@ pub trait Coerce<U: ?Sized + Pointee>: Pointee {
     /// Coerce metadata from `Self` to `U`.
     ///
     /// Any overflow will wrap around.
-    fn coerce_metadata<O: Size>(
-        metadata: <Self::Metadata as Packable>::Packed<O>,
-    ) -> <U::Metadata as Packable>::Packed<O>;
+    fn coerce_metadata<O: Size>(metadata: Self::Stored<O>) -> U::Stored<O>;
 
     /// Try to coerce metadata from `Self` to `U`.
     ///
     /// Any overflow will result in `None`.
-    fn try_coerce_metadata<O: Size>(
-        metadata: <Self::Metadata as Packable>::Packed<O>,
-    ) -> Option<<U::Metadata as Packable>::Packed<O>>;
+    fn try_coerce_metadata<O: Size>(metadata: Self::Stored<O>) -> Option<U::Stored<O>>;
 }
 
 /// Defines a coercion from a slice `[T]` to `[U]`.
@@ -186,14 +182,12 @@ where
     [T]: CoerceSlice<[U]>,
 {
     #[inline]
-    fn coerce_metadata<O: Size>((): ()) -> <<[T] as Pointee>::Metadata as Packable>::Packed<O> {
+    fn coerce_metadata<O: Size>((): ()) -> O {
         <[T]>::resize(O::ONE)
     }
 
     #[inline]
-    fn try_coerce_metadata<O: Size>(
-        (): (),
-    ) -> Option<<<[T] as Pointee>::Metadata as Packable>::Packed<O>> {
+    fn try_coerce_metadata<O: Size>((): ()) -> Option<O> {
         <[T]>::try_resize(O::ONE)
     }
 }
@@ -223,15 +217,13 @@ where
     [T]: CoerceSlice<[U]>,
 {
     #[inline]
-    fn coerce_metadata<O: Size>((): ()) -> <<[T] as Pointee>::Metadata as Packable>::Packed<O> {
+    fn coerce_metadata<O: Size>((): ()) -> <[T] as Pointee>::Stored<O> {
         let factor = O::try_from_usize(N).unwrap_or(O::MAX);
         <[T]>::resize(factor)
     }
 
     #[inline]
-    fn try_coerce_metadata<O: Size>(
-        (): (),
-    ) -> Option<<<[T] as Pointee>::Metadata as Packable>::Packed<O>> {
+    fn try_coerce_metadata<O: Size>((): ()) -> Option<<[T] as Pointee>::Stored<O>> {
         let factor = O::try_from_usize(N)?;
         <[T]>::try_resize(factor)
     }

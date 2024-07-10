@@ -27,7 +27,7 @@ use core::str;
 use crate::buf::{Buf, Padder, Validator, Visit};
 use crate::endian::ByteOrder;
 use crate::error::{Error, ErrorKind};
-use crate::pointer::{Packable, Pointee, Size};
+use crate::pointer::{Pointee, Size};
 
 mod sealed {
     use crate::ZeroCopy;
@@ -89,7 +89,7 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed + Pointee {
     unsafe fn validate_unsized<E, O>(
         data: NonNull<u8>,
         len: usize,
-        metadata: <Self::Metadata as Packable>::Packed<O>,
+        metadata: Self::Stored<O>,
     ) -> Result<Self::Metadata, Error>
     where
         E: ByteOrder,
@@ -645,7 +645,7 @@ unsafe impl UnsizedZeroCopy for str {
     unsafe fn validate_unsized<E, O>(
         data: NonNull<u8>,
         len: usize,
-        metadata: <Self::Metadata as Packable>::Packed<O>,
+        metadata: Self::Stored<O>,
     ) -> Result<Self::Metadata, Error>
     where
         E: ByteOrder,
@@ -706,7 +706,7 @@ where
     unsafe fn validate_unsized<E, O>(
         data: NonNull<u8>,
         len: usize,
-        metadata: <Self::Metadata as Packable>::Packed<O>,
+        metadata: Self::Stored<O>,
     ) -> Result<Self::Metadata, Error>
     where
         E: ByteOrder,

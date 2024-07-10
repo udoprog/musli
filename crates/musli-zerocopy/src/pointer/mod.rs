@@ -30,10 +30,6 @@ mod r#ref;
 pub use self::pointee::Pointee;
 mod pointee;
 
-#[doc(inline)]
-pub use self::packable::Packable;
-mod packable;
-
 pub use self::coerce::Coerce;
 mod coerce;
 

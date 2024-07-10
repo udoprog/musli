@@ -8,7 +8,7 @@ use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::error::{Error, ErrorKind, IntoRepr};
 use crate::mem::MaybeUninit;
 use crate::pointer::Coerce;
-use crate::pointer::{DefaultSize, Packable, Pointee, Size};
+use crate::pointer::{DefaultSize, Pointee, Size};
 use crate::ZeroCopy;
 
 /// A stored reference to a type `T`.
@@ -42,7 +42,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, swap_bytes_self, bounds = {T::Metadata: Packable<Packed<O>: ZeroCopy>})]
+#[zero_copy(crate, swap_bytes_self)]
 pub struct Ref<T, E = Native, O = DefaultSize>
 where
     T: ?Sized + Pointee,
@@ -50,7 +50,7 @@ where
     O: Size,
 {
     offset: O,
-    metadata: <T::Metadata as Packable>::Packed<O>,
+    metadata: T::Stored<O>,
     #[zero_copy(ignore)]
     _marker: PhantomData<(E, T)>,
 }
@@ -199,13 +199,13 @@ where
             panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
         };
 
-        let Some(metadata) = T::Metadata::try_from_metadata(metadata) else {
+        let Some(metadata) = T::try_from_metadata(metadata) else {
             panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
         };
 
         Self {
             offset: O::swap_bytes::<E>(offset),
-            metadata: <T::Metadata as Packable>::Packed::<O>::swap_bytes::<E>(metadata),
+            metadata: T::Stored::<O>::swap_bytes::<E>(metadata),
             _marker: PhantomData,
         }
     }
@@ -250,7 +250,7 @@ where
             );
 
             assert!(
-                <T::Metadata as Packable>::Packed::<O>::CAN_SWAP_BYTES,
+                T::Stored::<O>::CAN_SWAP_BYTES,
                 "Packed offset cannot be byte-ordered since it would not inhabit valid types"
             );
         }
@@ -262,7 +262,7 @@ where
             }));
         };
 
-        let Some(metadata) = T::Metadata::try_from_metadata(metadata) else {
+        let Some(metadata) = T::try_from_metadata(metadata) else {
             return Err(Error::new(ErrorKind::InvalidMetadataRange {
                 metadata: T::Metadata::into_repr(metadata),
                 max: O::into_repr(O::MAX),
@@ -271,7 +271,7 @@ where
 
         Ok(Self {
             offset: O::swap_bytes::<E>(offset),
-            metadata: <T::Metadata as Packable>::Packed::swap_bytes::<E>(metadata),
+            metadata: T::Stored::swap_bytes::<E>(metadata),
             _marker: PhantomData,
         })
     }
@@ -565,14 +565,14 @@ where
     /// assert_eq!(slice.metadata(), 10);
     /// ```
     #[inline]
-    pub fn metadata(self) -> <T::Metadata as Packable>::Packed<O> {
+    pub fn metadata(self) -> T::Stored<O> {
         self.metadata
     }
 }
 
 impl<T, E, O> Ref<T, E, O>
 where
-    T: Pointee<Metadata = ()>,
+    T: Pointee<Metadata = (), Stored<O> = ()>,
     E: ByteOrder,
     O: Size,
 {
@@ -832,7 +832,7 @@ where
 
 impl<T, E, O> fmt::Debug for Ref<T, E, O>
 where
-    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: fmt::Debug>>,
+    T: ?Sized + Pointee<Stored<O>: fmt::Debug>,
     E: ByteOrder,
     O: Size + fmt::Debug,
 {
@@ -870,7 +870,7 @@ where
 
 impl<T, E, O> PartialEq for Ref<T, E, O>
 where
-    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: PartialEq>>,
+    T: ?Sized + Pointee<Stored<O>: PartialEq>,
     E: ByteOrder,
     O: PartialEq + Size,
 {
@@ -882,7 +882,7 @@ where
 
 impl<T, E, O> Eq for Ref<T, E, O>
 where
-    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: Eq>>,
+    T: ?Sized + Pointee<Stored<O>: Eq>,
     E: ByteOrder,
     O: Eq + Size,
 {
@@ -890,7 +890,7 @@ where
 
 impl<T, E, O> PartialOrd for Ref<T, E, O>
 where
-    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: PartialOrd>>,
+    T: ?Sized + Pointee<Stored<O>: PartialOrd>,
     E: ByteOrder,
     O: Ord + Size,
 {
@@ -907,7 +907,7 @@ where
 
 impl<T, E, O> Ord for Ref<T, E, O>
 where
-    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: Ord>>,
+    T: ?Sized + Pointee<Stored<O>: Ord>,
     E: ByteOrder,
     O: Ord + Size,
 {
@@ -924,7 +924,7 @@ where
 
 impl<T, E, O> Hash for Ref<T, E, O>
 where
-    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: Hash>>,
+    T: ?Sized + Pointee<Stored<O>: Hash>,
     E: ByteOrder,
     O: Hash + Size,
 {
