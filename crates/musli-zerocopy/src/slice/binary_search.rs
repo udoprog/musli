@@ -49,8 +49,7 @@ pub enum BinarySearch {
 /// ```
 pub fn binary_search<S, Q>(buf: &Buf, slice: S, x: &Q) -> Result<BinarySearch, Error>
 where
-    S: Slice,
-    S::Item: ZeroCopy + Ord,
+    S: Slice<Item: ZeroCopy + Ord>,
     Q: Visit<Target = S::Item>,
 {
     binary_search_by(buf, slice, |value| x.visit(buf, |x| value.cmp(x)))
@@ -97,8 +96,7 @@ where
 /// ```
 pub fn binary_search_by<S, F>(buf: &Buf, slice: S, mut f: F) -> Result<BinarySearch, Error>
 where
-    S: Slice,
-    S::Item: ZeroCopy,
+    S: Slice<Item: ZeroCopy>,
     F: FnMut(&S::Item) -> Result<Ordering, Error>,
 {
     // INVARIANTS:

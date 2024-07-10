@@ -1,8 +1,8 @@
 use core::cmp::Ordering;
+use core::fmt;
 use core::hash::Hash;
 use core::marker::PhantomData;
 use core::mem::size_of;
-use core::{any, fmt};
 
 use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::error::{Error, ErrorKind, IntoRepr};
@@ -42,7 +42,7 @@ use crate::ZeroCopy;
 /// ```
 #[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, swap_bytes_self, bounds = {<T::Metadata as Packable>::Packed<O>: ZeroCopy})]
+#[zero_copy(crate, swap_bytes_self, bounds = {T::Metadata: Packable<Packed<O>: ZeroCopy>})]
 pub struct Ref<T, E = Native, O = DefaultSize>
 where
     T: ?Sized + Pointee,
@@ -188,17 +188,18 @@ where
         U: Copy + fmt::Debug,
         O: TryFrom<U>,
     {
-        assert!(
-            O::CAN_SWAP_BYTES,
-            "Offset `{}` cannot be byte-ordered since it would not inhabit valid types",
-            any::type_name::<O>()
-        );
+        const {
+            assert!(
+                O::CAN_SWAP_BYTES,
+                "Offset cannot be byte-ordered since it would not inhabit valid types"
+            );
+        }
 
         let Some(offset) = O::try_from(offset).ok() else {
             panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
         };
 
-        let Some(metadata) = <T::Metadata as Packable>::try_from_metadata(metadata) else {
+        let Some(metadata) = T::Metadata::try_from_metadata(metadata) else {
             panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
         };
 
@@ -213,9 +214,10 @@ where
     ///
     /// # Errors
     ///
+    /// This will not compile through a constant assertion if the `offset` or
+    ///   `metadata` can't be byte swapped as per [`ZeroCopy::CAN_SWAP_BYTES`].
+    ///
     /// This will error if either:
-    /// * The `offset` or `metadata` can't be byte swapped as per
-    ///   [`ZeroCopy::CAN_SWAP_BYTES`].
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
@@ -241,17 +243,16 @@ where
         U: Copy + IntoRepr + fmt::Debug,
         O: TryFrom<U>,
     {
-        if !O::CAN_SWAP_BYTES {
-            return Err(Error::new(ErrorKind::InvalidOffset {
-                ty: any::type_name::<O>(),
-            }));
-        }
+        const {
+            assert!(
+                O::CAN_SWAP_BYTES,
+                "Offset cannot be byte-ordered since it would not inhabit valid types"
+            );
 
-        if !<T::Metadata as Packable>::Packed::<O>::CAN_SWAP_BYTES {
-            return Err(Error::new(ErrorKind::InvalidMetadata {
-                ty: any::type_name::<T::Metadata>(),
-                packed: any::type_name::<<T::Metadata as Packable>::Packed<O>>(),
-            }));
+            assert!(
+                <T::Metadata as Packable>::Packed::<O>::CAN_SWAP_BYTES,
+                "Packed offset cannot be byte-ordered since it would not inhabit valid types"
+            );
         }
 
         let Some(offset) = O::try_from(offset).ok() else {
@@ -261,7 +262,7 @@ where
             }));
         };
 
-        let Some(metadata) = <T::Metadata as Packable>::try_from_metadata(metadata) else {
+        let Some(metadata) = T::Metadata::try_from_metadata(metadata) else {
             return Err(Error::new(ErrorKind::InvalidMetadataRange {
                 metadata: T::Metadata::into_repr(metadata),
                 max: O::into_repr(O::MAX),
@@ -270,7 +271,7 @@ where
 
         Ok(Self {
             offset: O::swap_bytes::<E>(offset),
-            metadata: <T::Metadata as Packable>::Packed::<O>::swap_bytes::<E>(metadata),
+            metadata: <T::Metadata as Packable>::Packed::swap_bytes::<E>(metadata),
             _marker: PhantomData,
         })
     }
@@ -577,11 +578,14 @@ where
 {
     /// Construct a reference at the given offset.
     ///
+    /// # Errors
+    ///
+    /// This will not compile through a constant assertion if the `offset` or
+    /// can't be byte swapped as per [`ZeroCopy::CAN_SWAP_BYTES`].
+    ///
     /// # Panics
     ///
-    /// This will panic if either:
-    /// * The `offset` can't be byte swapped as per
-    ///   [`ZeroCopy::CAN_SWAP_BYTES`].
+    /// This will panic if:
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     ///
     /// [`offset()`]: Self::offset
@@ -594,17 +598,26 @@ where
     /// let reference = Ref::<u64>::new(42);
     /// assert_eq!(reference.offset(), 42);
     /// ```
+    ///
+    /// Characters cannot be used as offsets:
+    ///
+    /// ```compile_fail
+    /// use musli_zerocopy::Ref;
+    ///
+    /// let reference = Ref::<_, _, char>::new('a');
+    /// ```
     #[inline]
     pub fn new<U>(offset: U) -> Self
     where
         U: Copy + fmt::Debug,
         O: TryFrom<U>,
     {
-        assert!(
-            O::CAN_SWAP_BYTES,
-            "Type `{}` cannot be byte-ordered since it would not inhabit valid types",
-            any::type_name::<O>()
-        );
+        const {
+            assert!(
+                O::CAN_SWAP_BYTES,
+                "Offset cannot be byte-ordered since it would not inhabit valid types",
+            );
+        }
 
         let Some(offset) = O::try_from(offset).ok() else {
             panic!("Offset {offset:?} not in the legal range 0-{}", O::MAX);
@@ -819,10 +832,9 @@ where
 
 impl<T, E, O> fmt::Debug for Ref<T, E, O>
 where
-    T: ?Sized + Pointee,
+    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: fmt::Debug>>,
     E: ByteOrder,
     O: Size + fmt::Debug,
-    <T::Metadata as Packable>::Packed<O>: fmt::Debug,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -858,10 +870,9 @@ where
 
 impl<T, E, O> PartialEq for Ref<T, E, O>
 where
-    T: ?Sized + Pointee,
+    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: PartialEq>>,
     E: ByteOrder,
     O: PartialEq + Size,
-    <T::Metadata as Packable>::Packed<O>: PartialEq,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -871,19 +882,17 @@ where
 
 impl<T, E, O> Eq for Ref<T, E, O>
 where
-    T: ?Sized + Pointee,
+    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: Eq>>,
     E: ByteOrder,
     O: Eq + Size,
-    <T::Metadata as Packable>::Packed<O>: Eq,
 {
 }
 
 impl<T, E, O> PartialOrd for Ref<T, E, O>
 where
-    T: ?Sized + Pointee,
+    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: PartialOrd>>,
     E: ByteOrder,
     O: Ord + Size,
-    <T::Metadata as Packable>::Packed<O>: PartialOrd,
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -898,10 +907,9 @@ where
 
 impl<T, E, O> Ord for Ref<T, E, O>
 where
-    T: ?Sized + Pointee,
+    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: Ord>>,
     E: ByteOrder,
     O: Ord + Size,
-    <T::Metadata as Packable>::Packed<O>: Ord,
 {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
@@ -916,10 +924,9 @@ where
 
 impl<T, E, O> Hash for Ref<T, E, O>
 where
-    T: ?Sized + Pointee,
+    T: ?Sized + Pointee<Metadata: Packable<Packed<O>: Hash>>,
     E: ByteOrder,
     O: Hash + Size,
-    <T::Metadata as Packable>::Packed<O>: Hash,
 {
     #[inline]
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {

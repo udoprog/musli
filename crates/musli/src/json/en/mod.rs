@@ -228,8 +228,7 @@ where
     #[inline]
     fn encode_bytes_vectored<I>(self, _: usize, vectors: I) -> Result<Self::Ok, C::Error>
     where
-        I: IntoIterator,
-        I::Item: AsRef<[u8]>,
+        I: IntoIterator<Item: AsRef<[u8]>>,
     {
         let mut seq = JsonArrayEncoder::new(self.cx, self.writer)?;
 

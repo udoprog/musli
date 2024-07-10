@@ -134,10 +134,7 @@ pub fn store_set<S, I>(
 ) -> Result<SetRef<I::Item, S::ByteOrder, S::Size>, Error>
 where
     S: ?Sized + StoreBuf,
-    I: IntoIterator,
-    I::Item: Visit + ZeroCopy,
-    <I::Item as Visit>::Target: Hash,
-    I::IntoIter: ExactSizeIterator,
+    I: IntoIterator<Item: Visit<Target: Hash> + ZeroCopy, IntoIter: ExactSizeIterator>,
 {
     let (key, entries, displacements) = store_raw(buf, entries, |entry| entry)?;
     Ok(SetRef::new(key, entries, displacements))
@@ -156,11 +153,8 @@ fn store_raw<K, I, S, F>(
     Error,
 >
 where
-    K: Visit + ZeroCopy,
-    K::Target: Hash,
-    I: IntoIterator,
-    I::Item: ZeroCopy,
-    I::IntoIter: ExactSizeIterator,
+    K: Visit<Target: Hash> + ZeroCopy,
+    I: IntoIterator<Item: ZeroCopy, IntoIter: ExactSizeIterator>,
     S: ?Sized + StoreBuf,
     F: Fn(&I::Item) -> &K,
 {
@@ -205,9 +199,7 @@ where
 fn build_slice<S, I>(buf: &mut S, entries: I) -> Ref<[I::Item], S::ByteOrder, S::Size>
 where
     S: ?Sized + StoreBuf,
-    I: IntoIterator,
-    I::Item: ZeroCopy,
-    I::IntoIter: ExactSizeIterator,
+    I: IntoIterator<Item: ZeroCopy, IntoIter: ExactSizeIterator>,
 {
     let offset = buf.next_offset::<I::Item>();
     let iter = entries.into_iter();

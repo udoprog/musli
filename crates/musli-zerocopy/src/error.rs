@@ -145,16 +145,9 @@ impl std::error::Error for Error {
 #[cfg_attr(test, derive(PartialEq))]
 #[non_exhaustive]
 pub(crate) enum ErrorKind {
-    InvalidOffset {
-        ty: &'static str,
-    },
     InvalidOffsetRange {
         offset: Repr,
         max: Repr,
-    },
-    InvalidMetadata {
-        ty: &'static str,
-        packed: &'static str,
     },
     InvalidMetadataRange {
         metadata: Repr,
@@ -233,20 +226,8 @@ pub(crate) enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorKind::InvalidOffset { ty } => {
-                write!(
-                    f,
-                    "Offset `{ty}` cannot be byte-ordered since it would not inhabit valid types",
-                )
-            }
             ErrorKind::InvalidOffsetRange { offset, max } => {
                 write!(f, "Offset {offset} not in legal range 0-{max}",)
-            }
-            ErrorKind::InvalidMetadata { ty, packed } => {
-                write!(
-                    f,
-                    "Metadata `{ty}` once packed as `{packed}` cannot be byte-ordered since it would not inhabit valid types",
-                )
             }
             ErrorKind::InvalidMetadataRange { metadata, max } => {
                 write!(f, "Metadata {metadata} not in legal range 0-{max}")

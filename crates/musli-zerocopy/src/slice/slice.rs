@@ -77,7 +77,10 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     /// use musli_zerocopy::{Error, Ref, ZeroCopy};
     /// use musli_zerocopy::slice::Slice;
     ///
-    /// fn generic<S>(r: Ref<[S::Item]>) -> Result<S, Error> where S: Slice, S::Item: ZeroCopy {
+    /// fn generic<S>(r: Ref<[S::Item]>) -> Result<S, Error>
+    /// where
+    ///     S: Slice<Item: ZeroCopy>
+    /// {
     ///     S::try_from_ref(r)
     /// }
     /// ```
