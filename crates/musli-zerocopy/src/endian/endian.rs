@@ -50,13 +50,19 @@ use crate::ZeroCopy;
 #[derive(ZeroCopy)]
 #[zero_copy(crate, swap_bytes_self, bounds = {T: ZeroCopy})]
 #[repr(transparent)]
-pub struct Endian<T, E: ByteOrder> {
+pub struct Endian<T, E>
+where
+    E: ByteOrder,
+{
     value: T,
     #[zero_copy(ignore)]
     _marker: PhantomData<E>,
 }
 
-impl<T: ZeroCopy> Endian<T, Little> {
+impl<T> Endian<T, Little>
+where
+    T: ZeroCopy,
+{
     /// Construct new value wrapper with [`Little`] [`ByteOrder`].
     ///
     /// # Examples
@@ -74,7 +80,10 @@ impl<T: ZeroCopy> Endian<T, Little> {
     }
 }
 
-impl<T: ZeroCopy> Endian<T, Big> {
+impl<T> Endian<T, Big>
+where
+    T: ZeroCopy,
+{
     /// Construct new value wrapper with [`Big`] [`ByteOrder`].
     ///
     /// # Examples
@@ -92,7 +101,11 @@ impl<T: ZeroCopy> Endian<T, Big> {
     }
 }
 
-impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
+impl<T, E> Endian<T, E>
+where
+    T: ZeroCopy,
+    E: ByteOrder,
+{
     /// Construct new value wrapper with the specified [`ByteOrder`].
     ///
     /// # Panics
@@ -171,9 +184,10 @@ impl<T: ZeroCopy, E: ByteOrder> Endian<T, E> {
     }
 }
 
-impl<T: ZeroCopy, E: ByteOrder> fmt::Debug for Endian<T, E>
+impl<T, E> fmt::Debug for Endian<T, E>
 where
-    T: fmt::Debug,
+    T: ZeroCopy + fmt::Debug,
+    E: ByteOrder,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -181,9 +195,10 @@ where
     }
 }
 
-impl<T: ZeroCopy, E: ByteOrder> Clone for Endian<T, E>
+impl<T, E> Clone for Endian<T, E>
 where
-    T: Clone,
+    T: ZeroCopy + Clone,
+    E: ByteOrder,
 {
     fn clone(&self) -> Self {
         Self {
@@ -193,7 +208,12 @@ where
     }
 }
 
-impl<T: ZeroCopy, E: ByteOrder> Copy for Endian<T, E> where T: Copy {}
+impl<T, E> Copy for Endian<T, E>
+where
+    T: ZeroCopy + Copy,
+    E: ByteOrder,
+{
+}
 
 /// Any `Endian<T>` implements [`Deref<Target = T>`] for natively wrapped types.
 ///

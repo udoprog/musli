@@ -240,8 +240,7 @@ where
     #[inline]
     fn encode_bytes_vectored<I>(self, len: usize, vectors: I) -> Result<Self::Ok, C::Error>
     where
-        I: IntoIterator,
-        I::Item: AsRef<[u8]>,
+        I: IntoIterator<Item: AsRef<[u8]>>,
     {
         let mut bytes = Vec::with_capacity(len);
 

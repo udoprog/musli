@@ -35,8 +35,7 @@ pub(crate) struct Iter<'a, I, T> {
 
 impl<'a, I, T> Iterator for Iter<'a, I, T>
 where
-    I: Iterator,
-    I::Item: Apply<T>,
+    I: Iterator<Item: Apply<T>>,
 {
     type Item = IterItem<'a, I::Item, T>;
 
@@ -53,8 +52,7 @@ where
 /// Apply an iterator of functions to a value.
 pub(crate) fn iter<I, T>(iter: I, value: &T) -> Iter<'_, I::IntoIter, T>
 where
-    I: IntoIterator,
-    I::Item: Apply<T>,
+    I: IntoIterator<Item: Apply<T>>,
 {
     Iter {
         iter: iter.into_iter(),

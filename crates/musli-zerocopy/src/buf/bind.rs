@@ -8,23 +8,39 @@ mod sealed {
 
     pub trait Sealed {}
 
-    impl<K, V, E: ByteOrder, O: Size> Sealed for crate::phf::map::MapRef<K, V, E, O>
+    impl<K, V, E, O> Sealed for crate::phf::map::MapRef<K, V, E, O>
     where
         K: ZeroCopy,
         V: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
     {
     }
 
-    impl<K, V, E: ByteOrder, O: Size> Sealed for crate::swiss::map::MapRef<K, V, E, O>
+    impl<K, V, E, O> Sealed for crate::swiss::map::MapRef<K, V, E, O>
     where
         K: ZeroCopy,
         V: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
     {
     }
 
-    impl<T, E: ByteOrder, O: Size> Sealed for crate::phf::set::SetRef<T, E, O> where T: ZeroCopy {}
+    impl<T, E, O> Sealed for crate::phf::set::SetRef<T, E, O>
+    where
+        T: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
+    {
+    }
 
-    impl<T, E: ByteOrder, O: Size> Sealed for crate::swiss::set::SetRef<T, E, O> where T: ZeroCopy {}
+    impl<T, E, O> Sealed for crate::swiss::set::SetRef<T, E, O>
+    where
+        T: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
+    {
+    }
 }
 
 /// Trait used for binding a reference to a [`Buf`] through [`Buf::bind()`].

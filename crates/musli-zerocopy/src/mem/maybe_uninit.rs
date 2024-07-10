@@ -4,7 +4,7 @@ use core::ptr::NonNull;
 use core::slice;
 
 use crate::buf;
-use crate::pointer::Pointee;
+use crate::pointer::{Pointee, Size};
 use crate::traits::ZeroCopy;
 
 /// A value which might or might not have been initialized.
@@ -114,4 +114,15 @@ where
     T: Pointee,
 {
     type Metadata = T::Metadata;
+    type Stored<O> = T::Stored<O>
+    where
+        O: Size;
+
+    #[inline]
+    fn try_from_metadata<O>(metadata: Self::Metadata) -> Option<Self::Stored<O>>
+    where
+        O: Size,
+    {
+        T::try_from_metadata(metadata)
+    }
 }

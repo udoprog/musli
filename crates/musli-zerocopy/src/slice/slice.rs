@@ -12,9 +12,21 @@ mod sealed {
 
     pub trait Sealed {}
 
-    impl<T, E: ByteOrder, O: Size> Sealed for Ref<[T], E, O> where T: ZeroCopy {}
+    impl<T, E, O> Sealed for Ref<[T], E, O>
+    where
+        T: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
+    {
+    }
 
-    impl<T, O: Size, L: Size, E: ByteOrder> Sealed for Packed<[T], O, L, E> {}
+    impl<T, O, L, E> Sealed for Packed<[T], O, L, E>
+    where
+        O: Size,
+        L: Size,
+        E: ByteOrder,
+    {
+    }
 }
 
 /// A trait implemented by slice-like types.
@@ -38,13 +50,19 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     /// use musli_zerocopy::{Ref, ZeroCopy};
     /// use musli_zerocopy::slice::Slice;
     ///
-    /// fn generic<S>(r: Ref<[S::Item]>) -> S where S: Slice, S::Item: ZeroCopy {
+    /// fn generic<S>(r: Ref<[S::Item]>) -> S
+    /// where
+    ///     S: Slice,
+    ///     S::Item: ZeroCopy
+    /// {
     ///     S::from_ref(r)
     /// }
     /// ```
-    fn from_ref<E: ByteOrder, O: Size>(slice: Ref<[Self::Item], E, O>) -> Self
+    fn from_ref<E, O>(slice: Ref<[Self::Item], E, O>) -> Self
     where
-        Self::Item: ZeroCopy;
+        Self::Item: ZeroCopy,
+        E: ByteOrder,
+        O: Size;
 
     /// Try to construct a slice from a [`Ref<[Self::Item]>`].
     ///
@@ -59,13 +77,18 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     /// use musli_zerocopy::{Error, Ref, ZeroCopy};
     /// use musli_zerocopy::slice::Slice;
     ///
-    /// fn generic<S>(r: Ref<[S::Item]>) -> Result<S, Error> where S: Slice, S::Item: ZeroCopy {
+    /// fn generic<S>(r: Ref<[S::Item]>) -> Result<S, Error>
+    /// where
+    ///     S: Slice<Item: ZeroCopy>
+    /// {
     ///     S::try_from_ref(r)
     /// }
     /// ```
-    fn try_from_ref<E: ByteOrder, O: Size>(slice: Ref<[Self::Item], E, O>) -> Result<Self, Error>
+    fn try_from_ref<E, O>(slice: Ref<[Self::Item], E, O>) -> Result<Self, Error>
     where
-        Self::Item: ZeroCopy;
+        Self::Item: ZeroCopy,
+        E: ByteOrder,
+        O: Size;
 
     /// Construct a slice from its `offset` and `len`.
     ///
@@ -274,17 +297,21 @@ where
     type ItemRef = Ref<T, A, B>;
 
     #[inline]
-    fn from_ref<E: ByteOrder, O: Size>(slice: Ref<[T], E, O>) -> Self
+    fn from_ref<E, O>(slice: Ref<[T], E, O>) -> Self
     where
         T: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
     {
         Ref::with_metadata(slice.offset(), slice.len())
     }
 
     #[inline]
-    fn try_from_ref<E: ByteOrder, O: Size>(slice: Ref<[T], E, O>) -> Result<Self, Error>
+    fn try_from_ref<E, O>(slice: Ref<[T], E, O>) -> Result<Self, Error>
     where
         T: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
     {
         Ref::try_with_metadata(slice.offset(), slice.len())
     }

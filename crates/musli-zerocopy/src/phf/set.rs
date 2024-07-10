@@ -94,9 +94,11 @@ where
 }
 
 /// Bind a [`SetRef`] into a [`Set`].
-impl<T, E: ByteOrder, O: Size> Bindable for SetRef<T, E, O>
+impl<T, E, O> Bindable for SetRef<T, E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     type Bound<'a> = Set<'a, T> where Self: 'a;
 
@@ -141,18 +143,22 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct SetRef<T, E: ByteOrder = Native, O: Size = DefaultSize>
+pub struct SetRef<T, E = Native, O = DefaultSize>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     key: Endian<HashKey, E>,
     entries: Ref<[T], E, O>,
     displacements: Ref<[Entry<u32, u32>], E, O>,
 }
 
-impl<T, E: ByteOrder, O: Size> SetRef<T, E, O>
+impl<T, E, O> SetRef<T, E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     #[cfg(feature = "alloc")]
     #[inline]
@@ -169,9 +175,11 @@ where
     }
 }
 
-impl<T, E: ByteOrder, O: Size> SetRef<T, E, O>
+impl<T, E, O> SetRef<T, E, O>
 where
     T: ZeroCopy,
+    E: ByteOrder,
+    O: Size,
 {
     /// Get a value from the set.
     ///

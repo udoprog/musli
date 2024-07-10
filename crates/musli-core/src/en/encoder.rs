@@ -868,8 +868,7 @@ pub trait Encoder: Sized {
         vectors: I,
     ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
-        I: IntoIterator,
-        I::Item: AsRef<[u8]>,
+        I: IntoIterator<Item: AsRef<[u8]>>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Bytes,

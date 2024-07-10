@@ -41,10 +41,16 @@ type StackEntry<'buf, T, F> = (LinksRef<T, F>, usize, &'buf [u8]);
 /// impl trie::Flavor for PackedTrie {
 ///     // The maximum length of a string slice stored in the trie is `u8::MAX`.
 ///     type String = Packed<[u8], u32, u8>;
+///
 ///     // The max number of values stored in a single node is `u16::MAX`.
-///     type Values<T> = Packed<[T], u32, u16> where T: ZeroCopy;
+///     type Values<T> = Packed<[T], u32, u16>
+///     where
+///         T: ZeroCopy;
+///
 ///     // The maximum number of children for a single node is `u8::MAX`.
-///     type Children<T> = Packed<[T], u32, u8> where T: ZeroCopy;
+///     type Children<T> = Packed<[T], u32, u8>
+///     where
+///         T: ZeroCopy;
 /// }
 ///
 /// fn populate<F>(buf: &mut OwnedBuf, mut trie: trie::Builder<u32, F>) -> Result<trie::TrieRef<u32, F>, Error>
@@ -94,9 +100,16 @@ pub trait Flavor {
 
 /// Marker type indicating the default trie [`Flavor`] to use for a given
 /// [`ByteOrder`] and [`Size`].
-pub struct DefaultFlavor<E: ByteOrder = Native, O: Size = DefaultSize>(PhantomData<(E, O)>);
+pub struct DefaultFlavor<E = Native, O = DefaultSize>(PhantomData<(E, O)>)
+where
+    E: ByteOrder,
+    O: Size;
 
-impl<E: ByteOrder, O: Size> Flavor for DefaultFlavor<E, O> {
+impl<E, O> Flavor for DefaultFlavor<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     type String = Ref<[u8], E, O>;
     type Values<T> = Ref<[T], E, O> where T: ZeroCopy;
     type Children<T> = Ref<[T], E, O> where T: ZeroCopy;
@@ -106,16 +119,18 @@ impl<E: ByteOrder, O: Size> Flavor for DefaultFlavor<E, O> {
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-pub struct TrieRef<T, F: Flavor = DefaultFlavor>
+pub struct TrieRef<T, F = DefaultFlavor>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     links: LinksRef<T, F>,
 }
 
-impl<T, F: Flavor> TrieRef<T, F>
+impl<T, F> TrieRef<T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     /// Debug print the current trie.
     ///
@@ -757,17 +772,19 @@ where
 ///
 /// See [`TrieRef::values_in()`].
 #[cfg(feature = "alloc")]
-pub struct ValuesIn<'a, 'buf, T, F: Flavor>
+pub struct ValuesIn<'a, 'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     iter: Walk<'a, 'buf, T, F, Vec<StackEntry<'buf, T, F>>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, 'buf, T, F: Flavor> Iterator for ValuesIn<'a, 'buf, T, F>
+impl<'a, 'buf, T, F> Iterator for ValuesIn<'a, 'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     type Item = Result<&'buf T, Error>;
 
@@ -786,16 +803,18 @@ where
 /// max iteration depth of `N`
 ///
 /// See [`TrieRef::values_in_fixed()`].
-pub struct ValuesInFixed<'a, 'buf, const N: usize, T, F: Flavor>
+pub struct ValuesInFixed<'a, 'buf, const N: usize, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     iter: Walk<'a, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
 }
 
-impl<'a, 'buf, const N: usize, T, F: Flavor> Iterator for ValuesInFixed<'a, 'buf, N, T, F>
+impl<'a, 'buf, const N: usize, T, F> Iterator for ValuesInFixed<'a, 'buf, N, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     type Item = Result<&'buf T, Error>;
 
@@ -814,17 +833,19 @@ where
 ///
 /// See [`TrieRef::values()`].
 #[cfg(feature = "alloc")]
-pub struct Values<'buf, T, F: Flavor>
+pub struct Values<'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     iter: Walk<'static, 'buf, T, F, Vec<StackEntry<'buf, T, F>>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'buf, T, F: Flavor> Iterator for Values<'buf, T, F>
+impl<'buf, T, F> Iterator for Values<'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     type Item = Result<&'buf T, Error>;
 
@@ -843,16 +864,18 @@ where
 /// depth of `N`
 ///
 /// See [`TrieRef::values_fixed()`].
-pub struct ValuesFixed<'buf, const N: usize, T, F: Flavor>
+pub struct ValuesFixed<'buf, const N: usize, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     iter: Walk<'static, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
 }
 
-impl<'buf, const N: usize, T, F: Flavor> Iterator for ValuesFixed<'buf, N, T, F>
+impl<'buf, const N: usize, T, F> Iterator for ValuesFixed<'buf, N, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     type Item = Result<&'buf T, Error>;
 
@@ -871,17 +894,19 @@ where
 ///
 /// See [`TrieRef::iter()`].
 #[cfg(feature = "alloc")]
-pub struct Iter<'buf, T, F: Flavor>
+pub struct Iter<'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     iter: Walk<'static, 'buf, T, F, Vec<StackEntry<'buf, T, F>>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'buf, T, F: Flavor> Iterator for Iter<'buf, T, F>
+impl<'buf, T, F> Iterator for Iter<'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     type Item = Result<(&'buf [u8], &'buf T), Error>;
 
@@ -895,16 +920,18 @@ where
 /// depth of `N`
 ///
 /// See [`TrieRef::iter_fixed()`].
-pub struct IterFixed<'buf, const N: usize, T, F: Flavor>
+pub struct IterFixed<'buf, const N: usize, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     iter: Walk<'static, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
 }
 
-impl<'buf, const N: usize, T, F: Flavor> Iterator for IterFixed<'buf, N, T, F>
+impl<'buf, const N: usize, T, F> Iterator for IterFixed<'buf, N, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     type Item = Result<(&'buf [u8], &'buf T), Error>;
 
@@ -918,17 +945,19 @@ where
 ///
 /// See [`TrieRef::iter_in()`].
 #[cfg(feature = "alloc")]
-pub struct IterIn<'a, 'buf, T, F: Flavor>
+pub struct IterIn<'a, 'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     iter: Walk<'a, 'buf, T, F, Vec<StackEntry<'buf, T, F>>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, 'buf, T, F: Flavor> Iterator for IterIn<'a, 'buf, T, F>
+impl<'a, 'buf, T, F> Iterator for IterIn<'a, 'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     type Item = Result<(&'buf [u8], &'buf T), Error>;
 
@@ -942,16 +971,18 @@ where
 /// fixed max iteration depth of `N`
 ///
 /// See [`TrieRef::iter_in_fixed()`].
-pub struct IterInFixed<'a, 'buf, const N: usize, T, F: Flavor>
+pub struct IterInFixed<'a, 'buf, const N: usize, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     iter: Walk<'a, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
 }
 
-impl<'a, 'buf, const N: usize, T, F: Flavor> Iterator for IterInFixed<'a, 'buf, N, T, F>
+impl<'a, 'buf, const N: usize, T, F> Iterator for IterInFixed<'a, 'buf, N, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     type Item = Result<(&'buf [u8], &'buf T), Error>;
 
@@ -965,18 +996,20 @@ where
 ///
 /// See [`TrieRef::debug()`].
 #[cfg(feature = "alloc")]
-pub struct Debug<'a, 'buf, T, F: Flavor>
+pub struct Debug<'a, 'buf, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     trie: &'a TrieRef<T, F>,
     buf: &'buf Buf,
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, 'buf, T, F: Flavor> fmt::Debug for Debug<'a, 'buf, T, F>
+impl<'a, 'buf, T, F> fmt::Debug for Debug<'a, 'buf, T, F>
 where
     T: fmt::Debug + ZeroCopy,
+    F: Flavor,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_map();
@@ -993,17 +1026,19 @@ where
 /// Debug printing of a trie with a fixed iteration depth of `N`.
 ///
 /// See [`TrieRef::debug_fixed()`].
-pub struct DebugFixed<'a, 'buf, const N: usize, T, F: Flavor>
+pub struct DebugFixed<'a, 'buf, const N: usize, T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     trie: &'a TrieRef<T, F>,
     buf: &'buf Buf,
 }
 
-impl<'a, 'buf, const N: usize, T, F: Flavor> fmt::Debug for DebugFixed<'a, 'buf, N, T, F>
+impl<'a, 'buf, const N: usize, T, F> fmt::Debug for DebugFixed<'a, 'buf, N, T, F>
 where
     T: fmt::Debug + ZeroCopy,
+    F: Flavor,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_map();
@@ -1017,9 +1052,10 @@ where
     }
 }
 
-impl<T, F: Flavor> Clone for TrieRef<T, F>
+impl<T, F> Clone for TrieRef<T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
     F::Values<T>: Clone,
     F::Children<NodeRef<T, F>>: Clone,
 {
@@ -1029,9 +1065,10 @@ where
     }
 }
 
-impl<T, F: Flavor> Copy for TrieRef<T, F>
+impl<T, F> Copy for TrieRef<T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
     F::Values<T>: Copy,
     F::Children<NodeRef<T, F>>: Copy,
 {
@@ -1040,17 +1077,19 @@ where
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-struct LinksRef<T, F: Flavor>
+struct LinksRef<T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     values: F::Values<T>,
     children: F::Children<NodeRef<T, F>>,
 }
 
-impl<T, F: Flavor> Clone for LinksRef<T, F>
+impl<T, F> Clone for LinksRef<T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
     F::Values<T>: Copy,
     F::Children<NodeRef<T, F>>: Copy,
 {
@@ -1060,9 +1099,10 @@ where
     }
 }
 
-impl<T, F: Flavor> Copy for LinksRef<T, F>
+impl<T, F> Copy for LinksRef<T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
     F::Values<T>: Copy,
     F::Children<NodeRef<T, F>>: Copy,
 {
@@ -1071,9 +1111,10 @@ where
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-struct NodeRef<T, F: Flavor>
+struct NodeRef<T, F>
 where
     T: ZeroCopy,
+    F: Flavor,
 {
     string: F::String,
     links: LinksRef<T, F>,

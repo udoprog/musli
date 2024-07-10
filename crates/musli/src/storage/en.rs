@@ -92,8 +92,7 @@ where
     #[inline]
     fn encode_bytes_vectored<I>(mut self, len: usize, vectors: I) -> Result<Self::Ok, C::Error>
     where
-        I: IntoIterator,
-        I::Item: AsRef<[u8]>,
+        I: IntoIterator<Item: AsRef<[u8]>>,
     {
         crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
 

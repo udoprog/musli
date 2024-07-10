@@ -33,7 +33,11 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 /// let mut buf = OwnedBuf::new();
 /// buf.store(&Custom { field: 10 });
 /// ```
-pub struct OwnedBuf<E: ByteOrder = Native, O: Size = DefaultSize> {
+pub struct OwnedBuf<E = Native, O = DefaultSize>
+where
+    E: ByteOrder,
+    O: Size,
+{
     data: NonNull<u8>,
     /// The initialized length of the buffer.
     len: usize,
@@ -169,7 +173,11 @@ impl OwnedBuf {
     }
 }
 
-impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
+impl<E, O> OwnedBuf<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     /// Modify the buffer to utilize the specified pointer size when inserting
     /// references.
     ///
@@ -207,7 +215,10 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     ///     .with_byte_order::<endian::Little>();
     /// ```
     #[inline]
-    pub fn with_byte_order<U: ByteOrder>(self) -> OwnedBuf<U, O> {
+    pub fn with_byte_order<U>(self) -> OwnedBuf<U, O>
+    where
+        U: ByteOrder,
+    {
         let this = ManuallyDrop::new(self);
 
         OwnedBuf {
@@ -539,12 +550,14 @@ impl<E: ByteOrder, O: Size> OwnedBuf<E, O> {
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn load_uninit_mut<T, U: ByteOrder, I: Size>(
+    pub fn load_uninit_mut<T, U, I>(
         &mut self,
         reference: Ref<MaybeUninit<T>, U, I>,
     ) -> &mut MaybeUninit<T>
     where
         T: ZeroCopy,
+        U: ByteOrder,
+        I: Size,
     {
         let at = reference.offset();
 
@@ -1125,7 +1138,11 @@ unsafe impl Send for OwnedBuf {}
 /// unaliased.
 unsafe impl Sync for OwnedBuf {}
 
-impl<E: ByteOrder, O: Size> Deref for OwnedBuf<E, O> {
+impl<E, O> Deref for OwnedBuf<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     type Target = Buf;
 
     #[inline]
@@ -1134,14 +1151,22 @@ impl<E: ByteOrder, O: Size> Deref for OwnedBuf<E, O> {
     }
 }
 
-impl<E: ByteOrder, O: Size> DerefMut for OwnedBuf<E, O> {
+impl<E, O> DerefMut for OwnedBuf<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         Buf::new_mut(self.as_mut_slice())
     }
 }
 
-impl<E: ByteOrder, O: Size> AsRef<Buf> for OwnedBuf<E, O> {
+impl<E, O> AsRef<Buf> for OwnedBuf<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     /// Trivial `AsRef<Buf>` implementation for `OwnedBuf<O>`.
     ///
     /// # Examples
@@ -1162,7 +1187,11 @@ impl<E: ByteOrder, O: Size> AsRef<Buf> for OwnedBuf<E, O> {
     }
 }
 
-impl<E: ByteOrder, O: Size> AsMut<Buf> for OwnedBuf<E, O> {
+impl<E, O> AsMut<Buf> for OwnedBuf<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     /// Trivial `AsMut<Buf>` implementation for `OwnedBuf<O>`.
     ///
     /// # Examples
@@ -1184,7 +1213,11 @@ impl<E: ByteOrder, O: Size> AsMut<Buf> for OwnedBuf<E, O> {
     }
 }
 
-impl<E: ByteOrder, O: Size> Borrow<Buf> for OwnedBuf<E, O> {
+impl<E, O> Borrow<Buf> for OwnedBuf<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     #[inline]
     fn borrow(&self) -> &Buf {
         self.as_ref()
@@ -1219,7 +1252,11 @@ impl<E: ByteOrder, O: Size> Borrow<Buf> for OwnedBuf<E, O> {
 /// buf.align_in_place();
 /// assert!(buf.alignment() >= align_of::<u32>());
 /// ```
-impl<E: ByteOrder, O: Size> Clone for OwnedBuf<E, O> {
+impl<E, O> Clone for OwnedBuf<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     fn clone(&self) -> Self {
         unsafe {
             let mut new = ManuallyDrop::new(Self::with_capacity_and_custom_alignment(
@@ -1235,7 +1272,11 @@ impl<E: ByteOrder, O: Size> Clone for OwnedBuf<E, O> {
     }
 }
 
-impl<E: ByteOrder, O: Size> Drop for OwnedBuf<E, O> {
+impl<E, O> Drop for OwnedBuf<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     fn drop(&mut self) {
         unsafe {
             if self.capacity != 0 {
@@ -1263,7 +1304,11 @@ const fn invalid_mut<T>(addr: usize) -> *mut T {
     unsafe { core::mem::transmute(addr) }
 }
 
-impl<E: ByteOrder, O: Size> StoreBuf for OwnedBuf<E, O> {
+impl<E, O> StoreBuf for OwnedBuf<E, O>
+where
+    E: ByteOrder,
+    O: Size,
+{
     type ByteOrder = E;
     type Size = O;
 

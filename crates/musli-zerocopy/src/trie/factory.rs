@@ -47,7 +47,7 @@ use super::{prefix, DefaultFlavor, Flavor, LinksRef, NodeRef, TrieRef};
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 #[cfg(feature = "alloc")]
-pub fn store<S, E: ByteOrder, O: Size, I, T>(
+pub fn store<S, E, O, I, T>(
     buf: &mut OwnedBuf<E, O>,
     it: I,
 ) -> Result<TrieRef<T, DefaultFlavor<E, O>>, Error>
@@ -55,6 +55,8 @@ where
     I: IntoIterator<Item = (Ref<S, E, O>, T)>,
     T: ZeroCopy,
     S: ?Sized + Pointee + Coerce<[u8]>,
+    E: ByteOrder,
+    O: Size,
 {
     // First step is to construct the trie in-memory.
     let mut trie = Builder::with_flavor();
@@ -70,7 +72,10 @@ where
 ///
 /// This can be used over [`store()`] to provide more control.
 #[cfg(feature = "alloc")]
-pub struct Builder<T, F: Flavor = DefaultFlavor> {
+pub struct Builder<T, F = DefaultFlavor>
+where
+    F: Flavor,
+{
     links: Links<T>,
     _marker: PhantomData<F>,
 }
@@ -93,7 +98,10 @@ impl<T> Default for Builder<T> {
 }
 
 #[cfg(feature = "alloc")]
-impl<T, F: Flavor> Builder<T, F> {
+impl<T, F> Builder<T, F>
+where
+    F: Flavor,
+{
     /// Construct a new empty trie builder with a custom [`Flavor`].
     pub const fn with_flavor() -> Self {
         Self {
@@ -133,7 +141,7 @@ impl<T, F: Flavor> Builder<T, F> {
     /// assert_eq!(trie.get(&buf, "working")?, Some(&[4, 5][..]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn insert<S, E: ByteOrder, O: Size>(
+    pub fn insert<S, E, O>(
         &mut self,
         buf: &Buf,
         string: Ref<S, E, O>,
@@ -141,6 +149,8 @@ impl<T, F: Flavor> Builder<T, F> {
     ) -> Result<(), Error>
     where
         S: ?Sized + Pointee + Coerce<[u8]>,
+        E: ByteOrder,
+        O: Size,
     {
         let mut string = string.coerce::<[u8]>();
         let mut current = buf.load(string)?;
@@ -240,12 +250,11 @@ impl<T, F: Flavor> Builder<T, F> {
     /// assert_eq!(trie.get(&buf, "working")?, Some(&[4][..]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn build<E: ByteOrder, O: Size>(
-        self,
-        buf: &mut OwnedBuf<E, O>,
-    ) -> Result<TrieRef<T, F>, Error>
+    pub fn build<E, O>(self, buf: &mut OwnedBuf<E, O>) -> Result<TrieRef<T, F>, Error>
     where
         T: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
     {
         Ok(TrieRef {
             links: self.links.into_ref(buf)?,
@@ -275,12 +284,12 @@ impl<T> Links<T> {
         }
     }
 
-    fn into_ref<E: ByteOrder, O: Size, F: Flavor>(
-        self,
-        buf: &mut OwnedBuf<E, O>,
-    ) -> Result<LinksRef<T, F>, Error>
+    fn into_ref<E, O, F>(self, buf: &mut OwnedBuf<E, O>) -> Result<LinksRef<T, F>, Error>
     where
         T: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
+        F: Flavor,
     {
         let values = F::Values::try_from_ref(buf.store_slice(&self.values))?;
 
@@ -310,12 +319,12 @@ impl<T> Node<T> {
         }
     }
 
-    fn into_ref<E: ByteOrder, O: Size, F: Flavor>(
-        self,
-        buf: &mut OwnedBuf<E, O>,
-    ) -> Result<NodeRef<T, F>, Error>
+    fn into_ref<E, O, F>(self, buf: &mut OwnedBuf<E, O>) -> Result<NodeRef<T, F>, Error>
     where
         T: ZeroCopy,
+        E: ByteOrder,
+        O: Size,
+        F: Flavor,
     {
         Ok(NodeRef {
             string: F::String::try_from_ref(self.string)?,
