@@ -75,7 +75,7 @@ bincode = { version = "1.3.3", default-features = false, optional = true }
 serde_json = { version = "1.0.114", default-features = false, features = ["float_roundtrip"], optional = true }
 serde_cbor = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
 dlhn = { version = "0.1.6", default-features = false, optional = true }
-bitcode = { version = "0.6.0", default-features = false, optional = true }
+bitcode = { version = "0.6.0", default-features = false, optional = true, features = ["std"] }
 rkyv = { version = "0.7.44", default-features = false, optional = true, features = ["size_32", "validation", "strict"] }
 postcard = { version = "1.0.8",  default-features = false, optional = true }
 bson = { version = "2.9.0", default-features = false, optional = true }
