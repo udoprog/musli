@@ -86,6 +86,7 @@ where
 
             macro_rules! fixed {
                 ($ty:ty) => {{
+                    #[allow(irrefutable_let_patterns)]
                     let Ok(value) = usize::try_from(<$ty>::read_bytes(cx, reader, bo)?) else {
                         return Err(cx.message("Value type out of bounds for usize"));
                     };

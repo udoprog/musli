@@ -139,6 +139,7 @@ where
 
             macro_rules! fixed {
                 ($ty:ty) => {{
+                    #[allow(irrefutable_let_patterns)]
                     let Ok(value) =
                         usize::try_from(<$ty as UnsignedOps>::read_bytes(cx, reader, bo)?)
                     else {
