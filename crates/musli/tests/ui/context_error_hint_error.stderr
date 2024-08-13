@@ -7,16 +7,6 @@ error[E0599]: the function or associated item `new` exists for struct `Capture<B
 16 |     let _cx = Capture::<Binary, MyError, _>::new();
    |                                              ^^^ function or associated item cannot be called on `Capture<Binary, MyError, _>` due to unsatisfied trait bounds
    |
-note: if you're trying to build a new `musli::context::Capture<musli::mode::Binary, MyError, _>` consider using one of the following associated functions:
-      musli::context::Capture::<M, E, &'static musli::alloc::System>::new
-      musli::context::Capture::<M, E, A>::with_alloc
-  --> src/context/capture.rs
-   |
-   |     pub fn new() -> Self {
-   |     ^^^^^^^^^^^^^^^^^^^^
-...
-   |     pub fn with_alloc(alloc: A) -> Self {
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    = note: the following trait bounds were not satisfied:
            `MyError: ContextError`
 note: the trait `ContextError` must be implemented
