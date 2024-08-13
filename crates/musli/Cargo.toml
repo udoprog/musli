@@ -34,6 +34,7 @@ json = ["value", "dep:itoa", "dep:ryu"]
 parse-full = []
 value = []
 serde = ["dep:serde"]
+error_in_core = []
 
 test = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde"]
 

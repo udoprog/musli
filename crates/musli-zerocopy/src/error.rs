@@ -141,6 +141,9 @@ impl std::error::Error for Error {
     }
 }
 
+#[cfg(all(not(feature = "std"), feature = "error_in_core"))]
+impl core::error::Error for Error {}
+
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 #[non_exhaustive]

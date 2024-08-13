@@ -55,6 +55,9 @@ impl std::error::Error for Error {
     }
 }
 
+#[cfg(all(not(feature = "std"), not(feature = "alloc"), feature = "error_in_core"))]
+impl core::error::Error for Error {}
+
 impl ContextError for Error {
     #[inline]
     #[allow(unused_variables)]

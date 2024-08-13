@@ -48,6 +48,9 @@ impl fmt::Display for ErrorImpl {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
+#[cfg(all(not(feature = "std"), feature = "error_in_core"))]
+impl core::error::Error for Error {}
+
 impl ContextError for Error {
     #[inline]
     fn custom<T>(error: T) -> Self
