@@ -1,6 +1,6 @@
 use std::hint::black_box;
 
-use criterion::{criterion_group, Criterion};
+use criterion::Criterion;
 
 use tests::models::*;
 use tests::utils;

@@ -3,7 +3,7 @@ use crate::Context;
 use super::{Decode, Decoder, EntriesDecoder, EntryDecoder, SizeHint};
 
 /// Trait governing how to decode a sequence of pairs.
-pub trait MapDecoder<'de>: Sized {
+pub trait MapDecoder<'de> {
     /// Context associated with the decoder.
     type Cx: ?Sized + Context;
     /// The decoder to use for a key.

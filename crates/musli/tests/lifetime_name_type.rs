@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(clippy::byte_char_slices)]
 
 use bstr::BStr;
 use musli::{Decode, Encode};

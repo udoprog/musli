@@ -1,3 +1,5 @@
+#![allow(clippy::assertions_on_constants)]
+
 use crate::endian::{Big, Little, Other};
 use crate::{ByteOrder, Endian, ZeroCopy};
 

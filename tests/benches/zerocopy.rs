@@ -1,5 +1,3 @@
-use std::hint::black_box;
-
 use criterion::Criterion;
 
 #[cfg(feature = "musli-zerocopy")]
@@ -24,13 +22,17 @@ struct DataRkyv {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
+    #[allow(unused)]
     let vec_size = 1000;
+    #[allow(unused)]
     let some_long_str = "some_long_string".repeat(100).to_string();
-
+    #[allow(unused)]
     let mut g = c.benchmark_group("zerocopy");
 
     #[cfg(feature = "musli-zerocopy")]
     g.bench_function("musli/checked", |b| {
+        use std::hint::black_box;
+
         let mut buf = OwnedBuf::new();
 
         let maybe_uninit = buf.store_uninit::<DataMusli>();
@@ -64,6 +66,8 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     #[cfg(feature = "rkyv")]
     g.bench_function("rkyv/unchecked", |b| {
+        use std::hint::black_box;
+
         let data = DataRkyv {
             slice: (0..vec_size)
                 .map(|_| some_long_str.as_bytes().to_vec())
@@ -87,6 +91,8 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     #[cfg(feature = "rkyv")]
     g.bench_function("rkyv/checked", |b| {
+        use std::hint::black_box;
+
         let data = DataRkyv {
             slice: (0..vec_size)
                 .map(|_| some_long_str.as_bytes().to_vec())
