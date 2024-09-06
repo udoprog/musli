@@ -3,7 +3,7 @@ use crate::Context;
 use super::{Decode, Decoder, SizeHint};
 
 /// Trait governing how to decode a sequence.
-pub trait SequenceDecoder<'de>: Sized {
+pub trait SequenceDecoder<'de> {
     /// Context associated with the decoder.
     type Cx: ?Sized + Context;
     /// The decoder for individual items.
@@ -39,7 +39,6 @@ pub trait SequenceDecoder<'de>: Sized {
     #[inline]
     fn next<T>(&mut self) -> Result<T, <Self::Cx as Context>::Error>
     where
-        Self: Sized,
         T: Decode<'de, <Self::Cx as Context>::Mode>,
     {
         self.decode_next()?.decode()
@@ -49,7 +48,6 @@ pub trait SequenceDecoder<'de>: Sized {
     #[inline]
     fn try_next<T>(&mut self) -> Result<Option<T>, <Self::Cx as Context>::Error>
     where
-        Self: Sized,
         T: Decode<'de, <Self::Cx as Context>::Mode>,
     {
         let Some(decoder) = self.try_decode_next()? else {

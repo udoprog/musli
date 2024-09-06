@@ -10,7 +10,7 @@ use super::{Decoder, SizeHint};
 /// If you do not intend to implement this, then serde compatibility for your
 /// format might be degraded.
 #[must_use = "Must call end_entries to complete decoding"]
-pub trait EntriesDecoder<'de>: Sized {
+pub trait EntriesDecoder<'de> {
     /// Context associated with the decoder.
     type Cx: ?Sized + Context;
     /// The decoder to use for a tuple field index.

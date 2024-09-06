@@ -319,7 +319,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     #[inline]
     fn visit_sequence<D>(self, _: &C, seq: &mut D) -> Result<Self::Ok, C::Error>
     where
-        D: SequenceDecoder<'de, Cx = C>,
+        D: ?Sized + SequenceDecoder<'de, Cx = C>,
     {
         let mut out = Vec::with_capacity(seq.size_hint().or_default());
 
@@ -334,7 +334,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     #[inline]
     fn visit_map<D>(self, _: &C, map: &mut D) -> Result<Self::Ok, C::Error>
     where
-        D: MapDecoder<'de, Cx = C>,
+        D: ?Sized + MapDecoder<'de, Cx = C>,
     {
         let mut out = Vec::with_capacity(map.size_hint().or_default());
 

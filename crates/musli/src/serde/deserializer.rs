@@ -482,7 +482,7 @@ where
 
 struct SeqAccess<'de, 'a, D>
 where
-    D: SequenceDecoder<'de>,
+    D: ?Sized + SequenceDecoder<'de>,
 {
     cx: &'a D::Cx,
     decoder: &'a mut D,
@@ -490,7 +490,7 @@ where
 
 impl<'de, 'a, D> SeqAccess<'de, 'a, D>
 where
-    D: SequenceDecoder<'de>,
+    D: ?Sized + SequenceDecoder<'de>,
 {
     fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
         Self { cx, decoder }
@@ -499,7 +499,7 @@ where
 
 impl<'de, 'a, D> de::SeqAccess<'de> for SeqAccess<'de, 'a, D>
 where
-    D: SequenceDecoder<'de>,
+    D: ?Sized + SequenceDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
 {
     type Error = <D::Cx as Context>::Error;
@@ -523,26 +523,26 @@ where
     }
 }
 
-struct MapAccess<'de, 'a, D: ?Sized>
+struct MapAccess<'de, 'a, D>
 where
-    D: EntriesDecoder<'de>,
+    D: ?Sized + EntriesDecoder<'de>,
 {
     cx: &'a D::Cx,
     decoder: &'a mut D,
 }
 
-impl<'de, 'a, D: ?Sized> MapAccess<'de, 'a, D>
+impl<'de, 'a, D> MapAccess<'de, 'a, D>
 where
-    D: EntriesDecoder<'de>,
+    D: ?Sized + EntriesDecoder<'de>,
 {
     fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
         Self { cx, decoder }
     }
 }
 
-impl<'de, 'a, D: ?Sized> de::MapAccess<'de> for MapAccess<'de, 'a, D>
+impl<'de, 'a, D> de::MapAccess<'de> for MapAccess<'de, 'a, D>
 where
-    D: EntriesDecoder<'de>,
+    D: ?Sized + EntriesDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
 {
     type Error = <D::Cx as Context>::Error;
@@ -842,7 +842,7 @@ where
     #[inline]
     fn visit_sequence<D>(self, cx: &C, decoder: &mut D) -> Result<Self::Ok, C::Error>
     where
-        D: SequenceDecoder<'de, Cx = C>,
+        D: ?Sized + SequenceDecoder<'de, Cx = C>,
     {
         self.visitor.visit_seq(SeqAccess::new(cx, decoder))
     }
@@ -850,7 +850,7 @@ where
     #[inline]
     fn visit_map<D>(self, cx: &C, decoder: &mut D) -> Result<Self::Ok, C::Error>
     where
-        D: MapDecoder<'de, Cx = C>,
+        D: ?Sized + MapDecoder<'de, Cx = C>,
     {
         let mut map_decoder = decoder.decode_remaining_entries()?;
         let value = self
