@@ -8,6 +8,15 @@ homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
 publish = false
+autobenches = false
+
+[[bench]]
+name = "comparison"
+harness = false
+
+[[bench]]
+name = "zerocopy"
+harness = false
 
 [features]
 default = ["std", "alloc"]
@@ -85,7 +94,3 @@ miniserde = { version = "0.1.38", default-features = false, optional = true }
 [dev-dependencies]
 tests = { path = ".", features = ["test"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
-
-[[bench]]
-name = "comparison"
-harness = false

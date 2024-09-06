@@ -1,6 +1,6 @@
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, Criterion};
 
 use tests::models::*;
 use tests::utils;
@@ -168,5 +168,5 @@ fn criterion_benchmark(c: &mut Criterion) {
     tests::types!(setup);
 }
 
-criterion_group!(benches, criterion_benchmark);
-criterion_main!(benches);
+criterion::criterion_group!(benches, criterion_benchmark);
+criterion::criterion_main!(benches);
