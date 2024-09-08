@@ -3,7 +3,7 @@ name = "musli-core"
 version = "0.0.123"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2021"
-rust-version = "1.79"
+rust-version = "1.81"
 description = """
 Core traits and types for the Müsli serialization framework.
 """

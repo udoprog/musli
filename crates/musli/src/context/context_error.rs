@@ -5,9 +5,8 @@
 //! encoding implementations to raise custom errors based on types that
 //! implement [Display][core::fmt::Display].
 
+use core::error::Error;
 use core::fmt;
-
-use crate::no_std;
 
 #[cfg(feature = "alloc")]
 use rust_alloc::string::{String, ToString};
@@ -22,7 +21,7 @@ pub trait ContextError: Sized + 'static + Send + Sync + fmt::Display + fmt::Debu
     /// Construct a custom error.
     fn custom<T>(error: T) -> Self
     where
-        T: 'static + Send + Sync + no_std::Error;
+        T: 'static + Send + Sync + Error;
 
     /// Collect an error from something that can be displayed.
     ///
@@ -33,20 +32,20 @@ pub trait ContextError: Sized + 'static + Send + Sync + fmt::Display + fmt::Debu
         T: fmt::Display;
 }
 
-#[cfg(all(feature = "std", feature = "alloc"))]
+#[cfg(feature = "std")]
 impl ContextError for std::io::Error {
     fn custom<T>(message: T) -> Self
     where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+        T: 'static + Send + Sync + Error,
     {
-        std::io::Error::new(std::io::ErrorKind::Other, message.to_string())
+        std::io::Error::new(std::io::ErrorKind::Other, message)
     }
 
     fn message<T>(message: T) -> Self
     where
         T: fmt::Display,
     {
-        std::io::Error::new(std::io::ErrorKind::Other, message.to_string())
+        std::io::Error::new(std::io::ErrorKind::Other, std::format!("{message}"))
     }
 }
 

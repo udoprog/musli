@@ -15,8 +15,7 @@ impl fmt::Display for CapacityError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for CapacityError {}
+impl core::error::Error for CapacityError {}
 
 /// A fixed capacity vector allocated on the stack.
 pub(crate) struct FixedVec<T, const N: usize> {

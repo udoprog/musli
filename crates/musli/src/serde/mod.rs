@@ -84,7 +84,7 @@
 //! assert_eq!(musli.address.city, "Springfield");
 //! assert_eq!(musli.address.zip, 12345);
 //! assert_eq!(musli.url, "https://example.com/");
-//! # Ok::<_, Box<dyn std::error::Error>>(())
+//! # Ok::<_, Box<dyn core::error::Error>>(())
 //! ```
 
 #![cfg(feature = "serde")]
@@ -95,6 +95,7 @@ mod error;
 mod serializer;
 
 use core::cell::RefCell;
+use core::error::Error;
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -103,7 +104,6 @@ use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
 use crate::alloc::{self, String};
-use crate::no_std;
 use crate::{Context, Decoder, Encoder};
 
 struct SerdeContext<'a, C>
@@ -153,7 +153,7 @@ where
     #[inline]
     fn custom<T>(&self, error: T) -> Self::Error
     where
-        T: 'static + Send + Sync + no_std::Error,
+        T: 'static + Send + Sync + Error,
     {
         *self.error.borrow_mut() = Some(self.inner.custom(error));
         error::SerdeError::Captured

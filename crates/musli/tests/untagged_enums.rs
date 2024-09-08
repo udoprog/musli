@@ -40,7 +40,7 @@ pub struct EmptyVariant;
 /// Untagged enums may only implement `Encode`, and will be encoded according to
 /// the exact specification of fields part of the variant.
 #[test]
-fn untagged_enums() -> Result<(), Box<dyn std::error::Error>> {
+fn untagged_enums() -> Result<(), Box<dyn core::error::Error>> {
     musli::macros::assert_decode_eq! {
         full,
         Enum::EmptyVariant1,

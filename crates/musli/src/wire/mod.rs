@@ -28,7 +28,7 @@
 //!     age: Option<u32>,
 //! }
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # fn main() -> Result<(), Box<dyn core::error::Error>> {
 //! let version2 = musli::wire::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(61),

@@ -19,17 +19,13 @@ use core::fmt;
 #[cfg(not(feature = "simdutf8"))]
 #[doc(inline)]
 pub use core::str::from_utf8;
-#[cfg(feature = "simdutf8")]
-#[doc(inline)]
-pub use simdutf8::basic::from_utf8;
 
 /// Error raised in case the UTF-8 sequence could not be decoded.
-#[non_exhaustive]
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Utf8Error;
 
-#[cfg(feature = "std")]
-impl std::error::Error for Utf8Error {}
+impl core::error::Error for Utf8Error {}
 
 impl fmt::Display for Utf8Error {
     #[inline]
@@ -58,10 +54,25 @@ pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
 #[inline(always)]
 #[cfg(all(feature = "alloc", feature = "simdutf8"))]
 pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
-    if from_utf8(&bytes).is_err() {
+    if simdutf8::basic::from_utf8(&bytes).is_err() {
         return Err(Utf8Error);
     }
 
     // SAFETY: String was checked above.
     Ok(unsafe { String::from_utf8_unchecked(bytes) })
+}
+
+/// Analogue to [`core::str::from_utf8()`].
+///
+/// Checks if the passed byte sequence is valid UTF-8 and returns an
+/// [`std::str`] reference to the passed byte slice wrapped in `Ok()` if it is.
+///
+/// # Errors
+///
+/// Will return the zero-sized Err([`Utf8Error`]) on if the input contains
+/// invalid UTF-8.
+#[inline]
+#[cfg(feature = "simdutf8")]
+pub fn from_utf8(input: &[u8]) -> Result<&str, Utf8Error> {
+    simdutf8::basic::from_utf8(input).map_err(|_| Utf8Error)
 }
