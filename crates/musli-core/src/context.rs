@@ -1,11 +1,11 @@
 //! Things related to working with contexts.
 
+use core::error::Error;
 use core::fmt;
 use core::str;
 
 use crate::alloc::Allocator;
 use crate::de::{DecodeBytes, DecodeUnsized, DecodeUnsizedBytes};
-use crate::no_std;
 use crate::{Decode, Decoder};
 
 /// Provides ergonomic access to the serialization context.
@@ -83,7 +83,7 @@ pub trait Context {
     #[inline]
     fn map<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
     where
-        T: 'static + Send + Sync + no_std::Error,
+        T: 'static + Send + Sync + Error,
     {
         move |error| self.custom(error)
     }
@@ -93,7 +93,7 @@ pub trait Context {
     /// reporting error-like things out from the context.
     fn custom<T>(&self, error: T) -> Self::Error
     where
-        T: 'static + Send + Sync + no_std::Error;
+        T: 'static + Send + Sync + Error;
 
     /// Generate a map function which maps an error using the `message` function.
     #[inline]
@@ -131,7 +131,7 @@ pub trait Context {
     #[inline(always)]
     fn marked_custom<T>(&self, mark: Self::Mark, message: T) -> Self::Error
     where
-        T: 'static + Send + Sync + no_std::Error,
+        T: 'static + Send + Sync + Error,
     {
         self.custom(message)
     }

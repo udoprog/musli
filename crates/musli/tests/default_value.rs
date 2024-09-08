@@ -68,7 +68,7 @@ fn default_age() -> u32 {
 
 // Ensure that skipped over fields ensures compatibility.
 #[test]
-fn decode_with_default() -> Result<(), Box<dyn std::error::Error>> {
+fn decode_with_default() -> Result<(), Box<dyn core::error::Error>> {
     static NAME: &str = "Aristotle";
     static COUNTRY: &str = "Greece";
 

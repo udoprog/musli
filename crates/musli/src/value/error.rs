@@ -45,8 +45,7 @@ impl fmt::Display for ErrorImpl {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for Error {}
+impl core::error::Error for Error {}
 
 impl ContextError for Error {
     #[inline]

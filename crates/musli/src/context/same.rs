@@ -1,3 +1,4 @@
+use core::error::Error;
 use core::fmt;
 use core::marker::PhantomData;
 
@@ -6,7 +7,6 @@ use crate::alloc::{self, Allocator, String};
 use crate::alloc::{System, SYSTEM};
 #[cfg(test)]
 use crate::mode::Binary;
-use crate::no_std;
 use crate::Context;
 
 use super::ContextError;
@@ -90,7 +90,7 @@ where
     #[inline]
     fn custom<T>(&self, message: T) -> Self::Error
     where
-        T: 'static + Send + Sync + no_std::Error,
+        T: 'static + Send + Sync + Error,
     {
         E::custom(message)
     }

@@ -6,7 +6,6 @@ use rust_alloc::boxed::Box;
 use rust_alloc::string::ToString;
 
 use crate::context::ContextError;
-use crate::no_std;
 
 /// Error raised during descriptive encoding.
 #[derive(Debug)]
@@ -26,7 +25,7 @@ enum ErrorImpl {
     #[cfg(feature = "alloc")]
     Message(Box<str>),
     #[cfg(feature = "alloc")]
-    Custom(Box<dyn 'static + Send + Sync + no_std::Error>),
+    Custom(Box<dyn 'static + Send + Sync + core::error::Error>),
     #[cfg(not(feature = "alloc"))]
     Empty,
 }
@@ -44,11 +43,11 @@ impl fmt::Display for ErrorImpl {
     }
 }
 
-#[cfg(all(feature = "std", feature = "alloc"))]
-impl std::error::Error for Error {
+impl core::error::Error for Error {
     #[inline]
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.err {
+            #[cfg(feature = "alloc")]
             ErrorImpl::Custom(err) => Some(&**err),
             _ => None,
         }
@@ -60,7 +59,7 @@ impl ContextError for Error {
     #[allow(unused_variables)]
     fn custom<T>(error: T) -> Self
     where
-        T: 'static + Send + Sync + no_std::Error,
+        T: 'static + Send + Sync + core::error::Error,
     {
         Self {
             #[cfg(feature = "alloc")]

@@ -603,5 +603,4 @@ impl fmt::Display for SliceUnderflow {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for SliceUnderflow {}
+impl core::error::Error for SliceUnderflow {}

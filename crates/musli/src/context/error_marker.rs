@@ -17,8 +17,7 @@ impl fmt::Display for ErrorMarker {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ErrorMarker {}
+impl core::error::Error for ErrorMarker {}
 
 #[cfg(test)]
 impl crate::context::ContextError for ErrorMarker {

@@ -1,11 +1,11 @@
 use core::cell::UnsafeCell;
+use core::error::Error;
 use core::fmt;
 use core::marker::PhantomData;
 
 use crate::alloc::{self, Allocator, String};
 #[cfg(feature = "alloc")]
 use crate::alloc::{System, SYSTEM};
-use crate::no_std;
 use crate::Context;
 
 use super::{ContextError, ErrorMarker};
@@ -92,7 +92,7 @@ where
     #[inline]
     fn custom<T>(&self, error: T) -> ErrorMarker
     where
-        T: 'static + Send + Sync + no_std::Error,
+        T: 'static + Send + Sync + Error,
     {
         // SAFETY: We're restricting access to the context, so that this is
         // safe.

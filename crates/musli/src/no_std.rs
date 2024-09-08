@@ -2,18 +2,9 @@
 //!
 //! * [`ToOwned`] - if the `alloc` feature is enabled, this is an alias for
 //!   `alloc::borrow::ToOwned`.
-//! * [`Error`] - if the `std` feature is enabled, this is an alias for
-//!   `std::error::Error`. If the `std` feature is disabled, this is a trait
-//!   which is implemented for everything that implements [`Debug`] and
-//!   [`Display`]. Note that this means that enabling the `std` feature might
-//!   cause code that is designed carelessly to break due to no longer
-//!   implementing the trait.
-//!
-//! [`Debug`]: core::fmt::Debug
-//! [`Display`]: core::fmt::Display
 
 #[doc(inline)]
-pub use musli_core::no_std::{Error, ToOwned};
+pub use musli_core::no_std::ToOwned;
 
 /// A somewhat portable, but also noisy abort implementation for no_std
 /// environments.
