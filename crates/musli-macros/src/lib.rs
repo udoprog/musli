@@ -12,6 +12,8 @@
 #![allow(clippy::needless_late_init)]
 #![allow(missing_docs)]
 
+#[cfg(feature = "api")]
+mod api;
 mod de;
 mod en;
 mod expander;
@@ -21,6 +23,30 @@ mod types;
 use proc_macro::TokenStream;
 
 const CRATE_DEFAULT: &str = "musli";
+
+#[doc(hidden)]
+#[proc_macro_derive(Endpoint, attributes(endpoint))]
+#[cfg(feature = "api")]
+pub fn endpoint(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    match api::endpoint(input, CRATE_DEFAULT, "api") {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
+
+#[doc(hidden)]
+#[proc_macro_derive(Request, attributes(request))]
+#[cfg(feature = "api")]
+pub fn request(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    match api::request(input, CRATE_DEFAULT, "api") {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.to_compile_error().into(),
+    }
+}
 
 /// Derive which automatically implements the [`Encode` trait].
 ///

@@ -12,7 +12,7 @@ readme = "README.md"
 homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
-keywords = ["no_std", "serialization"]
+keywords = ["binary", "json", "no_std", "serialization"]
 categories = ["encoding", "no-std", "no-std::no-alloc"]
 
 [package.metadata.docs.rs]
@@ -34,11 +34,13 @@ json = ["value", "dep:itoa", "dep:ryu"]
 parse-full = []
 value = []
 serde = ["dep:serde"]
+api = ["musli-macros/api", "storage"]
 
 test = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde"]
 
 [dependencies]
 musli-core = { version = "=0.0.124", path = "../musli-core", default-features = false }
+musli-macros = { version = "=0.0.124", path = "../musli-macros", features = [], optional = true }
 
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 itoa = { version = "1.0.10", optional = true }
@@ -49,7 +51,7 @@ serde = { version = "1.0.198", optional = true, default-features = false}
 loom = "0.7.2"
 
 [dev-dependencies]
-musli = { path = ".", features = ["test"] }
+musli = { path = ".", features = ["test", "api"] }
 tests = { path = "../../tests" }
 
 rand = "0.8.5"
