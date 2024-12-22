@@ -899,12 +899,12 @@ where
 }
 
 /// `SliceMut` are `Send` because the data they reference is unaliased.
-unsafe impl<'a> Send for SliceMut<'a> {}
+unsafe impl Send for SliceMut<'_> {}
 /// `SliceMut` are `Sync` since they are `Send` and the data they reference is
 /// unaliased.
-unsafe impl<'a> Sync for SliceMut<'a> {}
+unsafe impl Sync for SliceMut<'_> {}
 
-impl<'a, E, O> Deref for SliceMut<'a, E, O>
+impl<E, O> Deref for SliceMut<'_, E, O>
 where
     E: ByteOrder,
     O: Size,
@@ -917,7 +917,7 @@ where
     }
 }
 
-impl<'a, E, O> DerefMut for SliceMut<'a, E, O>
+impl<E, O> DerefMut for SliceMut<'_, E, O>
 where
     E: ByteOrder,
     O: Size,
@@ -928,7 +928,7 @@ where
     }
 }
 
-impl<'a, E, O> AsRef<Buf> for SliceMut<'a, E, O>
+impl<E, O> AsRef<Buf> for SliceMut<'_, E, O>
 where
     E: ByteOrder,
     O: Size,
@@ -955,7 +955,7 @@ where
     }
 }
 
-impl<'a, E, O> AsMut<Buf> for SliceMut<'a, E, O>
+impl<E, O> AsMut<Buf> for SliceMut<'_, E, O>
 where
     E: ByteOrder,
     O: Size,
@@ -983,7 +983,7 @@ where
     }
 }
 
-impl<'a, E, O> Borrow<Buf> for SliceMut<'a, E, O>
+impl<E, O> Borrow<Buf> for SliceMut<'_, E, O>
 where
     E: ByteOrder,
     O: Size,
@@ -994,7 +994,7 @@ where
     }
 }
 
-impl<'a, E, O> StoreBuf for SliceMut<'a, E, O>
+impl<E, O> StoreBuf for SliceMut<'_, E, O>
 where
     E: ByteOrder,
     O: Size,

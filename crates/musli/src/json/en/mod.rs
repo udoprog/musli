@@ -43,7 +43,10 @@ where
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U> = JsonEncoder<'this, W, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = JsonEncoder<'this, W, U>
+    where
+        U: 'this + Context;
     type EncodePack = JsonArrayEncoder<'a, W, C>;
     type EncodeSome = Self;
     type EncodeSequence = JsonArrayEncoder<'a, W, C>;

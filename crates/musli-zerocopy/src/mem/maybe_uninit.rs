@@ -114,7 +114,8 @@ where
     T: Pointee,
 {
     type Metadata = T::Metadata;
-    type Stored<O> = T::Stored<O>
+    type Stored<O>
+        = T::Stored<O>
     where
         O: Size;
 

@@ -33,7 +33,7 @@ where
     }
 }
 
-impl<'de, 'a, D> de::Deserializer<'de> for Deserializer<'de, 'a, D>
+impl<'de, D> de::Deserializer<'de> for Deserializer<'de, '_, D>
 where
     D: Decoder<'de>,
     <D::Cx as Context>::Error: de::Error,
@@ -360,7 +360,7 @@ where
     }
 }
 
-impl<'de, 'a, D> de::SeqAccess<'de> for SequenceAccess<'de, 'a, D>
+impl<'de, D> de::SeqAccess<'de> for SequenceAccess<'de, '_, D>
 where
     D: SequenceDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
@@ -403,7 +403,7 @@ where
     }
 }
 
-impl<'de, 'a, D> de::MapAccess<'de> for StructAccess<'de, 'a, D>
+impl<'de, D> de::MapAccess<'de> for StructAccess<'de, '_, D>
 where
     D: EntriesDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
@@ -497,7 +497,7 @@ where
     }
 }
 
-impl<'de, 'a, D> de::SeqAccess<'de> for SeqAccess<'de, 'a, D>
+impl<'de, D> de::SeqAccess<'de> for SeqAccess<'de, '_, D>
 where
     D: ?Sized + SequenceDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
@@ -540,7 +540,7 @@ where
     }
 }
 
-impl<'de, 'a, D> de::MapAccess<'de> for MapAccess<'de, 'a, D>
+impl<'de, D> de::MapAccess<'de> for MapAccess<'de, '_, D>
 where
     D: ?Sized + EntriesDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
@@ -628,7 +628,7 @@ where
     }
 }
 
-impl<'de, 'a, D> de::VariantAccess<'de> for EnumAccess<'de, 'a, D>
+impl<'de, D> de::VariantAccess<'de> for EnumAccess<'de, '_, D>
 where
     D: VariantDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,
@@ -677,7 +677,7 @@ where
     }
 }
 
-impl<'de, 'a, D> de::EnumAccess<'de> for EnumAccess<'de, 'a, D>
+impl<'de, D> de::EnumAccess<'de> for EnumAccess<'de, '_, D>
 where
     D: VariantDecoder<'de>,
     <D::Cx as Context>::Error: de::Error,

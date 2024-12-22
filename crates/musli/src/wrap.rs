@@ -32,7 +32,10 @@ impl<W> crate::writer::Writer for Wrap<W>
 where
     W: std::io::Write,
 {
-    type Mut<'this> = &'this mut Self where Self: 'this;
+    type Mut<'this>
+        = &'this mut Self
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {

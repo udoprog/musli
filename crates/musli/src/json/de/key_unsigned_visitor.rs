@@ -20,7 +20,7 @@ impl<T> KeyUnsignedVisitor<T> {
     }
 }
 
-impl<'de, C, T> UnsizedVisitor<'de, C, [u8]> for KeyUnsignedVisitor<T>
+impl<C, T> UnsizedVisitor<'_, C, [u8]> for KeyUnsignedVisitor<T>
 where
     C: ?Sized + Context,
     T: Unsigned,

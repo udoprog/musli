@@ -116,10 +116,12 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeEntry<'this> = JsonObjectPairDecoder<'a, P::Mut<'this>, C>
+    type DecodeEntry<'this>
+        = JsonObjectPairDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeRemainingEntries<'this> = JsonObjectDecoder<'a, P::Mut<'this>, C>
+    type DecodeRemainingEntries<'this>
+        = JsonObjectDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -160,10 +162,14 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeEntryKey<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
+    type DecodeEntryKey<'this>
+        = JsonKeyDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeEntryValue<'this> = JsonDecoder<'a, P::Mut<'this>, C> where Self: 'this;
+    type DecodeEntryValue<'this>
+        = JsonDecoder<'a, P::Mut<'this>, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {

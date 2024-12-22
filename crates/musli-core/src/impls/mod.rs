@@ -378,7 +378,7 @@ impl<'de, M> DecodeUnsized<'de, M> for str {
     {
         struct Visitor<F>(F);
 
-        impl<'de, C, F, O> UnsizedVisitor<'de, C, str> for Visitor<F>
+        impl<C, F, O> UnsizedVisitor<'_, C, str> for Visitor<F>
         where
             C: ?Sized + Context,
             F: FnOnce(&str) -> Result<O, C::Error>,
@@ -463,7 +463,7 @@ impl<'de, M> DecodeUnsizedBytes<'de, M> for [u8] {
     {
         struct Visitor<F>(F);
 
-        impl<'de, C, F, O> UnsizedVisitor<'de, C, [u8]> for Visitor<F>
+        impl<C, F, O> UnsizedVisitor<'_, C, [u8]> for Visitor<F>
         where
             C: ?Sized + Context,
             F: FnOnce(&[u8]) -> Result<O, C::Error>,

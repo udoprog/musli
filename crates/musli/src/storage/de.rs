@@ -43,7 +43,10 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U> = StorageDecoder<'this, R, OPT, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = StorageDecoder<'this, R, OPT, U>
+    where
+        U: 'this + Context;
     type DecodePack = Self;
     type DecodeSome = Self;
     type DecodeSequence = LimitedStorageDecoder<'a, R, OPT, C>;
@@ -323,7 +326,10 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeNext<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeNext<'this>
+        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn try_decode_next(
@@ -370,7 +376,10 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeNext<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeNext<'this>
+        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -405,10 +414,14 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeEntry<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeEntry<'this>
+        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type DecodeRemainingEntries<'this> = LimitedStorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeRemainingEntries<'this>
+        = LimitedStorageDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -443,7 +456,10 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeKey<'this>
+        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
     type DecodeValue = Self;
 
     #[inline]
@@ -463,8 +479,14 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeEntryKey<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeEntryValue<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeEntryKey<'this>
+        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type DecodeEntryValue<'this>
+        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
@@ -499,8 +521,14 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeTag<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeValue<'this> = StorageDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeTag<'this>
+        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type DecodeValue<'this>
+        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {

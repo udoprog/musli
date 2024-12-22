@@ -699,7 +699,7 @@ where
 
                     struct Visitor;
 
-                    impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
+                    impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
                     where
                         C: ?Sized + Context,
                     {

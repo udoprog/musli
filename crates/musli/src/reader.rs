@@ -58,7 +58,7 @@ pub trait Reader<'de>: self::sealed::Sealed {
     {
         struct Visitor<'a>(&'a mut [u8]);
 
-        impl<'a, 'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor<'a>
+        impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor<'_>
         where
             C: ?Sized + Context,
         {
@@ -169,7 +169,10 @@ where
 }
 
 impl<'de> Reader<'de> for &'de [u8] {
-    type Mut<'this> = &'this mut &'de [u8] where Self: 'this;
+    type Mut<'this>
+        = &'this mut &'de [u8]
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -340,7 +343,10 @@ impl<'de> SliceReader<'de> {
 }
 
 impl<'de> Reader<'de> for SliceReader<'de> {
-    type Mut<'this> = &'this mut Self where Self: 'this;
+    type Mut<'this>
+        = &'this mut Self
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -456,7 +462,10 @@ impl<'de, R> Reader<'de> for Limit<R>
 where
     R: Reader<'de>,
 {
-    type Mut<'this> = &'this mut Self where Self: 'this;
+    type Mut<'this>
+        = &'this mut Self
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -525,7 +534,10 @@ impl<'de, R> Reader<'de> for &mut R
 where
     R: ?Sized + Reader<'de>,
 {
-    type Mut<'this> = &'this mut R where Self: 'this;
+    type Mut<'this>
+        = &'this mut R
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {

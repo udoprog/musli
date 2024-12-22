@@ -26,7 +26,7 @@ impl<'a> Expander<'a> {
     }
 }
 
-impl<'a> Expander<'a> {
+impl Expander<'_> {
     pub fn expand(&self) -> Result<TokenStream, Vec<syn::Error>> {
         let cx = Ctxt::default();
 

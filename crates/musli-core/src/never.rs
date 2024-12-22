@@ -97,7 +97,8 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U> = Never<(), U>
+    type WithContext<'this, U>
+        = Never<(), U>
     where
         U: 'this + Context;
     type DecodeBuffer = Self;
@@ -156,7 +157,10 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
 
 impl<C: ?Sized + Context> AsDecoder for Never<(), C> {
     type Cx = C;
-    type Decoder<'this> = Self where Self: 'this;
+    type Decoder<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn as_decoder(&self) -> Result<Self::Decoder<'_>, C::Error> {
@@ -164,10 +168,16 @@ impl<C: ?Sized + Context> AsDecoder for Never<(), C> {
     }
 }
 
-impl<'de, C: ?Sized + Context> EntriesDecoder<'de> for Never<(), C> {
+impl<C: ?Sized + Context> EntriesDecoder<'_> for Never<(), C> {
     type Cx = C;
-    type DecodeEntryKey<'this> = Self where Self: 'this;
-    type DecodeEntryValue<'this> = Self where Self: 'this;
+    type DecodeEntryKey<'this>
+        = Self
+    where
+        Self: 'this;
+    type DecodeEntryValue<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
@@ -185,10 +195,16 @@ impl<'de, C: ?Sized + Context> EntriesDecoder<'de> for Never<(), C> {
     }
 }
 
-impl<'de, C: ?Sized + Context> VariantDecoder<'de> for Never<(), C> {
+impl<C: ?Sized + Context> VariantDecoder<'_> for Never<(), C> {
     type Cx = C;
-    type DecodeTag<'this> = Self where Self: 'this;
-    type DecodeValue<'this> = Self where Self: 'this;
+    type DecodeTag<'this>
+        = Self
+    where
+        Self: 'this;
+    type DecodeValue<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
@@ -201,10 +217,16 @@ impl<'de, C: ?Sized + Context> VariantDecoder<'de> for Never<(), C> {
     }
 }
 
-impl<'de, C: ?Sized + Context> MapDecoder<'de> for Never<(), C> {
+impl<C: ?Sized + Context> MapDecoder<'_> for Never<(), C> {
     type Cx = C;
-    type DecodeEntry<'this> = Self where Self: 'this;
-    type DecodeRemainingEntries<'this> = Self where Self: 'this;
+    type DecodeEntry<'this>
+        = Self
+    where
+        Self: 'this;
+    type DecodeRemainingEntries<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -224,9 +246,12 @@ impl<'de, C: ?Sized + Context> MapDecoder<'de> for Never<(), C> {
     }
 }
 
-impl<'de, C: ?Sized + Context> EntryDecoder<'de> for Never<(), C> {
+impl<C: ?Sized + Context> EntryDecoder<'_> for Never<(), C> {
     type Cx = C;
-    type DecodeKey<'this> = Self where Self: 'this;
+    type DecodeKey<'this>
+        = Self
+    where
+        Self: 'this;
     type DecodeValue = Self;
 
     #[inline]
@@ -240,9 +265,12 @@ impl<'de, C: ?Sized + Context> EntryDecoder<'de> for Never<(), C> {
     }
 }
 
-impl<'de, C: ?Sized + Context> SequenceDecoder<'de> for Never<(), C> {
+impl<C: ?Sized + Context> SequenceDecoder<'_> for Never<(), C> {
     type Cx = C;
-    type DecodeNext<'this> = Self where Self: 'this;
+    type DecodeNext<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
@@ -260,7 +288,10 @@ impl<C: ?Sized + Context, O: 'static> Encoder for Never<O, C> {
     type Error = C::Error;
     type Ok = O;
     type Mode = C::Mode;
-    type WithContext<'this, U> = Never<O, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = Never<O, U>
+    where
+        U: 'this + Context;
     type EncodePack = Self;
     type EncodeSome = Self;
     type EncodeSequence = Self;
@@ -298,7 +329,7 @@ impl<C: ?Sized + Context, O: 'static> Encoder for Never<O, C> {
     }
 }
 
-impl<'de, C, O: 'static, T> UnsizedVisitor<'de, C, T> for Never<O, T>
+impl<C, O, T> UnsizedVisitor<'_, C, T> for Never<O, T>
 where
     C: ?Sized + Context,
     T: ?Sized + ToOwned,
@@ -313,7 +344,10 @@ where
 impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeNext<'this> = Self where Self: 'this;
+    type EncodeNext<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -329,7 +363,10 @@ impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
 impl<O: 'static, C: ?Sized + Context> MapEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeEntry<'this> = Self where Self: 'this;
+    type EncodeEntry<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
@@ -344,8 +381,14 @@ impl<O: 'static, C: ?Sized + Context> MapEncoder for Never<O, C> {
 impl<O: 'static, C: ?Sized + Context> EntryEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeKey<'this> = Self where Self: 'this;
-    type EncodeValue<'this> = Self where Self: 'this;
+    type EncodeKey<'this>
+        = Self
+    where
+        Self: 'this;
+    type EncodeValue<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
@@ -366,8 +409,14 @@ impl<O: 'static, C: ?Sized + Context> EntryEncoder for Never<O, C> {
 impl<O: 'static, C: ?Sized + Context> EntriesEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeEntryKey<'this> = Self where Self: 'this;
-    type EncodeEntryValue<'this> = Self where Self: 'this;
+    type EncodeEntryKey<'this>
+        = Self
+    where
+        Self: 'this;
+    type EncodeEntryValue<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
@@ -388,8 +437,14 @@ impl<O: 'static, C: ?Sized + Context> EntriesEncoder for Never<O, C> {
 impl<O: 'static, C: ?Sized + Context> VariantEncoder for Never<O, C> {
     type Cx = C;
     type Ok = O;
-    type EncodeTag<'this> = Self where Self: 'this;
-    type EncodeData<'this> = Self where Self: 'this;
+    type EncodeTag<'this>
+        = Self
+    where
+        Self: 'this;
+    type EncodeData<'this>
+        = Self
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {

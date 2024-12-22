@@ -29,7 +29,10 @@ impl<'a, 'de> MutSliceParser<'a, 'de> {
 }
 
 impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
-    type Mut<'this> = MutSliceParser<'this, 'de> where Self: 'this;
+    type Mut<'this>
+        = MutSliceParser<'this, 'de>
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {

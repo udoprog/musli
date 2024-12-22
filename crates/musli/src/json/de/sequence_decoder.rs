@@ -95,7 +95,8 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeNext<'this> = JsonDecoder<'a, P::Mut<'this>, C>
+    type DecodeNext<'this>
+        = JsonDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
 

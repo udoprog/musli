@@ -39,7 +39,7 @@ where
 }
 
 #[crate::decoder(crate)]
-impl<'a, 'de, P, C> Decoder<'de> for JsonKeyDecoder<'a, P, C>
+impl<'de, P, C> Decoder<'de> for JsonKeyDecoder<'_, P, C>
 where
     P: Parser<'de>,
     C: ?Sized + Context,
@@ -47,7 +47,10 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U> = JsonKeyDecoder<'this, P, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = JsonKeyDecoder<'this, P, U>
+    where
+        U: 'this + Context;
 
     #[inline]
     fn cx(&self) -> &Self::Cx {

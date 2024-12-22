@@ -321,7 +321,7 @@ where
     }
 }
 
-impl<'a, E> ser::SerializeSeq for SerializeSeq<'a, E>
+impl<E> ser::SerializeSeq for SerializeSeq<'_, E>
 where
     <E::Cx as Context>::Error: ser::Error,
     E: SequenceEncoder,
@@ -345,7 +345,7 @@ where
     }
 }
 
-impl<'a, E> ser::SerializeTupleStruct for SerializeSeq<'a, E>
+impl<E> ser::SerializeTupleStruct for SerializeSeq<'_, E>
 where
     <E::Cx as Context>::Error: ser::Error,
     E: SequenceEncoder,
@@ -367,7 +367,7 @@ where
     }
 }
 
-impl<'a, E> ser::SerializeTuple for SerializeSeq<'a, E>
+impl<E> ser::SerializeTuple for SerializeSeq<'_, E>
 where
     <E::Cx as Context>::Error: ser::Error,
     E: SequenceEncoder,
@@ -389,7 +389,7 @@ where
     }
 }
 
-impl<'a, E> ser::SerializeTupleVariant for SerializeSeq<'a, E>
+impl<E> ser::SerializeTupleVariant for SerializeSeq<'_, E>
 where
     <E::Cx as Context>::Error: ser::Error,
     E: SequenceEncoder,
@@ -428,7 +428,7 @@ where
     }
 }
 
-impl<'a, E> ser::SerializeMap for SerializeMap<'a, E>
+impl<E> ser::SerializeMap for SerializeMap<'_, E>
 where
     <E::Cx as Context>::Error: ser::Error,
     E: EntriesEncoder,
@@ -479,7 +479,7 @@ where
     }
 }
 
-impl<'a, E> ser::SerializeStruct for SerializeStruct<'a, E>
+impl<E> ser::SerializeStruct for SerializeStruct<'_, E>
 where
     <E::Cx as Context>::Error: ser::Error,
     E: MapEncoder,
@@ -522,7 +522,7 @@ where
     }
 }
 
-impl<'a, E> ser::SerializeStructVariant for SerializeStructVariant<'a, E>
+impl<E> ser::SerializeStructVariant for SerializeStructVariant<'_, E>
 where
     <E::Cx as Context>::Error: ser::Error,
     E: MapEncoder,

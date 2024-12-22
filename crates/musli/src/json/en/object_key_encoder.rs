@@ -27,7 +27,7 @@ macro_rules! format_integer {
 }
 
 #[crate::encoder(crate)]
-impl<'a, W, C> Encoder for JsonObjectKeyEncoder<'a, W, C>
+impl<W, C> Encoder for JsonObjectKeyEncoder<'_, W, C>
 where
     W: Writer,
     C: ?Sized + Context,
@@ -36,7 +36,10 @@ where
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U> = JsonObjectKeyEncoder<'this, W, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = JsonObjectKeyEncoder<'this, W, U>
+    where
+        U: 'this + Context;
 
     #[inline]
     fn cx(&self) -> &Self::Cx {

@@ -30,7 +30,10 @@ where
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U> = StorageEncoder<'this, W, OPT, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = StorageEncoder<'this, W, OPT, U>
+    where
+        U: 'this + Context;
     type EncodePack = StorageEncoder<'a, W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
@@ -270,7 +273,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeNext<'this>
+        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -290,7 +296,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeEntry<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntry<'this>
+        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
@@ -310,8 +319,14 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeKey<'this>
+        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type EncodeValue<'this>
+        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
@@ -336,8 +351,14 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeEntryKey<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeEntryValue<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntryKey<'this>
+        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type EncodeEntryValue<'this>
+        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
@@ -362,8 +383,14 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeTag<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeData<'this> = StorageEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeTag<'this>
+        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type EncodeData<'this>
+        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {

@@ -169,7 +169,11 @@ impl<'a> Slice<'a> {
 }
 
 impl Allocator for Slice<'_> {
-    type RawVec<'this, T> = SliceBuf<'this, T> where Self: 'this, T: 'this;
+    type RawVec<'this, T>
+        = SliceBuf<'this, T>
+    where
+        Self: 'this,
+        T: 'this;
 
     #[inline]
     fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
@@ -205,7 +209,7 @@ pub struct SliceBuf<'a, T> {
     _marker: PhantomData<T>,
 }
 
-impl<'a, T> RawVec<T> for SliceBuf<'a, T> {
+impl<T> RawVec<T> for SliceBuf<'_, T> {
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {
         if additional == 0 || size_of::<T>() == 0 {

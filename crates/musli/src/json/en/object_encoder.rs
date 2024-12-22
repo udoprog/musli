@@ -41,7 +41,8 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeEntry<'this> = JsonObjectPairEncoder<'a, W::Mut<'this>, C>
+    type EncodeEntry<'this>
+        = JsonObjectPairEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -69,10 +70,14 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeEntryKey<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
+    type EncodeEntryKey<'this>
+        = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
-    type EncodeEntryValue<'this> = JsonEncoder<'a, W::Mut<'this>, C> where Self: 'this;
+    type EncodeEntryValue<'this>
+        = JsonEncoder<'a, W::Mut<'this>, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {

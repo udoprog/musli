@@ -185,7 +185,10 @@ impl<const N: usize> Default for FixedBytes<N> {
 }
 
 impl<const N: usize> Writer for FixedBytes<N> {
-    type Mut<'this> = &'this mut Self where Self: 'this;
+    type Mut<'this>
+        = &'this mut Self
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {

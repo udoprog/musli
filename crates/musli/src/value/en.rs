@@ -77,7 +77,10 @@ where
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U> = ValueEncoder<'this, OPT, O, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = ValueEncoder<'this, OPT, O, U>
+    where
+        U: 'this + Context;
     #[cfg(feature = "alloc")]
     type EncodeSome = ValueEncoder<'a, OPT, SomeValueWriter<O>, C>;
     #[cfg(feature = "alloc")]
@@ -401,7 +404,8 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeNext<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
+    type EncodeNext<'this>
+        = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
     where
         Self: 'this;
 
@@ -451,7 +455,8 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<'a, C::Allocator>, OPT, C>
+    type EncodeNext<'this>
+        = StorageEncoder<'a, &'this mut BufWriter<'a, C::Allocator>, OPT, C>
     where
         Self: 'this;
 
@@ -489,14 +494,15 @@ impl<'a, const OPT: Options, O, C: ?Sized> MapValueEncoder<'a, OPT, O, C> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> MapEncoder for MapValueEncoder<'a, OPT, O, C>
+impl<const OPT: Options, O, C> MapEncoder for MapValueEncoder<'_, OPT, O, C>
 where
     O: ValueOutput,
     C: ?Sized + Context,
 {
     type Cx = C;
     type Ok = ();
-    type EncodeEntry<'this> = PairValueEncoder<'this, OPT, C>
+    type EncodeEntry<'this>
+        = PairValueEncoder<'this, OPT, C>
     where
         Self: 'this;
 
@@ -520,10 +526,12 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeEntryKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeEntryKey<'this>
+        = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
-    type EncodeEntryValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeEntryValue<'this>
+        = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
 
@@ -581,10 +589,14 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeKey<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeKey<'this>
+        = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
-    type EncodeValue<'this> = ValueEncoder<'a, OPT, &'this mut Value, C> where Self: 'this;
+    type EncodeValue<'this>
+        = ValueEncoder<'a, OPT, &'this mut Value, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
@@ -631,10 +643,12 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeTag<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeTag<'this>
+        = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
-    type EncodeData<'this> = ValueEncoder<'a, OPT, &'this mut Value, C>
+    type EncodeData<'this>
+        = ValueEncoder<'a, OPT, &'this mut Value, C>
     where
         Self: 'this;
 
@@ -686,7 +700,8 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeNext<'this> = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
+    type EncodeNext<'this>
+        = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
     where
         Self: 'this;
 
@@ -728,7 +743,7 @@ impl<'a, const OPT: Options, O, C: ?Sized> VariantStructEncoder<'a, OPT, O, C> {
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, const OPT: Options, O, C> MapEncoder for VariantStructEncoder<'a, OPT, O, C>
+impl<const OPT: Options, O, C> MapEncoder for VariantStructEncoder<'_, OPT, O, C>
 where
     O: ValueOutput,
     C: ?Sized + Context,
@@ -736,7 +751,8 @@ where
     type Cx = C;
     type Ok = ();
 
-    type EncodeEntry<'this> = PairValueEncoder<'this, OPT, C>
+    type EncodeEntry<'this>
+        = PairValueEncoder<'this, OPT, C>
     where
         Self: 'this;
 

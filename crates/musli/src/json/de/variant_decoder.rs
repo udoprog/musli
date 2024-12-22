@@ -47,10 +47,14 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeTag<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
+    type DecodeTag<'this>
+        = JsonKeyDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeValue<'this> = JsonDecoder<'a, P::Mut<'this>, C> where Self: 'this;
+    type DecodeValue<'this>
+        = JsonDecoder<'a, P::Mut<'this>, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {

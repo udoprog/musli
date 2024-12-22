@@ -11,7 +11,7 @@ mod sealed {
 
     pub trait Sealed {}
 
-    impl<'a, E, O> Sealed for SliceMut<'a, E, O>
+    impl<E, O> Sealed for SliceMut<'_, E, O>
     where
         E: ByteOrder,
         O: Size,

@@ -86,7 +86,10 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U> = ValueDecoder<'this, 'de, OPT, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = ValueDecoder<'this, 'de, OPT, U>
+    where
+        U: 'this + Context;
     type DecodeBuffer = AsValueDecoder<'a, OPT, C>;
     type DecodeSome = Self;
     type DecodePack = StorageDecoder<'a, SliceReader<'de>, OPT, C>;
@@ -393,9 +396,12 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 }
 
-impl<'a, 'de, C: ?Sized + Context, const OPT: Options> AsDecoder for ValueDecoder<'a, 'de, OPT, C> {
+impl<'a, C: ?Sized + Context, const OPT: Options> AsDecoder for ValueDecoder<'a, '_, OPT, C> {
     type Cx = C;
-    type Decoder<'this> = ValueDecoder<'a, 'this, OPT, C> where Self: 'this;
+    type Decoder<'this>
+        = ValueDecoder<'a, 'this, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn as_decoder(&self) -> Result<Self::Decoder<'_>, C::Error> {
@@ -404,7 +410,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> AsDecoder for ValueDecode
 }
 
 /// A decoder over a simple value iterator.
-
 pub struct IterValueDecoder<'a, 'de, const OPT: Options, C: ?Sized> {
     cx: &'a C,
     iter: slice::Iter<'de, Value>,
@@ -425,7 +430,8 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> SequenceDecoder<'de>
     for IterValueDecoder<'a, 'de, OPT, C>
 {
     type Cx = C;
-    type DecodeNext<'this> = ValueDecoder<'a, 'de, OPT, C>
+    type DecodeNext<'this>
+        = ValueDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
 
@@ -471,10 +477,14 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> MapDecoder<'de>
     for IterValuePairsDecoder<'a, 'de, OPT, C>
 {
     type Cx = C;
-    type DecodeEntry<'this> = IterValuePairDecoder<'a, 'de, OPT, C>
+    type DecodeEntry<'this>
+        = IterValuePairDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
-    type DecodeRemainingEntries<'this> = IterValuePairsDecoder<'a, 'de, OPT, C> where Self: 'this;
+    type DecodeRemainingEntries<'this>
+        = IterValuePairsDecoder<'a, 'de, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -502,10 +512,14 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> EntriesDecoder<'de>
     for IterValuePairsDecoder<'a, 'de, OPT, C>
 {
     type Cx = C;
-    type DecodeEntryKey<'this> = ValueDecoder<'a, 'de, OPT, C>
+    type DecodeEntryKey<'this>
+        = ValueDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
-    type DecodeEntryValue<'this> = ValueDecoder<'a, 'de, OPT, C> where Self: 'this;
+    type DecodeEntryValue<'this>
+        = ValueDecoder<'a, 'de, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
@@ -535,7 +549,8 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> EntryDecoder<'de>
     for IterValuePairDecoder<'a, 'de, OPT, C>
 {
     type Cx = C;
-    type DecodeKey<'this> = ValueDecoder<'a, 'de, OPT, C>
+    type DecodeKey<'this>
+        = ValueDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
     type DecodeValue = ValueDecoder<'a, 'de, OPT, C>;
@@ -582,10 +597,12 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> VariantDecoder<'de>
     for IterValueVariantDecoder<'a, 'de, OPT, C>
 {
     type Cx = C;
-    type DecodeTag<'this> = ValueDecoder<'a, 'de, OPT, C>
+    type DecodeTag<'this>
+        = ValueDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
-    type DecodeValue<'this> = ValueDecoder<'a, 'de, OPT, C>
+    type DecodeValue<'this>
+        = ValueDecoder<'a, 'de, OPT, C>
     where
         Self: 'this;
 

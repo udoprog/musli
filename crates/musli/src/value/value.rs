@@ -385,7 +385,7 @@ impl<'de, M> Decode<'de, M> for Value {
 struct BytesVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C: ?Sized + Context> UnsizedVisitor<'de, C, [u8]> for BytesVisitor {
+impl<C: ?Sized + Context> UnsizedVisitor<'_, C, [u8]> for BytesVisitor {
     type Ok = Value;
 
     #[inline]
@@ -409,7 +409,7 @@ impl<'de, C: ?Sized + Context> UnsizedVisitor<'de, C, [u8]> for BytesVisitor {
 struct StringVisitor;
 
 #[cfg(feature = "alloc")]
-impl<'de, C: ?Sized + Context> UnsizedVisitor<'de, C, str> for StringVisitor {
+impl<C: ?Sized + Context> UnsizedVisitor<'_, C, str> for StringVisitor {
     type Ok = Value;
 
     #[inline]
@@ -501,7 +501,10 @@ impl<'a, const OPT: Options, C: ?Sized> AsValueDecoder<'a, OPT, C> {
 
 impl<'a, const OPT: Options, C: ?Sized + Context> AsDecoder for AsValueDecoder<'a, OPT, C> {
     type Cx = C;
-    type Decoder<'this> = ValueDecoder<'a, 'this, OPT, C> where Self: 'this;
+    type Decoder<'this>
+        = ValueDecoder<'a, 'this, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn as_decoder(&self) -> Result<Self::Decoder<'_>, C::Error> {

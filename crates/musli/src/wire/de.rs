@@ -34,7 +34,7 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> WireDecoder<'a, Limit<R>, OPT, C>
+impl<'de, R, const OPT: Options, C> WireDecoder<'_, Limit<R>, OPT, C>
 where
     C: ?Sized + Context,
     R: Reader<'de>,
@@ -211,7 +211,10 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U> = WireDecoder<'this, R, OPT, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = WireDecoder<'this, R, OPT, U>
+    where
+        U: 'this + Context;
     type DecodePack = WireDecoder<'a, Limit<R>, OPT, C>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingWireDecoder<'a, R, OPT, C>;
@@ -539,7 +542,10 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeNext<'this> = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeNext<'this>
+        = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
@@ -558,7 +564,10 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeNext<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeNext<'this>
+        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -594,8 +603,14 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeTag<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeValue<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeTag<'this>
+        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type DecodeValue<'this>
+        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
@@ -614,10 +629,14 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeEntry<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeEntry<'this>
+        = WireDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type DecodeRemainingEntries<'this> = RemainingWireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeRemainingEntries<'this>
+        = RemainingWireDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -650,7 +669,10 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeKey<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeKey<'this>
+        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
     type DecodeValue = Self;
 
     #[inline]
@@ -670,10 +692,12 @@ where
     R: Reader<'de>,
 {
     type Cx = C;
-    type DecodeEntryKey<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeEntryKey<'this>
+        = WireDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type DecodeEntryValue<'this> = WireDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeEntryValue<'this>
+        = WireDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 

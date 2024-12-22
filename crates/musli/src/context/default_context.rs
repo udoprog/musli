@@ -38,7 +38,7 @@ where
     _marker: PhantomData<M>,
 }
 
-impl<'a, A, M> DefaultContext<'a, A, M> where A: ?Sized + Allocator {}
+impl<A, M> DefaultContext<'_, A, M> where A: ?Sized + Allocator {}
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -164,7 +164,10 @@ where
     type Error = ErrorMarker;
     type Mark = usize;
     type Allocator = A;
-    type String<'this> = String<'this, A> where Self: 'this;
+    type String<'this>
+        = String<'this, A>
+    where
+        Self: 'this;
 
     #[inline]
     fn clear(&self) {
@@ -342,7 +345,7 @@ where
     errors: Errors<'b, 'a, A>,
 }
 
-impl<'b, 'a, A> fmt::Display for Report<'b, 'a, A>
+impl<'a, A> fmt::Display for Report<'_, 'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
@@ -381,7 +384,7 @@ where
     }
 }
 
-impl<'b, 'a, A> Clone for Errors<'b, 'a, A>
+impl<A> Clone for Errors<'_, '_, A>
 where
     A: ?Sized + Allocator,
 {
