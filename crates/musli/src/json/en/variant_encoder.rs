@@ -28,10 +28,12 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeTag<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
+    type EncodeTag<'this>
+        = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
-    type EncodeData<'this> = JsonEncoder<'a, W::Mut<'this>, C>
+    type EncodeData<'this>
+        = JsonEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
 

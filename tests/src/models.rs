@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 use musli_zerocopy::ZeroCopy;
 
 #[cfg(feature = "zerocopy")]
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 #[cfg(feature = "musli")]
 use musli::{Decode, Encode};
@@ -44,12 +44,11 @@ miri! {
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 #[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
-#[cfg_attr(feature = "zerocopy", derive(AsBytes, FromBytes, FromZeroes))]
+#[cfg_attr(feature = "zerocopy", derive(IntoBytes, FromBytes, Immutable))]
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
-    archive(compare(PartialEq), check_bytes),
-    archive_attr(derive(Debug))
+    rkyv(compare(PartialEq), derive(Debug))
 )]
 #[cfg_attr(any(feature = "musli-zerocopy", feature = "zerocopy"), repr(C))]
 #[cfg_attr(
@@ -106,8 +105,7 @@ impl PartialEq<PrimitivesPacked> for &PrimitivesPacked {
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
-    archive(compare(PartialEq), check_bytes),
-    archive_attr(derive(Debug))
+    rkyv(compare(PartialEq), derive(Debug))
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 #[cfg_attr(feature = "musli-zerocopy", repr(C))]
@@ -163,8 +161,7 @@ impl PartialEq<Primitives> for &Primitives {
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
-    archive(compare(PartialEq), check_bytes),
-    archive_attr(derive(Debug))
+    rkyv(compare(PartialEq), derive(Debug))
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 #[cfg_attr(
@@ -277,8 +274,7 @@ impl PartialEq<Tuples> for &Tuples {
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
-    archive(compare(PartialEq), check_bytes),
-    archive_attr(derive(Debug))
+    rkyv(compare(PartialEq), derive(Debug))
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed))]
 #[cfg_attr(
@@ -341,8 +337,7 @@ impl PartialEq<MediumEnum> for &MediumEnum {
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
-    archive(compare(PartialEq), check_bytes),
-    archive_attr(derive(Debug))
+    rkyv(compare(PartialEq), derive(Debug))
 )]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
 #[cfg_attr(

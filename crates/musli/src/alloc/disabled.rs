@@ -55,7 +55,10 @@ impl Default for Disabled {
 }
 
 impl Allocator for Disabled {
-    type RawVec<'this, T> = EmptyBuf<T> where T: 'this;
+    type RawVec<'this, T>
+        = EmptyBuf<T>
+    where
+        T: 'this;
 
     #[inline(always)]
     fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>

@@ -40,7 +40,7 @@ pub(crate) struct Mode<'a> {
     pub(crate) only: Only,
 }
 
-impl<'a> Mode<'a> {
+impl Mode<'_> {
     /// Construct a typed encode call.
     pub(crate) fn encode_t_encode(&self, encoding: FieldEncoding) -> syn::Path {
         let (mut encode_t, name) = match encoding {

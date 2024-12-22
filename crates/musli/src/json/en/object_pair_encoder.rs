@@ -24,10 +24,14 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeKey<'this> = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
+    type EncodeKey<'this>
+        = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
-    type EncodeValue<'this> = JsonEncoder<'a, W::Mut<'this>, C> where Self: 'this;
+    type EncodeValue<'this>
+        = JsonEncoder<'a, W::Mut<'this>, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {

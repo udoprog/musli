@@ -51,7 +51,11 @@ impl Default for System {
 }
 
 impl Allocator for System {
-    type RawVec<'this, T> = SystemBuf<T> where Self: 'this, T: 'this;
+    type RawVec<'this, T>
+        = SystemBuf<T>
+    where
+        Self: 'this,
+        T: 'this;
 
     #[inline]
     fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>

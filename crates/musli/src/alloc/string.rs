@@ -115,7 +115,7 @@ where
     }
 }
 
-impl<'a, A> AsRef<str> for String<'a, A>
+impl<A> AsRef<str> for String<'_, A>
 where
     A: ?Sized + Allocator,
 {

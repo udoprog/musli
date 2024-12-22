@@ -267,14 +267,14 @@ struct ExpectingWrapper<'a, T, C: ?Sized> {
     _marker: PhantomData<&'a C>,
 }
 
-impl<'a, T, C: ?Sized> ExpectingWrapper<'a, T, C> {
+impl<T, C: ?Sized> ExpectingWrapper<'_, T, C> {
     fn new(inner: &T) -> &Self {
         // SAFETY: `ExpectingWrapper` is repr(transparent) over `T`.
         unsafe { &*(inner as *const T as *const Self) }
     }
 }
 
-impl<'a, 'de, T, C> Expecting for ExpectingWrapper<'a, T, C>
+impl<'de, T, C> Expecting for ExpectingWrapper<'_, T, C>
 where
     C: ?Sized + Context,
     T: Visitor<'de, C>,

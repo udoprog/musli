@@ -53,7 +53,10 @@ impl<W> Writer for &mut W
 where
     W: ?Sized + Writer,
 {
-    type Mut<'this> = &'this mut W where Self: 'this;
+    type Mut<'this>
+        = &'this mut W
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -87,7 +90,10 @@ where
 
 #[cfg(feature = "alloc")]
 impl Writer for rust_alloc::vec::Vec<u8> {
-    type Mut<'this> = &'this mut Self where Self: 'this;
+    type Mut<'this>
+        = &'this mut Self
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -125,7 +131,10 @@ impl Writer for rust_alloc::vec::Vec<u8> {
 }
 
 impl Writer for &mut [u8] {
-    type Mut<'this> = &'this mut Self where Self: 'this;
+    type Mut<'this>
+        = &'this mut Self
+    where
+        Self: 'this;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -207,7 +216,8 @@ impl<'a, A> Writer for BufWriter<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
-    type Mut<'this> = &'this mut Self
+    type Mut<'this>
+        = &'this mut Self
     where
         Self: 'this;
 

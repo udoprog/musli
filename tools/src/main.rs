@@ -596,7 +596,7 @@ struct InteriorBins<'a> {
     comparison: RefCell<Option<PathBuf>>,
 }
 
-impl<'a> InteriorBins<'a> {
+impl InteriorBins<'_> {
     fn build(&self) -> Result<()> {
         fn shuffle(path: &mut PathBuf, to: &Path) -> Result<()> {
             fs::rename(&*path, to)
@@ -653,7 +653,7 @@ impl<'a> InteriorBins<'a> {
     }
 }
 
-impl<'a> Drop for InteriorBins<'a> {
+impl Drop for InteriorBins<'_> {
     fn drop(&mut self) {
         if self.clean {
             if let Some(fuzz) = self.fuzz.take() {

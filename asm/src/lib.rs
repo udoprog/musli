@@ -76,7 +76,7 @@ pub mod zerocopy_load {
                 zerocopy, $id,
                 #[inline(never)]
                 pub fn $id(buf: &[u8]) -> Option<$ty> {
-                    <$ty>::read_from(buf)
+                    <$ty>::read_from_bytes(buf).ok()
                 }
             }
         };
@@ -89,7 +89,7 @@ pub mod zerocopy_load {
 pub mod zerocopy_store {
     use core::mem::size_of;
     use tests::models::*;
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     macro_rules! build {
         ($id:ident, $ty:ty, $constant:ident, $number:literal) => {

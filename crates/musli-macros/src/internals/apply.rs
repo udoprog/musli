@@ -19,7 +19,7 @@ pub(crate) struct IterItem<'a, A, T> {
     value: &'a T,
 }
 
-impl<'a, A, T> ToTokens for IterItem<'a, A, T>
+impl<A, T> ToTokens for IterItem<'_, A, T>
 where
     A: Apply<T>,
 {

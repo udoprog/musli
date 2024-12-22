@@ -20,7 +20,7 @@ impl<T> KeySignedVisitor<T> {
     }
 }
 
-impl<'de, C: ?Sized + Context, T> UnsizedVisitor<'de, C, [u8]> for KeySignedVisitor<T>
+impl<C: ?Sized + Context, T> UnsizedVisitor<'_, C, [u8]> for KeySignedVisitor<T>
 where
     T: Signed,
 {

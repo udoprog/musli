@@ -22,7 +22,8 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeKey<'this> = JsonKeyDecoder<'a, P::Mut<'this>, C>
+    type DecodeKey<'this>
+        = JsonKeyDecoder<'a, P::Mut<'this>, C>
     where
         Self: 'this;
     type DecodeValue = JsonDecoder<'a, P, C>;

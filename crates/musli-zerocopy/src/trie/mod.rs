@@ -111,8 +111,14 @@ where
     O: Size,
 {
     type String = Ref<[u8], E, O>;
-    type Values<T> = Ref<[T], E, O> where T: ZeroCopy;
-    type Children<T> = Ref<[T], E, O> where T: ZeroCopy;
+    type Values<T>
+        = Ref<[T], E, O>
+    where
+        T: ZeroCopy;
+    type Children<T>
+        = Ref<[T], E, O>
+    where
+        T: ZeroCopy;
 }
 
 /// A stored reference to a trie.
@@ -781,7 +787,7 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, 'buf, T, F> Iterator for ValuesIn<'a, 'buf, T, F>
+impl<'buf, T, F> Iterator for ValuesIn<'_, 'buf, T, F>
 where
     T: ZeroCopy,
     F: Flavor,
@@ -811,7 +817,7 @@ where
     iter: Walk<'a, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
 }
 
-impl<'a, 'buf, const N: usize, T, F> Iterator for ValuesInFixed<'a, 'buf, N, T, F>
+impl<'buf, const N: usize, T, F> Iterator for ValuesInFixed<'_, 'buf, N, T, F>
 where
     T: ZeroCopy,
     F: Flavor,
@@ -954,7 +960,7 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, 'buf, T, F> Iterator for IterIn<'a, 'buf, T, F>
+impl<'buf, T, F> Iterator for IterIn<'_, 'buf, T, F>
 where
     T: ZeroCopy,
     F: Flavor,
@@ -979,7 +985,7 @@ where
     iter: Walk<'a, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
 }
 
-impl<'a, 'buf, const N: usize, T, F> Iterator for IterInFixed<'a, 'buf, N, T, F>
+impl<'buf, const N: usize, T, F> Iterator for IterInFixed<'_, 'buf, N, T, F>
 where
     T: ZeroCopy,
     F: Flavor,
@@ -1006,7 +1012,7 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<'a, 'buf, T, F> fmt::Debug for Debug<'a, 'buf, T, F>
+impl<T, F> fmt::Debug for Debug<'_, '_, T, F>
 where
     T: fmt::Debug + ZeroCopy,
     F: Flavor,
@@ -1035,7 +1041,7 @@ where
     buf: &'buf Buf,
 }
 
-impl<'a, 'buf, const N: usize, T, F> fmt::Debug for DebugFixed<'a, 'buf, N, T, F>
+impl<const N: usize, T, F> fmt::Debug for DebugFixed<'_, '_, N, T, F>
 where
     T: fmt::Debug + ZeroCopy,
     F: Flavor,

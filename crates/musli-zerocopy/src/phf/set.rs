@@ -48,7 +48,7 @@ pub struct Set<'a, T> {
     buf: &'a Buf,
 }
 
-impl<'a, T> Set<'a, T>
+impl<T> Set<'_, T>
 where
     T: ZeroCopy,
 {
@@ -100,7 +100,10 @@ where
     E: ByteOrder,
     O: Size,
 {
-    type Bound<'a> = Set<'a, T> where Self: 'a;
+    type Bound<'a>
+        = Set<'a, T>
+    where
+        Self: 'a;
 
     #[inline]
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error> {

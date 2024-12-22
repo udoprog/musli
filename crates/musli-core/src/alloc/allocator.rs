@@ -49,7 +49,11 @@ impl<A> Allocator for &A
 where
     A: ?Sized + Allocator,
 {
-    type RawVec<'this, T> = A::RawVec<'this, T> where Self: 'this, T: 'this;
+    type RawVec<'this, T>
+        = A::RawVec<'this, T>
+    where
+        Self: 'this,
+        T: 'this;
 
     #[inline(always)]
     fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>

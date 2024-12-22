@@ -69,7 +69,10 @@ where
     type Error = E;
     type Mark = ();
     type Allocator = A;
-    type String<'this> = String<'this, A> where Self: 'this;
+    type String<'this>
+        = String<'this, A>
+    where
+        Self: 'this;
 
     #[inline]
     fn clear(&self) {}

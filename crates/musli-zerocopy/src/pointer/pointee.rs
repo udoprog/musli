@@ -54,7 +54,10 @@ where
     T: ZeroCopy,
 {
     type Metadata = ();
-    type Stored<O> = () where O: Size;
+    type Stored<O>
+        = ()
+    where
+        O: Size;
 
     #[inline(always)]
     fn try_from_metadata<O>((): ()) -> Option<Self::Stored<O>>
@@ -70,7 +73,10 @@ where
     T: ZeroCopy,
 {
     type Metadata = usize;
-    type Stored<O> = O where O: Size;
+    type Stored<O>
+        = O
+    where
+        O: Size;
 
     #[inline(always)]
     fn try_from_metadata<O>(metadata: usize) -> Option<O>
@@ -83,7 +89,10 @@ where
 
 impl Pointee for str {
     type Metadata = usize;
-    type Stored<O> = O where O: Size;
+    type Stored<O>
+        = O
+    where
+        O: Size;
 
     #[inline(always)]
     fn try_from_metadata<O>(metadata: usize) -> Option<O>

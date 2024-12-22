@@ -3,6 +3,12 @@ name = "tools"
 edition = "2021"
 publish = false
 
+[features]
+default = []
+
+no-empty = []
+no-nonunit-variant = []
+
 [dependencies]
 tests = { path = "../tests" }
 

@@ -51,7 +51,7 @@ pub struct Map<'a, K, V> {
     buf: &'a Buf,
 }
 
-impl<'a, K, V> Map<'a, K, V>
+impl<K, V> Map<'_, K, V>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -169,7 +169,10 @@ where
     E: ByteOrder,
     O: Size,
 {
-    type Bound<'a> = Map<'a, K, V> where Self: 'a;
+    type Bound<'a>
+        = Map<'a, K, V>
+    where
+        Self: 'a;
 
     #[inline]
     fn bind(self, buf: &Buf) -> Result<Self::Bound<'_>, Error> {

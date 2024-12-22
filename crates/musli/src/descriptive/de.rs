@@ -36,7 +36,7 @@ impl<'a, R, const OPT: Options, C: ?Sized> SelfDecoder<'a, R, OPT, C> {
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> SelfDecoder<'a, Limit<R>, OPT, C>
+impl<'de, R, const OPT: Options, C> SelfDecoder<'_, Limit<R>, OPT, C>
 where
     R: Reader<'de>,
     C: ?Sized + Context,
@@ -222,7 +222,10 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U> = SelfDecoder<'this, R, OPT, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = SelfDecoder<'this, R, OPT, U>
+    where
+        U: 'this + Context;
     #[cfg(feature = "value")]
     type DecodeBuffer = crate::value::AsValueDecoder<'a, BUFFER_OPTIONS, C>;
     type DecodePack = SelfDecoder<'a, Limit<R>, OPT, C>;
@@ -757,7 +760,10 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeNext<'this> = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeNext<'this>
+        = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
@@ -776,7 +782,10 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeNext<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeNext<'this>
+        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -811,10 +820,12 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeEntry<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeEntry<'this>
+        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type DecodeRemainingEntries<'this> = RemainingSelfDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeRemainingEntries<'this>
+        = RemainingSelfDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -849,10 +860,12 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeEntryKey<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeEntryKey<'this>
+        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
-    type DecodeEntryValue<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+    type DecodeEntryValue<'this>
+        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -884,7 +897,10 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeKey<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeKey<'this>
+        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
     type DecodeValue = Self;
 
     #[inline]
@@ -904,8 +920,14 @@ where
     C: ?Sized + Context,
 {
     type Cx = C;
-    type DecodeTag<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
-    type DecodeValue<'this> = SelfDecoder<'a, R::Mut<'this>, OPT, C> where Self: 'this;
+    type DecodeTag<'this>
+        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type DecodeValue<'this>
+        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {

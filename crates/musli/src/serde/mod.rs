@@ -114,7 +114,7 @@ where
     inner: &'a C,
 }
 
-impl<'a, C> Context for SerdeContext<'a, C>
+impl<C> Context for SerdeContext<'_, C>
 where
     C: ?Sized + Context,
 {
@@ -122,7 +122,8 @@ where
     type Error = error::SerdeError;
     type Mark = C::Mark;
     type Allocator = C::Allocator;
-    type String<'this> = String<'this, C::Allocator>
+    type String<'this>
+        = String<'this, C::Allocator>
     where
         Self: 'this;
 

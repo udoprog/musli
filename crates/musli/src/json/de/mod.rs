@@ -111,7 +111,10 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U> = JsonDecoder<'this, P, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = JsonDecoder<'this, P, U>
+    where
+        U: 'this + Context;
     #[cfg(feature = "value")]
     type DecodeBuffer = crate::value::AsValueDecoder<'a, BUFFER_OPTIONS, C>;
     type DecodePack = JsonSequenceDecoder<'a, P, C>;

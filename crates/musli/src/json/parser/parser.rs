@@ -219,7 +219,10 @@ impl<'de, P> Parser<'de> for &mut P
 where
     P: ?Sized + Parser<'de>,
 {
-    type Mut<'this> = P::Mut<'this> where Self: 'this;
+    type Mut<'this>
+        = P::Mut<'this>
+    where
+        Self: 'this;
 
     #[inline(always)]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {

@@ -43,7 +43,8 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = JsonEncoder<'a, W::Mut<'this>, C>
+    type EncodeNext<'this>
+        = JsonEncoder<'a, W::Mut<'this>, C>
     where
         Self: 'this;
 

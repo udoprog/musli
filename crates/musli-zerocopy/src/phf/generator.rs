@@ -21,8 +21,9 @@ pub(crate) struct HashState {
 }
 
 /// Calculate displacements length.
+#[inline]
 pub(crate) fn displacements_len(len: usize) -> usize {
-    (len + DEFAULT_LAMBDA - 1) / DEFAULT_LAMBDA
+    len.div_ceil(DEFAULT_LAMBDA)
 }
 
 pub(crate) fn generate_hash<K, T, F, E, O>(

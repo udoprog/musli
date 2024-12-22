@@ -64,7 +64,10 @@ where
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U> = SelfEncoder<'this, W, OPT, U> where U: 'this + Context;
+    type WithContext<'this, U>
+        = SelfEncoder<'this, W, OPT, U>
+    where
+        U: 'this + Context;
     type EncodePack = SelfPackEncoder<'a, W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
@@ -331,7 +334,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = StorageEncoder<'a, &'this mut BufWriter<'a, C::Allocator>, OPT, C> where Self: 'this;
+    type EncodeNext<'this>
+        = StorageEncoder<'a, &'this mut BufWriter<'a, C::Allocator>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -354,7 +360,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeNext<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeNext<'this>
+        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -374,7 +383,10 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeEntry<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntry<'this>
+        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
@@ -394,8 +406,14 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeKey<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeValue<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeKey<'this>
+        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type EncodeValue<'this>
+        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
@@ -420,8 +438,14 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeEntryKey<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeEntryValue<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeEntryKey<'this>
+        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type EncodeEntryValue<'this>
+        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
@@ -446,8 +470,14 @@ where
 {
     type Cx = C;
     type Ok = ();
-    type EncodeTag<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
-    type EncodeData<'this> = SelfEncoder<'a, W::Mut<'this>, OPT, C> where Self: 'this;
+    type EncodeTag<'this>
+        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
+    type EncodeData<'this>
+        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+    where
+        Self: 'this;
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {

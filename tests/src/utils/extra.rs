@@ -45,59 +45,43 @@ pub mod serde_dlhn {
 #[cfg(feature = "rkyv")]
 #[crate::benchmarker]
 pub mod rkyv {
-    use rkyv::ser::serializers::{AlignedSerializer, BufferScratch, CompositeSerializer};
-    use rkyv::ser::Serializer;
-    use rkyv::validation::validators::DefaultValidator;
-    use rkyv::validation::CheckTypeError;
-    use rkyv::{AlignedVec, Archive, CheckBytes, Fallible, Infallible, Serialize};
+    use rkyv::api::high::{to_bytes_in, HighDeserializer, HighSerializer, HighValidator};
+    use rkyv::bytecheck::CheckBytes;
+    use rkyv::rancor::Failure;
+    use rkyv::ser::allocator::ArenaHandle;
+    use rkyv::util::AlignedVec;
+    use rkyv::{Archive, Serialize};
+
+    pub type Serializer<'buf, 'arena> =
+        HighSerializer<&'buf mut AlignedVec, ArenaHandle<'arena>, Failure>;
+    pub type Deserializer = HighDeserializer<Failure>;
+    pub type Validator<'a> = HighValidator<'a, Failure>;
 
     const BUFFER_LEN: usize = 10_000_000;
-    const SCRATCH_LEN: usize = 512_000;
-
-    type S<'buf> = CompositeSerializer<
-        AlignedSerializer<&'buf mut AlignedVec>,
-        BufferScratch<&'buf mut AlignedVec>,
-        Infallible,
-    >;
 
     struct Buffers {
         serializer: AlignedVec,
-        scratch: AlignedVec,
     }
 
     pub fn buffer() -> Buffers {
         Buffers {
             serializer: AlignedVec::with_capacity(BUFFER_LEN),
-            scratch: AlignedVec::with_capacity(SCRATCH_LEN),
         }
     }
 
-    pub fn encode<'buf, T>(
-        buf: &'buf mut Buffers,
-        value: &T,
-    ) -> Result<&'buf [u8], <S<'buf> as Fallible>::Error>
+    pub fn encode<'buf, T>(buf: &'buf mut Buffers, value: &T) -> Result<&'buf [u8], Failure>
     where
-        T: for<'value> Serialize<S<'value>>,
+        T: for<'a, 'b> Serialize<Serializer<'a, 'b>>,
     {
-        let mut serializer = CompositeSerializer::new(
-            AlignedSerializer::new(&mut buf.serializer),
-            BufferScratch::new(&mut buf.scratch),
-            Infallible,
-        );
-
-        serializer.serialize_value(value)?;
-        let bytes = serializer.into_serializer().into_inner();
-        Ok(bytes)
+        to_bytes_in(value, &mut buf.serializer)?;
+        Ok(buf.serializer.as_slice())
     }
 
-    pub fn decode<'buf, T>(
-        buf: &'buf [u8],
-    ) -> Result<&'buf T::Archived, CheckTypeError<T::Archived, DefaultValidator<'buf>>>
+    pub fn decode<T>(buf: &[u8]) -> Result<&T::Archived, Failure>
     where
-        T: Archive,
-        T::Archived: CheckBytes<DefaultValidator<'buf>>,
+        T: Archive<Archived: for<'a> CheckBytes<Validator<'a>>>,
     {
-        rkyv::check_archived_root::<T>(buf)
+        rkyv::access(buf)
     }
 }
 
@@ -144,7 +128,7 @@ pub mod zerocopy {
     use alloc::vec::Vec;
 
     use anyhow::Result;
-    use zerocopy::{AsBytes, FromBytes};
+    use zerocopy::{FromBytes, Immutable, IntoBytes};
 
     #[derive(Debug)]
     pub struct Error;
@@ -165,7 +149,7 @@ pub mod zerocopy {
 
     pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
-        T: AsBytes,
+        T: Immutable + IntoBytes,
     {
         buf.extend_from_slice(value.as_bytes());
         Ok(buf.as_slice())
@@ -175,7 +159,7 @@ pub mod zerocopy {
     where
         T: FromBytes,
     {
-        T::read_from(buf).ok_or(Error)
+        T::read_from_bytes(buf).map_err(|_| Error)
     }
 }
 
