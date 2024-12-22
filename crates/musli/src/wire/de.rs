@@ -133,7 +133,7 @@ where
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_len(&mut self, start: C::Mark) -> Result<usize, C::Error> {
+    fn decode_len(&mut self, start: &C::Mark) -> Result<usize, C::Error> {
         let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
         match tag.kind() {
@@ -279,7 +279,7 @@ where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
     {
         let mark = self.cx.mark();
-        let len = self.decode_len(mark)?;
+        let len = self.decode_len(&mark)?;
         let mut decoder = WireDecoder::new(self.cx, self.reader.limit(len));
         let output = f(&mut decoder)?;
         decoder.end()?;
@@ -289,11 +289,11 @@ where
     #[inline]
     fn decode_array<const N: usize>(mut self) -> Result<[u8; N], C::Error> {
         let mark = self.cx.mark();
-        let len = self.decode_len(mark)?;
+        let len = self.decode_len(&mark)?;
 
         if len != N {
             return Err(self.cx.marked_message(
-                mark,
+                &mark,
                 BadLength {
                     actual: len,
                     expected: N,
@@ -310,7 +310,7 @@ where
         V: UnsizedVisitor<'de, C, [u8]>,
     {
         let mark = self.cx.mark();
-        let len = self.decode_len(mark)?;
+        let len = self.decode_len(&mark)?;
         self.reader.read_bytes(self.cx, len, visitor)
     }
 

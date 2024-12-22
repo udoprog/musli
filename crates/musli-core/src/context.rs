@@ -15,9 +15,9 @@ pub trait Context {
     /// Mode of the context.
     type Mode: 'static;
     /// Error produced by context.
-    type Error: 'static;
+    type Error;
     /// A mark during processing.
-    type Mark: Copy + Default;
+    type Mark;
     /// The allocator associated with the context.
     type Allocator: ?Sized + Allocator;
     /// An allocated buffer containing a valid string.
@@ -27,6 +27,21 @@ pub trait Context {
 
     /// Clear the state of the context, allowing it to be re-used.
     fn clear(&self);
+
+    /// Advance the context by `n` bytes of input.
+    ///
+    /// This is typically used to move the mark forward as produced by
+    /// [Context::mark].
+    fn advance(&self, n: usize);
+
+    /// Return a mark which acts as a checkpoint at the current encoding state.
+    ///
+    /// The context is in a privileged state in that it sees everything, so a
+    /// mark can be quite useful for determining the context of an error.
+    ///
+    /// This typically indicates a byte offset, and is used by
+    /// [`marked_message`][Context::marked_message] to report a spanned error.
+    fn mark(&self) -> Self::Mark;
 
     /// Decode the given input using the associated mode.
     #[inline]
@@ -117,7 +132,7 @@ pub trait Context {
     /// A mark is generated using [Context::mark] and indicates a prior state.
     #[allow(unused_variables)]
     #[inline(always)]
-    fn marked_message<T>(&self, mark: Self::Mark, message: T) -> Self::Error
+    fn marked_message<T>(&self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: fmt::Display,
     {
@@ -129,31 +144,11 @@ pub trait Context {
     /// A mark is generated using [Context::mark] and indicates a prior state.
     #[allow(unused_variables)]
     #[inline(always)]
-    fn marked_custom<T>(&self, mark: Self::Mark, message: T) -> Self::Error
+    fn marked_custom<T>(&self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + Error,
     {
         self.custom(message)
-    }
-
-    /// Advance the context by `n` bytes of input.
-    ///
-    /// This is typically used to move the mark forward as produced by
-    /// [Context::mark].
-    #[allow(unused_variables)]
-    #[inline(always)]
-    fn advance(&self, n: usize) {}
-
-    /// Return a mark which acts as a checkpoint at the current encoding state.
-    ///
-    /// The context is in a privileged state in that it sees everything, so a
-    /// mark can be quite useful for determining the context of an error.
-    ///
-    /// This typically indicates a byte offset, and is used by
-    /// [`marked_message`][Context::marked_message] to report a spanned error.
-    #[inline(always)]
-    fn mark(&self) -> Self::Mark {
-        Self::Mark::default()
     }
 
     /// Report that an invalid variant tag was encountered.

@@ -113,7 +113,7 @@ where
     #[inline]
     fn shared_decode_map(mut self) -> Result<RemainingSelfDecoder<'a, R, OPT, C>, C::Error> {
         let pos = self.cx.mark();
-        let len = self.decode_prefix(Kind::Map, pos)?;
+        let len = self.decode_prefix(Kind::Map, &pos)?;
         Ok(RemainingSelfDecoder::new(self.cx, self.reader, len))
     }
 
@@ -121,13 +121,13 @@ where
     #[inline]
     fn shared_decode_sequence(mut self) -> Result<RemainingSelfDecoder<'a, R, OPT, C>, C::Error> {
         let pos = self.cx.mark();
-        let len = self.decode_prefix(Kind::Sequence, pos)?;
+        let len = self.decode_prefix(Kind::Sequence, &pos)?;
         Ok(RemainingSelfDecoder::new(self.cx, self.reader, len))
     }
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_prefix(&mut self, kind: Kind, mark: C::Mark) -> Result<usize, C::Error> {
+    fn decode_prefix(&mut self, kind: Kind, mark: &C::Mark) -> Result<usize, C::Error> {
         let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
         if tag.kind() != kind {
@@ -154,7 +154,7 @@ where
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_pack_length(&mut self, start: C::Mark) -> Result<usize, C::Error> {
+    fn decode_pack_length(&mut self, start: &C::Mark) -> Result<usize, C::Error> {
         let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
         match tag.kind() {
@@ -300,7 +300,7 @@ where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
     {
         let pos = self.cx.mark();
-        let len = self.decode_pack_length(pos)?;
+        let len = self.decode_pack_length(&pos)?;
         let mut decoder = SelfDecoder::new(self.cx, self.reader.limit(len));
         let output = f(&mut decoder)?;
         decoder.end()?;
@@ -310,11 +310,11 @@ where
     #[inline]
     fn decode_array<const N: usize>(mut self) -> Result<[u8; N], C::Error> {
         let pos = self.cx.mark();
-        let len = self.decode_prefix(Kind::Bytes, pos)?;
+        let len = self.decode_prefix(Kind::Bytes, &pos)?;
 
         if len != N {
             return Err(self.cx.marked_message(
-                pos,
+                &pos,
                 format_args! {
                     "Bad length, got {len} but expect {N}"
                 },
@@ -330,7 +330,7 @@ where
         V: UnsizedVisitor<'de, C, [u8]>,
     {
         let pos = self.cx.mark();
-        let len = self.decode_prefix(Kind::Bytes, pos)?;
+        let len = self.decode_prefix(Kind::Bytes, &pos)?;
         self.reader.read_bytes(self.cx, len, visitor)
     }
 
@@ -374,7 +374,7 @@ where
         }
 
         let pos = self.cx.mark();
-        let len = self.decode_prefix(Kind::String, pos)?;
+        let len = self.decode_prefix(Kind::String, &pos)?;
         self.reader.read_bytes(self.cx, len, Visitor(visitor))
     }
 
@@ -390,7 +390,7 @@ where
             FALSE => Ok(false),
             TRUE => Ok(true),
             tag => Err(self.cx.marked_message(
-                pos,
+                &pos,
                 format_args! {
                     "Bad boolean, got {tag:?}"
                 },
@@ -408,14 +408,14 @@ where
         if tag != CHAR {
             return Err(self
                 .cx
-                .marked_message(pos, format_args!("Expected {CHAR:?}, got {tag:?}")));
+                .marked_message(&pos, format_args!("Expected {CHAR:?}, got {tag:?}")));
         }
 
         let num = c::decode(self.cx, self.reader.borrow_mut())?;
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(self.cx.marked_message(pos, format_args!("Bad character"))),
+            None => Err(self.cx.marked_message(&pos, format_args!("Bad character"))),
         }
     }
 
@@ -572,7 +572,7 @@ where
             NONE => Ok(None),
             SOME => Ok(Some(self)),
             tag => Err(self.cx.marked_message(
-                pos,
+                &pos,
                 format_args! {
                     "Expected option, was {tag:?}"
                 },

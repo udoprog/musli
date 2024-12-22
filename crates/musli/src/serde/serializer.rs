@@ -272,8 +272,8 @@ where
     where
         T: ?Sized + fmt::Display,
     {
-        let string = self.cx.collect_string(value)?;
-        self.serialize_str(string.as_ref())
+        let buf = self.cx.collect_string(value)?;
+        self.serialize_str(buf.as_ref())
     }
 
     #[inline]

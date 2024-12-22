@@ -233,7 +233,7 @@ where
             p.consume_while(cx, is_digit)?;
         }
         _ => {
-            return Err(cx.marked_message(start, IntegerError::InvalidNumeric));
+            return Err(cx.marked_message(&start, IntegerError::InvalidNumeric));
         }
     }
 
@@ -273,7 +273,7 @@ where
     p.skip_whitespace(cx);
 
     let start = cx.mark();
-    decode_unsigned_base::<T, _, _>(cx, p, start)
+    decode_unsigned_base::<T, _, _>(cx, p, &start)
 }
 
 /// Fully parse an unsigned value.
@@ -289,9 +289,9 @@ where
 
     let start = cx.mark();
 
-    match decode_unsigned_full(cx, p, start)?.compute() {
+    match decode_unsigned_full(cx, p, &start)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.marked_message(start, error)),
+        Err(error) => Err(cx.marked_message(&start, error)),
     }
 }
 
@@ -312,7 +312,7 @@ where
         false
     };
 
-    let unsigned = decode_unsigned_base::<T::Unsigned, _, _>(cx, p, start)?;
+    let unsigned = decode_unsigned_base::<T::Unsigned, _, _>(cx, p, &start)?;
 
     Ok(SignedPartsBase {
         is_negative,
@@ -352,7 +352,7 @@ where
         false
     };
 
-    let parts = decode_unsigned_full::<T::Unsigned, _, _>(cx, p, start)?;
+    let parts = decode_unsigned_full::<T::Unsigned, _, _>(cx, p, &start)?;
 
     Ok(SignedPartsFull {
         is_negative,
@@ -375,7 +375,7 @@ where
 
     match decode_signed_base(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.marked_message(start, error)),
+        Err(error) => Err(cx.marked_message(&start, error)),
     }
 }
 
@@ -394,14 +394,14 @@ where
 
     match decode_signed_full_inner(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.marked_message(start, error)),
+        Err(error) => Err(cx.marked_message(&start, error)),
     }
 }
 
 /// Generically decode a single (whole) integer from a stream of bytes abiding
 /// by JSON convention for format.
 #[inline(always)]
-fn decode_unsigned_base<'de, T, C, P>(cx: &C, mut p: P, start: C::Mark) -> Result<T, C::Error>
+fn decode_unsigned_base<'de, T, C, P>(cx: &C, mut p: P, start: &C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
     P: Parser<'de>,
@@ -432,7 +432,7 @@ where
 fn decode_unsigned_full<'de, T, C, P>(
     cx: &C,
     mut p: P,
-    start: C::Mark,
+    start: &C::Mark,
 ) -> Result<Parts<T>, C::Error>
 where
     T: Unsigned,
@@ -484,7 +484,7 @@ where
 
 /// Decode an exponent.
 #[inline(always)]
-fn decode_exponent<'de, P, C>(cx: &C, mut p: P, start: C::Mark) -> Result<i32, C::Error>
+fn decode_exponent<'de, P, C>(cx: &C, mut p: P, start: &C::Mark) -> Result<i32, C::Error>
 where
     P: Parser<'de>,
     C: ?Sized + Context,
@@ -515,7 +515,7 @@ where
 
 /// Decode a single digit into `out`.
 #[inline(always)]
-fn digit<'de, T, C, P>(cx: &C, out: T, mut p: P, start: C::Mark) -> Result<T, C::Error>
+fn digit<'de, T, C, P>(cx: &C, out: T, mut p: P, start: &C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
     P: Parser<'de>,

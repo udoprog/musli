@@ -163,7 +163,10 @@ where
     ///
     /// const CONFIG: Encoding<Custom> = Encoding::new().with_mode();
     /// ```
-    pub const fn with_mode<T>(self) -> Encoding<T> {
+    pub const fn with_mode<T>(self) -> Encoding<T>
+    where
+        T: 'static,
+    {
         Encoding {
             _marker: marker::PhantomData,
         }

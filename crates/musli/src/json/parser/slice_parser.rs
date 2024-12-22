@@ -45,13 +45,13 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         let actual = self.lex(cx);
 
         if !matches!(actual, Token::String) {
-            return Err(cx.marked_message(start, format_args!("Expected string, found {actual}")));
+            return Err(cx.marked_message(&start, format_args!("Expected string, found {actual}")));
         }
 
         self.skip(cx, 1)?;
 
         let mut access = SliceAccess::new(cx, self.slice, self.index);
-        let out = access.parse_string(validate, start, scratch);
+        let out = access.parse_string(validate, &start, scratch);
         self.index = access.index;
 
         out

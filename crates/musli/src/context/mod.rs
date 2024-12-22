@@ -51,7 +51,6 @@ use crate::alloc::System;
 pub fn with_alloc<'a, A, M>(alloc: &'a A) -> DefaultContext<'a, A, M>
 where
     A: 'a + ?Sized + Allocator,
-    M: 'static,
 {
     DefaultContext::with_alloc(alloc)
 }
@@ -75,9 +74,6 @@ where
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub fn new<M>() -> DefaultContext<'static, System, M>
-where
-    M: 'static,
-{
+pub fn new<M>() -> DefaultContext<'static, System, M> {
     DefaultContext::new()
 }

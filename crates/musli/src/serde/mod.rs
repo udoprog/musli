@@ -139,6 +139,11 @@ where
     }
 
     #[inline]
+    fn advance(&self, n: usize) {
+        self.inner.advance(n)
+    }
+
+    #[inline]
     fn alloc(&self) -> &Self::Allocator {
         self.inner.alloc()
     }
