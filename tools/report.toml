@@ -127,7 +127,7 @@ description = [
 ]
 features = ["musli-zerocopy", "rkyv"]
 expected = [
-    "no-cstring", "no-string-key", "no-string-set", "no-tuple", "no-usize"
+    "no-cstring", "no-map", "no-set", "no-tuple", "no-usize"
 ]
 only = ["primitives", "primpacked"]
 

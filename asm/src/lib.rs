@@ -76,7 +76,7 @@ pub mod zerocopy_load {
                 zerocopy, $id,
                 #[inline(never)]
                 pub fn $id(buf: &[u8]) -> Option<$ty> {
-                    <$ty>::read_from(buf)
+                    <$ty>::read_from_bytes(buf).ok()
                 }
             }
         };
