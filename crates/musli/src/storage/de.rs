@@ -96,7 +96,7 @@ where
         if count != 0 {
             return Err(self
                 .cx
-                .marked_message(mark, ExpectedEmptySequence { actual: count }));
+                .marked_message(&mark, ExpectedEmptySequence { actual: count }));
         }
 
         Ok(())
@@ -174,7 +174,7 @@ where
         match byte {
             0 => Ok(false),
             1 => Ok(true),
-            b => Err(self.cx.marked_message(mark, BadBoolean { actual: b })),
+            b => Err(self.cx.marked_message(&mark, BadBoolean { actual: b })),
         }
     }
 
@@ -186,7 +186,7 @@ where
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(cx.marked_message(mark, BadCharacter { actual: num })),
+            None => Err(cx.marked_message(&mark, BadCharacter { actual: num })),
         }
     }
 

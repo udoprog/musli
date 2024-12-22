@@ -61,8 +61,8 @@ impl<A> Same<Binary, ErrorMarker, A> {
 
 impl<M, E, A> Context for Same<M, E, A>
 where
-    A: Allocator,
     M: 'static,
+    A: Allocator,
     E: ContextError,
 {
     type Mode = M;
@@ -76,6 +76,12 @@ where
 
     #[inline]
     fn clear(&self) {}
+
+    #[inline]
+    fn mark(&self) -> Self::Mark {}
+
+    #[inline]
+    fn advance(&self, _: usize) {}
 
     #[inline]
     fn alloc(&self) -> &Self::Allocator {

@@ -80,6 +80,12 @@ where
     }
 
     #[inline]
+    fn mark(&self) -> Self::Mark {}
+
+    #[inline]
+    fn advance(&self, _: usize) {}
+
+    #[inline]
     fn alloc(&self) -> &Self::Allocator {
         &self.alloc
     }

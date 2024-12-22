@@ -135,7 +135,7 @@ pub trait Parser<'de>: private::Sealed {
         self.read(cx, bytes)?;
 
         if bytes != exact.as_bytes() {
-            return Err(cx.marked_message(mark, format_args!("Expected `{exact}`")));
+            return Err(cx.marked_message(&mark, format_args!("Expected `{exact}`")));
         }
 
         Ok(())

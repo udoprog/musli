@@ -93,7 +93,10 @@ impl<T> RawVec<T> for Never<T> {
     }
 }
 
-impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
+impl<'de, C> Decoder<'de> for Never<(), C>
+where
+    C: ?Sized + Context,
+{
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
@@ -155,7 +158,10 @@ impl<'de, C: ?Sized + Context> Decoder<'de> for Never<(), C> {
     }
 }
 
-impl<C: ?Sized + Context> AsDecoder for Never<(), C> {
+impl<C> AsDecoder for Never<(), C>
+where
+    C: ?Sized + Context,
+{
     type Cx = C;
     type Decoder<'this>
         = Self
@@ -168,7 +174,10 @@ impl<C: ?Sized + Context> AsDecoder for Never<(), C> {
     }
 }
 
-impl<C: ?Sized + Context> EntriesDecoder<'_> for Never<(), C> {
+impl<C> EntriesDecoder<'_> for Never<(), C>
+where
+    C: ?Sized + Context,
+{
     type Cx = C;
     type DecodeEntryKey<'this>
         = Self
@@ -195,7 +204,10 @@ impl<C: ?Sized + Context> EntriesDecoder<'_> for Never<(), C> {
     }
 }
 
-impl<C: ?Sized + Context> VariantDecoder<'_> for Never<(), C> {
+impl<C> VariantDecoder<'_> for Never<(), C>
+where
+    C: ?Sized + Context,
+{
     type Cx = C;
     type DecodeTag<'this>
         = Self
@@ -217,7 +229,10 @@ impl<C: ?Sized + Context> VariantDecoder<'_> for Never<(), C> {
     }
 }
 
-impl<C: ?Sized + Context> MapDecoder<'_> for Never<(), C> {
+impl<C> MapDecoder<'_> for Never<(), C>
+where
+    C: ?Sized + Context,
+{
     type Cx = C;
     type DecodeEntry<'this>
         = Self
@@ -246,7 +261,10 @@ impl<C: ?Sized + Context> MapDecoder<'_> for Never<(), C> {
     }
 }
 
-impl<C: ?Sized + Context> EntryDecoder<'_> for Never<(), C> {
+impl<C> EntryDecoder<'_> for Never<(), C>
+where
+    C: ?Sized + Context,
+{
     type Cx = C;
     type DecodeKey<'this>
         = Self
@@ -265,7 +283,10 @@ impl<C: ?Sized + Context> EntryDecoder<'_> for Never<(), C> {
     }
 }
 
-impl<C: ?Sized + Context> SequenceDecoder<'_> for Never<(), C> {
+impl<C> SequenceDecoder<'_> for Never<(), C>
+where
+    C: ?Sized + Context,
+{
     type Cx = C;
     type DecodeNext<'this>
         = Self
@@ -283,7 +304,11 @@ impl<C: ?Sized + Context> SequenceDecoder<'_> for Never<(), C> {
     }
 }
 
-impl<C: ?Sized + Context, O: 'static> Encoder for Never<O, C> {
+impl<C, O> Encoder for Never<O, C>
+where
+    C: ?Sized + Context,
+    O: 'static,
+{
     type Cx = C;
     type Error = C::Error;
     type Ok = O;
@@ -341,7 +366,11 @@ where
     }
 }
 
-impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
+impl<O, C> SequenceEncoder for Never<O, C>
+where
+    O: 'static,
+    C: ?Sized + Context,
+{
     type Cx = C;
     type Ok = O;
     type EncodeNext<'this>
@@ -360,7 +389,11 @@ impl<O: 'static, C: ?Sized + Context> SequenceEncoder for Never<O, C> {
     }
 }
 
-impl<O: 'static, C: ?Sized + Context> MapEncoder for Never<O, C> {
+impl<O, C> MapEncoder for Never<O, C>
+where
+    O: 'static,
+    C: ?Sized + Context,
+{
     type Cx = C;
     type Ok = O;
     type EncodeEntry<'this>
@@ -378,7 +411,11 @@ impl<O: 'static, C: ?Sized + Context> MapEncoder for Never<O, C> {
     }
 }
 
-impl<O: 'static, C: ?Sized + Context> EntryEncoder for Never<O, C> {
+impl<O, C> EntryEncoder for Never<O, C>
+where
+    O: 'static,
+    C: ?Sized + Context,
+{
     type Cx = C;
     type Ok = O;
     type EncodeKey<'this>
@@ -406,7 +443,11 @@ impl<O: 'static, C: ?Sized + Context> EntryEncoder for Never<O, C> {
     }
 }
 
-impl<O: 'static, C: ?Sized + Context> EntriesEncoder for Never<O, C> {
+impl<O, C> EntriesEncoder for Never<O, C>
+where
+    O: 'static,
+    C: ?Sized + Context,
+{
     type Cx = C;
     type Ok = O;
     type EncodeEntryKey<'this>
@@ -434,7 +475,11 @@ impl<O: 'static, C: ?Sized + Context> EntriesEncoder for Never<O, C> {
     }
 }
 
-impl<O: 'static, C: ?Sized + Context> VariantEncoder for Never<O, C> {
+impl<O, C> VariantEncoder for Never<O, C>
+where
+    O: 'static,
+    C: ?Sized + Context,
+{
     type Cx = C;
     type Ok = O;
     type EncodeTag<'this>

@@ -219,24 +219,24 @@ where
     }
 
     #[inline]
-    fn marked_message<T>(&self, mark: Self::Mark, message: T) -> Self::Error
+    fn marked_message<T>(&self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: fmt::Display,
     {
         if let Some(string) = self.format_string(message) {
-            self.push_error(mark..self.mark.get(), string);
+            self.push_error(*mark..self.mark.get(), string);
         }
 
         ErrorMarker
     }
 
     #[inline]
-    fn marked_custom<T>(&self, mark: Self::Mark, message: T) -> Self::Error
+    fn marked_custom<T>(&self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
         if let Some(string) = self.format_string(message) {
-            self.push_error(mark..self.mark.get(), string);
+            self.push_error(*mark..self.mark.get(), string);
         }
 
         ErrorMarker

@@ -16,10 +16,13 @@ where
 }
 
 /// Collect a string into a string buffer.
-pub(crate) fn collect_string<C, T>(cx: &C, value: T) -> Result<String<'_, C::Allocator>, C::Error>
+pub(crate) fn collect_string<'cx, C, T>(
+    cx: &'cx C,
+    value: &T,
+) -> Result<String<'cx, C::Allocator>, C::Error>
 where
-    C: ?Sized + Context,
-    T: fmt::Display,
+    C: 'cx + ?Sized + Context,
+    T: ?Sized + fmt::Display,
 {
     use core::fmt::Write;
 

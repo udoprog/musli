@@ -197,7 +197,7 @@ where
 
             if array.len() != N {
                 return Err(cx.marked_message(
-                    mark,
+                    &mark,
                     format_args!(
                         "Array with length {} does not have the expected {N} number of elements",
                         array.len()
