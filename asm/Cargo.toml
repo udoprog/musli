@@ -15,4 +15,4 @@ tests = { path = "../tests", default-features = false, features = ["std"] }
 
 musli-zerocopy = { path = "../crates/musli-zerocopy", optional = true }
 
-zerocopy = { version = "0.7.32", default-features = false, optional = true, features = ["byteorder", "derive"] }
+zerocopy = { version = "0.8.13", default-features = false, optional = true, features = ["derive"] }

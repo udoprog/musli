@@ -89,7 +89,7 @@ pub mod zerocopy_load {
 pub mod zerocopy_store {
     use core::mem::size_of;
     use tests::models::*;
-    use zerocopy::AsBytes;
+    use zerocopy::IntoBytes;
 
     macro_rules! build {
         ($id:ident, $ty:ty, $constant:ident, $number:literal) => {

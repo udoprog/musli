@@ -94,8 +94,7 @@ other popular libraries:
 [^padded]: This is on zerocopy's roadmap, but it fundamentally doesn't play
     well with the central `FromBytes` / `ToBytes` pair of traits
 
-[^zeroes]: [FromBytes extends
-    FromZeroes](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html)
+[^zeroes]: [FromBytes extends FromZeros](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html)
 
 [^dictionary]: <https://github.com/udoprog/jpv/blob/main/crates/lib/src/database.rs>
 
