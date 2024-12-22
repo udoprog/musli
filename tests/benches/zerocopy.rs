@@ -3,7 +3,11 @@ use criterion::Criterion;
 #[cfg(feature = "musli-zerocopy")]
 use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 #[cfg(feature = "rkyv")]
-use rkyv::{Archive, Serialize};
+use rkyv::rancor::Failure;
+#[cfg(feature = "rkyv")]
+use rkyv::vec::ArchivedVec;
+#[cfg(feature = "rkyv")]
+use rkyv::{Archive, Deserialize, Portable, Serialize};
 
 // Musli zero copy
 #[derive(ZeroCopy, Debug)]
@@ -15,7 +19,6 @@ struct DataMusli {
 
 // Rkyv zero copy
 #[derive(Archive, Serialize)]
-#[archive(compare(PartialEq), check_bytes)]
 #[cfg(feature = "rkyv")]
 struct DataRkyv {
     slice: Vec<Vec<u8>>,
@@ -74,12 +77,12 @@ fn criterion_benchmark(c: &mut Criterion) {
                 .collect(),
         };
 
-        let bytes = rkyv::to_bytes::<_, 4096>(&data).unwrap();
+        let bytes = rkyv::to_bytes::<Failure>(&data).unwrap();
 
         b.iter(|| {
             let mut len = 0;
 
-            let archived = unsafe { rkyv::archived_root::<DataRkyv>(&bytes) };
+            let archived = unsafe { rkyv::access_unchecked::<ArchivedDataRkyv>(&bytes) };
 
             for item in archived.slice.iter() {
                 len += black_box(item.as_slice()).len();
@@ -99,12 +102,12 @@ fn criterion_benchmark(c: &mut Criterion) {
                 .collect(),
         };
 
-        let bytes = rkyv::to_bytes::<_, 4096>(&data).unwrap();
+        let bytes = rkyv::to_bytes::<Failure>(&data).unwrap();
 
         b.iter(|| {
             let mut len = 0;
 
-            let archived = rkyv::check_archived_root::<DataRkyv>(&bytes).unwrap();
+            let archived = rkyv::access::<ArchivedDataRkyv, Failure>(&bytes).unwrap();
 
             for item in archived.slice.iter() {
                 len += black_box(item.as_slice()).len();

@@ -92,5 +92,4 @@ zerocopy = { version = "0.8.13", default-features = false, optional = true, feat
 miniserde = { version = "0.1.38", default-features = false, optional = true }
 
 [dev-dependencies]
-tests = { path = ".", features = ["test"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
