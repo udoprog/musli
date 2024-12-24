@@ -45,10 +45,12 @@ pub mod serde_dlhn {
 #[cfg(feature = "rkyv")]
 #[crate::benchmarker]
 pub mod rkyv {
-    use rkyv::api::high::{to_bytes_in, HighDeserializer, HighSerializer, HighValidator};
+    use rkyv::api::high::{
+        to_bytes_in_with_alloc, HighDeserializer, HighSerializer, HighValidator,
+    };
     use rkyv::bytecheck::CheckBytes;
     use rkyv::rancor::Failure;
-    use rkyv::ser::allocator::ArenaHandle;
+    use rkyv::ser::allocator::{Arena, ArenaHandle};
     use rkyv::util::AlignedVec;
     use rkyv::{Archive, Serialize};
 
@@ -61,11 +63,17 @@ pub mod rkyv {
 
     struct Buffers {
         serializer: AlignedVec,
+        arena: Arena,
+    }
+
+    pub fn reset(buf: &mut Buffers) {
+        buf.serializer.clear();
     }
 
     pub fn buffer() -> Buffers {
         Buffers {
             serializer: AlignedVec::with_capacity(BUFFER_LEN),
+            arena: Arena::new(),
         }
     }
 
@@ -73,7 +81,7 @@ pub mod rkyv {
     where
         T: for<'a, 'b> Serialize<Serializer<'a, 'b>>,
     {
-        to_bytes_in(value, &mut buf.serializer)?;
+        to_bytes_in_with_alloc(value, &mut buf.serializer, buf.arena.acquire())?;
         Ok(buf.serializer.as_slice())
     }
 
