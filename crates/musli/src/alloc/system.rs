@@ -36,7 +36,7 @@ use super::{Allocator, RawVec};
 pub struct System;
 
 impl System {
-    /// Construct a new allocator.
+    /// Construct a new system allocator.
     #[inline]
     pub const fn new() -> Self {
         Self

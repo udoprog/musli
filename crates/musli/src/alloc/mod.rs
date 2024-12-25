@@ -88,8 +88,7 @@ mod system;
 pub use self::system::System;
 
 /// The static system allocator instance.
-#[cfg(feature = "alloc")]
-pub static SYSTEM: System = System::new();
+pub(crate) static SYSTEM: System = System::new();
 
 mod disabled;
 #[doc(inline)]
