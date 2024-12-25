@@ -1,8 +1,11 @@
 #![no_std]
+#![no_main]
 #![allow(internal_features)]
-#![feature(start, core_intrinsics, lang_items, link_cfg)]
+#![feature(core_intrinsics, lang_items, link_cfg)]
 
 mod prelude;
+
+use core::ffi::c_int;
 
 use musli::alloc::{ArrayBuffer, Slice};
 use musli::context;
@@ -22,8 +25,8 @@ struct Value<'a> {
     serde: Serde,
 }
 
-#[start]
-fn main(_argc: isize, _argv: *const *const u8) -> isize {
+#[no_mangle]
+extern "C" fn main(_argc: c_int, _argv: *const *const u8) -> c_int {
     let mut buf = ArrayBuffer::new();
     let alloc = Slice::new(&mut buf);
     let cx = context::with_alloc(&alloc);
