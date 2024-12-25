@@ -37,6 +37,9 @@ use crate::alloc::System;
 ///
 /// # Examples
 ///
+/// The `default` macro provides access to the default allocator. This is how it
+/// can be used with this method:
+///
 /// ```
 /// use musli::context;
 ///
@@ -48,6 +51,23 @@ use crate::alloc::System;
 /// });
 /// # Ok::<(), musli::context::ErrorMarker>(())
 /// ```
+///
+/// We can also very conveniently set up an allocator which uses an existing
+/// buffer:
+///
+/// ```
+/// use musli::{alloc, context};
+///
+/// let mut buf = alloc::ArrayBuffer::new();
+/// let alloc = alloc::Slice::new(&mut buf);
+/// let cx = context::with_alloc(&alloc);
+///
+/// let encoding = musli::json::Encoding::new();
+/// let string = encoding.to_string_with(&cx, &42)?;
+/// assert_eq!(string, "42");
+/// # Ok::<(), musli::context::ErrorMarker>(())
+/// ```
+///
 pub fn with_alloc<'a, A, M>(alloc: &'a A) -> DefaultContext<'a, A, M>
 where
     A: 'a + ?Sized + Allocator,

@@ -88,7 +88,15 @@ mod system;
 pub use self::system::System;
 
 /// The static system allocator instance.
-pub(crate) static SYSTEM: System = System::new();
+#[cfg(feature = "alloc")]
+pub(crate) static __SYSTEM: System = System::new();
+
+/// Get a reference to the static system allocator instance.
+#[cfg(feature = "alloc")]
+#[inline]
+pub fn system() -> &'static System {
+    &__SYSTEM
+}
 
 mod disabled;
 #[doc(inline)]
@@ -167,7 +175,7 @@ pub use __default as default;
 #[doc(hidden)]
 macro_rules! __default_allocator_impl {
     (|$alloc:ident| $body:block) => {{
-        let $alloc = &$crate::alloc::SYSTEM;
+        let $alloc = $crate::alloc::system();
         $body
     }};
 }
