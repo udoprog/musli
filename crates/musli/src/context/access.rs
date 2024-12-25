@@ -6,6 +6,7 @@ pub(crate) struct Access {
 }
 
 impl Access {
+    #[inline]
     pub(crate) fn new() -> Self {
         Self {
             state: Cell::new(0),

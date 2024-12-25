@@ -43,9 +43,11 @@ impl<A, M> DefaultContext<'_, A, M> where A: ?Sized + Allocator {}
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<M> DefaultContext<'static, System, M> {
-    /// Construct a new context which uses the system allocator for memory.
+    /// Construct a new context which uses the [`System`] allocator for memory.
+    ///
+    /// [`System`]: crate::alloc::System
     #[inline]
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         Self::with_alloc(&crate::alloc::SYSTEM)
     }
 }
