@@ -65,6 +65,7 @@ pub trait Context {
     }
 
     /// Decode the given input as bytes using the associated mode.
+    #[inline]
     fn decode_bytes<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
     where
         T: DecodeBytes<'de, Self::Mode>,
@@ -153,80 +154,100 @@ pub trait Context {
 
     /// Report that an invalid variant tag was encountered.
     #[inline(always)]
-    fn invalid_variant_tag<T>(&self, _: &'static str, tag: &T) -> Self::Error
+    fn invalid_variant_tag<T>(&self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
     {
-        self.message(format_args!("Invalid variant tag {tag:?}"))
+        self.message(format_args!(
+            "Type {type_name} received invalid variant tag {tag:?}"
+        ))
     }
 
     /// The value for the given tag could not be collected.
     #[inline(always)]
-    fn expected_tag<T>(&self, _: &'static str, tag: &T) -> Self::Error
+    fn expected_tag<T>(&self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
     {
-        self.message(format_args!("Expected tag: {tag:?}"))
+        self.message(format_args!("Type {type_name} expected tag {tag:?}"))
     }
 
     /// Trying to decode an uninhabitable type.
     #[inline(always)]
-    fn uninhabitable(&self, _: &'static str) -> Self::Error {
-        self.message(format_args!("Cannot decode uninhabitable types"))
+    fn uninhabitable(&self, type_name: &'static str) -> Self::Error {
+        self.message(format_args!(
+            "Type {type_name} cannot be decoded since it's uninhabitable"
+        ))
     }
 
     /// Encountered an unsupported field tag.
     #[inline(always)]
-    fn invalid_field_tag<T>(&self, _: &'static str, tag: &T) -> Self::Error
+    fn invalid_field_tag<T>(&self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
     {
-        self.message(format_args!("Invalid field tag {tag:?}"))
+        self.message(format_args!(
+            "Type {type_name} is missing invalid field tag {tag:?}"
+        ))
     }
 
     /// Expected another field to decode.
     #[inline(always)]
-    fn expected_field_adjacent<T, C>(&self, _: &'static str, tag: &T, content: &C) -> Self::Error
+    fn expected_field_adjacent<T, C>(
+        &self,
+        type_name: &'static str,
+        tag: &T,
+        content: &C,
+    ) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
         C: ?Sized + fmt::Debug,
     {
         self.message(format_args!(
-            "Expected adjacent field {tag:?} or {content:?}"
+            "Type {type_name} expected adjacent field {tag:?} or {content:?}"
         ))
     }
 
     /// Missing adjacent tag when decoding.
     #[inline(always)]
-    fn missing_adjacent_tag<T>(&self, _: &'static str, tag: &T) -> Self::Error
+    fn missing_adjacent_tag<T>(&self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
     {
-        self.message(format_args!("Missing adjacent tag {tag:?}"))
+        self.message(format_args!(
+            "Type {type_name} is missing adjacent tag {tag:?}"
+        ))
     }
 
     /// Encountered an unsupported field tag.
     #[inline(always)]
-    fn invalid_field_string_tag(&self, _: &'static str, field: Self::String<'_>) -> Self::Error {
+    fn invalid_field_string_tag(
+        &self,
+        type_name: &'static str,
+        field: Self::String<'_>,
+    ) -> Self::Error {
         let field = field.as_ref();
-        self.message(format_args!("Invalid field tag `{field}`"))
+        self.message(format_args!(
+            "Type {type_name} received invalid field tag {field:?}"
+        ))
     }
 
     /// Missing variant field required to decode.
     #[allow(unused_variables)]
     #[inline(always)]
-    fn missing_variant_field<T>(&self, name: &'static str, tag: &T) -> Self::Error
+    fn missing_variant_field<T>(&self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
     {
-        self.message(format_args!("Missing variant field: {tag:?}"))
+        self.message(format_args!(
+            "Type {type_name} is missing variant field {tag:?}"
+        ))
     }
 
     /// Indicate that a variant tag could not be determined.
-    #[allow(unused_variables)]
     #[inline(always)]
-    fn missing_variant_tag(&self, name: &'static str) -> Self::Error {
-        self.message(format_args!("Missing variant tag"))
+    fn missing_variant_tag(&self, type_name: &'static str) -> Self::Error {
+        self.message(format_args!("Type {type_name} is missing variant tag"))
     }
 
     /// Encountered an unsupported variant field.
@@ -234,7 +255,7 @@ pub trait Context {
     #[inline(always)]
     fn invalid_variant_field_tag<V, T>(
         &self,
-        name: &'static str,
+        type_name: &'static str,
         variant: &V,
         tag: &T,
     ) -> Self::Error
@@ -243,12 +264,11 @@ pub trait Context {
         T: ?Sized + fmt::Debug,
     {
         self.message(format_args!(
-            "Invalid variant field tag `{tag:?}` for variant `{variant:?}`",
+            "Type {type_name} received invalid variant field tag {tag:?} for variant {variant:?}",
         ))
     }
 
     /// Missing variant field required to decode.
-    #[allow(unused_variables)]
     #[inline(always)]
     fn alloc_failed(&self) -> Self::Error {
         self.message("Failed to allocate")
@@ -261,9 +281,10 @@ pub trait Context {
     /// This will be matched with a corresponding call to [`leave_struct`].
     ///
     /// [`leave_struct`]: Context::leave_struct
-    #[allow(unused_variables)]
     #[inline(always)]
-    fn enter_struct(&self, name: &'static str) {}
+    fn enter_struct(&self, type_name: &'static str) {
+        _ = type_name;
+    }
 
     /// Trace that we've left the last struct that was entered.
     #[inline(always)]
@@ -276,9 +297,10 @@ pub trait Context {
     /// This will be matched with a corresponding call to [`leave_enum`].
     ///
     /// [`leave_enum`]: Context::leave_enum
-    #[allow(unused_variables)]
     #[inline(always)]
-    fn enter_enum(&self, name: &'static str) {}
+    fn enter_enum(&self, type_name: &'static str) {
+        _ = type_name;
+    }
 
     /// Trace that we've left the last enum that was entered.
     #[inline(always)]
@@ -306,12 +328,13 @@ pub trait Context {
     /// ```
     ///
     /// [`leave_field`]: Context::leave_field
-    #[allow(unused_variables)]
     #[inline(always)]
-    fn enter_named_field<T>(&self, name: &'static str, tag: &T)
+    fn enter_named_field<T>(&self, type_name: &'static str, tag: &T)
     where
         T: ?Sized + fmt::Display,
     {
+        _ = type_name;
+        _ = tag;
     }
 
     /// Trace that we've entered the given unnamed field.
@@ -378,7 +401,7 @@ pub trait Context {
     /// [`leave_variant`]: Context::leave_variant
     #[allow(unused_variables)]
     #[inline(always)]
-    fn enter_variant<T>(&self, name: &'static str, tag: T)
+    fn enter_variant<T>(&self, type_name: &'static str, tag: T)
     where
         T: fmt::Display,
     {
