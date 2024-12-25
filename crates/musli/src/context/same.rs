@@ -2,9 +2,9 @@ use core::error::Error;
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::alloc::{self, Allocator, String};
 #[cfg(feature = "alloc")]
-use crate::alloc::{System, SYSTEM};
+use crate::alloc::System;
+use crate::alloc::{self, Allocator, String};
 #[cfg(test)]
 use crate::mode::Binary;
 use crate::Context;
@@ -32,9 +32,10 @@ impl<M, E> Same<M, E, &'static System>
 where
     E: ContextError,
 {
-    /// Construct a new same-error context with a custom allocator.
+    /// Construct a new same-error context with the [`System`] allocator.
+    #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(&SYSTEM)
+        Self::with_alloc(crate::alloc::system())
     }
 }
 

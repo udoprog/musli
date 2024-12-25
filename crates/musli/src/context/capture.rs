@@ -3,9 +3,9 @@ use core::error::Error;
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::alloc::{self, Allocator, String};
 #[cfg(feature = "alloc")]
-use crate::alloc::{System, SYSTEM};
+use crate::alloc::System;
+use crate::alloc::{self, Allocator, String};
 use crate::Context;
 
 use super::{ContextError, ErrorMarker};
@@ -27,8 +27,9 @@ where
     E: ContextError,
 {
     /// Construct a new capturing context using the [`System`] allocator.
+    #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(&SYSTEM)
+        Self::with_alloc(alloc::system())
     }
 }
 
