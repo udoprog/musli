@@ -192,3 +192,39 @@ pub mod miniserde {
         json::from_str(string)
     }
 }
+
+#[cfg(feature = "speedy")]
+#[crate::benchmarker]
+pub mod speedy {
+    use alloc::vec::Vec;
+    use speedy::{Readable, Writable};
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
+    pub fn encode<'buf, T>(
+        buffer: &'buf mut Vec<u8>,
+        value: &T,
+    ) -> Result<&'buf [u8], speedy::Error>
+    where
+        T: Writable<speedy::LittleEndian>,
+    {
+        let len = value.bytes_needed()?;
+        // See https://github.com/koute/speedy/issues/78
+        buffer.resize(len, 0);
+        value.write_to_buffer(buffer.as_mut_slice())?;
+        Ok(buffer.as_slice())
+    }
+
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, speedy::Error>
+    where
+        T: Readable<'buf, speedy::LittleEndian>,
+    {
+        T::read_from_buffer(buf)
+    }
+}

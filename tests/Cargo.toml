@@ -70,6 +70,7 @@ dlhn = ["dep:dlhn", "serde", "no-128", "no-map"]
 bitcode = ["dep:bitcode", "serde"]
 bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
 miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"]
+speedy = ["dep:speedy", "no-usize", "no-cstring"]
 
 [dependencies]
 musli = { path = "../crates/musli", version = "0.0.124", default-features = false, optional = true, features = [] }
@@ -90,6 +91,7 @@ postcard = { version = "1.0.8",  default-features = false, optional = true }
 bson = { version = "2.9.0", default-features = false, optional = true }
 zerocopy = { version = "0.8.13", default-features = false, optional = true, features = ["derive"] }
 miniserde = { version = "0.1.38", default-features = false, optional = true }
+speedy = { version = "0.8.7", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
