@@ -59,7 +59,9 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 #[doc(inline)]
 pub use self::encoding::to_writer;
 #[doc(inline)]
-pub use self::encoding::{decode, encode, from_slice, from_str, to_fixed_bytes, Encoding, DEFAULT};
+pub use self::encoding::{
+    decode, encode, from_slice, from_str, to_fixed_bytes, to_slice, Encoding, DEFAULT,
+};
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]
