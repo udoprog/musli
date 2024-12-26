@@ -188,12 +188,21 @@ pub mod generic {
 
 #[cfg(feature = "musli")]
 pub mod musli {
+    use musli::context::{ErrorMarker as Error, Ignore};
     use musli::options::{self, Float, Integer, Options};
-    use musli::storage::{Encoding, Error};
+    use musli::storage::Encoding;
     use musli::{Decode, Encode};
 
     use tests::models::Primitives;
     use tests::Packed;
+
+    const OPTIONS: Options = options::new()
+        .with_length(Integer::Fixed)
+        .with_integer(Integer::Fixed)
+        .with_float(Float::Fixed)
+        .build();
+
+    const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
     pub fn encode_primitives<'buf>(
         buffer: &'buf mut Vec<u8>,
@@ -206,35 +215,23 @@ pub mod musli {
         decode::<Primitives>(buf)
     }
 
-    const OPTIONS: Options = options::new()
-        .with_length(Integer::Fixed)
-        .with_integer(Integer::Fixed)
-        .with_float(Float::Fixed)
-        .build();
-
-    const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
-
-    pub fn buffer() -> Vec<u8> {
-        Vec::with_capacity(4096)
-    }
-
-    pub fn reset(buf: &mut Vec<u8>) {
-        buf.clear();
-    }
-
+    #[inline(always)]
     pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
         T: Encode<Packed>,
     {
-        ENCODING.encode(&mut *buf, value)?;
+        let cx = Ignore::new();
+        ENCODING.encode_with(&cx, &mut *buf, value)?;
         Ok(buf)
     }
 
+    #[inline(always)]
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
         T: Decode<'buf, Packed>,
     {
-        ENCODING.from_slice(buf)
+        let cx = Ignore::new();
+        ENCODING.from_slice_with(&cx, buf)
     }
 }
 

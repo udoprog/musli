@@ -4,7 +4,7 @@ use crate::int::{Signed, Unsigned, UnsignedOps};
 use crate::{Context, Options, Reader, Writer};
 
 /// Governs how unsigned integers are encoded into a [`Writer`].
-#[inline]
+#[inline(always)]
 pub(crate) fn encode_unsigned<C, W, T, const OPT: Options>(
     cx: &C,
     writer: W,
@@ -26,7 +26,7 @@ where
 
 /// Decode an unsigned value from the specified reader using the configuration
 /// passed in through `F`.
-#[inline]
+#[inline(always)]
 pub(crate) fn decode_unsigned<'de, C, R, T, const OPT: Options>(
     cx: &C,
     reader: R,
@@ -46,7 +46,7 @@ where
 }
 
 /// Governs how signed integers are encoded into a [`Writer`].
-#[inline]
+#[inline(always)]
 pub(crate) fn encode_signed<C, W, T, const OPT: Options>(
     cx: &C,
     writer: W,
@@ -68,7 +68,7 @@ where
 }
 
 /// Governs how signed integers are decoded from a [`Reader`].
-#[inline]
+#[inline(always)]
 pub(crate) fn decode_signed<'de, C, R, T, const OPT: Options>(
     cx: &C,
     reader: R,
@@ -92,7 +92,7 @@ where
 }
 
 /// Governs how usize lengths are encoded into a [`Writer`].
-#[inline]
+#[inline(always)]
 pub(crate) fn encode_usize<C, W, const OPT: Options>(
     cx: &C,
     writer: W,
@@ -123,7 +123,7 @@ where
 }
 
 /// Governs how usize lengths are decoded from a [`Reader`].
-#[inline]
+#[inline(always)]
 pub(crate) fn decode_usize<'de, C, R, const OPT: Options>(
     cx: &C,
     reader: R,

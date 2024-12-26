@@ -207,10 +207,7 @@ pub mod speedy {
         buf.clear();
     }
 
-    pub fn encode<'buf, T>(
-        buffer: &'buf mut Vec<u8>,
-        value: &T,
-    ) -> Result<&'buf [u8], Error>
+    pub fn encode<'buf, T>(buffer: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
         T: Writable<LittleEndian>,
     {

@@ -130,7 +130,7 @@ where
 }
 
 /// Governs how unsigned integers are decoded from a [`Reader`].
-#[inline]
+#[inline(always)]
 pub(crate) fn decode_unsigned<'de, C, R, T, const OPT: Options>(
     cx: &C,
     mut reader: R,
