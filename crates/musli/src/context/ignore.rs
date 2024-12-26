@@ -9,22 +9,19 @@ use crate::alloc::{self, Allocator, String};
 use crate::mode::Binary;
 use crate::Context;
 
-use super::{ContextError, ErrorMarker};
+use super::ErrorMarker;
 
 /// A simple non-diagnostical capturing context which ignores the error and
 /// loses all information about it (except that it happened).
-pub struct Ignore<M, E, A> {
+pub struct Ignore<M, A> {
     alloc: A,
     error: Cell<bool>,
-    _marker: PhantomData<(M, E)>,
+    _marker: PhantomData<M>,
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Ignore<M, E, &'static System>
-where
-    E: ContextError,
-{
+impl<M> Ignore<M, &'static System> {
     /// Construct a new ignoring context with the [`System`] allocator.
     #[inline]
     pub fn new() -> Self {
@@ -32,7 +29,7 @@ where
     }
 }
 
-impl<M, E, A> Ignore<M, E, A> {
+impl<M, A> Ignore<M, A> {
     /// Construct a new ignoring context.
     pub fn with_alloc(alloc: A) -> Self {
         Self {
@@ -44,28 +41,25 @@ impl<M, E, A> Ignore<M, E, A> {
 }
 
 #[cfg(test)]
-impl<A> Ignore<Binary, ErrorMarker, A> {
+impl<A> Ignore<Binary, A> {
     /// Construct a new ignoring context which collects an error marker.
     pub(crate) fn with_marker(alloc: A) -> Self {
         Self::with_alloc(alloc)
     }
 }
 
-impl<M, E, A> Ignore<M, E, A>
-where
-    E: ContextError,
-{
+impl<M, A> Ignore<M, A> {
     /// Construct an error or panic.
-    pub fn unwrap(self) -> E {
+    pub fn unwrap(self) -> ErrorMarker {
         if self.error.get() {
-            return E::message("error");
+            return ErrorMarker;
         }
 
         panic!("did not error")
     }
 }
 
-impl<M, E, A> Context for Ignore<M, E, A>
+impl<M, A> Context for Ignore<M, A>
 where
     M: 'static,
     A: Allocator,
@@ -122,10 +116,7 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Default for Ignore<M, E, &'static System>
-where
-    E: ContextError,
-{
+impl<M> Default for Ignore<M, &'static System> {
     #[inline]
     fn default() -> Self {
         Self::new()

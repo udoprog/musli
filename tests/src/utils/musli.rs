@@ -39,13 +39,19 @@ pub mod musli_json {
 pub mod musli_storage_packed {
     use alloc::vec::Vec;
 
-    use musli::options::{self, Integer, Options};
+    use musli::context::Same;
+    use musli::options::{self, Float, Integer, Options};
     use musli::storage::{Encoding, Error};
     use musli::{Decode, Encode};
 
     use crate::mode::Packed;
 
-    const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+    const OPTIONS: Options = options::new()
+        .with_length(Integer::Fixed)
+        .with_integer(Integer::Fixed)
+        .with_float(Float::Fixed)
+        .build();
+
     const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
     pub fn buffer() -> Vec<u8> {
