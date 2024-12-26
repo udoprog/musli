@@ -48,7 +48,7 @@ impl fmt::Display for ErrorImpl {
 impl core::error::Error for Error {}
 
 impl ContextError for Error {
-    #[inline]
+    #[inline(always)]
     fn custom<T>(error: T) -> Self
     where
         T: fmt::Display,
@@ -56,7 +56,7 @@ impl ContextError for Error {
         Self::message(error)
     }
 
-    #[inline]
+    #[inline(always)]
     #[allow(unused_variables)]
     fn message<T>(message: T) -> Self
     where

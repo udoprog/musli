@@ -28,7 +28,9 @@ macro_rules! miri {
 pub mod generate;
 #[doc(inline)]
 pub use self::generate::{Generate, Rng};
+#[cfg(feature = "musli")]
 mod mode;
+#[cfg(feature = "musli")]
 pub use self::mode::Packed;
 pub mod models;
 pub mod utils;

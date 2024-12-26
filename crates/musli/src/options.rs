@@ -35,7 +35,7 @@ impl Builder {
     /// Indicates if an integer serialization should be variable.
     #[inline(always)]
     pub const fn with_integer(self, integer: Integer) -> Self {
-        const MASK: Options = 0b11 << INTEGER_BIT;
+        const MASK: Options = 0b1 << INTEGER_BIT;
         Self((self.0 & !MASK) | ((integer as Options) << INTEGER_BIT))
     }
 
@@ -133,10 +133,10 @@ pub(crate) const fn length<const OPT: Options>() -> Integer {
 #[inline(always)]
 pub(crate) const fn length_width<const OPT: Options>() -> Width {
     match (OPT >> LENGTH_WIDTH_BIT) & 0b11 {
-        0 => Width::U8,
-        1 => Width::U16,
-        2 => Width::U32,
-        _ => Width::U64,
+        0 => Width::U64,
+        1 => Width::U32,
+        2 => Width::U16,
+        _ => Width::U8,
     }
 }
 
@@ -162,7 +162,7 @@ pub(crate) const fn is_map_keys_as_numbers<const OPT: Options>() -> bool {
 }
 
 /// Integer serialization mode.
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum Integer {
@@ -173,7 +173,7 @@ pub enum Integer {
 }
 
 /// Float serialization mode.
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum Float {
@@ -190,8 +190,7 @@ pub enum Float {
 ///
 /// By default, this is the [`ByteOrder::NATIVE`] byte order of the target
 /// platform.
-#[derive(PartialEq, Eq)]
-#[cfg_attr(test, derive(Debug))]
+#[derive(Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum ByteOrder {
@@ -257,19 +256,18 @@ macro_rules! width_arm {
 pub(crate) use width_arm;
 
 /// The width of a numerical type.
-#[derive(Clone, Copy)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum Width {
-    /// 8 bit width.
-    U8 = 0,
-    /// 16 bit width.
-    U16 = 1,
-    /// 32 bit width.
-    U32 = 2,
     /// 64 bit width.
-    U64 = 3,
+    U64 = 0,
+    /// 32 bit width.
+    U32 = 1,
+    /// 16 bit width.
+    U16 = 2,
+    /// 8 bit width.
+    U8 = 3,
 }
 
 #[test]
@@ -310,6 +308,7 @@ fn test_builds() {
             assert_or_default!($expr, integer::<O>(), Integer::Variable, ($($integer)?));
             assert_or_default!($expr, float::<O>(), Float::Integer, ($($float)?));
             assert_or_default!($expr, length::<O>(), Integer::Variable, ($($length)?));
+            assert_or_default!($expr, length_width::<O>(), Width::U64, ($($length_width)?));
             assert_or_default!($expr, is_map_keys_as_numbers::<O>(), false, ($($is_map_keys_as_numbers)?));
         }}
     }
@@ -327,6 +326,13 @@ fn test_builds() {
     test_case! {
         self::new().with_integer(Integer::Fixed) => {
             integer = Integer::Fixed,
+        }
+    }
+
+    test_case! {
+        self::new().with_length(Integer::Fixed) => {
+            length = Integer::Fixed,
+            length_width = Width::U64,
         }
     }
 

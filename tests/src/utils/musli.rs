@@ -39,8 +39,9 @@ pub mod musli_json {
 pub mod musli_storage_packed {
     use alloc::vec::Vec;
 
+    use musli::context::{ErrorMarker as Error, Ignore};
     use musli::options::{self, Float, Integer, Options};
-    use musli::storage::{Encoding, Error};
+    use musli::storage::Encoding;
     use musli::{Decode, Encode};
 
     use crate::mode::Packed;
@@ -65,7 +66,8 @@ pub mod musli_storage_packed {
     where
         T: Encode<Packed>,
     {
-        ENCODING.encode(&mut *buf, value)?;
+        let cx = Ignore::new();
+        ENCODING.encode_with(&cx, &mut *buf, value)?;
         Ok(buf)
     }
 
@@ -73,7 +75,8 @@ pub mod musli_storage_packed {
     where
         T: Decode<'buf, Packed>,
     {
-        ENCODING.from_slice(buf)
+        let cx = Ignore::new();
+        ENCODING.from_slice_with(&cx, buf)
     }
 }
 

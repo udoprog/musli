@@ -121,7 +121,7 @@ where
         write!(f, "type supported by the wire encoder")
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode<T>(self, value: T) -> Result<Self::Ok, C::Error>
     where
         T: Encode<Self::Mode>,
@@ -129,31 +129,31 @@ where
         value.encode(self.cx, self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_empty(mut self) -> Result<Self::Ok, C::Error> {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_pack(self) -> Result<Self::EncodePack, C::Error> {
         Ok(WireSequenceEncoder::new(self.cx, self.writer))
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_array<const N: usize>(self, array: &[u8; N]) -> Result<Self::Ok, C::Error> {
         self.encode_bytes(array)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), bytes.len())?;
         self.writer.write_bytes(self.cx, bytes)?;
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_bytes_vectored<I>(mut self, len: usize, vectors: I) -> Result<Self::Ok, C::Error>
     where
         I: IntoIterator<Item: AsRef<[u8]>>,
@@ -167,12 +167,12 @@ where
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_string(self, string: &str) -> Result<Self::Ok, C::Error> {
         self.encode_bytes(string.as_bytes())
     }
 
-    #[inline]
+    #[inline(always)]
     fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         T: ?Sized + fmt::Display,
@@ -181,12 +181,85 @@ where
         self.encode_string(buf.as_ref())
     }
 
-    #[inline]
+    #[inline(always)]
+    fn encode_bool(mut self, value: bool) -> Result<Self::Ok, C::Error> {
+        self.writer.write_byte(
+            self.cx,
+            Tag::new(Kind::Continuation, if value { 1 } else { 0 }).byte(),
+        )
+    }
+
+    #[inline(always)]
+    fn encode_char(self, value: char) -> Result<Self::Ok, C::Error> {
+        self.encode_u32(value as u32)
+    }
+
+    #[inline(always)]
+    fn encode_u8(mut self, value: u8) -> Result<Self::Ok, C::Error> {
+        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+    }
+
+    #[inline(always)]
+    fn encode_u16(mut self, value: u16) -> Result<Self::Ok, C::Error> {
+        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+    }
+
+    #[inline(always)]
+    fn encode_u32(mut self, value: u32) -> Result<Self::Ok, C::Error> {
+        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+    }
+
+    #[inline(always)]
+    fn encode_u64(mut self, value: u64) -> Result<Self::Ok, C::Error> {
+        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+    }
+
+    #[inline(always)]
+    fn encode_u128(mut self, value: u128) -> Result<Self::Ok, C::Error> {
+        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+    }
+
+    #[inline(always)]
+    fn encode_i8(self, value: i8) -> Result<Self::Ok, C::Error> {
+        self.encode_u8(value as u8)
+    }
+
+    #[inline(always)]
+    fn encode_i16(mut self, value: i16) -> Result<Self::Ok, C::Error> {
+        crate::wire::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+    }
+
+    #[inline(always)]
+    fn encode_i32(mut self, value: i32) -> Result<Self::Ok, C::Error> {
+        crate::wire::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+    }
+
+    #[inline(always)]
+    fn encode_i64(mut self, value: i64) -> Result<Self::Ok, C::Error> {
+        crate::wire::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+    }
+
+    #[inline(always)]
+    fn encode_i128(mut self, value: i128) -> Result<Self::Ok, C::Error> {
+        crate::wire::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
+    }
+
+    #[inline(always)]
+    fn encode_f32(self, value: f32) -> Result<Self::Ok, C::Error> {
+        self.encode_u32(value.to_bits())
+    }
+
+    #[inline(always)]
+    fn encode_f64(self, value: f64) -> Result<Self::Ok, C::Error> {
+        self.encode_u64(value.to_bits())
+    }
+
+    #[inline(always)]
     fn encode_usize(mut self, value: usize) -> Result<Self::Ok, C::Error> {
         crate::wire::int::encode_length::<_, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_isize(mut self, value: isize) -> Result<Self::Ok, C::Error> {
         crate::wire::int::encode_length::<_, _, OPT>(
             self.cx,
@@ -195,118 +268,45 @@ where
         )
     }
 
-    #[inline]
-    fn encode_bool(mut self, value: bool) -> Result<Self::Ok, C::Error> {
-        self.writer.write_byte(
-            self.cx,
-            Tag::new(Kind::Continuation, if value { 1 } else { 0 }).byte(),
-        )
-    }
-
-    #[inline]
-    fn encode_char(self, value: char) -> Result<Self::Ok, C::Error> {
-        self.encode_u32(value as u32)
-    }
-
-    #[inline]
-    fn encode_u8(mut self, value: u8) -> Result<Self::Ok, C::Error> {
-        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
-    }
-
-    #[inline]
-    fn encode_u16(mut self, value: u16) -> Result<Self::Ok, C::Error> {
-        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
-    }
-
-    #[inline]
-    fn encode_u32(mut self, value: u32) -> Result<Self::Ok, C::Error> {
-        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
-    }
-
-    #[inline]
-    fn encode_u64(mut self, value: u64) -> Result<Self::Ok, C::Error> {
-        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
-    }
-
-    #[inline]
-    fn encode_u128(mut self, value: u128) -> Result<Self::Ok, C::Error> {
-        crate::wire::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
-    }
-
-    #[inline]
-    fn encode_i8(self, value: i8) -> Result<Self::Ok, C::Error> {
-        self.encode_u8(value as u8)
-    }
-
-    #[inline]
-    fn encode_i16(mut self, value: i16) -> Result<Self::Ok, C::Error> {
-        crate::wire::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
-    }
-
-    #[inline]
-    fn encode_i32(mut self, value: i32) -> Result<Self::Ok, C::Error> {
-        crate::wire::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
-    }
-
-    #[inline]
-    fn encode_i64(mut self, value: i64) -> Result<Self::Ok, C::Error> {
-        crate::wire::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
-    }
-
-    #[inline]
-    fn encode_i128(mut self, value: i128) -> Result<Self::Ok, C::Error> {
-        crate::wire::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
-    }
-
-    #[inline]
-    fn encode_f32(self, value: f32) -> Result<Self::Ok, C::Error> {
-        self.encode_u32(value.to_bits())
-    }
-
-    #[inline]
-    fn encode_f64(self, value: f64) -> Result<Self::Ok, C::Error> {
-        self.encode_u64(value.to_bits())
-    }
-
-    #[inline]
+    #[inline(always)]
     fn encode_some(mut self) -> Result<Self::EncodeSome, C::Error> {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 1).byte())?;
         Ok(self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_none(mut self) -> Result<Self::Ok, C::Error> {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 0).byte())?;
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
         self.encode_sequence_len(hint.size)?;
         Ok(self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         self.encode_map_len(hint.size)?;
         Ok(self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_map_entries(self, hint: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
         self.encode_map(hint)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_variant(mut self) -> Result<Self::EncodeVariant, C::Error> {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
         Ok(self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
@@ -321,7 +321,7 @@ where
         self.encode_sequence(hint)
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_map_variant<T>(
         mut self,
         tag: &T,

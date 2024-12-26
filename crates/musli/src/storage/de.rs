@@ -71,7 +71,7 @@ where
         write!(f, "type supported by the storage decoder")
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode<T>(self) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
@@ -79,7 +79,7 @@ where
         self.cx.decode(self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
     where
         T: ?Sized + DecodeUnsized<'de, Self::Mode>,
@@ -88,7 +88,7 @@ where
         self.cx.decode_unsized(self, f)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_empty(mut self) -> Result<(), C::Error> {
         let mark = self.cx.mark();
         let count = crate::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?;
@@ -102,7 +102,7 @@ where
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_pack<F, O>(mut self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
@@ -110,12 +110,12 @@ where
         f(&mut self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_array<const N: usize>(mut self) -> Result<[u8; N], C::Error> {
         self.reader.read_array(self.cx)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: UnsizedVisitor<'de, C, [u8]>,
@@ -124,7 +124,7 @@ where
         self.reader.read_bytes(self.cx, len, visitor)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: UnsizedVisitor<'de, C, str>,
@@ -166,7 +166,7 @@ where
         self.decode_bytes(Visitor(visitor))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_bool(mut self) -> Result<bool, C::Error> {
         let mark = self.cx.mark();
         let byte = self.reader.read_byte(self.cx)?;
@@ -178,7 +178,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_char(self) -> Result<char, C::Error> {
         let cx = self.cx;
         let mark = self.cx.mark();
@@ -190,88 +190,88 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u8(mut self) -> Result<u8, C::Error> {
         self.reader.read_byte(self.cx)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u16(self) -> Result<u16, C::Error> {
         crate::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u32(self) -> Result<u32, C::Error> {
         crate::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u64(self) -> Result<u64, C::Error> {
         crate::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u128(self) -> Result<u128, C::Error> {
         crate::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i8(self) -> Result<i8, C::Error> {
         Ok(self.decode_u8()? as i8)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i16(self) -> Result<i16, C::Error> {
         crate::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i32(self) -> Result<i32, C::Error> {
         crate::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i64(self) -> Result<i64, C::Error> {
         crate::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i128(self) -> Result<i128, C::Error> {
         crate::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
-    #[inline]
-    fn decode_usize(self) -> Result<usize, C::Error> {
-        crate::int::decode_usize::<_, _, OPT>(self.cx, self.reader)
-    }
-
-    #[inline]
-    fn decode_isize(self) -> Result<isize, C::Error> {
-        Ok(self.decode_usize()? as isize)
-    }
-
     /// Decode a 32-bit floating point value by reading the 32-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
-    #[inline]
+    #[inline(always)]
     fn decode_f32(self) -> Result<f32, C::Error> {
         Ok(f32::from_bits(self.decode_u32()?))
     }
 
     /// Decode a 64-bit floating point value by reading the 64-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
-    #[inline]
+    #[inline(always)]
     fn decode_f64(self) -> Result<f64, C::Error> {
         let bits = self.decode_u64()?;
         Ok(f64::from_bits(bits))
     }
 
-    #[inline]
+    #[inline(always)]
+    fn decode_usize(self) -> Result<usize, C::Error> {
+        crate::int::decode_usize::<_, _, OPT>(self.cx, self.reader)
+    }
+
+    #[inline(always)]
+    fn decode_isize(self) -> Result<isize, C::Error> {
+        Ok(self.decode_usize()? as isize)
+    }
+
+    #[inline(always)]
     fn decode_option(mut self) -> Result<Option<Self::DecodeSome>, C::Error> {
         let b = self.reader.read_byte(self.cx)?;
         Ok(if b == 1 { Some(self) } else { None })
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_sequence<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
@@ -287,7 +287,7 @@ where
         Ok(output)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
@@ -303,7 +303,7 @@ where
         Ok(output)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
@@ -311,7 +311,7 @@ where
         self.decode_map(f)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_variant<F, O>(mut self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, C::Error>,
@@ -546,6 +546,7 @@ struct ExpectedEmptySequence {
 }
 
 impl fmt::Display for ExpectedEmptySequence {
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { actual } = *self;
         write!(f, "Expected empty sequence, but was {actual}",)
@@ -557,6 +558,7 @@ struct BadBoolean {
 }
 
 impl fmt::Display for BadBoolean {
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { actual } = *self;
         write!(f, "Bad boolean byte 0x{actual:02x}")
@@ -568,6 +570,7 @@ struct BadCharacter {
 }
 
 impl fmt::Display for BadCharacter {
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { actual } = *self;
         write!(f, "Bad character number {actual}")
