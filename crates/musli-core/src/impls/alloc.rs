@@ -35,7 +35,7 @@ use crate::Context;
 use super::PlatformTag;
 
 impl<M> Encode<M> for String {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -45,7 +45,7 @@ impl<M> Encode<M> for String {
 }
 
 impl<'de, M> Decode<'de, M> for String {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -58,22 +58,22 @@ impl<'de, M> Decode<'de, M> for String {
         {
             type Ok = String;
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "string")
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_owned(self, _: &C, value: String) -> Result<Self::Ok, C::Error> {
                 Ok(value)
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_borrowed(self, cx: &C, string: &'de str) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, string)
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_ref(self, _: &C, string: &str) -> Result<Self::Ok, C::Error> {
                 Ok(string.to_owned())
             }
@@ -84,7 +84,7 @@ impl<'de, M> Decode<'de, M> for String {
 }
 
 impl<'de, M> Decode<'de, M> for Box<str> {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -97,7 +97,7 @@ impl<'de, M, T> Decode<'de, M> for Box<[T]>
 where
     T: Decode<'de, M>,
 {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -117,7 +117,7 @@ macro_rules! cow {
         |$reference:ident| $reference_expr:expr $(,)?
     ) => {
         impl<M> $encode<M> for Cow<'_, $ty> {
-            #[inline]
+            #[inline(always)]
             fn $encode_fn<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
@@ -127,7 +127,7 @@ macro_rules! cow {
         }
 
         impl<'de, M> $decode<'de, M> for Cow<'de, $ty> {
-            #[inline]
+            #[inline(always)]
             fn $decode_fn<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
@@ -140,12 +140,12 @@ macro_rules! cow {
                 {
                     type Ok = Cow<'de, $ty>;
 
-                    #[inline]
+                    #[inline(always)]
                     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                         write!(f, "a string")
                     }
 
-                    #[inline]
+                    #[inline(always)]
                     fn visit_owned(
                         self,
                         $cx: &C,
@@ -154,7 +154,7 @@ macro_rules! cow {
                         Ok($owned_expr)
                     }
 
-                    #[inline]
+                    #[inline(always)]
                     fn visit_borrowed(
                         self,
                         $cx: &C,
@@ -163,7 +163,7 @@ macro_rules! cow {
                         Ok($borrowed_expr)
                     }
 
-                    #[inline]
+                    #[inline(always)]
                     fn visit_ref(
                         self,
                         $cx: &C,
@@ -221,7 +221,7 @@ macro_rules! sequence {
             T: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline]
+            #[inline(always)]
             fn encode<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
@@ -249,7 +249,7 @@ macro_rules! sequence {
             T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline]
+            #[inline(always)]
             fn decode<D>($cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
@@ -277,7 +277,7 @@ macro_rules! sequence {
             T: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline]
+            #[inline(always)]
             fn encode_packed<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
@@ -346,7 +346,7 @@ macro_rules! map {
             V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline]
+            #[inline(always)]
             fn encode<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
@@ -370,7 +370,7 @@ macro_rules! map {
             V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline]
+            #[inline(always)]
             fn trace_encode<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
@@ -400,7 +400,7 @@ macro_rules! map {
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline]
+            #[inline(always)]
             fn decode<D>($cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
@@ -424,7 +424,7 @@ macro_rules! map {
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline]
+            #[inline(always)]
             fn trace_decode<D>($cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
@@ -459,7 +459,7 @@ map!(
 );
 
 impl<M> Encode<M> for CString {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
@@ -469,7 +469,7 @@ impl<M> Encode<M> for CString {
 }
 
 impl<'de, M> Decode<'de, M> for CString {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -482,22 +482,22 @@ impl<'de, M> Decode<'de, M> for CString {
         {
             type Ok = CString;
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "a cstring")
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_owned(self, cx: &C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 CString::from_vec_with_nul(value).map_err(cx.map())
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, bytes)
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(CStr::from_bytes_with_nul(bytes)
                     .map_err(cx.map())?
@@ -516,7 +516,7 @@ macro_rules! smart_pointer {
             where
                 T: ?Sized + Encode<M>,
             {
-                #[inline]
+                #[inline(always)]
                 fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
                 where
                     E: Encoder<Mode = M>,
@@ -529,7 +529,7 @@ macro_rules! smart_pointer {
             where
                 T: Decode<'de, M>,
             {
-                #[inline]
+                #[inline(always)]
                 fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -539,7 +539,7 @@ macro_rules! smart_pointer {
             }
 
             impl<'de, M> DecodeBytes<'de, M> for $ty<[u8]> {
-                #[inline]
+                #[inline(always)]
                 fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -549,7 +549,7 @@ macro_rules! smart_pointer {
             }
 
             impl<'de, M> Decode<'de, M> for $ty<CStr> {
-                #[inline]
+                #[inline(always)]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -561,7 +561,7 @@ macro_rules! smart_pointer {
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
             impl<'de, M> Decode<'de, M> for $ty<Path> where PlatformTag: Decode<'de, M> {
-                #[inline]
+                #[inline(always)]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -573,7 +573,7 @@ macro_rules! smart_pointer {
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
             impl<'de, M> Decode<'de, M> for $ty<OsStr> where PlatformTag: Decode<'de, M> {
-                #[inline]
+                #[inline(always)]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -594,7 +594,7 @@ where
     PlatformTag: Encode<M>,
 {
     #[cfg(unix)]
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -611,7 +611,7 @@ where
     }
 
     #[cfg(windows)]
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -658,7 +658,7 @@ impl<M> Encode<M> for OsString
 where
     PlatformTag: Encode<M>,
 {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -673,7 +673,7 @@ impl<'de, M> Decode<'de, M> for OsString
 where
     PlatformTag: Decode<'de, M>,
 {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -705,12 +705,12 @@ where
                     {
                         type Ok = OsString;
 
-                        #[inline]
+                        #[inline(always)]
                         fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                             write!(f, "a literal byte reference")
                         }
 
-                        #[inline]
+                        #[inline(always)]
                         fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                             let mut buf = Vec::with_capacity(bytes.len() / 2);
 
@@ -739,7 +739,7 @@ impl<M> Encode<M> for Path
 where
     PlatformTag: Encode<M>,
 {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -754,7 +754,7 @@ impl<M> Encode<M> for PathBuf
 where
     PlatformTag: Encode<M>,
 {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -769,7 +769,7 @@ impl<'de, M> Decode<'de, M> for PathBuf
 where
     PlatformTag: Decode<'de, M>,
 {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -779,7 +779,7 @@ where
 }
 
 impl<M> EncodeBytes<M> for Vec<u8> {
-    #[inline]
+    #[inline(always)]
     fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -789,7 +789,7 @@ impl<M> EncodeBytes<M> for Vec<u8> {
 }
 
 impl<M> EncodeBytes<M> for Box<[u8]> {
-    #[inline]
+    #[inline(always)]
     fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -799,7 +799,7 @@ impl<M> EncodeBytes<M> for Box<[u8]> {
 }
 
 impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
-    #[inline]
+    #[inline(always)]
     fn decode_bytes<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -812,17 +812,17 @@ impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
         {
             type Ok = Vec<u8>;
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "bytes")
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
@@ -833,7 +833,7 @@ impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
 }
 
 impl<M> EncodeBytes<M> for VecDeque<u8> {
-    #[inline]
+    #[inline(always)]
     fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -844,7 +844,7 @@ impl<M> EncodeBytes<M> for VecDeque<u8> {
 }
 
 impl<'de, M> DecodeBytes<'de, M> for VecDeque<u8> {
-    #[inline]
+    #[inline(always)]
     fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,

@@ -193,7 +193,7 @@ pub mod musli {
     use musli::storage::Encoding;
     use musli::{Decode, Encode};
 
-    use tests::models::Primitives;
+    use tests::models::Primitives as Model;
     use tests::Packed;
 
     const OPTIONS: Options = options::new()
@@ -204,15 +204,15 @@ pub mod musli {
 
     const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
-    pub fn encode_primitives<'buf>(
+    pub fn encode_model<'buf>(
         buffer: &'buf mut Vec<u8>,
-        value: &Primitives,
+        value: &Model,
     ) -> Result<&'buf [u8], Error> {
-        encode::<Primitives>(buffer, value)
+        encode::<Model>(buffer, value)
     }
 
-    pub fn decode_primitives<'buf>(buf: &'buf [u8]) -> Result<Primitives, Error> {
-        decode::<Primitives>(buf)
+    pub fn decode_model<'buf>(buf: &'buf [u8]) -> Result<Model, Error> {
+        decode::<Model>(buf)
     }
 
     #[inline(always)]
@@ -237,27 +237,24 @@ pub mod musli {
 
 #[cfg(feature = "speedy")]
 pub mod speedy {
-    use speedy::{Readable, Writable};
-    use tests::models::Primitives;
+    use speedy::{Error, LittleEndian, Readable, Writable};
+    use tests::models::Primitives as Model;
 
-    pub fn encode_primitives<'buf>(
+    pub fn encode_model<'buf>(
         buffer: &'buf mut Vec<u8>,
-        value: &Primitives,
-    ) -> Result<&'buf [u8], speedy::Error> {
-        encode::<Primitives>(buffer, value)
+        value: &Model,
+    ) -> Result<&'buf [u8], Error> {
+        encode::<Model>(buffer, value)
     }
 
-    pub fn decode_primitives<'buf>(buf: &'buf [u8]) -> Result<Primitives, speedy::Error> {
-        decode::<Primitives>(buf)
+    pub fn decode_model<'buf>(buf: &'buf [u8]) -> Result<Model, Error> {
+        decode::<Model>(buf)
     }
 
     #[inline(always)]
-    pub fn encode<'buf, T>(
-        buffer: &'buf mut Vec<u8>,
-        value: &T,
-    ) -> Result<&'buf [u8], speedy::Error>
+    pub fn encode<'buf, T>(buffer: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
     where
-        T: Writable<speedy::LittleEndian>,
+        T: Writable<LittleEndian>,
     {
         let len = value.bytes_needed()?;
         // See https://github.com/koute/speedy/issues/78
@@ -267,9 +264,9 @@ pub mod speedy {
     }
 
     #[inline(always)]
-    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, speedy::Error>
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Readable<'buf, speedy::LittleEndian>,
+        T: Readable<'buf, LittleEndian>,
     {
         T::read_from_buffer(buf)
     }

@@ -14,7 +14,7 @@ where
     W: Writer,
     C: ?Sized + Context,
 {
-    #[inline]
+    #[inline(always)]
     pub(super) fn new(cx: &'a C, mut writer: W) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'{')?;
         Ok(Self { cx, writer })
@@ -37,18 +37,18 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
         Ok(JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         self.writer.write_byte(self.cx, b':')?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn finish_variant(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, b'}')
     }

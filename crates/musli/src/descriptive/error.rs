@@ -14,7 +14,7 @@ pub struct Error {
 }
 
 impl fmt::Display for Error {
-    #[inline]
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.err.fmt(f)
     }
@@ -44,7 +44,7 @@ impl fmt::Display for ErrorImpl {
 }
 
 impl core::error::Error for Error {
-    #[inline]
+    #[inline(always)]
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.err {
             #[cfg(feature = "alloc")]

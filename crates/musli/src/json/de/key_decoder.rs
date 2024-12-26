@@ -19,12 +19,12 @@ where
     C: ?Sized + Context,
 {
     /// Construct a new fixed width message encoder.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn new(cx: &'a C, parser: P) -> Self {
         Self { cx, parser }
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_escaped_bytes<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: UnsizedVisitor<'de, C, [u8]>,
@@ -52,12 +52,12 @@ where
     where
         U: 'this + Context;
 
-    #[inline]
+    #[inline(always)]
     fn cx(&self) -> &Self::Cx {
         self.cx
     }
 
-    #[inline]
+    #[inline(always)]
     fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
     where
         U: Context,
@@ -65,12 +65,12 @@ where
         Ok(JsonKeyDecoder::new(cx, self.parser))
     }
 
-    #[inline]
+    #[inline(always)]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "value that can be decoded from a object key")
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode<T>(self) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
@@ -78,7 +78,7 @@ where
         self.cx.decode(self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
     where
         T: ?Sized + DecodeUnsized<'de, Self::Mode>,
@@ -87,78 +87,78 @@ where
         self.cx.decode_unsized(self, f)
     }
 
-    #[inline]
+    #[inline(always)]
     fn skip(self) -> Result<(), C::Error> {
         JsonDecoder::new(self.cx, self.parser).skip()
     }
 
-    #[inline]
+    #[inline(always)]
     fn try_skip(self) -> Result<Skip, C::Error> {
         self.skip()?;
         Ok(Skip::Skipped)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u8(self) -> Result<u8, C::Error> {
         self.decode_escaped_bytes(KeyUnsignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u16(self) -> Result<u16, C::Error> {
         self.decode_escaped_bytes(KeyUnsignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u32(self) -> Result<u32, C::Error> {
         self.decode_escaped_bytes(KeyUnsignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u64(self) -> Result<u64, C::Error> {
         self.decode_escaped_bytes(KeyUnsignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u128(self) -> Result<u128, C::Error> {
         self.decode_escaped_bytes(KeyUnsignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i8(self) -> Result<i8, C::Error> {
         self.decode_escaped_bytes(KeySignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i16(self) -> Result<i16, C::Error> {
         self.decode_escaped_bytes(KeySignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i32(self) -> Result<i32, C::Error> {
         self.decode_escaped_bytes(KeySignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i64(self) -> Result<i64, C::Error> {
         self.decode_escaped_bytes(KeySignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i128(self) -> Result<i128, C::Error> {
         self.decode_escaped_bytes(KeySignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_usize(self) -> Result<usize, C::Error> {
         self.decode_escaped_bytes(KeyUnsignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_isize(self) -> Result<isize, C::Error> {
         self.decode_escaped_bytes(KeySignedVisitor::new())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: UnsizedVisitor<'de, C, str>,
@@ -166,7 +166,7 @@ where
         JsonDecoder::new(self.cx, self.parser).decode_string(visitor)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: Visitor<'de, C>,

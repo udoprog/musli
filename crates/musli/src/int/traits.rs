@@ -102,38 +102,38 @@ macro_rules! implement {
 
             type Signed = $signed;
 
-            #[inline]
+            #[inline(always)]
             fn signed(self) -> Self::Signed {
                 self as $signed
             }
 
-            #[inline]
+            #[inline(always)]
             fn from_byte(byte: u8) -> Self {
                 byte as $unsigned
             }
 
-            #[inline]
+            #[inline(always)]
             fn as_byte(self) -> u8 {
                 self as u8
             }
 
-            #[inline]
+            #[inline(always)]
             #[cfg(feature = "wire")]
             fn is_smaller_than(self, b: u8) -> bool {
                 self < b as $unsigned
             }
 
-            #[inline]
+            #[inline(always)]
             fn is_zero(self) -> bool {
                 self == 0
             }
 
-            #[inline]
+            #[inline(always)]
             fn wrapping_shl(self, value: u32) -> Self {
                 <$unsigned>::wrapping_shl(self, value)
             }
 
-            #[inline]
+            #[inline(always)]
             fn wrapping_add(self, value: Self) -> Self {
                 <$unsigned>::wrapping_add(self, value)
             }

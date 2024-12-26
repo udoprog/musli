@@ -41,7 +41,7 @@ impl Token {
     ///
     /// Note that this should optimize into a no-op beyond the lookup into the
     /// `MAP` table.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn from_byte(b: u8) -> Token {
         match MAP[b as usize] {
             WS => Token::Whitespace,
@@ -61,12 +61,12 @@ impl Token {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn is_value(&self) -> bool {
         (*self as u8) & VAL_BIT != 0
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn is_null(&self) -> bool {
         matches!(self, Token::Null)
     }

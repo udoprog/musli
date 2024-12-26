@@ -36,7 +36,7 @@ where
 }
 
 impl Default for Encoding<OPTIONS, Binary> {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self::new()
     }
@@ -131,7 +131,7 @@ where
 }
 
 impl<const OPT: Options, M> Clone for Encoding<OPT, M> {
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         *self
     }

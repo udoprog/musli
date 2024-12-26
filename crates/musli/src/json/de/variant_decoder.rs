@@ -14,7 +14,7 @@ where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
-    #[inline]
+    #[inline(always)]
     pub(super) fn new(cx: &'a C, mut parser: P) -> Result<Self, C::Error> {
         let actual = parser.lex(cx);
 
@@ -26,7 +26,7 @@ where
         Ok(Self { cx, parser })
     }
 
-    #[inline]
+    #[inline(always)]
     pub(super) fn end(mut self) -> Result<(), C::Error> {
         let actual = self.parser.lex(self.cx);
 
@@ -56,12 +56,12 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
         Ok(JsonKeyDecoder::new(self.cx, self.parser.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         let actual = self.parser.lex(self.cx);
 
