@@ -7,7 +7,7 @@ use dec2flt::RawFloat;
 #[derive(Debug, PartialEq)]
 struct ParseFloatError;
 
-#[inline(always)]
+#[inline]
 fn dec2flt<F: RawFloat>(s: &str) -> Result<F, ParseFloatError> {
     let (f, len) = dec2flt::dec2flt::<F>(s.as_bytes()).ok_or(ParseFloatError)?;
 

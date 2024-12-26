@@ -35,7 +35,7 @@ where
         })
     }
 
-    #[inline(always)]
+    #[inline]
     pub(super) fn new(cx: &'a C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
         let actual = parser.lex(cx);
 
@@ -84,7 +84,7 @@ where
     }
 
     /// Parse end of object.
-    #[inline(always)]
+    #[inline]
     pub(super) fn skip_object_remaining(mut self) -> Result<(), C::Error> {
         // Someone else is responsible for finalizing this decoder.
         if self.finalized {
@@ -125,12 +125,12 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.len)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_entry(&mut self) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
         if !self.parse_map_key()? {
             return Ok(None);
@@ -142,7 +142,7 @@ where
         )))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_remaining_entries(
         &mut self,
     ) -> Result<Self::DecodeRemainingEntries<'_>, <Self::Cx as Context>::Error> {
@@ -171,7 +171,7 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         if !self.parse_map_key()? {
             return Ok(None);
@@ -180,7 +180,7 @@ where
         Ok(Some(JsonKeyDecoder::new(self.cx, self.parser.borrow_mut())))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
         let actual = self.parser.lex(self.cx);
 
@@ -194,7 +194,7 @@ where
         Ok(JsonDecoder::new(self.cx, self.parser.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn end_entries(self) -> Result<(), C::Error> {
         self.skip_object_remaining()
     }

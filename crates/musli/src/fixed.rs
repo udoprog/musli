@@ -37,6 +37,7 @@ impl<const N: usize> FixedBytes<N> {
     }
 
     /// Construct a fixed bytes while asserting that the given runtime capacity isn't violated.
+    #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         assert!(
             capacity < N,

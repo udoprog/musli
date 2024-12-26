@@ -56,7 +56,7 @@ impl<T> SignedPartsFull<T>
 where
     T: Signed,
 {
-    #[inline(always)]
+    #[inline]
     pub(crate) fn compute(self) -> Result<T, IntegerError> {
         let Self {
             is_negative,
@@ -75,7 +75,7 @@ where
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) fn compute_float<F>(self) -> F
     where
         F: Float,
@@ -124,7 +124,7 @@ where
     F: Float,
 {
     /// Compute as float with a negative exponent.
-    #[inline(always)]
+    #[inline]
     fn compute_float(self, e: i32) -> F {
         self.value.pow10(e - self.exp)
     }
@@ -158,7 +158,7 @@ impl<T> Parts<T>
 where
     T: Unsigned,
 {
-    #[inline(always)]
+    #[inline]
     pub(crate) fn compute(self) -> Result<T, IntegerError> {
         macro_rules! check {
             ($expr:expr, $kind:ident) => {
@@ -202,7 +202,7 @@ where
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) fn compute_float<F>(self) -> F
     where
         F: Float,
@@ -296,7 +296,7 @@ where
 }
 
 /// Decode a signed integer.
-#[inline(always)]
+#[inline]
 fn decode_signed_base<'de, T, C, P>(cx: &C, mut p: P) -> Result<SignedPartsBase<T>, C::Error>
 where
     C: ?Sized + Context,
@@ -336,7 +336,7 @@ where
 }
 
 /// Decode a full signed integer.
-#[inline(always)]
+#[inline]
 fn decode_signed_full_inner<'de, T, C, P>(cx: &C, mut p: P) -> Result<SignedPartsFull<T>, C::Error>
 where
     C: ?Sized + Context,
@@ -400,7 +400,7 @@ where
 
 /// Generically decode a single (whole) integer from a stream of bytes abiding
 /// by JSON convention for format.
-#[inline(always)]
+#[inline]
 fn decode_unsigned_base<'de, T, C, P>(cx: &C, mut p: P, start: &C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
@@ -428,7 +428,7 @@ where
 
 /// Generically decode a single (whole) integer from a stream of bytes abiding
 /// by JSON convention for format.
-#[inline(always)]
+#[inline]
 fn decode_unsigned_full<'de, T, C, P>(
     cx: &C,
     mut p: P,
@@ -483,7 +483,7 @@ where
 }
 
 /// Decode an exponent.
-#[inline(always)]
+#[inline]
 fn decode_exponent<'de, P, C>(cx: &C, mut p: P, start: &C::Mark) -> Result<i32, C::Error>
 where
     P: Parser<'de>,
@@ -514,7 +514,7 @@ where
 }
 
 /// Decode a single digit into `out`.
-#[inline(always)]
+#[inline]
 fn digit<'de, T, C, P>(cx: &C, out: T, mut p: P, start: &C::Mark) -> Result<T, C::Error>
 where
     T: Unsigned,
@@ -529,7 +529,7 @@ where
 }
 
 /// Decode sequence of zeros.
-#[inline(always)]
+#[inline]
 fn decode_zeros<'de, P, C>(cx: &C, mut p: P) -> Result<i32, C::Error>
 where
     P: Parser<'de>,
@@ -546,13 +546,13 @@ where
 }
 
 // Test if b is numeric.
-#[inline(always)]
+#[inline]
 fn is_digit(b: u8) -> bool {
     b.is_ascii_digit()
 }
 
 // Test if b is numeric.
-#[inline(always)]
+#[inline]
 fn is_digit_nonzero(b: u8) -> bool {
     (b'1'..=b'9').contains(&b)
 }
@@ -652,17 +652,17 @@ mod traits {
 
                 const ZERO: Self = 0;
 
-                #[inline(always)]
+                #[inline]
                 fn from_byte(b: u8) -> Self {
                     b as $unsigned
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn is_zero(&self) -> bool {
                     *self == 0
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn checked_pow10(self, e: u32) -> Option<Self> {
                     static POWS: [$unsigned; count!(() $($pows)*)] = [
                         $($pows),*
@@ -677,7 +677,7 @@ mod traits {
                     self.checked_mul(n)
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn checked_neg_pow10(self, e: u32) -> Option<Self> {
                     const ONE: $unsigned = 1;
                     let div = ONE.checked_pow10(e)?;
@@ -689,22 +689,22 @@ mod traits {
                     }
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn checked_mul10(self) -> Option<Self> {
                     self.checked_mul(10)
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn checked_add(self, other: Self) -> Option<Self> {
                     <$unsigned>::checked_add(self, other)
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn checked_pow(self, exp: u32) -> Option<Self> {
                     <$unsigned>::checked_pow(self, exp)
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn negate(self) -> Option<Self::Signed> {
                     if self > (<$unsigned>::MAX >> 1) + 1 {
                         None
@@ -713,7 +713,7 @@ mod traits {
                     }
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn signed(self) -> Option<Self::Signed> {
                     if self > <$unsigned>::MAX >> 1 {
                         None
@@ -722,7 +722,7 @@ mod traits {
                     }
                 }
 
-                #[inline(always)]
+                #[inline]
                 fn into_float<F>(self) -> F where F: FromUnsigned<Self> {
                     F::from_unsigned(self)
                 }
@@ -848,18 +848,18 @@ mod traits {
     macro_rules! float {
         ($float:ty, $fallback:path) => {
             impl Float for $float {
-                #[inline(always)]
+                #[inline]
                 fn negate(self) -> Self {
                     -self
                 }
 
-                #[inline(always)]
+                #[inline]
                 #[cfg(feature = "std")]
                 fn pow10(self, e: i32) -> Self {
                     self * <$float>::powi(10.0, e)
                 }
 
-                #[inline(always)]
+                #[inline]
                 #[cfg(not(feature = "std"))]
                 fn pow10(self, e: i32) -> Self {
                     self * $fallback(10.0, e)

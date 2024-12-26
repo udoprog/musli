@@ -14,7 +14,7 @@ pub struct Error {
 }
 
 impl fmt::Display for Error {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.err.fmt(f)
     }
@@ -42,7 +42,7 @@ impl fmt::Display for ErrorImpl {
 impl core::error::Error for Error {}
 
 impl ContextError for Error {
-    #[inline(always)]
+    #[inline]
     fn custom<T>(error: T) -> Self
     where
         T: fmt::Display,
@@ -50,7 +50,7 @@ impl ContextError for Error {
         Self::message(error)
     }
 
-    #[inline(always)]
+    #[inline]
     #[allow(unused_variables)]
     fn message<T>(message: T) -> Self
     where

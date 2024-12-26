@@ -13,7 +13,7 @@ pub(crate) struct KeySignedVisitor<T> {
 }
 
 impl<T> KeySignedVisitor<T> {
-    #[inline(always)]
+    #[inline]
     pub(super) const fn new() -> Self {
         Self {
             _marker: marker::PhantomData,
@@ -27,12 +27,12 @@ where
 {
     type Ok = T;
 
-    #[inline(always)]
+    #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "bytes")
     }
 
-    #[inline(always)]
+    #[inline]
     fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         parse_signed(cx, &mut SliceParser::new(bytes))
     }

@@ -38,7 +38,7 @@ impl fmt::Display for Utf8Error {
 /// depending on if the `simdutf8` feature is enabled.
 ///
 /// [`String::from_utf8`]: rust_alloc::string::String::from_utf8
-#[inline(always)]
+#[inline]
 #[cfg(all(feature = "alloc", not(feature = "simdutf8")))]
 pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
     match String::from_utf8(bytes) {
@@ -51,7 +51,7 @@ pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
 /// depending on if the `simdutf8` feature is enabled.
 ///
 /// [`String::from_utf8`]: rust_alloc::string::String::from_utf8
-#[inline(always)]
+#[inline]
 #[cfg(all(feature = "alloc", feature = "simdutf8"))]
 pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
     if simdutf8::basic::from_utf8(&bytes).is_err() {

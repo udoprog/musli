@@ -60,7 +60,7 @@ impl Allocator for Disabled {
     where
         T: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
     where
         T: 'a,

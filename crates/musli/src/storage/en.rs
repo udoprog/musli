@@ -14,7 +14,7 @@ pub struct StorageEncoder<'a, W, const OPT: Options, C: ?Sized> {
 
 impl<'a, W, const OPT: Options, C: ?Sized> StorageEncoder<'a, W, OPT, C> {
     /// Construct a new fixed width message encoder.
-    #[inline(always)]
+    #[inline]
     pub fn new(cx: &'a C, writer: W) -> Self {
         Self { cx, writer }
     }
@@ -43,12 +43,12 @@ where
     type EncodeSequenceVariant = Self;
     type EncodeMapVariant = Self;
 
-    #[inline(always)]
+    #[inline]
     fn cx(&self) -> &Self::Cx {
         self.cx
     }
 
-    #[inline(always)]
+    #[inline]
     fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
     where
         U: Context,
@@ -56,12 +56,12 @@ where
         Ok(StorageEncoder::new(cx, self.writer))
     }
 
-    #[inline(always)]
+    #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "type supported by the storage encoder")
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode<T>(self, value: T) -> Result<Self::Ok, Self::Error>
     where
         T: Encode<Self::Mode>,
@@ -69,30 +69,30 @@ where
         value.encode(self.cx, self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_empty(self) -> Result<Self::Ok, C::Error> {
         static HINT: SequenceHint = SequenceHint::with_size(0);
         self.encode_sequence_fn(&HINT, |_| Ok(()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_pack(self) -> Result<Self::EncodePack, C::Error> {
         Ok(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_array<const N: usize>(mut self, array: &[u8; N]) -> Result<Self::Ok, C::Error> {
         self.writer.write_bytes(self.cx, array)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), bytes.len())?;
         self.writer.write_bytes(self.cx, bytes)?;
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_bytes_vectored<I>(mut self, len: usize, vectors: I) -> Result<Self::Ok, C::Error>
     where
         I: IntoIterator<Item: AsRef<[u8]>>,
@@ -106,14 +106,14 @@ where
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_string(mut self, string: &str) -> Result<Self::Ok, C::Error> {
         crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), string.len())?;
         self.writer.write_bytes(self.cx, string.as_bytes())?;
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         T: ?Sized + fmt::Display,
@@ -122,122 +122,122 @@ where
         self.encode_string(buf.as_ref())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_bool(mut self, value: bool) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, if value { 1 } else { 0 })
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_char(self, value: char) -> Result<Self::Ok, C::Error> {
         self.encode_u32(value as u32)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u8(mut self, value: u8) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u16(mut self, value: u16) -> Result<Self::Ok, C::Error> {
         crate::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u32(mut self, value: u32) -> Result<Self::Ok, C::Error> {
         crate::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u64(mut self, value: u64) -> Result<Self::Ok, C::Error> {
         crate::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u128(mut self, value: u128) -> Result<Self::Ok, C::Error> {
         crate::int::encode_unsigned::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i8(self, value: i8) -> Result<Self::Ok, C::Error> {
         self.encode_u8(value as u8)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i16(mut self, value: i16) -> Result<Self::Ok, C::Error> {
         crate::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i32(mut self, value: i32) -> Result<Self::Ok, C::Error> {
         crate::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i64(mut self, value: i64) -> Result<Self::Ok, C::Error> {
         crate::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i128(mut self, value: i128) -> Result<Self::Ok, C::Error> {
         crate::int::encode_signed::<_, _, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_f32(self, value: f32) -> Result<Self::Ok, C::Error> {
         self.encode_u32(value.to_bits())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_f64(self, value: f64) -> Result<Self::Ok, C::Error> {
         self.encode_u64(value.to_bits())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_usize(mut self, value: usize) -> Result<Self::Ok, C::Error> {
         crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_isize(self, value: isize) -> Result<Self::Ok, C::Error> {
         self.encode_usize(value as usize)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_some(mut self) -> Result<Self::EncodeSome, C::Error> {
         self.writer.write_byte(self.cx, 1)?;
         Ok(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_none(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, 0)?;
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
         crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_map_entries(mut self, hint: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
         crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_variant(self) -> Result<Self::EncodeVariant, C::Error> {
         Ok(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
@@ -251,7 +251,7 @@ where
         Ok(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_map_variant<T>(
         mut self,
         tag: &T,
@@ -278,12 +278,12 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
@@ -301,12 +301,12 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn finish_map(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
@@ -328,17 +328,17 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
@@ -360,17 +360,17 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn finish_entries(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
@@ -392,17 +392,17 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn finish_variant(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }

@@ -102,38 +102,38 @@ macro_rules! implement {
 
             type Signed = $signed;
 
-            #[inline(always)]
+            #[inline]
             fn signed(self) -> Self::Signed {
                 self as $signed
             }
 
-            #[inline(always)]
+            #[inline]
             fn from_byte(byte: u8) -> Self {
                 byte as $unsigned
             }
 
-            #[inline(always)]
+            #[inline]
             fn as_byte(self) -> u8 {
                 self as u8
             }
 
-            #[inline(always)]
+            #[inline]
             #[cfg(feature = "wire")]
             fn is_smaller_than(self, b: u8) -> bool {
                 self < b as $unsigned
             }
 
-            #[inline(always)]
+            #[inline]
             fn is_zero(self) -> bool {
                 self == 0
             }
 
-            #[inline(always)]
+            #[inline]
             fn wrapping_shl(self, value: u32) -> Self {
                 <$unsigned>::wrapping_shl(self, value)
             }
 
-            #[inline(always)]
+            #[inline]
             fn wrapping_add(self, value: Self) -> Self {
                 <$unsigned>::wrapping_add(self, value)
             }
@@ -146,7 +146,7 @@ macro_rules! implement_ops {
         implement!($signed, $unsigned);
 
         impl UnsignedOps for $unsigned {
-            #[inline(always)]
+            #[inline]
             fn write_bytes<C, W>(
                 self,
                 cx: &C,
@@ -166,7 +166,7 @@ macro_rules! implement_ops {
                 writer.write_bytes(cx, &bytes)
             }
 
-            #[inline(always)]
+            #[inline]
             fn read_bytes<'de, C, R>(
                 cx: &C,
                 mut reader: R,

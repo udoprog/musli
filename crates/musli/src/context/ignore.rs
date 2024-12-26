@@ -23,7 +23,7 @@ pub struct Ignore<M, A> {
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<M> Ignore<M, &'static System> {
     /// Construct a new ignoring context with the [`System`] allocator.
-    #[inline(always)]
+    #[inline]
     pub fn new() -> Self {
         Self::with_alloc(crate::alloc::system())
     }
@@ -31,7 +31,7 @@ impl<M> Ignore<M, &'static System> {
 
 impl<M, A> Ignore<M, A> {
     /// Construct a new ignoring context.
-    #[inline(always)]
+    #[inline]
     pub fn with_alloc(alloc: A) -> Self {
         Self {
             alloc,
@@ -44,7 +44,7 @@ impl<M, A> Ignore<M, A> {
 #[cfg(test)]
 impl<A> Ignore<Binary, A> {
     /// Construct a new ignoring context which collects an error marker.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn with_marker(alloc: A) -> Self {
         Self::with_alloc(alloc)
     }
@@ -52,7 +52,7 @@ impl<A> Ignore<Binary, A> {
 
 impl<M, A> Ignore<M, A> {
     /// Construct an error or panic.
-    #[inline(always)]
+    #[inline]
     pub fn unwrap(self) -> ErrorMarker {
         if self.error.get() {
             return ErrorMarker;
@@ -76,21 +76,21 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn clear(&self) {}
 
-    #[inline(always)]
+    #[inline]
     fn mark(&self) -> Self::Mark {}
 
-    #[inline(always)]
+    #[inline]
     fn advance(&self, _: usize) {}
 
-    #[inline(always)]
+    #[inline]
     fn alloc(&self) -> &Self::Allocator {
         &self.alloc
     }
 
-    #[inline(always)]
+    #[inline]
     fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
@@ -98,7 +98,7 @@ where
         alloc::collect_string(self, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn custom<T>(&self, _: T) -> ErrorMarker
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -107,7 +107,7 @@ where
         ErrorMarker
     }
 
-    #[inline(always)]
+    #[inline]
     fn message<T>(&self, _: T) -> ErrorMarker
     where
         T: fmt::Display,
@@ -120,7 +120,7 @@ where
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<M> Default for Ignore<M, &'static System> {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::new()
     }

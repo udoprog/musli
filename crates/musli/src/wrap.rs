@@ -23,6 +23,7 @@ pub struct Wrap<T> {
 ///
 /// [`Reader`]: crate::reader::Reader
 /// [`Writer`]: crate::writer::Writer
+#[inline]
 pub fn wrap<T>(inner: T) -> Wrap<T> {
     Wrap { inner }
 }

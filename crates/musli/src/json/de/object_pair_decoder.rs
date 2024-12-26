@@ -10,7 +10,7 @@ pub(crate) struct JsonObjectPairDecoder<'a, P, C: ?Sized> {
 }
 
 impl<'a, P, C: ?Sized> JsonObjectPairDecoder<'a, P, C> {
-    #[inline(always)]
+    #[inline]
     pub(super) fn new(cx: &'a C, parser: P) -> Self {
         Self { cx, parser }
     }
@@ -28,12 +28,12 @@ where
         Self: 'this;
     type DecodeValue = JsonDecoder<'a, P, C>;
 
-    #[inline(always)]
+    #[inline]
     fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(JsonKeyDecoder::new(self.cx, self.parser.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_value(mut self) -> Result<Self::DecodeValue, C::Error> {
         let actual = self.parser.lex(self.cx);
 

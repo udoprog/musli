@@ -22,7 +22,7 @@ pub struct MutSliceParser<'a, 'de> {
 
 impl<'a, 'de> MutSliceParser<'a, 'de> {
     /// Construct a new instance around the specified slice.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn new(slice: &'a mut &'de [u8]) -> Self {
         Self { slice }
     }
@@ -34,12 +34,12 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         MutSliceParser::new(self.slice)
     }
 
-    #[inline(always)]
+    #[inline]
     fn parse_string<'scratch, C>(
         &mut self,
         cx: &C,
@@ -65,7 +65,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         out
     }
 
-    #[inline(always)]
+    #[inline]
     fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
@@ -76,7 +76,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         out
     }
 
-    #[inline(always)]
+    #[inline]
     fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
@@ -90,7 +90,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
@@ -106,7 +106,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn skip_whitespace<C>(&mut self, cx: &C)
     where
         C: ?Sized + Context,
@@ -129,7 +129,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         cx.advance(n);
     }
 
-    #[inline(always)]
+    #[inline]
     fn peek(&mut self) -> Option<u8> {
         self.slice.first().copied()
     }
