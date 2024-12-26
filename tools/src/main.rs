@@ -132,6 +132,16 @@ struct CompilerMessage {
 }
 
 #[derive(Default, Parser)]
+struct BinArgs {
+    /// Build new and clean up test binaries after running.
+    #[arg(long)]
+    clean: bool,
+    /// Don't build test binaries in release mode.
+    #[arg(long)]
+    no_release: bool,
+}
+
+#[derive(Default, Parser)]
 struct ArgsReport {
     /// The output directory to write results into.
     #[arg(long)]
@@ -148,15 +158,14 @@ struct ArgsReport {
     /// Run `--quick` benchmarks.
     #[arg(long)]
     quick: bool,
-    /// Build new and clean up test binaries after running.
-    #[arg(long)]
-    clean: bool,
     /// Skip size comparisons.
     #[arg(long)]
     no_size: bool,
     /// Reference graphics from the given branch.
     #[arg(long)]
     branch: Option<String>,
+    #[command(flatten)]
+    bins: BinArgs,
 }
 
 #[derive(Parser)]
@@ -177,6 +186,8 @@ enum Cmd {
     Clippy(ArgsClippy),
     /// Run `cargo build` with over all supported feature configurations.
     Build(ArgsBuild),
+    /// Perform a basic check.
+    Check(BinArgs),
 }
 
 impl Default for Cmd {
@@ -203,9 +214,9 @@ fn main() -> Result<()> {
 
     let target = root.join("target");
 
-    let args = Args::try_parse()?;
+    let mut args = Args::try_parse()?;
 
-    let command = args.command.unwrap_or_default();
+    let command = args.command.take().unwrap_or_default();
 
     let reports_path = root.join("tools").join("report.toml");
     let reports =
@@ -213,50 +224,37 @@ fn main() -> Result<()> {
     let manifest: Manifest =
         toml::from_str(&reports).with_context(|| anyhow!("{}", reports_path.display()))?;
 
+    let output = match &command {
+        Cmd::Report(ArgsReport {
+            output: Some(output),
+            ..
+        }) => output.to_owned(),
+        _ => root.join("benchmarks"),
+    };
+
     match command {
         Cmd::Report(a) => {
-            let output = match &a.output {
-                Some(output) => output.to_owned(),
-                None => root.join("benchmarks"),
-            };
+            let bins = build_bins(&target, &output, &args, &manifest, &a.bins)?;
+
+            for b in &bins {
+                println!("Sanity checking: {}", b.report.title);
+
+                sanity_check(&b.bins.fuzz()?).context("Sanity check failed")?;
+                // Test benches binaries.
+                run_path(&b.bins.comparison()?, &[], &[])?;
+            }
 
             let branch = a.branch.as_deref().unwrap_or(manifest.branch.as_str());
 
             let mut built_reports = Vec::new();
             let mut size_sets = Vec::new();
 
-            let mut bins = Vec::new();
-
-            for report in &manifest.reports {
-                if report.skip {
-                    continue;
-                }
-
-                if let Some(do_report) = args.report.as_deref() {
-                    if do_report != report.id {
-                        continue;
-                    }
-                }
-
-                bins.push(Bins::new(&output, &target, &manifest, report, a.clean)?);
-            }
-
             let mut errored = Vec::new();
-
-            for bins in &bins {
-                println!("Sanity checking: {}", bins.report.title);
-
-                sanity_check(&bins.bins.fuzz()?).context("Sanity check failed")?;
-                // Test benches binaries.
-                run_path(&bins.bins.comparison()?, &[], &[])?;
-            }
 
             for bins in &bins {
                 println!("Building: {}", bins.report.title);
 
-                let run_bench = a.bench || !bins.paths.criterion_output.is_dir();
-
-                match build_report(&a, bins, run_bench, a.filter.as_deref()) {
+                match build_report(&a, bins, a.bench, a.filter.as_deref()) {
                     Ok(group_plots) => {
                         built_reports.push((bins, group_plots));
                     }
@@ -485,12 +483,6 @@ fn main() -> Result<()> {
             fs::write(report, o.as_bytes())?;
         }
         Cmd::Clippy(a) => {
-            let mut remaining = Vec::new();
-
-            for arg in a.remaining {
-                remaining.push(arg);
-            }
-
             let mut builds = Vec::new();
 
             for report in &manifest.reports {
@@ -509,8 +501,8 @@ fn main() -> Result<()> {
                     &report.features,
                     &report.expected,
                     "clippy",
-                    &[],
-                    &remaining[..],
+                    None::<OsString>,
+                    &a.remaining[..],
                 )?;
 
                 builds.push((report, build));
@@ -543,12 +535,6 @@ fn main() -> Result<()> {
             }
         }
         Cmd::Build(a) => {
-            let mut remaining = Vec::new();
-
-            for arg in a.remaining {
-                remaining.push(arg);
-            }
-
             let mut builds = Vec::new();
 
             for report in &manifest.reports {
@@ -567,8 +553,8 @@ fn main() -> Result<()> {
                     &report.features,
                     &report.expected,
                     "build",
-                    &[],
-                    &remaining,
+                    None::<OsString>,
+                    &a.remaining[..],
                 )?;
 
                 builds.push(build);
@@ -584,9 +570,46 @@ fn main() -> Result<()> {
                 bail!("One or more commands failed")
             }
         }
+        Cmd::Check(a) => {
+            let bins = build_bins(&target, &output, &args, &manifest, &a)?;
+
+            for b in &bins {
+                println!("Sanity checking: {}", b.report.title);
+
+                sanity_check(&b.bins.fuzz()?).context("Sanity check failed")?;
+                // Test benches binaries.
+                run_path(&b.bins.comparison()?, &[], &[])?;
+            }
+        }
     }
 
     Ok(())
+}
+
+fn build_bins<'a>(
+    target: &'a Path,
+    output: &'a Path,
+    args: &Args,
+    manifest: &'a Manifest,
+    bins: &BinArgs,
+) -> Result<Vec<Bins<'a>>> {
+    let mut out = Vec::new();
+
+    for report in &manifest.reports {
+        if report.skip {
+            continue;
+        }
+
+        if let Some(do_report) = args.report.as_deref() {
+            if do_report != report.id {
+                continue;
+            }
+        }
+
+        out.push(Bins::new(output, target, manifest, report, bins)?);
+    }
+
+    Ok(out)
 }
 
 struct InteriorBins<'a> {
@@ -594,6 +617,7 @@ struct InteriorBins<'a> {
     report: &'a Report,
     manifest: &'a Manifest,
     clean: bool,
+    no_release: bool,
     fuzz: RefCell<Option<PathBuf>>,
     comparison: RefCell<Option<PathBuf>>,
 }
@@ -624,9 +648,11 @@ impl InteriorBins<'_> {
             .binaries
             .join(format!("fuzz-{}{}", self.report.id, EXE_SUFFIX));
 
-        if self.clean || !(to_comparison.is_file() && to_fuzz.is_file()) {
-            let mut built =
-                build_bench(self.manifest, self.report).context("Building bench binaries")?;
+        let rebuild = self.clean || self.no_release;
+
+        if rebuild || !(to_comparison.is_file() && to_fuzz.is_file()) {
+            let mut built = build_bench(self.manifest, !self.no_release, self.report)
+                .context("Building bench binaries")?;
 
             shuffle(&mut built.comparison, &to_comparison)?;
             shuffle(&mut built.fuzz, &to_fuzz)?;
@@ -682,7 +708,7 @@ impl<'a> Bins<'a> {
         target: &'a Path,
         manifest: &'a Manifest,
         report: &'a Report,
-        clean: bool,
+        bins: &BinArgs,
     ) -> Result<Self> {
         Ok(Self {
             report,
@@ -691,7 +717,8 @@ impl<'a> Bins<'a> {
                 binaries: target.join("tools"),
                 report,
                 manifest,
-                clean,
+                clean: bins.clean || bins.no_release,
+                no_release: bins.no_release,
                 fuzz: RefCell::new(None),
                 comparison: RefCell::new(None),
             },
@@ -1008,27 +1035,20 @@ struct Build {
     comparison: PathBuf,
 }
 
-fn build_tests<C, S>(
+fn build_tests(
     manifest: &Manifest,
     features: &[String],
     expected: &[String],
-    command: C,
-    head: &[S],
-    remaining: &[S],
-) -> Result<CustomBuild>
-where
-    C: AsRef<OsStr>,
-    S: AsRef<OsStr>,
-{
+    command: impl AsRef<OsStr>,
+    head: impl IntoIterator<Item: AsRef<OsStr>>,
+    remaining: impl IntoIterator<Item: AsRef<OsStr>, IntoIter: ExactSizeIterator>,
+) -> Result<CustomBuild> {
     let mut child = Command::new("cargo");
-    child.arg(command);
-    child.args(["-p", "tests"]);
-
-    if !head.is_empty() {
-        child.args(head);
-    }
-
-    child.arg("--message-format=json");
+    child
+        .arg(command)
+        .args(["-p", "tests"])
+        .args(head)
+        .arg("--message-format=json");
     child.stdout(Stdio::piped());
 
     let features_argument = manifest
@@ -1041,7 +1061,9 @@ where
 
     child.args(["--no-default-features", "--features", &features_argument]);
 
-    if !remaining.is_empty() {
+    let remaining = remaining.into_iter();
+
+    if remaining.len() > 0 {
         child.arg("--");
         child.args(remaining);
     }
@@ -1129,14 +1151,16 @@ where
 }
 
 /// Build benchmarks.
-fn build_bench(manifest: &Manifest, report: &Report) -> Result<Build> {
+fn build_bench(manifest: &Manifest, release: bool, report: &Report) -> Result<Build> {
+    let head = release.then_some("--release");
+
     let build = build_tests(
         manifest,
         &report.features,
         &report.expected,
         "build",
-        &["--release", "--benches"],
-        &[],
+        head.into_iter().chain(["--benches"]),
+        None::<OsString>,
     )?;
 
     if !build.bad_features.is_empty() {

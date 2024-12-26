@@ -38,7 +38,8 @@ test = ["simdutf8", "musli-wire", "musli-storage", "musli-descriptive", "musli-j
 # skips rt benchmarks
 no-rt = []
 
-no-usize = []
+no-usize = ["no-isize"]
+no-isize = []
 no-float = []
 no-cstring = []
 no-map = []
@@ -70,7 +71,7 @@ dlhn = ["dep:dlhn", "serde", "no-128", "no-map"]
 bitcode = ["dep:bitcode", "serde"]
 bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
 miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"]
-speedy = ["dep:speedy", "no-usize", "no-cstring"]
+speedy = ["dep:speedy", "no-isize", "no-cstring"]
 
 [dependencies]
 musli = { path = "../crates/musli", version = "0.0.124", default-features = false, optional = true, features = [] }

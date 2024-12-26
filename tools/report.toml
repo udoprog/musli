@@ -19,7 +19,8 @@ string-key = "Maps with strings as keys like `HashMap<String, T>` are not suppor
 number-key = "Maps with numerical keys like `HashMap<u32, T>` are not supported."
 tuple = "Tuples like `(u32, u32)` are not supported."
 cstring = "`CString`'s are not supported."
-usize = "`usize` and `isize` types are not supported."
+usize = "`usize` types are not supported."
+isize = "`isize` types are not supported."
 set = "Sets like `HashSet<T>` are not supported."
 map = "Maps like `MashMap<K, V>` are not supported."
 nonunit-variant = "Only empty unit variants are supported."
@@ -132,7 +133,7 @@ features = [
 ]
 expected = [
     "musli",
-    "no-usize",
+    "no-isize",
     "no-cstring",
 ]
 
@@ -147,7 +148,7 @@ description = [
 ]
 features = ["musli-zerocopy", "rkyv"]
 expected = [
-    "no-cstring", "no-map", "no-set", "no-tuple", "no-usize",
+    "no-cstring", "no-map", "no-set", "no-tuple", "no-usize", "no-isize",
 ]
 only = ["primitives", "primpacked"]
 
