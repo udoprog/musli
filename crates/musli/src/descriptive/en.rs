@@ -24,7 +24,7 @@ pub struct SelfEncoder<'a, W, const OPT: Options, C: ?Sized> {
 
 impl<'a, W, const OPT: Options, C: ?Sized> SelfEncoder<'a, W, OPT, C> {
     /// Construct a new fixed width message encoder.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn new(cx: &'a C, writer: W) -> Self {
         Self { cx, writer }
     }
@@ -44,7 +44,7 @@ where
     C: ?Sized + Context,
 {
     /// Construct a new fixed width message encoder.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn new(cx: &'a C, writer: W) -> Self {
         Self {
             cx,
@@ -77,12 +77,12 @@ where
     type EncodeSequenceVariant = Self;
     type EncodeMapVariant = Self;
 
-    #[inline]
+    #[inline(always)]
     fn cx(&self) -> &Self::Cx {
         self.cx
     }
 
-    #[inline]
+    #[inline(always)]
     fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
     where
         U: Context,
@@ -90,7 +90,7 @@ where
         Ok(SelfEncoder::new(cx, self.writer))
     }
 
-    #[inline]
+    #[inline(always)]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "type supported by the descriptive encoder")
     }
@@ -262,7 +262,7 @@ where
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Sequence, hint.size)?;
         Ok(self)
@@ -339,12 +339,12 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, &mut self.buffer))
     }
 
-    #[inline]
+    #[inline(always)]
     fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
         encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Bytes, buffer.len())?;
@@ -365,12 +365,12 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
@@ -388,12 +388,12 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn finish_map(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
@@ -415,17 +415,17 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
@@ -447,17 +447,17 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn finish_entries(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
@@ -479,24 +479,24 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn finish_variant(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 }
 
 /// Encode a length prefix.
-#[inline]
+#[inline(always)]
 fn encode_prefix<C, W, const OPT: Options>(
     cx: &C,
     mut writer: W,

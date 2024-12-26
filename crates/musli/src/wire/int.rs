@@ -6,7 +6,7 @@ use crate::{Context, Options, Reader, Writer};
 use super::tag::{Kind, Tag, DATA_MASK};
 
 /// Governs how usize lengths are encoded into a [`Writer`].
-#[inline]
+#[inline(always)]
 pub(crate) fn encode_length<C, W, const OPT: Options>(
     cx: &C,
     mut writer: W,
@@ -47,7 +47,7 @@ where
 }
 
 /// Governs how usize lengths are decoded from a [`Reader`].
-#[inline]
+#[inline(always)]
 pub(crate) fn decode_length<'de, C, R, const OPT: Options>(
     cx: &C,
     mut reader: R,
@@ -101,7 +101,7 @@ where
 }
 
 /// Governs how unsigned integers are encoded into a [`Writer`].
-#[inline]
+#[inline(always)]
 pub(crate) fn encode_unsigned<C, W, T, const OPT: Options>(
     cx: &C,
     mut writer: W,
@@ -167,7 +167,7 @@ where
 }
 
 /// Governs how signed integers are encoded into a [`Writer`].
-#[inline]
+#[inline(always)]
 pub(crate) fn encode_signed<C, W, T, const OPT: Options>(
     cx: &C,
     writer: W,
@@ -184,7 +184,7 @@ where
 }
 
 /// Governs how signed integers are decoded from a [`Reader`].
-#[inline]
+#[inline(always)]
 pub(crate) fn decode_signed<'de, C, R, T, const OPT: Options>(
     cx: &C,
     reader: R,

@@ -14,7 +14,7 @@ pub struct Error {
 }
 
 impl fmt::Display for Error {
-    #[inline]
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.err.fmt(f)
     }

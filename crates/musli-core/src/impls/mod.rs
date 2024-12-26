@@ -32,7 +32,7 @@ enum PlatformTag {
 }
 
 impl<M> Encode<M> for () {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
@@ -42,7 +42,7 @@ impl<M> Encode<M> for () {
 }
 
 impl<'de, M> Decode<'de, M> for () {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -52,7 +52,7 @@ impl<'de, M> Decode<'de, M> for () {
 }
 
 impl<T, M> Encode<M> for marker::PhantomData<T> {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
@@ -62,7 +62,7 @@ impl<T, M> Encode<M> for marker::PhantomData<T> {
 }
 
 impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T> {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -97,7 +97,7 @@ atomic_impl!("ptr", AtomicIsize, AtomicUsize);
 macro_rules! non_zero {
     ($ty:ty) => {
         impl<M> Encode<M> for $ty {
-            #[inline]
+            #[inline(always)]
             fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder,
@@ -160,7 +160,7 @@ impl<M, T, const N: usize> Encode<M> for [T; N]
 where
     T: Encode<M>,
 {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -181,7 +181,7 @@ impl<'de, M, T, const N: usize> Decode<'de, M> for [T; N]
 where
     T: Decode<'de, M>,
 {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -214,7 +214,7 @@ impl<M, T, const N: usize> EncodePacked<M> for [T; N]
 where
     T: Encode<M>,
 {
-    #[inline]
+    #[inline(always)]
     fn encode_packed<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -233,7 +233,7 @@ impl<'de, M, T, const N: usize> DecodePacked<'de, M> for [T; N]
 where
     T: Decode<'de, M>,
 {
-    #[inline]
+    #[inline(always)]
     fn decode_packed<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -254,7 +254,7 @@ where
 macro_rules! impl_number {
     ($ty:ty, $read:ident, $write:ident) => {
         impl<M> Encode<M> for $ty {
-            #[inline]
+            #[inline(always)]
             fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder,
@@ -264,7 +264,7 @@ macro_rules! impl_number {
         }
 
         impl<'de, M> Decode<'de, M> for $ty {
-            #[inline]
+            #[inline(always)]
             fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de>,
@@ -276,7 +276,7 @@ macro_rules! impl_number {
 }
 
 impl<M> Encode<M> for bool {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
@@ -286,7 +286,7 @@ impl<M> Encode<M> for bool {
 }
 
 impl<'de, M> Decode<'de, M> for bool {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -296,7 +296,7 @@ impl<'de, M> Decode<'de, M> for bool {
 }
 
 impl<M> Encode<M> for char {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
@@ -306,7 +306,7 @@ impl<M> Encode<M> for char {
 }
 
 impl<'de, M> Decode<'de, M> for char {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -331,7 +331,7 @@ impl_number!(f32, decode_f32, encode_f32);
 impl_number!(f64, decode_f64, encode_f64);
 
 impl<M> Encode<M> for str {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
@@ -341,7 +341,7 @@ impl<M> Encode<M> for str {
 }
 
 impl<'de, M> Decode<'de, M> for &'de str {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -354,12 +354,12 @@ impl<'de, M> Decode<'de, M> for &'de str {
         {
             type Ok = &'de str;
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "string borrowed from source")
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_borrowed(self, _: &C, string: &'de str) -> Result<Self::Ok, C::Error> {
                 Ok(string)
             }
@@ -370,7 +370,7 @@ impl<'de, M> Decode<'de, M> for &'de str {
 }
 
 impl<'de, M> DecodeUnsized<'de, M> for str {
-    #[inline]
+    #[inline(always)]
     fn decode_unsized<D, F, O>(_: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
     where
         D: Decoder<'de>,
@@ -385,12 +385,12 @@ impl<'de, M> DecodeUnsized<'de, M> for str {
         {
             type Ok = O;
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "string visited from source")
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_ref(self, _: &C, string: &str) -> Result<Self::Ok, C::Error> {
                 (self.0)(string)
             }
@@ -426,7 +426,7 @@ where
 }
 
 impl<'de, M> Decode<'de, M> for &'de [u8] {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -439,12 +439,12 @@ impl<'de, M> Decode<'de, M> for &'de [u8] {
         {
             type Ok = &'de [u8];
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "bytes borrowed from source")
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes)
             }
@@ -455,7 +455,7 @@ impl<'de, M> Decode<'de, M> for &'de [u8] {
 }
 
 impl<'de, M> DecodeUnsizedBytes<'de, M> for [u8] {
-    #[inline]
+    #[inline(always)]
     fn decode_unsized_bytes<D, F, O>(_: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
     where
         D: Decoder<'de>,
@@ -470,12 +470,12 @@ impl<'de, M> DecodeUnsizedBytes<'de, M> for [u8] {
         {
             type Ok = O;
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "bytes visited from source")
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 (self.0)(bytes)
             }
@@ -489,7 +489,7 @@ impl<T, M> Encode<M> for Option<T>
 where
     T: Encode<M>,
 {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -505,7 +505,7 @@ impl<'de, M, T> Decode<'de, M> for Option<T>
 where
     T: Decode<'de, M>,
 {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -531,7 +531,7 @@ where
     U: Encode<M>,
     ResultTag: Encode<M>,
 {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -551,7 +551,7 @@ where
     U: Decode<'de, M>,
     ResultTag: Decode<'de, M>,
 {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -571,7 +571,7 @@ impl<T, M> Encode<M> for Wrapping<T>
 where
     T: Encode<M>,
 {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -584,7 +584,7 @@ impl<'de, M, T> Decode<'de, M> for Wrapping<T>
 where
     T: Decode<'de, M>,
 {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -594,7 +594,7 @@ where
 }
 
 impl<M> Encode<M> for CStr {
-    #[inline]
+    #[inline(always)]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
@@ -604,7 +604,7 @@ impl<M> Encode<M> for CStr {
 }
 
 impl<'de, M> Decode<'de, M> for &'de CStr {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -629,7 +629,7 @@ impl<'de, M> DecodeUnsized<'de, M> for CStr {
 }
 
 impl<M> EncodeBytes<M> for [u8] {
-    #[inline]
+    #[inline(always)]
     fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -639,7 +639,7 @@ impl<M> EncodeBytes<M> for [u8] {
 }
 
 impl<const N: usize, M> EncodeBytes<M> for [u8; N] {
-    #[inline]
+    #[inline(always)]
     fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -649,7 +649,7 @@ impl<const N: usize, M> EncodeBytes<M> for [u8; N] {
 }
 
 impl<'de, M> DecodeBytes<'de, M> for &'de [u8] {
-    #[inline]
+    #[inline(always)]
     fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -659,7 +659,7 @@ impl<'de, M> DecodeBytes<'de, M> for &'de [u8] {
 }
 
 impl<'de, M, const N: usize> DecodeBytes<'de, M> for [u8; N] {
-    #[inline]
+    #[inline(always)]
     fn decode_bytes<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,

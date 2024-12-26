@@ -39,20 +39,20 @@ where
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
     /// Visit an owned value.
-    #[inline]
+    #[inline(always)]
     fn visit_owned(self, cx: &C, value: T::Owned) -> Result<Self::Ok, C::Error> {
         self.visit_ref(cx, value.borrow())
     }
 
     /// Visit a string that is borrowed directly from the source data.
-    #[inline]
+    #[inline(always)]
     fn visit_borrowed(self, cx: &C, value: &'de T) -> Result<Self::Ok, C::Error> {
         self.visit_ref(cx, value)
     }
 
     /// Visit a value reference that is provided from the decoder in any manner
     /// possible. Which might require additional decoding work.
-    #[inline]
+    #[inline(always)]
     fn visit_ref(self, cx: &C, _: &T) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::AnyValue,
@@ -68,7 +68,7 @@ struct ExpectingWrapper<'a, T, C: ?Sized, I: ?Sized> {
 }
 
 impl<T, C: ?Sized, U: ?Sized> ExpectingWrapper<'_, T, C, U> {
-    #[inline]
+    #[inline(always)]
     fn new(value: &T) -> &Self {
         // SAFETY: `ExpectingWrapper` is repr(transparent) over `T`.
         unsafe { &*(value as *const T as *const Self) }
@@ -81,7 +81,7 @@ where
     C: ?Sized + Context,
     U: ?Sized + ToOwned,
 {
-    #[inline]
+    #[inline(always)]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.expecting(f)
     }

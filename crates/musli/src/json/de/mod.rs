@@ -58,7 +58,7 @@ where
     C: ?Sized + Context,
 {
     /// Construct a new fixed width message encoder.
-    #[inline]
+    #[inline(always)]
     pub(crate) fn new(cx: &'a C, parser: P) -> Self {
         Self { cx, parser }
     }
@@ -86,17 +86,17 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn parse_true(mut self) -> Result<(), C::Error> {
         self.parser.parse_exact(self.cx, "true")
     }
 
-    #[inline]
+    #[inline(always)]
     fn parse_false(mut self) -> Result<(), C::Error> {
         self.parser.parse_exact(self.cx, "false")
     }
 
-    #[inline]
+    #[inline(always)]
     fn parse_null(mut self) -> Result<(), C::Error> {
         self.parser.parse_exact(self.cx, "null")
     }
@@ -124,12 +124,12 @@ where
     type DecodeSome = JsonDecoder<'a, P, C>;
     type DecodeVariant = JsonVariantDecoder<'a, P, C>;
 
-    #[inline]
+    #[inline(always)]
     fn cx(&self) -> &Self::Cx {
         self.cx
     }
 
-    #[inline]
+    #[inline(always)]
     fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
     where
         U: Context,
@@ -137,12 +137,12 @@ where
         Ok(JsonDecoder::new(cx, self.parser))
     }
 
-    #[inline]
+    #[inline(always)]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "value that can be decoded from JSON")
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode<T>(self) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
@@ -150,7 +150,7 @@ where
         self.cx.decode(self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
     where
         T: ?Sized + DecodeUnsized<'de, Self::Mode>,
@@ -159,19 +159,19 @@ where
         self.cx.decode_unsized(self, f)
     }
 
-    #[inline]
+    #[inline(always)]
     fn skip(self) -> Result<(), C::Error> {
         self.skip_any()
     }
 
-    #[inline]
+    #[inline(always)]
     fn try_skip(self) -> Result<Skip, C::Error> {
         self.skip()?;
         Ok(Skip::Skipped)
     }
 
     #[cfg(feature = "value")]
-    #[inline]
+    #[inline(always)]
     fn decode_buffer(self) -> Result<Self::DecodeBuffer, C::Error> {
         let cx = self.cx;
         let value = self.decode::<crate::value::Value>()?;
@@ -180,12 +180,12 @@ where
         Ok(value.into_value_decoder(cx))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_empty(self) -> Result<(), C::Error> {
         self.skip()
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_bool(mut self) -> Result<bool, C::Error> {
         match self.parser.lex(self.cx) {
             Token::True => {
@@ -202,7 +202,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_char(mut self) -> Result<char, C::Error> {
         let start = self.cx.mark();
         let mut scratch = Vec::new_in(self.cx.alloc());
@@ -223,77 +223,77 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u8(mut self) -> Result<u8, C::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u16(mut self) -> Result<u16, C::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u32(mut self) -> Result<u32, C::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u64(mut self) -> Result<u64, C::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_u128(mut self) -> Result<u128, C::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i8(mut self) -> Result<i8, C::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i16(mut self) -> Result<i16, C::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i32(mut self) -> Result<i32, C::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i64(mut self) -> Result<i64, C::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_i128(mut self) -> Result<i128, C::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_usize(mut self) -> Result<usize, C::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_isize(mut self) -> Result<isize, C::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_f32(mut self) -> Result<f32, C::Error> {
         self.parser.parse_f32(self.cx)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_f64(mut self) -> Result<f64, C::Error> {
         self.parser.parse_f64(self.cx)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_array<const N: usize>(self) -> Result<[u8; N], C::Error> {
         let cx = self.cx;
         let mark = cx.mark();
@@ -324,7 +324,7 @@ where
     }
 
     #[cfg(feature = "alloc")]
-    #[inline]
+    #[inline(always)]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: UnsizedVisitor<'de, C, [u8]>,
@@ -342,7 +342,7 @@ where
         })
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: UnsizedVisitor<'de, C, str>,
@@ -355,7 +355,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_option(mut self) -> Result<Option<Self::DecodeSome>, C::Error> {
         if self.parser.lex(self.cx).is_null() {
             self.parse_null()?;
@@ -365,7 +365,7 @@ where
         }
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_pack<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
@@ -376,7 +376,7 @@ where
         Ok(output)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_sequence<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
@@ -387,7 +387,7 @@ where
         Ok(output)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_sequence_hint<F, O>(self, hint: &SequenceHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
@@ -398,7 +398,7 @@ where
         Ok(output)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
@@ -409,7 +409,7 @@ where
         Ok(output)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_map_hint<F, O>(self, hint: &MapHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
@@ -420,7 +420,7 @@ where
         Ok(output)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
@@ -428,7 +428,7 @@ where
         self.decode_map(f)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_variant<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, C::Error>,
@@ -439,7 +439,7 @@ where
         Ok(output)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: Visitor<'de, C>,
@@ -447,7 +447,7 @@ where
         self.parser.parse_number(self.cx, visitor)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: Visitor<'de, C>,

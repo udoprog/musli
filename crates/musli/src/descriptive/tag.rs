@@ -170,7 +170,7 @@ impl Tag {
     ///
     /// The `data` argument must fit within the numerical bounds specified by
     /// [`DATA_MASK`].
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn new(kind: Kind, data: u8) -> Self {
         debug_assert!(data <= DATA_MASK, "Data must fit in DATA_MASK");
 
@@ -180,7 +180,7 @@ impl Tag {
     }
 
     /// Construct a tag corresponding to a mark.
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn from_mark(mark: Mark) -> Self {
         Self {
             repr: Kind::Mark as u8 | mark as u8,
@@ -188,7 +188,7 @@ impl Tag {
     }
 
     /// Access the mark this byte corresponds to.
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn mark(&self) -> Mark {
         // SAFETY: The representation used by `Mark` is exhaustive over all
         // emitted bit-patterns.
@@ -196,7 +196,7 @@ impl Tag {
     }
 
     /// Access the number kind this tag corresponds to.
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn number_kind(&self) -> NumberKind {
         // SAFETY: The representation used by `Mark` is exhaustive over all
         // emitted bit-patterns.
@@ -204,19 +204,19 @@ impl Tag {
     }
 
     /// Construct from a byte.
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn from_byte(repr: u8) -> Self {
         Self { repr }
     }
 
     /// Coerce type flag into a byte.
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn byte(self) -> u8 {
         self.repr
     }
 
     /// Access the kind of the tag.
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn kind(self) -> Kind {
         // SAFETY: this is safe because we've ensured that all available Kind
         // variants occupy all available bit patterns.
@@ -225,14 +225,14 @@ impl Tag {
 
     /// Perform raw access over the data payload. Will return [DATA_MASK] if
     /// data is empty.
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn data_raw(self) -> u8 {
         self.repr & DATA_MASK
     }
 
     /// Perform checked access over the internal data. Returns [None] if data is
     /// empty.
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn data(self) -> Option<u8> {
         let data = self.data_raw();
 
@@ -247,7 +247,7 @@ impl Tag {
     ///
     /// Returns a tuple where the boolean indicates if the value was embedded or
     /// not.
-    #[inline]
+    #[inline(always)]
     pub(crate) const fn with_len(kind: Kind, len: usize) -> (Self, bool) {
         if len < DATA_MASK as usize {
             (Self::new(kind, len as u8), true)
@@ -267,7 +267,7 @@ impl fmt::Debug for Tag {
 }
 
 impl<'de, M> Decode<'de, M> for Tag {
-    #[inline]
+    #[inline(always)]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,

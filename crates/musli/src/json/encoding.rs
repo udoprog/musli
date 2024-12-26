@@ -49,7 +49,7 @@ crate::macros::bare_encoding!(Text, DEFAULT, json, IntoParser);
 /// # Ok::<(), Error>(())
 /// ```
 #[cfg(feature = "alloc")]
-#[inline]
+#[inline(always)]
 pub fn to_string<T>(value: &T) -> Result<String, Error>
 where
     T: ?Sized + Encode<Text>,
@@ -83,7 +83,7 @@ where
 /// assert_eq!(person.age, 61);
 /// # Ok::<(), Error>(())
 /// ```
-#[inline]
+#[inline(always)]
 pub fn from_str<'de, T>(string: &'de str) -> Result<T, Error>
 where
     T: Decode<'de, Text>,
@@ -100,7 +100,7 @@ where
 }
 
 impl Default for Encoding<Text> {
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self::new()
     }
@@ -140,7 +140,7 @@ impl Encoding<Text> {
     /// assert_eq!(expected, actual);
     /// # Ok::<(), Error>(())
     /// ```
-    #[inline]
+    #[inline(always)]
     pub const fn new() -> Self {
         Encoding {
             _marker: marker::PhantomData,
@@ -209,7 +209,7 @@ where
     /// # Ok::<(), Error>(())
     /// ```
     #[cfg(feature = "alloc")]
-    #[inline]
+    #[inline(always)]
     pub fn to_string<T>(self, value: &T) -> Result<String, Error>
     where
         T: ?Sized + Encode<M>,
@@ -256,7 +256,7 @@ where
     /// # Ok::<(), Error>(())
     /// ```
     #[cfg(feature = "alloc")]
-    #[inline]
+    #[inline(always)]
     pub fn to_string_with<T, C>(self, cx: &C, value: &T) -> Result<String, C::Error>
     where
         C: ?Sized + Context<Mode = M>,
@@ -271,7 +271,7 @@ where
 }
 
 impl<M> Clone for Encoding<M> {
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         *self
     }

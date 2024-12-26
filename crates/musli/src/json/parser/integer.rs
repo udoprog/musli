@@ -124,7 +124,7 @@ where
     F: Float,
 {
     /// Compute as float with a negative exponent.
-    #[inline]
+    #[inline(always)]
     fn compute_float(self, e: i32) -> F {
         self.value.pow10(e - self.exp)
     }
@@ -546,7 +546,7 @@ where
 }
 
 // Test if b is numeric.
-#[inline]
+#[inline(always)]
 fn is_digit(b: u8) -> bool {
     b.is_ascii_digit()
 }
@@ -848,18 +848,18 @@ mod traits {
     macro_rules! float {
         ($float:ty, $fallback:path) => {
             impl Float for $float {
-                #[inline]
+                #[inline(always)]
                 fn negate(self) -> Self {
                     -self
                 }
 
-                #[inline]
+                #[inline(always)]
                 #[cfg(feature = "std")]
                 fn pow10(self, e: i32) -> Self {
                     self * <$float>::powi(10.0, e)
                 }
 
-                #[inline]
+                #[inline(always)]
                 #[cfg(not(feature = "std"))]
                 fn pow10(self, e: i32) -> Self {
                     self * $fallback(10.0, e)

@@ -17,7 +17,7 @@ pub struct StorageDecoder<'a, R, const OPT: Options, C: ?Sized> {
 
 impl<'a, R, const OPT: Options, C: ?Sized> StorageDecoder<'a, R, OPT, C> {
     /// Construct a new fixed width message encoder.
-    #[inline]
+    #[inline(always)]
     pub fn new(cx: &'a C, reader: R) -> Self {
         Self { cx, reader }
     }
@@ -58,7 +58,7 @@ where
         self.cx
     }
 
-    #[inline]
+    #[inline(always)]
     fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
     where
         U: Context,
@@ -66,7 +66,7 @@ where
         Ok(StorageDecoder::new(cx, self.reader))
     }
 
-    #[inline]
+    #[inline(always)]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "type supported by the storage decoder")
     }
@@ -138,25 +138,25 @@ where
         {
             type Ok = V::Ok;
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 self.0.expecting(f)
             }
 
             #[cfg(feature = "alloc")]
-            #[inline]
+            #[inline(always)]
             fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_borrowed(cx, string)
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_ref(cx, string)
@@ -331,14 +331,14 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn try_decode_next(
         &mut self,
     ) -> Result<Option<Self::DecodeNext<'_>>, <Self::Cx as Context>::Error> {
         Ok(Some(self.decode_next()?))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
@@ -349,7 +349,7 @@ where
     C: ?Sized + Context,
     R: Reader<'de>,
 {
-    #[inline]
+    #[inline(always)]
     fn new(cx: &'a C, mut reader: R) -> Result<Self, C::Error> {
         let remaining = crate::int::decode_usize::<_, _, OPT>(cx, reader.borrow_mut())?;
 
@@ -360,7 +360,7 @@ where
         })
     }
 
-    #[inline]
+    #[inline(always)]
     fn with_remaining(cx: &'a C, reader: R, remaining: usize) -> Self {
         Self {
             cx,
@@ -381,12 +381,12 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn size_hint(&self) -> SizeHint {
         SizeHint::exact(self.remaining)
     }
 
-    #[inline]
+    #[inline(always)]
     fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
@@ -396,7 +396,7 @@ where
         Ok(Some(StorageDecoder::new(self.cx, self.reader.borrow_mut())))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, <Self::Cx as Context>::Error> {
         let cx = self.cx;
 
@@ -423,12 +423,12 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn size_hint(&self) -> SizeHint {
         SizeHint::exact(self.remaining)
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_entry(&mut self) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
@@ -438,7 +438,7 @@ where
         Ok(Some(StorageDecoder::new(self.cx, self.reader.borrow_mut())))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_remaining_entries(
         &mut self,
     ) -> Result<Self::DecodeRemainingEntries<'_>, <Self::Cx as Context>::Error> {
@@ -462,12 +462,12 @@ where
         Self: 'this;
     type DecodeValue = Self;
 
-    #[inline]
+    #[inline(always)]
     fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_value(self) -> Result<Self::DecodeValue, C::Error> {
         Ok(self)
     }
@@ -488,7 +488,7 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
@@ -498,12 +498,12 @@ where
         Ok(Some(StorageDecoder::new(self.cx, self.reader.borrow_mut())))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn end_entries(self) -> Result<(), C::Error> {
         if self.remaining != 0 {
             return Err(self
@@ -530,12 +530,12 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }

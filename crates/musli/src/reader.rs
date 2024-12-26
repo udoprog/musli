@@ -64,17 +64,17 @@ pub trait Reader<'de>: self::sealed::Sealed {
         {
             type Ok = ();
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "bytes")
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, bytes)
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 self.0.copy_from_slice(bytes);
                 Ok(())
@@ -114,17 +114,17 @@ pub trait Reader<'de>: self::sealed::Sealed {
         {
             type Ok = [u8; N];
 
-            #[inline]
+            #[inline(always)]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "bytes")
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, bytes)
             }
 
-            #[inline]
+            #[inline(always)]
             fn visit_ref(mut self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 self.0.copy_from_slice(bytes);
                 cx.advance(bytes.len());
@@ -621,7 +621,7 @@ impl SliceUnderflow {
 }
 
 impl fmt::Display for SliceUnderflow {
-    #[inline]
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let SliceUnderflow { n, remaining } = self;
 

@@ -18,12 +18,12 @@ where
     W: Writer,
     C: ?Sized + Context,
 {
-    #[inline]
+    #[inline(always)]
     pub(super) fn new(cx: &'a C, writer: W) -> Result<Self, C::Error> {
         Self::with_end(cx, writer, b"]")
     }
 
-    #[inline]
+    #[inline(always)]
     pub(super) fn with_end(cx: &'a C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'[')?;
 
@@ -48,7 +48,7 @@ where
     where
         Self: 'this;
 
-    #[inline]
+    #[inline(always)]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         if !take(&mut self.first) {
             self.writer.write_byte(self.cx, b',')?;
@@ -57,7 +57,7 @@ where
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline]
+    #[inline(always)]
     fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_bytes(self.cx, self.end)
     }
