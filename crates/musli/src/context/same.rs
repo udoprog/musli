@@ -33,7 +33,7 @@ where
     E: ContextError,
 {
     /// Construct a new same-error context with the [`System`] allocator.
-    #[inline(always)]
+    #[inline]
     pub fn new() -> Self {
         Self::with_alloc(crate::alloc::system())
     }
@@ -44,7 +44,7 @@ where
     E: ContextError,
 {
     /// Construct a new `Same` context with a custom allocator.
-    #[inline(always)]
+    #[inline]
     pub fn with_alloc(alloc: A) -> Self {
         Self {
             alloc,
@@ -56,7 +56,7 @@ where
 #[cfg(test)]
 impl<A> Same<Binary, ErrorMarker, A> {
     /// Construct a new `Same` capturing context.
-    #[inline(always)]
+    #[inline]
     pub(crate) fn with_marker(alloc: A) -> Self {
         Self::with_alloc(alloc)
     }
@@ -77,21 +77,21 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn clear(&self) {}
 
-    #[inline(always)]
+    #[inline]
     fn mark(&self) -> Self::Mark {}
 
-    #[inline(always)]
+    #[inline]
     fn advance(&self, _: usize) {}
 
-    #[inline(always)]
+    #[inline]
     fn alloc(&self) -> &Self::Allocator {
         &self.alloc
     }
 
-    #[inline(always)]
+    #[inline]
     fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
@@ -99,7 +99,7 @@ where
         alloc::collect_string(self, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn custom<T>(&self, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + Error,
@@ -107,7 +107,7 @@ where
         E::custom(message)
     }
 
-    #[inline(always)]
+    #[inline]
     fn message<T>(&self, message: T) -> Self::Error
     where
         T: fmt::Display,
@@ -122,7 +122,7 @@ impl<M, E> Default for Same<M, E, &'static System>
 where
     E: ContextError,
 {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::new()
     }

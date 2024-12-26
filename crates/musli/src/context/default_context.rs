@@ -47,7 +47,7 @@ impl<M> DefaultContext<'static, System, M> {
     /// allocator for memory.
     ///
     /// [`System`]: crate::alloc::System
-    #[inline(always)]
+    #[inline]
     pub fn new() -> Self {
         Self::with_alloc(crate::alloc::system())
     }
@@ -55,7 +55,7 @@ impl<M> DefaultContext<'static, System, M> {
 
 #[cfg(feature = "alloc")]
 impl<M> Default for DefaultContext<'static, System, M> {
-    #[inline(always)]
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -67,7 +67,7 @@ where
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
-    #[inline(always)]
+    #[inline]
     pub(super) fn with_alloc(alloc: &'a A) -> Self {
         let errors = Vec::new_in(alloc);
         let path = Vec::new_in(alloc);
@@ -86,14 +86,14 @@ where
 
     /// Configure the context to visualize type information, and not just
     /// variant and fields.
-    #[inline(always)]
+    #[inline]
     pub fn include_type(&mut self) -> &mut Self {
         self.include_type = true;
         self
     }
 
     /// Generate a line-separated report of all collected errors.
-    #[inline(always)]
+    #[inline]
     pub fn report(&self) -> Report<'_, 'a, A> {
         Report {
             errors: self.errors(),
@@ -101,7 +101,7 @@ where
     }
 
     /// Iterate over all collected errors.
-    #[inline(always)]
+    #[inline]
     pub fn errors(&self) -> Errors<'_, 'a, A> {
         let access = self.access.shared();
 
@@ -114,7 +114,7 @@ where
     }
 
     /// Push an error into the collection.
-    #[inline(always)]
+    #[inline]
     fn push_error(&self, range: Range<usize>, error: String<'a, A>) {
         let _access = self.access.exclusive();
 
@@ -125,7 +125,7 @@ where
     }
 
     /// Push a path.
-    #[inline(always)]
+    #[inline]
     fn push_path(&self, step: Step<'a, A>) {
         let _access = self.access.exclusive();
 
@@ -138,7 +138,7 @@ where
     }
 
     /// Pop the last path.
-    #[inline(always)]
+    #[inline]
     fn pop_path(&self) {
         let cap = self.cap.get();
 
@@ -155,7 +155,7 @@ where
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn format_string<T>(&self, value: T) -> Option<String<'a, A>>
     where
         T: fmt::Display,
@@ -180,7 +180,7 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn clear(&self) {
         self.mark.set(0);
         let _access = self.access.exclusive();
@@ -192,12 +192,12 @@ where
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn alloc(&self) -> &Self::Allocator {
         self.alloc
     }
 
-    #[inline(always)]
+    #[inline]
     fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
     where
         T: ?Sized + fmt::Display,
@@ -205,7 +205,7 @@ where
         alloc::collect_string(self, value)
     }
 
-    #[inline(always)]
+    #[inline]
     fn custom<T>(&self, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -217,7 +217,7 @@ where
         ErrorMarker
     }
 
-    #[inline(always)]
+    #[inline]
     fn message<T>(&self, message: T) -> Self::Error
     where
         T: fmt::Display,
@@ -229,7 +229,7 @@ where
         ErrorMarker
     }
 
-    #[inline(always)]
+    #[inline]
     fn marked_message<T>(&self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: fmt::Display,
@@ -241,7 +241,7 @@ where
         ErrorMarker
     }
 
-    #[inline(always)]
+    #[inline]
     fn marked_custom<T>(&self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -253,17 +253,17 @@ where
         ErrorMarker
     }
 
-    #[inline(always)]
+    #[inline]
     fn mark(&self) -> Self::Mark {
         self.mark.get()
     }
 
-    #[inline(always)]
+    #[inline]
     fn advance(&self, n: usize) {
         self.mark.set(self.mark.get().wrapping_add(n));
     }
 
-    #[inline(always)]
+    #[inline]
     fn enter_named_field<T>(&self, name: &'static str, _: &T)
     where
         T: ?Sized + fmt::Display,
@@ -271,7 +271,7 @@ where
         self.push_path(Step::Named(name));
     }
 
-    #[inline(always)]
+    #[inline]
     fn enter_unnamed_field<T>(&self, index: u32, _: &T)
     where
         T: ?Sized + fmt::Display,
@@ -279,60 +279,60 @@ where
         self.push_path(Step::Unnamed(index));
     }
 
-    #[inline(always)]
+    #[inline]
     fn leave_field(&self) {
         self.pop_path();
     }
 
-    #[inline(always)]
+    #[inline]
     fn enter_struct(&self, name: &'static str) {
         if self.include_type {
             self.push_path(Step::Struct(name));
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn leave_struct(&self) {
         if self.include_type {
             self.pop_path();
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn enter_enum(&self, name: &'static str) {
         if self.include_type {
             self.push_path(Step::Enum(name));
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn leave_enum(&self) {
         if self.include_type {
             self.pop_path();
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn enter_variant<T>(&self, name: &'static str, _: T) {
         self.push_path(Step::Variant(name));
     }
 
-    #[inline(always)]
+    #[inline]
     fn leave_variant(&self) {
         self.pop_path();
     }
 
-    #[inline(always)]
+    #[inline]
     fn enter_sequence_index(&self, index: usize) {
         self.push_path(Step::Index(index));
     }
 
-    #[inline(always)]
+    #[inline]
     fn leave_sequence_index(&self) {
         self.pop_path();
     }
 
-    #[inline(always)]
+    #[inline]
     fn enter_map_key<T>(&self, field: T)
     where
         T: fmt::Display,
@@ -342,7 +342,7 @@ where
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn leave_map_key(&self) {
         self.pop_path();
     }
@@ -360,7 +360,7 @@ impl<'a, A> fmt::Display for Report<'_, 'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for error in self.errors.clone() {
             writeln!(f, "{error}")?;
@@ -389,7 +389,7 @@ where
 {
     type Item = Error<'b, 'a, A>;
 
-    #[inline(always)]
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let (range, error) = self.errors.next()?;
         Some(Error::new(self.path, self.cap, range.clone(), error))
@@ -400,7 +400,7 @@ impl<A> Clone for Errors<'_, '_, A>
 where
     A: ?Sized + Allocator,
 {
-    #[inline(always)]
+    #[inline]
     fn clone(&self) -> Self {
         Self {
             path: self.path,
@@ -426,7 +426,7 @@ impl<'b, 'a, A> Error<'b, 'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
-    #[inline(always)]
+    #[inline]
     fn new(path: &'b [Step<'a, A>], cap: usize, range: Range<usize>, error: &'b str) -> Self {
         Self {
             path,
@@ -441,7 +441,7 @@ impl<'a, A> fmt::Display for Error<'_, 'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let path = FormatPath::new(self.path, self.cap);
 
@@ -490,7 +490,7 @@ impl<'b, 'a, A> FormatPath<'b, 'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
-    #[inline(always)]
+    #[inline]
     pub(crate) fn new(path: &'b [Step<'a, A>], cap: usize) -> Self {
         Self { path, cap }
     }
@@ -500,7 +500,7 @@ impl<'a, A> fmt::Display for FormatPath<'_, 'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
-    #[inline(always)]
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut has_type = false;
         let mut has_field = false;

@@ -224,12 +224,12 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         (**self).borrow_mut()
     }
 
-    #[inline(always)]
+    #[inline]
     fn parse_string<'scratch, C>(
         &mut self,
         cx: &C,
@@ -242,7 +242,7 @@ where
         (**self).parse_string(cx, validate, scratch)
     }
 
-    #[inline(always)]
+    #[inline]
     fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
@@ -250,7 +250,7 @@ where
         (**self).skip_string(cx)
     }
 
-    #[inline(always)]
+    #[inline]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
     where
         C: ?Sized + Context,
@@ -258,12 +258,12 @@ where
         (**self).read_byte(cx)
     }
 
-    #[inline(always)]
+    #[inline]
     fn peek(&mut self) -> Option<u8> {
         (**self).peek()
     }
 
-    #[inline(always)]
+    #[inline]
     fn lex<C>(&mut self, cx: &C) -> Token
     where
         C: ?Sized + Context,
@@ -271,7 +271,7 @@ where
         (**self).lex(cx)
     }
 
-    #[inline(always)]
+    #[inline]
     fn skip_whitespace<C>(&mut self, cx: &C)
     where
         C: ?Sized + Context,
@@ -279,7 +279,7 @@ where
         (**self).skip_whitespace(cx);
     }
 
-    #[inline(always)]
+    #[inline]
     fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
@@ -287,7 +287,7 @@ where
         (**self).skip(cx, n)
     }
 
-    #[inline(always)]
+    #[inline]
     fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
@@ -295,7 +295,7 @@ where
         (**self).read(cx, buf)
     }
 
-    #[inline(always)]
+    #[inline]
     fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>
     where
         C: ?Sized + Context,
@@ -303,7 +303,7 @@ where
         (**self).parse_f32(cx)
     }
 
-    #[inline(always)]
+    #[inline]
     fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
     where
         C: ?Sized + Context,

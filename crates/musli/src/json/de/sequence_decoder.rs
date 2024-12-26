@@ -20,7 +20,7 @@ where
     P: Parser<'de>,
     C: ?Sized + Context,
 {
-    #[inline(always)]
+    #[inline]
     pub(super) fn new(cx: &'a C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
         let actual = parser.lex(cx);
 
@@ -65,7 +65,7 @@ where
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub(super) fn skip_sequence_remaining(mut self) -> Result<(), C::Error> {
         if self.finalized {
             return Ok(());
@@ -100,12 +100,12 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.len)
     }
 
-    #[inline(always)]
+    #[inline]
     fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         if !self.parse_next_value()? {
             return Ok(None);
@@ -114,7 +114,7 @@ where
         Ok(Some(JsonDecoder::new(self.cx, self.parser.borrow_mut())))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
         if !self.parse_next_value()? {
             return Err(self.cx.message(format_args!("Encountered short array")));

@@ -57,12 +57,12 @@ impl<'a, 'de, C> SliceAccess<'a, 'de, C>
 where
     C: ?Sized + Context,
 {
-    #[inline(always)]
+    #[inline]
     pub(crate) fn new(cx: &'a C, slice: &'de [u8], index: usize) -> Self {
         Self { cx, slice, index }
     }
 
-    #[inline(always)]
+    #[inline]
     fn next(&mut self) -> Result<u8, C::Error> {
         let Some(b) = self.slice.get(self.index) else {
             return Err(self.cx.message("End of input"));
@@ -73,7 +73,7 @@ where
         Ok(*b)
     }
 
-    #[inline(always)]
+    #[inline]
     fn parse_hex_escape(&mut self) -> Result<u16, C::Error> {
         let &[a, b, c, d, ..] = &self.slice[self.index..] else {
             return Err(self.cx.message("Unexpected end of hex escape"));
@@ -393,7 +393,7 @@ where
     }
 
     /// Check that the given slice is valid UTF-8.
-    #[inline(always)]
+    #[inline]
     fn check_utf8(&self, bytes: &[u8], start: &C::Mark) -> Result<(), C::Error> {
         if crate::str::from_utf8(bytes).is_err() {
             Err(self.cx.marked_message(start, "Invalid unicode string"))
@@ -426,7 +426,7 @@ static HEX: [u8; 256] = {
     ]
 };
 
-#[inline(always)]
+#[inline]
 pub(crate) fn decode_hex_val(val: u8) -> Option<u16> {
     let n = HEX[val as usize] as u16;
 

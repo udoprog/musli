@@ -116,7 +116,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
         write!(f, "cannot be decoded from value")
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode<T>(self) -> Result<T, C::Error>
     where
         T: Decode<'de, Self::Mode>,
@@ -124,7 +124,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
         self.cx.decode(self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
     where
         T: ?Sized + DecodeUnsized<'de, Self::Mode>,
@@ -133,108 +133,108 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
         self.cx.decode_unsized(self, f)
     }
 
-    #[inline(always)]
+    #[inline]
     fn skip(self) -> Result<(), C::Error> {
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn try_skip(self) -> Result<Skip, C::Error> {
         Ok(Skip::Skipped)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_buffer(self) -> Result<Self::DecodeBuffer, C::Error> {
         Ok(AsValueDecoder::new(self.cx, self.value.clone()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_empty(self) -> Result<(), C::Error> {
         ensure!(self, hint, ExpectedUnit(hint), Value::Unit => Ok(()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_bool(self) -> Result<bool, C::Error> {
         ensure!(self, hint, ExpectedBool(hint), Value::Bool(b) => Ok(*b))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_char(self) -> Result<char, C::Error> {
         ensure!(self, hint, ExpectedChar(hint), Value::Char(c) => Ok(*c))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u8(self) -> Result<u8, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => u8)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u16(self) -> Result<u16, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => u16)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u32(self) -> Result<u32, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => u32)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u64(self) -> Result<u64, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => u64)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_u128(self) -> Result<u128, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => u128)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i8(self) -> Result<i8, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => i8)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i16(self) -> Result<i16, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => i16)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i32(self) -> Result<i32, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => i32)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i64(self) -> Result<i64, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => i64)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_i128(self) -> Result<i128, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => i128)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_f32(self) -> Result<f32, C::Error> {
         ensure!(self, hint, ExpectedNumber(NumberHint::F32, hint), Value::Number(Number::F32(n)) => Ok(*n))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_f64(self) -> Result<f64, C::Error> {
         ensure!(self, hint, ExpectedNumber(NumberHint::F64, hint), Value::Number(Number::F64(n)) => Ok(*n))
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_usize(self) -> Result<usize, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => usize)
     }
 
-    #[inline(always)]
+    #[inline]
     fn decode_isize(self) -> Result<isize, C::Error> {
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => isize)
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_array<const N: usize>(self) -> Result<[u8; N], C::Error> {
         ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
             <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| self.cx.message(ErrorMessage::ArrayOutOfBounds))
@@ -242,7 +242,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: UnsizedVisitor<'de, C, [u8]>,
@@ -253,7 +253,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
         V: UnsizedVisitor<'de, C, str>,
@@ -264,7 +264,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_option(self) -> Result<Option<Self::DecodeSome>, C::Error> {
         ensure!(self, hint, ExpectedOption(hint), Value::Option(option) => {
             Ok(option.as_ref().map(|some| ValueDecoder::new(self.cx, some)))
@@ -272,7 +272,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_pack<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
@@ -283,7 +283,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_sequence<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, <Self::Cx as Context>::Error>,
@@ -294,7 +294,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
@@ -305,7 +305,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
@@ -316,7 +316,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
@@ -325,7 +325,7 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn decode_variant<F, O>(self, f: F) -> Result<O, C::Error>
     where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, C::Error>,

@@ -116,7 +116,7 @@ where
         write!(f, "value that can be encoded")
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode<T>(self, value: T) -> Result<Self::Ok, C::Error>
     where
         T: Encode<Self::Mode>,
@@ -124,123 +124,123 @@ where
         value.encode(self.cx, self)
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_empty(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_bool(self, b: bool) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Bool(b));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_char(self, c: char) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Char(c));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u8(self, n: u8) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::U8(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u16(self, n: u16) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::U16(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u32(self, n: u32) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::U32(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u64(self, n: u64) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::U64(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_u128(self, n: u128) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::U128(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i8(self, n: i8) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::I8(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i16(self, n: i16) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::I16(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i32(self, n: i32) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::I32(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i64(self, n: i64) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::I64(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_i128(self, n: i128) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::I128(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_f32(self, n: f32) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::F32(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_f64(self, n: f64) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::F64(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_usize(self, n: usize) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::Usize(n)));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_isize(self, n: isize) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Number(Number::Isize(n)));
         Ok(())
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_array<const N: usize>(self, array: &[u8; N]) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Bytes(array.into()));
         Ok(())
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_bytes(self, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Bytes(bytes.to_vec()));
         Ok(())
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_bytes_vectored<I>(self, len: usize, vectors: I) -> Result<Self::Ok, C::Error>
     where
         I: IntoIterator<Item: AsRef<[u8]>>,
@@ -256,13 +256,13 @@ where
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_string(self, string: &str) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::String(string.into()));
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         T: ?Sized + fmt::Display,
@@ -272,7 +272,7 @@ where
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_some(self) -> Result<Self::EncodeSome, C::Error> {
         Ok(ValueEncoder::new(
             self.cx,
@@ -283,44 +283,44 @@ where
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_none(self) -> Result<Self::Ok, C::Error> {
         self.output.write(Value::Option(None));
         Ok(())
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_pack(self) -> Result<Self::EncodePack, C::Error> {
         PackValueEncoder::new(self.cx, self.output)
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_sequence(self, _: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
         Ok(SequenceValueEncoder::new(self.cx, self.output))
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_map(self, _: &MapHint) -> Result<Self::EncodeMap, C::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_map_entries(self, _: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_variant(self) -> Result<Self::EncodeVariant, C::Error> {
         Ok(VariantValueEncoder::new(self.cx, self.output))
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_unit_variant<T>(self, tag: &T) -> Result<(), C::Error>
     where
         T: ?Sized + Encode<C::Mode>,
@@ -332,7 +332,7 @@ where
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     #[cfg(feature = "alloc")]
     fn encode_sequence_variant<T>(
         self,
@@ -354,7 +354,7 @@ where
     }
 
     #[cfg(feature = "alloc")]
-    #[inline(always)]
+    #[inline]
     fn encode_map_variant<T>(
         self,
         tag: &T,

@@ -221,12 +221,12 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         self
     }
 
-    #[inline(always)]
+    #[inline]
     fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
@@ -238,7 +238,7 @@ where
         Ok(())
     }
 
-    #[inline(always)]
+    #[inline]
     fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
     where
         C: ?Sized + Context,

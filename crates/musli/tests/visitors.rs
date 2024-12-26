@@ -9,7 +9,7 @@ pub struct BytesReference<'de> {
 }
 
 impl<'de, M> Decode<'de, M> for BytesReference<'de> {
-    #[inline(always)]
+    #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -22,12 +22,12 @@ impl<'de, M> Decode<'de, M> for BytesReference<'de> {
         {
             type Ok = &'de [u8];
 
-            #[inline(always)]
+            #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "a literal byte reference")
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes)
             }
@@ -66,7 +66,7 @@ pub struct StringReference<'de> {
 }
 
 impl<'de, M> Decode<'de, M> for StringReference<'de> {
-    #[inline(always)]
+    #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -79,12 +79,12 @@ impl<'de, M> Decode<'de, M> for StringReference<'de> {
         {
             type Ok = &'de str;
 
-            #[inline(always)]
+            #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "exact bytes reference")
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_borrowed(self, _: &C, bytes: &'de str) -> Result<Self::Ok, C::Error> {
                 Ok(bytes)
             }

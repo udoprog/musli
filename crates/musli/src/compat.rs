@@ -19,6 +19,7 @@ pub struct Sequence<T>(pub T);
 
 impl<T> Sequence<T> {
     /// Construct a new sequence wrapper.
+    #[inline]
     pub const fn new(value: T) -> Self {
         Self(value)
     }
@@ -37,6 +38,7 @@ impl<M> Encode<M> for Sequence<()> {
 }
 
 impl<'de, M> Decode<'de, M> for Sequence<()> {
+    #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,

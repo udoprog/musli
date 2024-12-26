@@ -11,7 +11,7 @@ pub(crate) struct JsonObjectPairEncoder<'a, W, C: ?Sized> {
 }
 
 impl<'a, W, C: ?Sized> JsonObjectPairEncoder<'a, W, C> {
-    #[inline(always)]
+    #[inline]
     pub(super) const fn new(cx: &'a C, empty: bool, writer: W) -> Self {
         Self { cx, empty, writer }
     }
@@ -33,7 +33,7 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         if !self.empty {
             self.writer.write_byte(self.cx, b',')?;
@@ -42,13 +42,13 @@ where
         Ok(JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
         self.writer.write_byte(self.cx, b':')?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn finish_entry(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }

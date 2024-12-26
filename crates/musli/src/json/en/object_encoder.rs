@@ -16,12 +16,12 @@ where
     W: Writer,
     C: ?Sized + Context,
 {
-    #[inline(always)]
+    #[inline]
     pub(super) fn new(cx: &'a C, writer: W) -> Result<Self, C::Error> {
         Self::with_end(cx, writer, b"}")
     }
 
-    #[inline(always)]
+    #[inline]
     pub(super) fn with_end(cx: &'a C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'{')?;
 
@@ -46,7 +46,7 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         self.len += 1;
 
@@ -57,7 +57,7 @@ where
         ))
     }
 
-    #[inline(always)]
+    #[inline]
     fn finish_map(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_bytes(self.cx, self.end)
     }
@@ -79,7 +79,7 @@ where
     where
         Self: 'this;
 
-    #[inline(always)]
+    #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         if self.len > 0 {
             self.writer.write_byte(self.cx, b',')?;
@@ -89,13 +89,13 @@ where
         Ok(JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
         self.writer.write_byte(self.cx, b':')?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
-    #[inline(always)]
+    #[inline]
     fn finish_entries(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, b'}')
     }

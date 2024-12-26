@@ -33,35 +33,35 @@ const LENGTH_WIDTH_BIT: Options = 16;
 
 impl Builder {
     /// Indicates if an integer serialization should be variable.
-    #[inline(always)]
+    #[inline]
     pub const fn with_integer(self, integer: Integer) -> Self {
         const MASK: Options = 0b1 << INTEGER_BIT;
         Self((self.0 & !MASK) | ((integer as Options) << INTEGER_BIT))
     }
 
     /// Indicates the configuration of float serialization.
-    #[inline(always)]
+    #[inline]
     pub const fn with_float(self, float: Float) -> Self {
         const MASK: Options = 0b11 << FLOAT_BIT;
         Self((self.0 & !MASK) | ((float as Options) << FLOAT_BIT))
     }
 
     /// Specify which byte order to use, if that's relevant.
-    #[inline(always)]
+    #[inline]
     pub const fn with_byte_order(self, byte_order: ByteOrder) -> Self {
         const MASK: Options = 0b1 << BYTEORDER_BIT;
         Self((self.0 & !MASK) | ((byte_order as Options) << BYTEORDER_BIT))
     }
 
     /// Specify how lengths should be serialized.
-    #[inline(always)]
+    #[inline]
     pub const fn with_length(self, length: Integer) -> Self {
         const MASK: Options = 0b1 << LENGTH_BIT;
         Self((self.0 & !MASK) | ((length as Options) << LENGTH_BIT))
     }
 
     /// Allows for treating string keys as numbers.
-    #[inline(always)]
+    #[inline]
     pub const fn with_map_keys_as_numbers(self, value: bool) -> Self {
         const MASK: Options = 0b1 << MAP_KEYS_AS_NUMBERS_BIT;
         let value = if value { 1 } else { 0 };
@@ -69,7 +69,7 @@ impl Builder {
     }
 
     /// If length is set to [`Integer::Fixed`], specify the width of the length.
-    #[inline(always)]
+    #[inline]
     pub const fn with_length_width(self, width: Width) -> Self {
         const MASK: Options = 0b11 << LENGTH_WIDTH_BIT;
         let this = self.with_length(Integer::Fixed);
@@ -77,7 +77,7 @@ impl Builder {
     }
 
     /// Build a flavor.
-    #[inline(always)]
+    #[inline]
     pub const fn build(self) -> Options {
         self.0
     }
@@ -90,7 +90,7 @@ impl Builder {
     feature = "json",
     feature = "value"
 ))]
-#[inline(always)]
+#[inline]
 pub(crate) const fn integer<const OPT: Options>() -> Integer {
     match (OPT >> INTEGER_BIT) & 0b1 {
         0 => Integer::Variable,
@@ -99,7 +99,7 @@ pub(crate) const fn integer<const OPT: Options>() -> Integer {
 }
 
 #[cfg(test)]
-#[inline(always)]
+#[inline]
 pub(crate) const fn float<const OPT: Options>() -> Float {
     match (OPT >> FLOAT_BIT) & 0b11 {
         0 => Float::Integer,
@@ -115,7 +115,7 @@ pub(crate) const fn float<const OPT: Options>() -> Float {
     feature = "json",
     feature = "value"
 ))]
-#[inline(always)]
+#[inline]
 pub(crate) const fn length<const OPT: Options>() -> Integer {
     match (OPT >> LENGTH_BIT) & 0b1 {
         0 => Integer::Variable,
@@ -130,7 +130,7 @@ pub(crate) const fn length<const OPT: Options>() -> Integer {
     feature = "json",
     feature = "value"
 ))]
-#[inline(always)]
+#[inline]
 pub(crate) const fn length_width<const OPT: Options>() -> Width {
     match (OPT >> LENGTH_WIDTH_BIT) & 0b11 {
         0 => Width::U64,
@@ -147,7 +147,7 @@ pub(crate) const fn length_width<const OPT: Options>() -> Width {
     feature = "json",
     feature = "value"
 ))]
-#[inline(always)]
+#[inline]
 pub(crate) const fn byteorder<const OPT: Options>() -> ByteOrder {
     match (OPT >> BYTEORDER_BIT) & 0b1 {
         0 => ByteOrder::Little,
@@ -156,7 +156,7 @@ pub(crate) const fn byteorder<const OPT: Options>() -> ByteOrder {
 }
 
 #[cfg(all(feature = "alloc", feature = "value"))]
-#[inline(always)]
+#[inline]
 pub(crate) const fn is_map_keys_as_numbers<const OPT: Options>() -> bool {
     ((OPT >> MAP_KEYS_AS_NUMBERS_BIT) & 0b1) == 1
 }

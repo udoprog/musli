@@ -18,7 +18,7 @@ pub(crate) fn abort(s: &'static str) -> ! {
 
     // A panic during an unwinding drop leads to an abort.
     impl Drop for Abort {
-        #[inline(always)]
+        #[inline]
         fn drop(&mut self) {
             panic!()
         }
