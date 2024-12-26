@@ -32,7 +32,7 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
         where
             W: $crate::Writer,
@@ -71,7 +71,7 @@ macro_rules! bare_encoding {
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-        #[inline]
+        #[inline(always)]
         pub fn to_vec<T>(value: &T) -> Result<rust_alloc::vec::Vec<u8>, Error>
         where
             T: ?Sized + $crate::Encode<crate::mode::$mode>,
@@ -103,7 +103,7 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<$crate::FixedBytes<N>, Error>
         where
             T: ?Sized + $crate::Encode<crate::mode::$mode>,
@@ -143,7 +143,7 @@ macro_rules! bare_encoding {
         /// ```
         #[cfg(feature = "std")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
-        #[inline]
+        #[inline(always)]
         pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
         where
             W: std::io::Write,
@@ -187,7 +187,7 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
         where
             R: $reader_trait<'de>,
@@ -222,7 +222,7 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
         where
             T: $crate::Decode<'de, $mode>,
@@ -269,7 +269,7 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), Error>
         where
             W: $crate::Writer,
@@ -312,7 +312,7 @@ macro_rules! encoding_impls {
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-        #[inline]
+        #[inline(always)]
         pub fn to_vec<T>(self, value: &T) -> Result<rust_alloc::vec::Vec<u8>, Error>
         where
             T: ?Sized + $crate::Encode<$mode>,
@@ -350,7 +350,7 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn to_fixed_bytes<const N: usize, T>(
             self,
             value: &T,
@@ -397,7 +397,7 @@ macro_rules! encoding_impls {
         /// # Ok::<(), Error>(())
         /// ```
         #[cfg(feature = "std")]
-        #[inline]
+        #[inline(always)]
         pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), Error>
         where
             W: std::io::Write,
@@ -444,7 +444,7 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn decode<'de, R, T>(self, reader: R) -> Result<T, Error>
         where
             R: $reader_trait<'de>,
@@ -484,7 +484,7 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
         where
             T: $crate::Decode<'de, $mode>,
@@ -500,7 +500,7 @@ macro_rules! encoding_impls {
         ///
         /// This is an alias over [`Encoding::from_slice`] for convenience. See
         /// its documentation for more.
-        #[inline]
+        #[inline(always)]
         pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, Error>
         where
             T: $crate::Decode<'de, M>,
@@ -548,7 +548,7 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
@@ -598,7 +598,7 @@ macro_rules! encoding_impls {
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-        #[inline]
+        #[inline(always)]
         pub fn to_vec_with<C, T>(
             self,
             cx: &C,
@@ -645,7 +645,7 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn to_fixed_bytes_with<C, const N: usize, T>(
             self,
             cx: &C,
@@ -697,7 +697,7 @@ macro_rules! encoding_impls {
         /// # Ok::<(), Error>(())
         /// ```
         #[cfg(feature = "std")]
-        #[inline]
+        #[inline(always)]
         pub fn to_writer_with<C, W, T>(self, cx: &C, write: W, value: &T) -> Result<(), C::Error>
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
@@ -747,7 +747,7 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn decode_with<'de, C, R, T>(self, cx: &C, reader: R) -> Result<T, C::Error>
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
@@ -796,7 +796,7 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[inline]
+        #[inline(always)]
         pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
@@ -815,7 +815,7 @@ macro_rules! encoding_impls {
         /// See its documentation for more.
         ///
         /// [`Context`]: crate::Context
-        #[inline]
+        #[inline(always)]
         pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
         where
             C: ?Sized + $crate::Context<Mode = M>,
