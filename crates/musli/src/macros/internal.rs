@@ -41,6 +41,45 @@ macro_rules! bare_encoding {
             $default.encode(writer, value)
         }
 
+        /// Encode the given value to the given slice using the [`DEFAULT`]
+        /// [`Encoding`] and return the number of bytes encoded.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        #[doc = concat!("use musli::", stringify!($what), ";")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let mut data = Vec::new();
+        /// data.resize(128, 0);
+        ///
+        #[doc = concat!("let w = ", stringify!($what), "::to_slice(&mut data[..], &Person {")]
+        ///     name: "Aristotle".to_string(),
+        ///     age: 61,
+        /// })?;
+        ///
+        /// assert!(w > 0);
+        ///
+        #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..w])?;")]
+        /// assert_eq!(person.name, "Aristotle");
+        /// assert_eq!(person.age, 61);
+        /// # Ok::<(), Error>(())
+        /// ```
+        #[inline]
+        pub fn to_slice<T>(out: &mut [u8], value: &T) -> Result<usize, Error>
+        where
+            T: ?Sized + $crate::Encode<crate::mode::$mode>,
+        {
+            $default.to_slice(out, value)
+        }
+
         /// Encode the given value to a [`Vec`] using the [`DEFAULT`]
         /// [`Encoding`].
         ///
@@ -278,6 +317,52 @@ macro_rules! encoding_impls {
             $crate::alloc::default!(|alloc| {
                 let cx = $crate::context::Same::with_alloc(alloc);
                 self.encode_with(&cx, writer, value)
+            })
+        }
+
+        /// Encode the given value to the given slice using the current
+        /// [`Encoding`] and return the number of bytes encoded.
+        ///
+        /// [`Writer`]: crate::Writer
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let mut data = Vec::new();
+        /// data.resize(128, 0);
+        ///
+        /// let w = ENCODING.to_slice(&mut data, &Person {
+        ///     name: "Aristotle".to_string(),
+        ///     age: 61,
+        /// })?;
+        ///
+        /// assert!(w > 0);
+        ///
+        /// let person: Person = ENCODING.from_slice(&data[..w])?;
+        /// assert_eq!(person.name, "Aristotle");
+        /// assert_eq!(person.age, 61);
+        /// # Ok::<(), Error>(())
+        /// ```
+        #[inline]
+        pub fn to_slice<T>(self, out: &mut [u8], value: &T) -> Result<usize, Error>
+        where
+            T: ?Sized + $crate::Encode<$mode>,
+        {
+            $crate::alloc::default!(|alloc| {
+                let cx = $crate::context::Same::with_alloc(alloc);
+                self.to_slice_with(&cx, out, value)
             })
         }
 
@@ -557,6 +642,64 @@ macro_rules! encoding_impls {
         {
             cx.clear();
             T::encode(value, cx, $encoder_new(cx, writer))
+        }
+
+        /// Encode the given value to the given slice using the current
+        /// [`Encoding`] and return the number of bytes encoded.
+        ///
+        /// This is the same as [`Encoding::to_slice`] but allows for using a
+        /// configurable [`Context`].
+        ///
+        /// [`Context`]: crate::Context
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        /// use musli::alloc::System;
+        /// use musli::context::Same;
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let cx = Same::new();
+        ///
+        /// let mut data = Vec::new();
+        /// data.resize(128, 0);
+        ///
+        /// let w = ENCODING.to_slice_with(&cx, &mut data[..], &Person {
+        ///     name: "Aristotle".to_string(),
+        ///     age: 61,
+        /// })?;
+        ///
+        /// assert!(w > 0);
+        ///
+        /// let person: Person = ENCODING.from_slice_with(&cx, &data[..w])?;
+        /// assert_eq!(person.name, "Aristotle");
+        /// assert_eq!(person.age, 61);
+        /// # Ok::<(), Error>(())
+        /// ```
+        #[inline]
+        pub fn to_slice_with<C, T>(
+            self,
+            cx: &C,
+            mut out: &mut [u8],
+            value: &T,
+        ) -> Result<usize, C::Error>
+        where
+            C: ?Sized + $crate::Context<Mode = $mode>,
+            T: ?Sized + $crate::Encode<C::Mode>,
+        {
+            let len = out.len();
+            self.encode_with(cx, &mut out, value)?;
+            Ok(len - out.len())
         }
 
         /// Encode the given value to a [`Vec`] using the current [`Encoding`].
