@@ -65,9 +65,28 @@ fn criterion_benchmark(c: &mut Criterion) {
                     {
                         let mut state = framework.state();
                         state.reset($size_hint, value);
-                        let mut out = state.encode(value).expect("encoding should success");
 
-                        let actual = out.decode::<$ty>().expect("decoding should succeed");
+                        let mut out = match state.encode(value) {
+                            Ok(out) => out,
+                            Err(error) => {
+                                panic! {
+                                    "{} / {}: encoding of value[{index}] failed: {error:?}",
+                                    stringify!($framework),
+                                    stringify!($name)
+                                };
+                            }
+                        };
+
+                        let actual = match out.decode::<$ty>() {
+                            Ok(actual) => actual,
+                            Err(error) => {
+                                panic! {
+                                    "{} / {}: decoding of value[{index}] failed: {error:?}",
+                                    stringify!($framework),
+                                    stringify!($name)
+                                };
+                            }
+                        };
 
                         #[cfg(not(feature = "no-binary-equality"))]
                         assert_eq!(
