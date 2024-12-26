@@ -7,15 +7,19 @@ Helper project to disassemble serialization.
 """
 
 [features]
-default = ["musli-zerocopy", "zerocopy"]
+default = []
 musli-zerocopy = ["dep:musli-zerocopy", "tests/musli-zerocopy"]
 zerocopy = ["dep:zerocopy", "tests/zerocopy"]
+speedy = ["dep:speedy", "tests/speedy"]
+musli = ["dep:musli", "tests/musli"]
 
 no-nonunit-variant = []
 no-empty = []
 
 [dependencies]
-tests = { path = "../tests", default-features = false, features = ["std"] }
+tests = { path = "../tests", default-features = false, features = ["alloc", "std"] }
 
 musli-zerocopy = { path = "../crates/musli-zerocopy", optional = true }
+musli = { path = "../crates/musli", optional = true, features = ["storage"] }
+speedy = { version = "0.8.7", optional = true }
 zerocopy = { version = "0.8.13", default-features = false, optional = true, features = ["derive"] }

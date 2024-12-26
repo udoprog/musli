@@ -185,3 +185,95 @@ pub mod generic {
         en
     }
 }
+
+#[cfg(feature = "musli")]
+pub mod musli {
+    use musli::options::{self, Float, Integer, Options};
+    use musli::storage::{Encoding, Error};
+    use musli::{Decode, Encode};
+
+    use tests::models::Primitives;
+    use tests::Packed;
+
+    pub fn encode_primitives<'buf>(
+        buffer: &'buf mut Vec<u8>,
+        value: &Primitives,
+    ) -> Result<&'buf [u8], Error> {
+        encode::<Primitives>(buffer, value)
+    }
+
+    pub fn decode_primitives<'buf>(buf: &'buf [u8]) -> Result<Primitives, Error> {
+        decode::<Primitives>(buf)
+    }
+
+    const OPTIONS: Options = options::new()
+        .with_length(Integer::Fixed)
+        .with_integer(Integer::Fixed)
+        .with_float(Float::Fixed)
+        .build();
+
+    const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: Encode<Packed>,
+    {
+        ENCODING.encode(&mut *buf, value)?;
+        Ok(buf)
+    }
+
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
+    where
+        T: Decode<'buf, Packed>,
+    {
+        ENCODING.from_slice(buf)
+    }
+}
+
+#[cfg(feature = "speedy")]
+pub mod speedy {
+    use speedy::{Readable, Writable};
+    use tests::models::Primitives;
+
+    pub fn encode_primitives<'buf>(
+        buffer: &'buf mut Vec<u8>,
+        value: &Primitives,
+    ) -> Result<&'buf [u8], speedy::Error> {
+        encode::<Primitives>(buffer, value)
+    }
+
+    pub fn decode_primitives<'buf>(buf: &'buf [u8]) -> Result<Primitives, speedy::Error> {
+        decode::<Primitives>(buf)
+    }
+
+    #[inline(always)]
+    pub fn encode<'buf, T>(
+        buffer: &'buf mut Vec<u8>,
+        value: &T,
+    ) -> Result<&'buf [u8], speedy::Error>
+    where
+        T: Writable<speedy::LittleEndian>,
+    {
+        let len = value.bytes_needed()?;
+        // See https://github.com/koute/speedy/issues/78
+        buffer.resize(len, 0);
+        value.write_to_buffer(buffer.as_mut_slice())?;
+        Ok(buffer.as_slice())
+    }
+
+    #[inline(always)]
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, speedy::Error>
+    where
+        T: Readable<'buf, speedy::LittleEndian>,
+    {
+        T::read_from_buffer(buf)
+    }
+}
