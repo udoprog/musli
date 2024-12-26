@@ -55,6 +55,7 @@ miri! {
     feature = "miniserde",
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
+#[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 pub struct PrimitivesPacked {
     unsigned8: u8,
     #[cfg_attr(feature = "musli", musli(bytes))]
@@ -113,6 +114,7 @@ impl PartialEq<PrimitivesPacked> for &PrimitivesPacked {
     feature = "miniserde",
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
+#[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 pub struct Primitives {
     boolean: bool,
     #[cfg(not(feature = "no-char"))]
@@ -168,6 +170,7 @@ impl PartialEq<Primitives> for &Primitives {
     feature = "miniserde",
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
+#[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 pub struct Allocated {
     #[cfg(feature = "alloc")]
     string: String,
@@ -239,6 +242,7 @@ impl PartialEq<Allocated> for &Allocated {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(feature = "musli", musli(mode = Packed, packed))]
+#[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 pub struct Tuples {
     u0: (),
     u1: (bool,),
@@ -282,6 +286,7 @@ impl PartialEq<Tuples> for &Tuples {
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[cfg(any(not(feature = "no-empty"), not(feature = "no-nonunit-variant")))]
+#[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 pub enum MediumEnum {
     #[cfg(not(feature = "no-empty"))]
     Empty,
@@ -344,6 +349,7 @@ impl PartialEq<MediumEnum> for &MediumEnum {
     feature = "miniserde",
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
+#[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 pub struct LargeStruct {
     #[generate(range = PRIMITIVES_RANGE)]
     #[cfg(feature = "alloc")]

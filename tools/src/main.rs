@@ -254,7 +254,9 @@ fn main() -> Result<()> {
             for bins in &bins {
                 println!("Building: {}", bins.report.title);
 
-                match build_report(&a, bins, a.bench, a.filter.as_deref()) {
+                let run_bench = a.bench || !bins.paths.criterion_output.is_dir();
+
+                match build_report(&a, bins, run_bench, a.filter.as_deref()) {
                     Ok(group_plots) => {
                         built_reports.push((bins, group_plots));
                     }

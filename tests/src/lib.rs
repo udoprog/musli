@@ -78,6 +78,8 @@ macro_rules! feature_matrix {
         $call!(bson $(, $($tt)*)*);
         #[cfg(feature = "miniserde")]
         $call!(miniserde $(, $($tt)*)*);
+        #[cfg(feature = "speedy")]
+        $call!(speedy $(, $($tt)*)*);
     };
 }
 

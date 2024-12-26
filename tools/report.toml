@@ -117,6 +117,26 @@ expected = [
 ]
 
 [[reports]]
+id = "speedy"
+title = "Features for speedy"
+link = "speedy"
+description = [
+    "This is a suite for speedy, which doesn't support `isize`.",
+]
+features = [
+    "musli-wire",
+    "musli-descriptive",
+    "musli-storage",
+    "musli-value",
+    "speedy",
+]
+expected = [
+    "musli",
+    "no-usize",
+    "no-cstring",
+]
+
+[[reports]]
 id = "zerocopy-rkyv"
 title = "Müsli vs rkyv"
 link = "müsli-vs-rkyv"
@@ -127,7 +147,7 @@ description = [
 ]
 features = ["musli-zerocopy", "rkyv"]
 expected = [
-    "no-cstring", "no-map", "no-set", "no-tuple", "no-usize"
+    "no-cstring", "no-map", "no-set", "no-tuple", "no-usize",
 ]
 only = ["primitives", "primpacked"]
 
