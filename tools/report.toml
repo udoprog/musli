@@ -119,10 +119,10 @@ expected = [
 
 [[reports]]
 id = "speedy"
-title = "Features for speedy"
+title = "Speedy"
 link = "speedy"
 description = [
-    "This is a suite for speedy, which doesn't support `isize`.",
+    "This is a test suite for speedy features.",
 ]
 features = [
     "musli-wire",
