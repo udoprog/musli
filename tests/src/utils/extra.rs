@@ -197,7 +197,7 @@ pub mod miniserde {
 #[crate::benchmarker]
 pub mod speedy {
     use alloc::vec::Vec;
-    use speedy::{Readable, Writable};
+    use speedy::{Error, LittleEndian, Readable, Writable};
 
     pub fn buffer() -> Vec<u8> {
         Vec::with_capacity(4096)
@@ -210,9 +210,9 @@ pub mod speedy {
     pub fn encode<'buf, T>(
         buffer: &'buf mut Vec<u8>,
         value: &T,
-    ) -> Result<&'buf [u8], speedy::Error>
+    ) -> Result<&'buf [u8], Error>
     where
-        T: Writable<speedy::LittleEndian>,
+        T: Writable<LittleEndian>,
     {
         let len = value.bytes_needed()?;
         // See https://github.com/koute/speedy/issues/78
@@ -221,9 +221,9 @@ pub mod speedy {
         Ok(buffer.as_slice())
     }
 
-    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, speedy::Error>
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Readable<'buf, speedy::LittleEndian>,
+        T: Readable<'buf, LittleEndian>,
     {
         T::read_from_buffer(buf)
     }

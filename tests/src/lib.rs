@@ -29,6 +29,7 @@ pub mod generate;
 #[doc(inline)]
 pub use self::generate::{Generate, Rng};
 mod mode;
+pub use self::mode::Packed;
 pub mod models;
 pub mod utils;
 

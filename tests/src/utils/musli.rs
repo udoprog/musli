@@ -39,7 +39,6 @@ pub mod musli_json {
 pub mod musli_storage_packed {
     use alloc::vec::Vec;
 
-    use musli::context::Same;
     use musli::options::{self, Float, Integer, Options};
     use musli::storage::{Encoding, Error};
     use musli::{Decode, Encode};
