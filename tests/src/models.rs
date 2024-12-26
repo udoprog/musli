@@ -75,7 +75,7 @@ pub struct PrimitivesPacked {
     signed128: i128,
     #[cfg(not(feature = "no-usize"))]
     unsignedsize: usize,
-    #[cfg(not(feature = "no-usize"))]
+    #[cfg(not(feature = "no-isize"))]
     signedsize: isize,
     float32: f32,
     #[cfg_attr(feature = "musli", musli(bytes))]
@@ -133,7 +133,7 @@ pub struct Primitives {
     signed128: i128,
     #[cfg(not(feature = "no-usize"))]
     unsignedsize: usize,
-    #[cfg(not(feature = "no-usize"))]
+    #[cfg(not(feature = "no-isize"))]
     signedsize: isize,
     #[cfg(not(feature = "no-float"))]
     float32: f32,
