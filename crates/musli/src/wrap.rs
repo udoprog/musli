@@ -3,9 +3,9 @@
 //! The main methods in this module is the [`wrap`] function which constructs an
 //! adapter around an I/O type to work with musli.
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "alloc", feature = "std"))]
 use crate::alloc::Vec;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "alloc", feature = "std"))]
 use crate::Context;
 
 /// Wrap a type so that it implements [`Reader`] and [`Writer`].
@@ -15,7 +15,7 @@ use crate::Context;
 /// [`Reader`]: crate::reader::Reader
 /// [`Writer`]: crate::writer::Writer
 pub struct Wrap<T> {
-    #[cfg_attr(not(feature = "std"), allow(unused))]
+    #[cfg_attr(not(any(feature = "alloc", feature = "std")), allow(unused))]
     inner: T,
 }
 
@@ -71,7 +71,6 @@ where
     where
         C: ?Sized + Context,
     {
-        // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
     }
 
@@ -81,6 +80,34 @@ where
         C: ?Sized + Context,
     {
         self.inner.write_all(bytes).map_err(cx.map())?;
+        cx.advance(bytes.len());
+        Ok(())
+    }
+}
+
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+impl crate::writer::Writer for Wrap<&mut rust_alloc::vec::Vec<u8>> {
+    type Mut<'this> = &'this mut Self where Self: 'this;
+
+    #[inline]
+    fn borrow_mut(&mut self) -> Self::Mut<'_> {
+        self
+    }
+
+    #[inline]
+    fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        self.write_bytes(cx, buffer.as_slice())
+    }
+
+    #[inline]
+    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        self.inner.extend_from_slice(bytes);
         cx.advance(bytes.len());
         Ok(())
     }

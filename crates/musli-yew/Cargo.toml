@@ -1,0 +1,29 @@
+[package]
+name = "musli-yew"
+version = "0.0.124"
+authors = ["John-John Tedro <udoprog@tedro.se>"]
+edition = "2021"
+description = """
+Types for integrating Müsli with yew.
+"""
+documentation = "https://docs.rs/musli"
+readme = "README.md"
+homepage = "https://github.com/udoprog/musli"
+repository = "https://github.com/udoprog/musli"
+license = "MIT OR Apache-2.0"
+keywords = ["javascript", "web", "webasm"]
+categories = ["gui", "wasm", "web-programming"]
+
+[features]
+default = ["log"]
+log = ["dep:log"]
+
+[dependencies]
+musli = { version = "0.0.124", path = "../musli", default-features = false, features = ["api", "alloc"] }
+
+log = { version = "0.4.21", optional = true }
+slab = "0.4.9"
+wasm-bindgen = "0.2.92"
+web-sys = { version = "0.3.69", features = ["WebSocket", "MessageEvent", "Performance"] }
+yew = "0.21.0"
+gloo = { version = "0.11.0", features = ["timers"], default-features = false }

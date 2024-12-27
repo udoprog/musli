@@ -592,5 +592,8 @@ pub use self::writer::{IntoWriter, Writer};
 
 pub mod no_std;
 
+#[cfg(feature = "api")]
+pub mod api;
+
 mod int;
 mod str;
