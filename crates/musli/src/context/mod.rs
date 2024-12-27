@@ -43,12 +43,13 @@ use crate::alloc::System;
 /// ```
 /// use musli::context;
 ///
-/// musli::alloc::default!(|alloc| {
+/// musli::alloc::default(|alloc| {
 ///     let cx = context::with_alloc(alloc);
 ///     let encoding = musli::json::Encoding::new();
 ///     let string = encoding.to_string_with(&cx, &42)?;
 ///     assert_eq!(string, "42");
-/// });
+///     Ok(())
+/// })?;
 /// # Ok::<(), musli::context::ErrorMarker>(())
 /// ```
 ///
@@ -84,12 +85,13 @@ where
 /// ```
 /// use musli::context;
 ///
-/// musli::alloc::default!(|alloc| {
+/// musli::alloc::default(|alloc| {
 ///     let cx = context::new();
 ///     let encoding = musli::json::Encoding::new();
 ///     let string = encoding.to_string_with(&cx, &42)?;
 ///     assert_eq!(string, "42");
-/// });
+///     Ok(())
+/// })?;
 /// # Ok::<(), musli::context::ErrorMarker>(())
 /// ```
 #[cfg(feature = "alloc")]

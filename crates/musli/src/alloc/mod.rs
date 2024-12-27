@@ -17,7 +17,7 @@
 //! ```
 //! use musli::alloc::Vec;
 //!
-//! musli::alloc::default!(|alloc| {
+//! musli::alloc::default(|alloc| {
 //!     let mut a = Vec::new_in(alloc);
 //!     let mut b = Vec::new_in(alloc);
 //!
@@ -77,6 +77,9 @@
 #[cfg(test)]
 mod tests;
 
+mod default;
+use self::default::{DefaultAllocator, DEFAULT_ARRAY_BUFFER};
+
 #[doc(inline)]
 pub use musli_core::alloc::{Allocator, RawVec};
 
@@ -118,33 +121,25 @@ mod vec;
 #[doc(inline)]
 pub use self::vec::Vec;
 
-/// The default stack buffer size for the default allocator provided through
-/// [`default!`].
-pub const DEFAULT_ARRAY_BUFFER: usize = 4096;
-
-#[macro_export]
-#[doc(hidden)]
-macro_rules! __default {
-    (|$alloc:ident| $body:block) => {
-        $crate::alloc::__default_allocator_impl!(|$alloc| $body)
-    };
-}
-
-/// Call the given block `$body` with the default allocator.
+/// Call the given block `body` with an instance of the [`DefaultAllocator`].
 ///
 /// This is useful if you want to write application which are agnostic to
 /// whether the `alloc` feature is or isn't enabled.
 ///
 /// * If the `alloc` feature is enabled, this is the [`System`] allocator.
 /// * If the `alloc` feature is disabled, this is the [`Slice`] allocator with
-///   [`DEFAULT_ARRAY_BUFFER`] bytes allocated on the stack.
+///   [`DEFAULT_ARRAY_BUFFER`] bytes allocated on the stack. The second
+///   parameters allows for this to be tweaked.
+///
+/// Note that the [`DEFAULT_ARRAY_BUFFER`] parameter is always present since it
+/// is necessary to make the type generic over all default allocators.
 ///
 /// # Examples
 ///
 /// ```
 /// use musli::alloc::Vec;
 ///
-/// musli::alloc::default!(|alloc| {
+/// musli::alloc::default(|alloc| {
 ///     let mut a = Vec::new_in(alloc);
 ///     let mut b = Vec::new_in(alloc);
 ///
@@ -167,30 +162,65 @@ macro_rules! __default {
 ///     assert_eq!(a.len(), 12);
 /// });
 /// ```
-#[doc(inline)]
-pub use __default as default;
+#[inline]
+pub fn default<O>(body: impl FnOnce(&DefaultAllocator<'_, DEFAULT_ARRAY_BUFFER>) -> O) -> O {
+    default_allocator_impl::<DEFAULT_ARRAY_BUFFER, O>(body)
+}
+
+/// Same as [`default`] but allows for specifying a default static buffer size
+/// other than [`DEFAULT_ARRAY_BUFFER`].
+///
+/// See [`default`] for more information.
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::Vec;
+///
+/// musli::alloc::with_buffer::<128, _>(|alloc| {
+///     let mut a = Vec::new_in(alloc);
+///     let mut b = Vec::new_in(alloc);
+///
+///     b.write(b"He11o");
+///     a.write(b.as_slice());
+///
+///     assert_eq!(a.as_slice(), b"He11o");
+///     assert_eq!(a.len(), 5);
+///
+///     a.write(b" W0rld");
+///
+///     assert_eq!(a.as_slice(), b"He11o W0rld");
+///     assert_eq!(a.len(), 11);
+///
+///     let mut c = Vec::new_in(alloc);
+///     c.write(b"!");
+///     a.write(c.as_slice());
+///
+///     assert_eq!(a.as_slice(), b"He11o W0rld!");
+///     assert_eq!(a.len(), 12);
+/// });
+/// ```
+#[inline]
+pub fn with_buffer<const BUF: usize, O>(body: impl FnOnce(&DefaultAllocator<'_, BUF>) -> O) -> O {
+    default_allocator_impl::<BUF, O>(body)
+}
 
 #[cfg(feature = "alloc")]
-#[macro_export]
-#[doc(hidden)]
-macro_rules! __default_allocator_impl {
-    (|$alloc:ident| $body:block) => {{
-        let $alloc = $crate::alloc::system();
-        $body
-    }};
+#[inline(always)]
+fn default_allocator_impl<const BUF: usize, O>(
+    body: impl FnOnce(&DefaultAllocator<'_, BUF>) -> O,
+) -> O {
+    let alloc = DefaultAllocator::new(crate::alloc::system());
+    body(alloc)
 }
 
 #[cfg(not(feature = "alloc"))]
-#[macro_export]
-#[doc(hidden)]
-macro_rules! __default_allocator_impl {
-    (|$alloc:ident| $body:block) => {{
-        let mut __buf =
-            $crate::alloc::ArrayBuffer::<{ $crate::alloc::DEFAULT_ARRAY_BUFFER }>::new();
-        let $alloc = $crate::alloc::Slice::new(&mut __buf);
-        $body
-    }};
+#[inline(always)]
+fn default_allocator_impl<const BUF: usize, O>(
+    body: impl FnOnce(&DefaultAllocator<'_, BUF>) -> O,
+) -> O {
+    let mut buf = crate::alloc::ArrayBuffer::<BUF>::with_size();
+    let slice = crate::alloc::Slice::new(&mut buf);
+    let alloc = DefaultAllocator::new(&slice);
+    body(alloc)
 }
-
-#[doc(hidden)]
-pub use __default_allocator_impl;

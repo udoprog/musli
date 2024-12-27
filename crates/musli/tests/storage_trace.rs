@@ -30,7 +30,7 @@ struct To {
 
 #[test]
 fn storage_trace() {
-    musli::alloc::default!(|alloc| {
+    musli::alloc::default(|alloc| {
         let cx = context::with_alloc(alloc);
 
         let from = From {

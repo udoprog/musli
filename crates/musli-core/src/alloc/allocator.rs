@@ -18,7 +18,7 @@ pub trait Allocator {
     ///
     /// let values: [u32; 4] = [1, 2, 3, 4];
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut buf = alloc.new_raw_vec::<u32>();
     ///     let mut len = 0;
     ///

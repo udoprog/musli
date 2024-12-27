@@ -10,7 +10,7 @@ use crate::mode::Binary;
 
 #[test]
 fn test_decode_exponent() {
-    crate::alloc::default!(|alloc| {
+    crate::alloc::default(|alloc| {
         let cx = context::Same::<Binary, Error, _>::with_alloc(alloc);
 
         macro_rules! test_number {
@@ -47,7 +47,7 @@ fn test_decode_exponent() {
 
 #[test]
 fn test_decode_unsigned() {
-    crate::alloc::default!(|alloc| {
+    crate::alloc::default(|alloc| {
         let cx = context::Same::<Binary, Error, _>::with_alloc(alloc);
 
         macro_rules! test_number {
@@ -115,7 +115,7 @@ fn test_decode_unsigned() {
 
 #[test]
 fn test_decode_signed() {
-    crate::alloc::default!(|alloc| {
+    crate::alloc::default(|alloc| {
         let cx = context::Same::<Binary, Error, _>::with_alloc(alloc);
 
         macro_rules! test_number {
