@@ -44,7 +44,7 @@ macro_rules! test_fns {
                 }
             }
 
-            $crate::alloc::default!(|alloc| {
+            $crate::alloc::default(|alloc| {
                 let mut cx = $crate::context::with_alloc(alloc);
                 cx.include_type();
 
@@ -130,7 +130,7 @@ macro_rules! test_fns {
                 }
             }
 
-            $crate::alloc::default!(|alloc| {
+            $crate::alloc::default(|alloc| {
                 let mut cx = $crate::context::with_alloc(alloc);
                 cx.include_type();
 
@@ -178,7 +178,7 @@ macro_rules! test_fns {
 
             use ::core::any::type_name;
 
-            $crate::alloc::default!(|alloc| {
+            $crate::alloc::default(|alloc| {
                 let mut cx = $crate::context::with_alloc(alloc);
                 cx.include_type();
 

@@ -34,7 +34,7 @@ where
     /// ```
     /// use musli::alloc::Vec;
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///
     ///     a.push(String::from("Hello"));
@@ -63,7 +63,7 @@ where
     /// ```
     /// use musli::alloc::Vec;
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///
     ///     assert_eq!(a.len(), 0);
@@ -82,7 +82,7 @@ where
     /// ```
     /// use musli::alloc::Vec;
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///
     ///     assert!(a.is_empty());
@@ -105,7 +105,7 @@ where
     /// ```
     /// use musli::alloc::Vec;
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///
     ///     a.push(b'H');
@@ -141,7 +141,7 @@ where
     /// ```
     /// use musli::alloc::Vec;
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///
     ///     a.push(String::from("foo"));
@@ -172,7 +172,7 @@ where
     /// ```
     /// use musli::alloc::Vec;
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///
     ///     a.push(b'H');
@@ -199,7 +199,7 @@ where
     /// ```
     /// use musli::alloc::Vec;
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///     assert_eq!(a.as_slice(), b"");
     ///     a.write(b"Hello");
@@ -238,7 +238,7 @@ where
     /// ```
     /// use musli::alloc::Vec;
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///     assert_eq!(a.len(), 0);
     ///     a.write(b"Hello");
@@ -272,7 +272,7 @@ where
     /// ```
     /// use musli::alloc::Vec;
     ///
-    /// musli::alloc::default!(|alloc| {
+    /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///     let mut b = Vec::new_in(alloc);
     ///
@@ -307,14 +307,15 @@ where
 ///
 /// use musli::alloc::Vec;
 ///
-/// musli::alloc::default!(|alloc| {
+/// musli::alloc::default(|alloc| {
 ///     let mut a = Vec::new_in(alloc);
 ///     let world = "World";
 ///
 ///     write!(a, "Hello {world}")?;
 ///
 ///     assert_eq!(a.as_slice(), b"Hello World");
-/// });
+///     Ok(())
+/// })?;
 /// # Ok::<(), core::fmt::Error>(())
 /// ```
 impl<'a, A> fmt::Write for Vec<'a, u8, A>

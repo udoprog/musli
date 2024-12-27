@@ -19,7 +19,7 @@ struct Collection {
 
 #[test]
 fn trace_collection() {
-    musli::alloc::default!(|alloc| {
+    musli::alloc::default(|alloc| {
         let cx = context::with_alloc(alloc);
 
         let mut values = HashMap::new();

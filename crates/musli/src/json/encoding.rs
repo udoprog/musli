@@ -215,7 +215,7 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        crate::alloc::default!(|alloc| {
+        crate::alloc::default(|alloc| {
             let cx = crate::context::Same::with_alloc(alloc);
             self.to_string_with(&cx, value)
         })

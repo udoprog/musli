@@ -16,7 +16,7 @@ const ITER: usize = 100;
 
 #[test]
 fn basic_continuation() {
-    crate::alloc::default!(|alloc| {
+    crate::alloc::default(|alloc| {
         let cx = context::Ignore::with_marker(&alloc);
         let mut bytes = FixedBytes::<8>::new();
         c::encode(&cx, &mut bytes, 5000u32).unwrap();
@@ -36,7 +36,7 @@ fn test_continuation_encoding() {
     where
         T: PartialEq<T> + fmt::Debug + Unsigned,
     {
-        crate::alloc::default!(|alloc| {
+        crate::alloc::default(|alloc| {
             let mut out = Vec::new();
             let cx = crate::context::Ignore::with_marker(&alloc);
             c::encode(&cx, &mut out, expected).unwrap();
@@ -55,7 +55,7 @@ fn test_continuation_encoding() {
     where
         T: Unsigned,
     {
-        crate::alloc::default!(|alloc| {
+        crate::alloc::default(|alloc| {
             let mut out = Vec::new();
             let cx = crate::context::Same::with_marker(&alloc);
             c::encode(&cx, crate::wrap::wrap(&mut out), value).unwrap();
