@@ -68,6 +68,9 @@ pub struct SystemBuf<T> {
     size: usize,
 }
 
+unsafe impl<T> Send for SystemBuf<T> where T: Send {}
+unsafe impl<T> Sync for SystemBuf<T> where T: Sync {}
+
 impl<T> RawVec<T> for SystemBuf<T> {
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {

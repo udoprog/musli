@@ -3,12 +3,15 @@
 
 use core::marker;
 
+#[cfg(feature = "alloc")]
+use crate::alloc::System;
 use crate::mode::Binary;
 use crate::options;
-use crate::{IntoReader, IntoWriter, Options};
+use crate::{Context, Decode, Encode, IntoReader, IntoWriter, Options};
 
 use super::de::SelfDecoder;
 use super::en::SelfEncoder;
+#[cfg(feature = "alloc")]
 use super::error::Error;
 
 /// The default flavor used by the [`DEFAULT`] configuration.

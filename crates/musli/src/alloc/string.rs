@@ -3,9 +3,8 @@ use core::ops::Deref;
 use core::str;
 
 use crate::fixed::CapacityError;
-use crate::Context;
 
-use super::{Allocator, Vec};
+use super::{AllocError, Allocator, Vec};
 
 /// Wrapper around a buffer that is guaranteed to be a valid utf-8 string.
 pub struct String<A>
@@ -15,21 +14,24 @@ where
     buf: Vec<u8, A>,
 }
 
+#[cfg(feature = "alloc")]
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<String<crate::alloc::System>>();
+};
+
 /// Collect a string into a string buffer.
-pub(crate) fn collect_string<'cx, C, T>(
-    cx: &'cx C,
-    value: &T,
-) -> Result<String<C::Allocator>, C::Error>
+pub(crate) fn collect_string<A, T>(alloc: A, value: T) -> Result<String<A>, AllocError>
 where
-    C: 'cx + ?Sized + Context,
-    T: ?Sized + fmt::Display,
+    A: Allocator,
+    T: fmt::Display,
 {
     use core::fmt::Write;
 
-    let mut string = String::new_in(cx.alloc());
+    let mut string = String::new_in(alloc);
 
     if write!(string, "{value}").is_err() {
-        return Err(cx.message("Failed to write to string"));
+        return Err(AllocError);
     }
 
     Ok(string)

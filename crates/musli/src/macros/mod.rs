@@ -13,7 +13,7 @@ mod internal;
     feature = "descriptive",
     feature = "value"
 ))]
-pub(crate) use self::internal::{bare_encoding, encoding_impls};
+pub(crate) use self::internal::{bare_encoding, encoding_impls, implement_error};
 
 #[cfg(all(
     feature = "test",

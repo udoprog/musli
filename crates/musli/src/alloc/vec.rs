@@ -16,6 +16,12 @@ where
     len: usize,
 }
 
+#[cfg(feature = "alloc")]
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Vec<u8, crate::alloc::System>>();
+};
+
 impl<T, A> Vec<T, A>
 where
     A: Allocator,

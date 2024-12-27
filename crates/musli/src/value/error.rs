@@ -5,6 +5,7 @@ use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use rust_alloc::string::ToString;
 
+use crate::alloc::Allocator;
 use crate::context::ContextError;
 
 use super::type_hint::{NumberHint, TypeHint};
@@ -47,18 +48,21 @@ impl fmt::Display for ErrorImpl {
 
 impl core::error::Error for Error {}
 
-impl ContextError for Error {
+impl<A> ContextError<A> for Error
+where
+    A: Allocator,
+{
     #[inline]
-    fn custom<T>(error: T) -> Self
+    fn custom<T>(alloc: A, error: T) -> Self
     where
         T: fmt::Display,
     {
-        Self::message(error)
+        Self::message(alloc, error)
     }
 
     #[inline]
     #[allow(unused_variables)]
-    fn message<T>(message: T) -> Self
+    fn message<T>(_: A, message: T) -> Self
     where
         T: fmt::Display,
     {

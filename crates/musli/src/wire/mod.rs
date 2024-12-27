@@ -103,6 +103,8 @@ mod tag;
 pub mod test;
 
 /// Convenient result alias for use with `musli::wire`.
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[cfg(feature = "alloc")]
@@ -110,13 +112,14 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 #[doc(inline)]
 pub use self::encoding::to_vec;
 #[doc(inline)]
-#[cfg(feature = "std")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
+#[cfg(all(feature = "std", feature = "alloc"))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
 pub use self::encoding::to_writer;
+#[cfg(feature = "alloc")]
 #[doc(inline)]
-pub use self::encoding::{
-    decode, encode, from_slice, to_fixed_bytes, to_slice, Encoding, DEFAULT, OPTIONS,
-};
+pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, to_slice};
+#[doc(inline)]
+pub use self::encoding::{Encoding, DEFAULT, OPTIONS};
 #[doc(inline)]
 pub use self::error::Error;
 
