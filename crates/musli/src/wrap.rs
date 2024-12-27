@@ -29,14 +29,37 @@ pub fn wrap<T>(inner: T) -> Wrap<T> {
 }
 
 #[cfg(feature = "std")]
+impl<W> crate::writer::IntoWriter for Wrap<W>
+where
+    W: std::io::Write,
+{
+    type Ok = ();
+    type Writer = Self;
+
+    #[inline]
+    fn into_writer(self) -> Self::Writer {
+        self
+    }
+}
+
+#[cfg(feature = "std")]
 impl<W> crate::writer::Writer for Wrap<W>
 where
     W: std::io::Write,
 {
+    type Ok = ();
     type Mut<'this>
         = &'this mut Self
     where
         Self: 'this;
+
+    #[inline]
+    fn finish<C>(&mut self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        Ok(())
+    }
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {

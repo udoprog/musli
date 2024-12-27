@@ -9,9 +9,9 @@ use rust_alloc::string::String;
 use rust_alloc::vec::Vec;
 
 use crate::mode::Text;
-use crate::Decode;
 #[cfg(feature = "alloc")]
 use crate::{Context, Encode};
+use crate::{Decode, IntoWriter};
 
 use super::de::JsonDecoder;
 use super::en::JsonEncoder;
@@ -21,7 +21,7 @@ use super::parser::IntoParser;
 /// The default configuration.
 pub const DEFAULT: Encoding = Encoding::new();
 
-crate::macros::bare_encoding!(Text, DEFAULT, json, IntoParser);
+crate::macros::bare_encoding!(Text, DEFAULT, json, IntoParser, IntoWriter);
 
 /// Encode the given value to a [`String`] using the [`DEFAULT`] [`Encoding`].
 ///
@@ -177,7 +177,8 @@ where
         json,
         JsonEncoder::new,
         JsonDecoder::new,
-        IntoParser::into_parser
+        IntoParser::into_parser,
+        IntoWriter::into_writer,
     );
 
     /// Encode the given value to the given value to a [`String`] using the

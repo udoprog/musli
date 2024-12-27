@@ -186,10 +186,19 @@ impl<const N: usize> Default for FixedBytes<N> {
 }
 
 impl<const N: usize> Writer for FixedBytes<N> {
+    type Ok = ();
     type Mut<'this>
         = &'this mut Self
     where
         Self: 'this;
+
+    #[inline]
+    fn finish<C>(&mut self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        Ok(())
+    }
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {

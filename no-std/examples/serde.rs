@@ -41,9 +41,7 @@ extern "C" fn main(_argc: c_int, _argv: *const *const u8) -> c_int {
         serde: Serde { field: 42 },
     };
 
-    let mut w = &mut buf[..];
-
-    let Ok(..) = encoding.encode_with(&cx, &mut w, &value) else {
+    let Ok(w) = encoding.to_slice_with(&cx, &mut buf[..], &value) else {
         for _error in cx.errors() {
             // report error
         }
@@ -51,9 +49,7 @@ extern "C" fn main(_argc: c_int, _argv: *const *const u8) -> c_int {
         return 1;
     };
 
-    let written = 1024 - w.len();
-
-    let Ok(value): Result<Value, _> = encoding.from_slice_with(&cx, &buf[..written]) else {
+    let Ok(value): Result<Value, _> = encoding.from_slice_with(&cx, &buf[..w]) else {
         for _error in cx.errors() {
             // report error
         }

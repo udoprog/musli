@@ -588,7 +588,7 @@ pub mod wrap;
 
 pub mod writer;
 #[doc(inline)]
-pub use self::writer::Writer;
+pub use self::writer::{IntoWriter, Writer};
 
 pub mod no_std;
 
