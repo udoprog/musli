@@ -7,25 +7,35 @@ use super::System;
 use super::{Allocator, RawVec};
 
 /// The default stack buffer size for the default allocator provided through
-/// [`default!`].
+/// [`default()`].
+///
+/// [`default()`]: super::default()
 pub const DEFAULT_ARRAY_BUFFER: usize = 4096;
 
 macro_rules! implement {
     ($id:ident, $ty:ty) => {
-        /// Alias for the default allocator implementation.
+        /// The default allocator implementation.
         ///
-        /// The exact type of this differs depending on whether the `alloc` feature is
-        /// enabled.
+        /// The exact implementation of this depends on if the `alloc` feature
+        /// is enabled.
+        ///
+        /// For more information, see [`default()`].
+        ///
+        /// [`default()`]: super::default()
         #[repr(transparent)]
         pub struct $id<'buf, const BUF: usize> {
             inner: $ty,
             _marker: PhantomData<&'buf mut [u8]>,
         }
 
-        /// Alias for the default raw vector implementation.
+        /// The default raw vector allocation.
         ///
-        /// The exact type of this differs depending on whether the `alloc` feature is
-        /// enabled.
+        /// The exact implementation of this depends on if the `alloc` feature
+        /// is enabled.
+        ///
+        /// For more information, see [`default()`].
+        ///
+        /// [`default()`]: super::default()
         pub struct DefaultRawVec<'a, 'buf: 'a, T, const BUF: usize>
         where
             T: 'a,
