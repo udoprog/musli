@@ -1,10 +1,10 @@
 use core::marker::PhantomData;
 
-#[cfg(not(feature = "alloc"))]
-use super::Slice;
-#[cfg(feature = "alloc")]
-use super::System;
 use super::{Allocator, RawVec};
+#[cfg(not(feature = "alloc"))]
+use super::{Slice, SliceBuf};
+#[cfg(feature = "alloc")]
+use super::{System, SystemBuf};
 
 /// The default stack buffer size for the default allocator provided through
 /// [`default()`].
@@ -13,7 +13,7 @@ use super::{Allocator, RawVec};
 pub const DEFAULT_ARRAY_BUFFER: usize = 4096;
 
 macro_rules! implement {
-    ($id:ident, $ty:ty) => {
+    ($id:ident, $ty:ty, $raw_vec:ty) => {
         /// The default allocator implementation.
         ///
         /// The exact implementation of this depends on if the `alloc` feature
@@ -28,6 +28,16 @@ macro_rules! implement {
             _marker: PhantomData<&'buf mut [u8]>,
         }
 
+        impl<'buf, const BUF: usize> $id<'buf, BUF> {
+            #[inline]
+            pub(super) fn new(inner: $ty) -> Self {
+                Self {
+                    inner,
+                    _marker: PhantomData,
+                }
+            }
+        }
+
         /// The default raw vector allocation.
         ///
         /// The exact implementation of this depends on if the `alloc` feature
@@ -36,43 +46,24 @@ macro_rules! implement {
         /// For more information, see [`default()`].
         ///
         /// [`default()`]: super::default()
-        pub struct DefaultRawVec<'a, 'buf: 'a, T, const BUF: usize>
-        where
-            T: 'a,
-        {
-            inner: <$ty as Allocator>::RawVec<'a, T>,
-            _marker: PhantomData<&'buf mut [u8]>,
-        }
-
-        impl<'buf, const BUF: usize> $id<'buf, BUF> {
-            #[inline]
-            #[cfg_attr(feature = "alloc", allow(clippy::needless_lifetimes))]
-            pub(super) fn new<'a>(alloc: &'a $ty) -> &'a Self {
-                // SAFETY: The type is repr(transparent) over the interior value.
-                unsafe { &*(alloc as *const $ty).cast::<Self>() }
-            }
+        pub struct DefaultRawVec<'a, T, const BUF: usize> {
+            inner: $raw_vec,
+            _marker: PhantomData<&'a ()>,
         }
     };
 }
 
 #[cfg(feature = "alloc")]
-implement!(DefaultAllocator, System);
+implement!(DefaultAllocator, System, SystemBuf<T>);
 
 #[cfg(not(feature = "alloc"))]
-implement!(DefaultAllocator, Slice<'buf>);
+implement!(DefaultAllocator, Slice<'buf>, SliceBuf<'a, T>);
 
-impl<'buf, const BUF: usize> Allocator for DefaultAllocator<'buf, BUF> {
-    type RawVec<'this, T>
-        = DefaultRawVec<'this, 'buf, T, BUF>
-    where
-        Self: 'this,
-        T: 'this;
+impl<'a, const BUF: usize> Allocator for &'a DefaultAllocator<'_, BUF> {
+    type RawVec<T> = DefaultRawVec<'a, T, BUF>;
 
     #[inline]
-    fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
-    where
-        T: 'a,
-    {
+    fn new_raw_vec<T>(self) -> Self::RawVec<T> {
         DefaultRawVec {
             inner: self.inner.new_raw_vec(),
             _marker: PhantomData,
@@ -80,10 +71,7 @@ impl<'buf, const BUF: usize> Allocator for DefaultAllocator<'buf, BUF> {
     }
 }
 
-impl<'a, T, const BUF: usize> RawVec<T> for DefaultRawVec<'a, '_, T, BUF>
-where
-    T: 'a,
-{
+impl<T, const BUF: usize> RawVec<T> for DefaultRawVec<'_, T, BUF> {
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> bool {
         self.inner.resize(len, additional)

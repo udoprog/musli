@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::alloc::{System, Vec};
 
 const BIG1: &[u8] = &[
@@ -9,7 +7,7 @@ const BIG2: &[u8] = &[
     0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
 ];
 
-fn work(alloc: &System) {
+fn work(alloc: System) {
     let mut buf1 = Vec::new_in(alloc);
     let mut buf2 = Vec::new_in(alloc);
 
@@ -23,9 +21,8 @@ fn work(alloc: &System) {
 #[test]
 fn test_concurrent_allocator() {
     loom::model(|| {
-        let alloc = Arc::new(System::new());
-        let alloc2 = alloc.clone();
-        loom::thread::spawn(move || work(&alloc2));
-        work(&alloc);
+        let alloc = System::new();
+        loom::thread::spawn(move || work(alloc));
+        work(alloc);
     });
 }

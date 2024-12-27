@@ -20,8 +20,8 @@ use super::{Allocator, RawVec};
 ///
 /// let alloc = System::new();
 ///
-/// let mut buf1 = Vec::new_in(&alloc);
-/// let mut buf2 = Vec::new_in(&alloc);
+/// let mut buf1 = Vec::new_in(alloc);
+/// let mut buf2 = Vec::new_in(alloc);
 //
 /// assert!(buf1.write(b"Hello, "));
 /// assert!(buf2.write(b"world!"));
@@ -32,6 +32,7 @@ use super::{Allocator, RawVec};
 /// buf1.extend(buf2);
 /// assert_eq!(buf1.as_slice(), b"Hello, world!");
 /// ```
+#[derive(Clone, Copy)]
 #[non_exhaustive]
 pub struct System;
 
@@ -51,17 +52,10 @@ impl Default for System {
 }
 
 impl Allocator for System {
-    type RawVec<'this, T>
-        = SystemBuf<T>
-    where
-        Self: 'this,
-        T: 'this;
+    type RawVec<T> = SystemBuf<T>;
 
     #[inline]
-    fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
-    where
-        T: 'a,
-    {
+    fn new_raw_vec<T>(self) -> Self::RawVec<T> {
         SystemBuf::DANGLING
     }
 }

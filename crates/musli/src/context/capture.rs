@@ -22,14 +22,14 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Capture<M, E, &'static System>
+impl<M, E> Capture<M, E, System>
 where
     E: ContextError,
 {
     /// Construct a new capturing context using the [`System`] allocator.
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(alloc::system())
+        Self::with_alloc(alloc::System::new())
     }
 }
 
@@ -60,16 +60,13 @@ impl<M, E, A> Context for Capture<M, E, A>
 where
     M: 'static,
     E: ContextError,
-    A: Allocator,
+    A: Clone + Allocator,
 {
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = ();
     type Allocator = A;
-    type String<'this>
-        = String<'this, A>
-    where
-        Self: 'this;
+    type String = String<A>;
 
     #[inline]
     fn clear(&self) {
@@ -87,12 +84,12 @@ where
     fn advance(&self, _: usize) {}
 
     #[inline]
-    fn alloc(&self) -> &Self::Allocator {
-        &self.alloc
+    fn alloc(&self) -> Self::Allocator {
+        self.alloc.clone()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
@@ -130,7 +127,7 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Default for Capture<M, E, &'static System>
+impl<M, E> Default for Capture<M, E, System>
 where
     E: ContextError,
 {

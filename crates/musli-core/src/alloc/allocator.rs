@@ -3,10 +3,7 @@ use super::RawVec;
 /// An allocator that can be used in combination with a context.
 pub trait Allocator {
     /// The type of an allocated buffer.
-    type RawVec<'this, T>: RawVec<T>
-    where
-        Self: 'this,
-        T: 'this;
+    type RawVec<T>: RawVec<T>;
 
     /// Construct an empty uninitialized raw vector with an alignment matching
     /// that of `T` that is associated with this allocator.
@@ -40,26 +37,5 @@ pub trait Allocator {
     ///     assert_eq!(bytes, values);
     /// });
     /// ```
-    fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
-    where
-        T: 'a;
-}
-
-impl<A> Allocator for &A
-where
-    A: ?Sized + Allocator,
-{
-    type RawVec<'this, T>
-        = A::RawVec<'this, T>
-    where
-        Self: 'this,
-        T: 'this;
-
-    #[inline(always)]
-    fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
-    where
-        T: 'a,
-    {
-        (*self).new_raw_vec::<T>()
-    }
+    fn new_raw_vec<T>(self) -> Self::RawVec<T>;
 }

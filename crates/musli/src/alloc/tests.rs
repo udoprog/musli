@@ -1,8 +1,8 @@
 use super::{Allocator, Vec};
 
-fn basic_allocations<A>(alloc: &A)
+fn basic_allocations<A>(alloc: A)
 where
-    A: Allocator,
+    A: Copy + Allocator,
 {
     let mut a = Vec::new_in(alloc);
     let mut b = Vec::new_in(alloc);
@@ -31,7 +31,10 @@ where
     assert_eq!(a.len(), 12);
 }
 
-fn grow_allocations<A: Allocator>(alloc: &A) {
+fn grow_allocations<A>(alloc: A)
+where
+    A: Copy + Allocator,
+{
     const BYTES: &[u8] = b"abcd";
 
     let mut a = Vec::new_in(alloc);
@@ -70,7 +73,7 @@ fn grow_allocations<A: Allocator>(alloc: &A) {
 #[test]
 fn system_basic() {
     let alloc = super::System::new();
-    basic_allocations(&alloc);
+    basic_allocations(alloc);
 }
 
 #[test]
@@ -83,12 +86,12 @@ fn nostd_basic() {
 #[test]
 fn system_grow() {
     let alloc = super::System::new();
-    grow_allocations(&alloc);
+    grow_allocations(alloc);
 }
 
-fn zst_allocations<A>(alloc: &A)
+fn zst_allocations<A>(alloc: A)
 where
-    A: Allocator,
+    A: Copy + Allocator,
 {
     let mut a = Vec::new_in(alloc);
     let mut b = Vec::new_in(alloc);
@@ -105,7 +108,7 @@ where
 #[test]
 fn system_zst() {
     let alloc = super::System::new();
-    zst_allocations(&alloc);
+    zst_allocations(alloc);
 }
 
 #[test]

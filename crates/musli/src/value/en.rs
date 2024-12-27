@@ -429,7 +429,7 @@ where
 {
     cx: &'a C,
     output: O,
-    writer: BufWriter<'a, C::Allocator>,
+    writer: BufWriter<C::Allocator>,
 }
 
 #[cfg(feature = "alloc")]
@@ -456,7 +456,7 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = StorageEncoder<'a, &'this mut BufWriter<'a, C::Allocator>, OPT, C>
+        = StorageEncoder<'a, &'this mut BufWriter<C::Allocator>, OPT, C>
     where
         Self: 'this;
 

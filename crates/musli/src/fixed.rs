@@ -206,7 +206,7 @@ impl<const N: usize> Writer for FixedBytes<N> {
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {

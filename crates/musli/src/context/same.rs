@@ -28,14 +28,14 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Same<M, E, &'static System>
+impl<M, E> Same<M, E, System>
 where
     E: ContextError,
 {
     /// Construct a new same-error context with the [`System`] allocator.
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(crate::alloc::system())
+        Self::with_alloc(crate::alloc::System::new())
     }
 }
 
@@ -65,17 +65,14 @@ impl<A> Same<Binary, ErrorMarker, A> {
 impl<M, E, A> Context for Same<M, E, A>
 where
     M: 'static,
-    A: Allocator,
+    A: Clone + Allocator,
     E: ContextError,
 {
     type Mode = M;
     type Error = E;
     type Mark = ();
     type Allocator = A;
-    type String<'this>
-        = String<'this, A>
-    where
-        Self: 'this;
+    type String = String<A>;
 
     #[inline]
     fn clear(&self) {}
@@ -87,12 +84,12 @@ where
     fn advance(&self, _: usize) {}
 
     #[inline]
-    fn alloc(&self) -> &Self::Allocator {
-        &self.alloc
+    fn alloc(&self) -> Self::Allocator {
+        self.alloc.clone()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
@@ -118,7 +115,7 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Default for Same<M, E, &'static System>
+impl<M, E> Default for Same<M, E, System>
 where
     E: ContextError,
 {

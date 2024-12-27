@@ -19,11 +19,9 @@ pub trait Context {
     /// A mark during processing.
     type Mark;
     /// The allocator associated with the context.
-    type Allocator: ?Sized + Allocator;
+    type Allocator: Allocator;
     /// An allocated buffer containing a valid string.
-    type String<'this>: AsRef<str>
-    where
-        Self: 'this;
+    type String: AsRef<str>;
 
     /// Clear the state of the context, allowing it to be re-used.
     fn clear(&self);
@@ -86,12 +84,12 @@ pub trait Context {
     }
 
     /// Access the underlying allocator.
-    fn alloc(&self) -> &Self::Allocator;
+    fn alloc(&self) -> Self::Allocator;
 
     /// Collect and allocate a string from a [`Display`] implementation.
     ///
     /// [`Display`]: fmt::Display
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display;
 
@@ -224,9 +222,10 @@ pub trait Context {
     fn invalid_field_string_tag(
         &self,
         type_name: &'static str,
-        field: Self::String<'_>,
+        field: Self::String,
     ) -> Self::Error {
         let field = field.as_ref();
+
         self.message(format_args!(
             "Type {type_name} received invalid field tag {field:?}"
         ))
