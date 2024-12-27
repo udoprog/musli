@@ -13,7 +13,9 @@ use super::{ContextError, ErrorMarker};
 /// A simple non-diagnostical capturing context.
 pub struct Capture<M, E, A>
 where
-    E: ContextError,
+    M: 'static,
+    E: ContextError<A>,
+    A: Allocator,
 {
     alloc: A,
     error: UnsafeCell<Option<E>>,
@@ -24,7 +26,8 @@ where
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<M, E> Capture<M, E, System>
 where
-    E: ContextError,
+    M: 'static,
+    E: ContextError<System>,
 {
     /// Construct a new capturing context using the [`System`] allocator.
     #[inline]
@@ -35,7 +38,9 @@ where
 
 impl<M, E, A> Capture<M, E, A>
 where
-    E: ContextError,
+    M: 'static,
+    E: ContextError<A>,
+    A: Clone + Allocator,
 {
     /// Construct a new capturing allocator.
     pub fn with_alloc(alloc: A) -> Self {
@@ -48,8 +53,10 @@ where
 
     /// Construct an error or panic.
     pub fn unwrap(self) -> E {
+        let alloc = self.alloc();
+
         let Some(error) = self.error.into_inner() else {
-            return E::message("no error captured");
+            return E::message(alloc, "no error captured");
         };
 
         error
@@ -59,7 +66,7 @@ where
 impl<M, E, A> Context for Capture<M, E, A>
 where
     M: 'static,
-    E: ContextError,
+    E: ContextError<A>,
     A: Clone + Allocator,
 {
     type Mode = M;
@@ -93,7 +100,10 @@ where
     where
         T: ?Sized + fmt::Display,
     {
-        alloc::collect_string(self, value)
+        match alloc::collect_string(self.alloc(), value) {
+            Ok(string) => Ok(string),
+            Err(error) => Err(self.custom(error)),
+        }
     }
 
     #[inline]
@@ -101,10 +111,12 @@ where
     where
         T: 'static + Send + Sync + Error,
     {
+        let error = E::custom(self.alloc(), error);
+
         // SAFETY: We're restricting access to the context, so that this is
         // safe.
         unsafe {
-            self.error.get().replace(Some(E::custom(error)));
+            self.error.get().replace(Some(error));
         }
 
         ErrorMarker
@@ -115,10 +127,12 @@ where
     where
         T: fmt::Display,
     {
+        let error = E::message(self.alloc(), message);
+
         // SAFETY: We're restricting access to the context, so that this is
         // safe.
         unsafe {
-            self.error.get().replace(Some(E::message(message)));
+            self.error.get().replace(Some(error));
         }
 
         ErrorMarker
@@ -129,7 +143,7 @@ where
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<M, E> Default for Capture<M, E, System>
 where
-    E: ContextError,
+    E: ContextError<System>,
 {
     #[inline]
     fn default() -> Self {

@@ -189,19 +189,14 @@ pub mod generic {
 #[cfg(feature = "musli")]
 pub mod musli {
     use musli::context::{ErrorMarker as Error, Ignore};
-    use musli::options::{self, Float, Integer, Options};
+    use musli::options::{self, Options};
     use musli::storage::Encoding;
     use musli::{Decode, Encode};
 
     use tests::models::Primitives as Model;
     use tests::Packed;
 
-    const OPTIONS: Options = options::new()
-        .with_length(Integer::Fixed)
-        .with_integer(Integer::Fixed)
-        .with_float(Float::Fixed)
-        .build();
-
+    const OPTIONS: Options = options::new().with_fixed().build();
     const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
     pub fn encode_model<'buf>(

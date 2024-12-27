@@ -199,7 +199,10 @@ where
     where
         T: ?Sized + fmt::Display,
     {
-        alloc::collect_string(self, value)
+        match alloc::collect_string(self.alloc(), value) {
+            Ok(string) => Ok(string),
+            Err(error) => Err(self.custom(error)),
+        }
     }
 
     #[inline]

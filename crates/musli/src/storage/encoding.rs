@@ -3,12 +3,15 @@
 
 use core::marker;
 
+#[cfg(feature = "alloc")]
+use crate::alloc::System;
 use crate::mode::Binary;
 use crate::options;
-use crate::{IntoReader, IntoWriter, Options};
+use crate::{Context, Decode, Encode, IntoReader, IntoWriter, Options};
 
 use super::de::StorageDecoder;
 use super::en::StorageEncoder;
+#[cfg(feature = "alloc")]
 use super::error::Error;
 
 /// Default options to use with [`Encoding`].

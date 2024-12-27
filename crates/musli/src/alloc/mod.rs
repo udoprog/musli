@@ -115,6 +115,20 @@ mod vec;
 #[doc(inline)]
 pub use self::vec::Vec;
 
+use core::fmt;
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub(crate) struct AllocError;
+
+impl fmt::Display for AllocError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Failed to allocate memory")
+    }
+}
+
+impl core::error::Error for AllocError {}
+
 /// Call the given block `body` with an instance of the [`DefaultAllocator`].
 ///
 /// This is useful if you want to write application which are agnostic to

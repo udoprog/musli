@@ -8,6 +8,9 @@
 use core::error::Error;
 use core::fmt;
 
+#[cfg(any(feature = "alloc", feature = "std"))]
+use crate::alloc::Allocator;
+
 #[cfg(feature = "alloc")]
 use rust_alloc::string::{String, ToString};
 
@@ -17,9 +20,9 @@ use rust_alloc::string::{String, ToString};
     note = "use `musli::context::ErrorMarker` to ignore errors",
     note = "use `std::io::Error` and `std::string::String`, if the `std` or `alloc` features are enabled for `musli`"
 )]
-pub trait ContextError: Sized + 'static + Send + Sync + fmt::Display + fmt::Debug {
+pub trait ContextError<A> {
     /// Construct a custom error.
-    fn custom<T>(error: T) -> Self
+    fn custom<T>(alloc: A, error: T) -> Self
     where
         T: 'static + Send + Sync + Error;
 
@@ -27,21 +30,24 @@ pub trait ContextError: Sized + 'static + Send + Sync + fmt::Display + fmt::Debu
     ///
     /// This is made available to format custom error messages in `no_std`
     /// environments. The error message is to be collected by formatting `T`.
-    fn message<T>(message: T) -> Self
+    fn message<T>(alloc: A, message: T) -> Self
     where
         T: fmt::Display;
 }
 
 #[cfg(feature = "std")]
-impl ContextError for std::io::Error {
-    fn custom<T>(message: T) -> Self
+impl<A> ContextError<A> for std::io::Error
+where
+    A: Allocator,
+{
+    fn custom<T>(_: A, message: T) -> Self
     where
         T: 'static + Send + Sync + Error,
     {
         std::io::Error::new(std::io::ErrorKind::Other, message)
     }
 
-    fn message<T>(message: T) -> Self
+    fn message<T>(_: A, message: T) -> Self
     where
         T: fmt::Display,
     {
@@ -50,9 +56,12 @@ impl ContextError for std::io::Error {
 }
 
 #[cfg(feature = "alloc")]
-impl ContextError for String {
+impl<A> ContextError<A> for String
+where
+    A: Allocator,
+{
     #[inline]
-    fn custom<T>(message: T) -> Self
+    fn custom<T>(_: A, message: T) -> Self
     where
         T: fmt::Display,
     {
@@ -60,7 +69,7 @@ impl ContextError for String {
     }
 
     #[inline]
-    fn message<T>(message: T) -> Self
+    fn message<T>(_: A, message: T) -> Self
     where
         T: fmt::Display,
     {

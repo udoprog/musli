@@ -32,11 +32,13 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn encode<W, T>(writer: W, value: &T) -> Result<W::Ok, Error>
         where
             W: $writer_trait,
-            T: ?Sized + $crate::Encode<crate::mode::$mode>,
+            T: ?Sized + Encode<crate::mode::$mode>,
         {
             $default.encode(writer, value)
         }
@@ -72,10 +74,12 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn to_slice<T>(out: &mut [u8], value: &T) -> Result<usize, Error>
         where
-            T: ?Sized + $crate::Encode<crate::mode::$mode>,
+            T: ?Sized + Encode<crate::mode::$mode>,
         {
             $default.to_slice(out, value)
         }
@@ -113,7 +117,7 @@ macro_rules! bare_encoding {
         #[inline]
         pub fn to_vec<T>(value: &T) -> Result<rust_alloc::vec::Vec<u8>, Error>
         where
-            T: ?Sized + $crate::Encode<crate::mode::$mode>,
+            T: ?Sized + Encode<crate::mode::$mode>,
         {
             $default.to_vec(value)
         }
@@ -142,10 +146,12 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn to_fixed_bytes<const N: usize, T>(value: &T) -> Result<$crate::FixedBytes<N>, Error>
         where
-            T: ?Sized + $crate::Encode<crate::mode::$mode>,
+            T: ?Sized + Encode<crate::mode::$mode>,
         {
             $default.to_fixed_bytes::<N, _>(value)
         }
@@ -180,13 +186,13 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[cfg(feature = "std")]
-        #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
+        #[cfg(all(feature = "std", feature = "alloc"))]
+        #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
         #[inline]
         pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
         where
             W: std::io::Write,
-            T: ?Sized + $crate::Encode<crate::mode::$mode>,
+            T: ?Sized + Encode<crate::mode::$mode>,
         {
             $default.to_writer(writer, value)
         }
@@ -226,11 +232,13 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
         where
             R: $reader_trait<'de>,
-            T: $crate::Decode<'de, $mode>,
+            T: Decode<'de, $mode>,
         {
             $default.decode(reader)
         }
@@ -261,10 +269,12 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
         where
-            T: $crate::Decode<'de, $mode>,
+            T: Decode<'de, $mode>,
         {
             $default.from_slice(bytes)
         }
@@ -315,16 +325,16 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn encode<W, T>(self, writer: W, value: &T) -> Result<W::Ok, Error>
         where
             W: $writer_trait,
-            T: ?Sized + $crate::Encode<$mode>,
+            T: ?Sized + Encode<$mode>,
         {
-            $crate::alloc::default(|alloc| {
-                let cx = $crate::context::Same::with_alloc(alloc);
-                self.encode_with(&cx, writer, value)
-            })
+            let cx = $crate::context::Same::with_alloc(System::new());
+            self.encode_with(&cx, writer, value)
         }
 
         /// Encode the given value to the given slice using the current
@@ -362,15 +372,15 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn to_slice<T>(self, out: &mut [u8], value: &T) -> Result<usize, Error>
         where
-            T: ?Sized + $crate::Encode<$mode>,
+            T: ?Sized + Encode<$mode>,
         {
-            $crate::alloc::default(|alloc| {
-                let cx = $crate::context::Same::with_alloc(alloc);
-                self.to_slice_with(&cx, out, value)
-            })
+            let cx = $crate::context::Same::with_alloc(System::new());
+            self.to_slice_with(&cx, out, value)
         }
 
         /// Encode the given value to a [`Vec`] using the current [`Encoding`].
@@ -407,7 +417,7 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn to_vec<T>(self, value: &T) -> Result<rust_alloc::vec::Vec<u8>, Error>
         where
-            T: ?Sized + $crate::Encode<$mode>,
+            T: ?Sized + Encode<$mode>,
         {
             let mut vec = rust_alloc::vec::Vec::new();
             self.encode(&mut vec, value)?;
@@ -442,18 +452,18 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn to_fixed_bytes<const N: usize, T>(
             self,
             value: &T,
         ) -> Result<$crate::FixedBytes<N>, Error>
         where
-            T: ?Sized + $crate::Encode<$mode>,
+            T: ?Sized + Encode<$mode>,
         {
-            $crate::alloc::default(|alloc| {
-                let cx = $crate::context::Same::with_alloc(alloc);
-                self.to_fixed_bytes_with(&cx, value)
-            })
+            let cx = $crate::context::Same::with_alloc(System::new());
+            self.to_fixed_bytes_with(&cx, value)
         }
 
         /// Encode the given value to the given [`Write`] using the current
@@ -488,12 +498,13 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
-        #[cfg(feature = "std")]
+        #[cfg(all(feature = "std", feature = "alloc"))]
+        #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
         #[inline]
         pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), Error>
         where
             W: std::io::Write,
-            T: ?Sized + $crate::Encode<$mode>,
+            T: ?Sized + Encode<$mode>,
         {
             let writer = $crate::wrap::wrap(write);
             self.encode(writer, value)
@@ -536,16 +547,16 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn decode<'de, R, T>(self, reader: R) -> Result<T, Error>
         where
             R: $reader_trait<'de>,
-            T: $crate::Decode<'de, $mode>,
+            T: Decode<'de, $mode>,
         {
-            $crate::alloc::default(|alloc| {
-                let cx = $crate::context::Same::with_alloc(alloc);
-                self.decode_with(&cx, reader)
-            })
+            let cx = $crate::context::Same::with_alloc(System::new());
+            self.decode_with(&cx, reader)
         }
 
         /// Decode the given type `T` from the given slice using the current
@@ -576,15 +587,15 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<(), Error>(())
         /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
         where
-            T: $crate::Decode<'de, $mode>,
+            T: Decode<'de, $mode>,
         {
-            $crate::alloc::default(|alloc| {
-                let cx = $crate::context::Same::with_alloc(alloc);
-                self.from_slice_with(&cx, bytes)
-            })
+            let cx = $crate::context::Same::with_alloc(System::new());
+            self.from_slice_with(&cx, bytes)
         }
 
         /// Decode the given type `T` from the given string using the current
@@ -592,10 +603,12 @@ macro_rules! encoding_impls {
         ///
         /// This is an alias over [`Encoding::from_slice`] for convenience. See
         /// its documentation for more.
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
         pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, Error>
         where
-            T: $crate::Decode<'de, M>,
+            T: Decode<'de, M>,
         {
             self.from_slice(string.as_bytes())
         }
@@ -643,9 +656,9 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<W::Ok, C::Error>
         where
-            C: ?Sized + $crate::Context<Mode = $mode>,
+            C: ?Sized + Context<Mode = $mode>,
             W: $writer_trait,
-            T: ?Sized + $crate::Encode<C::Mode>,
+            T: ?Sized + Encode<C::Mode>,
         {
             cx.clear();
             let mut writer = $writer_trait::$into_writer(writer);
@@ -704,8 +717,8 @@ macro_rules! encoding_impls {
             value: &T,
         ) -> Result<usize, C::Error>
         where
-            C: ?Sized + $crate::Context<Mode = $mode>,
-            T: ?Sized + $crate::Encode<C::Mode>,
+            C: ?Sized + Context<Mode = $mode>,
+            T: ?Sized + Encode<C::Mode>,
         {
             let len = out.len();
             let remaining = self.encode_with(cx, out, value)?;
@@ -758,8 +771,8 @@ macro_rules! encoding_impls {
             value: &T,
         ) -> Result<rust_alloc::vec::Vec<u8>, C::Error>
         where
-            C: ?Sized + $crate::Context<Mode = $mode>,
-            T: ?Sized + $crate::Encode<C::Mode>,
+            C: ?Sized + Context<Mode = $mode>,
+            T: ?Sized + Encode<C::Mode>,
         {
             let mut vec = rust_alloc::vec::Vec::new();
             self.encode_with(cx, &mut vec, value)?;
@@ -805,8 +818,8 @@ macro_rules! encoding_impls {
             value: &T,
         ) -> Result<$crate::FixedBytes<N>, C::Error>
         where
-            C: ?Sized + $crate::Context<Mode = $mode>,
-            T: ?Sized + $crate::Encode<C::Mode>,
+            C: ?Sized + Context<Mode = $mode>,
+            T: ?Sized + Encode<C::Mode>,
         {
             let mut bytes = $crate::FixedBytes::new();
             self.encode_with(cx, &mut bytes, value)?;
@@ -853,9 +866,9 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn to_writer_with<C, W, T>(self, cx: &C, write: W, value: &T) -> Result<(), C::Error>
         where
-            C: ?Sized + $crate::Context<Mode = $mode>,
+            C: ?Sized + Context<Mode = $mode>,
             W: std::io::Write,
-            T: ?Sized + $crate::Encode<C::Mode>,
+            T: ?Sized + Encode<C::Mode>,
         {
             let writer = $crate::wrap::wrap(write);
             self.encode_with(cx, writer, value)
@@ -903,9 +916,9 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn decode_with<'de, C, R, T>(self, cx: &C, reader: R) -> Result<T, C::Error>
         where
-            C: ?Sized + $crate::Context<Mode = $mode>,
+            C: ?Sized + Context<Mode = $mode>,
             R: $reader_trait<'de>,
-            T: $crate::Decode<'de, C::Mode>,
+            T: Decode<'de, C::Mode>,
         {
             cx.clear();
             let reader = $reader_trait::$into_reader(reader);
@@ -952,8 +965,8 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
         where
-            C: ?Sized + $crate::Context<Mode = $mode>,
-            T: $crate::Decode<'de, $mode>,
+            C: ?Sized + Context<Mode = $mode>,
+            T: Decode<'de, $mode>,
         {
             self.decode_with(cx, bytes)
         }
@@ -971,12 +984,134 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
         where
-            C: ?Sized + $crate::Context<Mode = M>,
-            T: $crate::Decode<'de, M>,
+            C: ?Sized + Context<Mode = M>,
+            T: Decode<'de, M>,
         {
             self.from_slice_with(cx, string.as_bytes())
         }
     };
 }
 
+macro_rules! implement_error {
+    (
+        $(#[$($meta:meta)*])*
+        $vis:vis struct $id:ident;
+    ) => {
+        $(#[$($meta)*])*
+        #[cfg(feature = "alloc")]
+        pub struct $id<A = $crate::alloc::System>
+        where
+            A: $crate::alloc::Allocator,
+        {
+            err: Impl<A>,
+        }
+
+        $(#[$($meta)*])*
+        #[cfg(not(feature = "alloc"))]
+        pub struct $id<A>
+        where
+            A: $crate::alloc::Allocator,
+        {
+            err: Impl<A>,
+        }
+
+        impl<A> core::fmt::Display for $id<A>
+        where
+            A: $crate::alloc::Allocator,
+        {
+            #[inline]
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                self.err.fmt(f)
+            }
+        }
+
+        impl<A> core::fmt::Debug for $id<A>
+        where
+            A: $crate::alloc::Allocator,
+        {
+            #[inline]
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                self.err.fmt(f)
+            }
+        }
+
+        enum Impl<A>
+        where
+            A: $crate::alloc::Allocator,
+        {
+            Message(crate::alloc::String<A>),
+            Alloc(crate::alloc::AllocError),
+        }
+
+        impl<A> core::fmt::Display for Impl<A>
+        where
+            A: $crate::alloc::Allocator,
+        {
+            #[inline]
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                match self {
+                    Impl::Message(message) => message.fmt(f),
+                    Impl::Alloc(error) => error.fmt(f),
+                }
+            }
+        }
+
+        impl<A> core::fmt::Debug for Impl<A>
+        where
+            A: $crate::alloc::Allocator,
+        {
+            #[inline]
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                match self {
+                    Impl::Message(message) => {
+                        f.debug_tuple("Message").field(message).finish()
+                    }
+                    Impl::Alloc(error) => {
+                        f.debug_tuple("Alloc").field(error).finish()
+                    }
+                }
+            }
+        }
+
+        impl<A> core::error::Error for $id<A>
+        where
+            A: $crate::alloc::Allocator
+        {
+        }
+
+        impl<A> $crate::context::ContextError<A> for $id<A>
+        where
+            A: $crate::alloc::Allocator,
+        {
+            #[inline]
+            fn custom<T>(alloc: A, error: T) -> Self
+            where
+                T: core::fmt::Display,
+            {
+                Self::message(alloc, error)
+            }
+
+            #[inline]
+            fn message<T>(alloc: A, message: T) -> Self
+            where
+                T: core::fmt::Display,
+            {
+                let err = match crate::alloc::collect_string(alloc, &message) {
+                    Ok(message) => Impl::Message(message),
+                    Err(error) => Impl::Alloc(error),
+                };
+
+                Self { err }
+            }
+        }
+
+        #[cfg(feature = "alloc")]
+        const _: () = {
+            const fn assert_send_sync<T: Send + Sync>() {}
+            assert_send_sync::<$id<$crate::alloc::System>>();
+        };
+    };
+}
+
 pub(crate) use encoding_impls;
+pub(crate) use implement_error;

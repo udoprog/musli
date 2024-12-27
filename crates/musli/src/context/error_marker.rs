@@ -20,9 +20,12 @@ impl fmt::Display for ErrorMarker {
 impl core::error::Error for ErrorMarker {}
 
 #[cfg(test)]
-impl crate::context::ContextError for ErrorMarker {
+impl<A> crate::context::ContextError<A> for ErrorMarker
+where
+    A: crate::alloc::Allocator,
+{
     #[inline]
-    fn custom<T>(_: T) -> Self
+    fn custom<T>(_: A, _: T) -> Self
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -30,7 +33,7 @@ impl crate::context::ContextError for ErrorMarker {
     }
 
     #[inline]
-    fn message<T>(_: T) -> Self
+    fn message<T>(_: A, _: T) -> Self
     where
         T: fmt::Display,
     {

@@ -20,7 +20,9 @@ use super::ErrorMarker;
 /// error type directly.
 pub struct Same<M, E, A>
 where
-    E: ContextError,
+    M: 'static,
+    E: ContextError<A>,
+    A: Allocator,
 {
     alloc: A,
     _marker: PhantomData<(M, E)>,
@@ -30,7 +32,8 @@ where
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<M, E> Same<M, E, System>
 where
-    E: ContextError,
+    M: 'static,
+    E: ContextError<System>,
 {
     /// Construct a new same-error context with the [`System`] allocator.
     #[inline]
@@ -41,7 +44,9 @@ where
 
 impl<M, E, A> Same<M, E, A>
 where
-    E: ContextError,
+    M: 'static,
+    E: ContextError<A>,
+    A: Allocator,
 {
     /// Construct a new `Same` context with a custom allocator.
     #[inline]
@@ -54,7 +59,10 @@ where
 }
 
 #[cfg(test)]
-impl<A> Same<Binary, ErrorMarker, A> {
+impl<A> Same<Binary, ErrorMarker, A>
+where
+    A: Allocator,
+{
     /// Construct a new `Same` capturing context.
     #[inline]
     pub(crate) fn with_marker(alloc: A) -> Self {
@@ -65,8 +73,8 @@ impl<A> Same<Binary, ErrorMarker, A> {
 impl<M, E, A> Context for Same<M, E, A>
 where
     M: 'static,
+    E: ContextError<A>,
     A: Clone + Allocator,
-    E: ContextError,
 {
     type Mode = M;
     type Error = E;
@@ -93,7 +101,10 @@ where
     where
         T: ?Sized + fmt::Display,
     {
-        alloc::collect_string(self, value)
+        match alloc::collect_string(self.alloc(), value) {
+            Ok(string) => Ok(string),
+            Err(error) => Err(self.custom(error)),
+        }
     }
 
     #[inline]
@@ -101,7 +112,7 @@ where
     where
         T: 'static + Send + Sync + Error,
     {
-        E::custom(message)
+        E::custom(self.alloc(), message)
     }
 
     #[inline]
@@ -109,7 +120,7 @@ where
     where
         T: fmt::Display,
     {
-        E::message(message)
+        E::message(self.alloc(), message)
     }
 }
 
@@ -117,7 +128,8 @@ where
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<M, E> Default for Same<M, E, System>
 where
-    E: ContextError,
+    M: 'static,
+    E: ContextError<System>,
 {
     #[inline]
     fn default() -> Self {

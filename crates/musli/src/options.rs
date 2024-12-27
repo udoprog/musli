@@ -1,5 +1,7 @@
 //! Serialization options.
 
+use core::fmt;
+
 /// [`Options`] builder.
 pub struct Builder(Options);
 
@@ -8,8 +10,17 @@ const DEFAULT: Options = (ByteOrder::NATIVE as Options) << BYTEORDER_BIT;
 /// Start building new options.
 ///
 /// Call [`Builder::build`] to construct them.
+#[inline]
 pub const fn new() -> Builder {
     Builder(DEFAULT)
+}
+
+/// Construct a [`Builder`] from the raw underlying value of an [`Options`].
+///
+/// This can be used to modify a value at compile time.
+#[inline]
+pub const fn from_raw(value: Options) -> Builder {
+    Builder(value)
 }
 
 /// Type encapsulating a static options for an encoding.
@@ -76,10 +87,66 @@ impl Builder {
         Self((this.0 & !MASK) | ((width as Options) << LENGTH_WIDTH_BIT))
     }
 
+    /// Configure the options to use fixed serialization.
+    ///
+    /// This causes numerical and length types to use the default fixed-length
+    /// serialization which is typically more efficient than variable-length
+    /// through [`with_variable()`] but is less compact.
+    ///
+    /// This is the same as calling [`with_integer(Integer::Fixed)`],
+    /// [`with_float(Float::Fixed)`], and [`with_length(Integer::Fixed)`].
+    ///
+    /// [`with_variable()`]: Builder::with_variable
+    /// [`with_integer(Integer::Fixed)`]: Builder::with_integer
+    /// [`with_float(Float::Fixed)`]: Builder::with_float
+    /// [`with_length(Integer::Fixed)`]: Builder::with_length
+    #[inline]
+    pub const fn with_fixed(self) -> Self {
+        self.with_integer(Integer::Fixed)
+            .with_float(Float::Fixed)
+            .with_length(Integer::Fixed)
+    }
+
+    /// Configure the options to use variable serialization.
+    ///
+    /// This causes numerical and length types to use the default
+    /// variable-length serialization which is typically less efficient than
+    /// fixed-length through [`with_fixed()`] but is more compact.
+    ///
+    /// This is the same as calling [`with_integer(Integer::Fixed)`],
+    /// [`with_float(Float::Fixed)`], and [`with_length(Integer::Fixed)`].
+    ///
+    /// [`with_fixed()`]: Builder::with_fixed
+    /// [`with_integer(Integer::Fixed)`]: Builder::with_integer
+    /// [`with_float(Float::Fixed)`]: Builder::with_float
+    /// [`with_length(Integer::Fixed)`]: Builder::with_length
+    #[inline]
+    pub const fn with_variable(self) -> Self {
+        self.with_integer(Integer::Variable)
+            .with_float(Float::Variable)
+            .with_length(Integer::Variable)
+    }
+
     /// Build a flavor.
     #[inline]
     pub const fn build(self) -> Options {
         self.0
+    }
+}
+
+impl fmt::Debug for Builder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Builder")
+            .field("byteorder", &byteorder_value(self.0))
+            .field("integer", &integer_value(self.0))
+            .field("float", &float_value(self.0))
+            .field("length", &length_value(self.0))
+            .field("length_width", &length_width_value(self.0))
+            .field(
+                "is_map_keys_as_numbers",
+                &is_map_keys_as_numbers_value(self.0),
+            )
+            .finish()
     }
 }
 
@@ -92,7 +159,12 @@ impl Builder {
 ))]
 #[inline]
 pub(crate) const fn integer<const OPT: Options>() -> Integer {
-    match (OPT >> INTEGER_BIT) & 0b1 {
+    integer_value(OPT)
+}
+
+#[inline]
+const fn integer_value(opt: Options) -> Integer {
+    match (opt >> INTEGER_BIT) & 0b1 {
         0 => Integer::Variable,
         _ => Integer::Fixed,
     }
@@ -101,7 +173,12 @@ pub(crate) const fn integer<const OPT: Options>() -> Integer {
 #[cfg(test)]
 #[inline]
 pub(crate) const fn float<const OPT: Options>() -> Float {
-    match (OPT >> FLOAT_BIT) & 0b11 {
+    float_value(OPT)
+}
+
+#[inline]
+const fn float_value(opt: Options) -> Float {
+    match (opt >> FLOAT_BIT) & 0b11 {
         0 => Float::Integer,
         1 => Float::Variable,
         _ => Float::Fixed,
@@ -117,7 +194,12 @@ pub(crate) const fn float<const OPT: Options>() -> Float {
 ))]
 #[inline]
 pub(crate) const fn length<const OPT: Options>() -> Integer {
-    match (OPT >> LENGTH_BIT) & 0b1 {
+    length_value(OPT)
+}
+
+#[inline]
+const fn length_value(opt: Options) -> Integer {
+    match (opt >> LENGTH_BIT) & 0b1 {
         0 => Integer::Variable,
         _ => Integer::Fixed,
     }
@@ -132,7 +214,12 @@ pub(crate) const fn length<const OPT: Options>() -> Integer {
 ))]
 #[inline]
 pub(crate) const fn length_width<const OPT: Options>() -> Width {
-    match (OPT >> LENGTH_WIDTH_BIT) & 0b11 {
+    length_width_value(OPT)
+}
+
+#[inline]
+const fn length_width_value(opt: Options) -> Width {
+    match (opt >> LENGTH_WIDTH_BIT) & 0b11 {
         0 => Width::U64,
         1 => Width::U32,
         2 => Width::U16,
@@ -149,7 +236,12 @@ pub(crate) const fn length_width<const OPT: Options>() -> Width {
 ))]
 #[inline]
 pub(crate) const fn byteorder<const OPT: Options>() -> ByteOrder {
-    match (OPT >> BYTEORDER_BIT) & 0b1 {
+    byteorder_value(OPT)
+}
+
+#[inline]
+pub(crate) const fn byteorder_value(opt: Options) -> ByteOrder {
+    match (opt >> BYTEORDER_BIT) & 0b1 {
         0 => ByteOrder::Little,
         _ => ByteOrder::Big,
     }
@@ -158,7 +250,11 @@ pub(crate) const fn byteorder<const OPT: Options>() -> ByteOrder {
 #[cfg(all(feature = "alloc", feature = "value"))]
 #[inline]
 pub(crate) const fn is_map_keys_as_numbers<const OPT: Options>() -> bool {
-    ((OPT >> MAP_KEYS_AS_NUMBERS_BIT) & 0b1) == 1
+    is_map_keys_as_numbers_value(OPT)
+}
+
+const fn is_map_keys_as_numbers_value(opt: Options) -> bool {
+    ((opt >> MAP_KEYS_AS_NUMBERS_BIT) & 0b1) == 1
 }
 
 /// Integer serialization mode.

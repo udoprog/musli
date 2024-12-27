@@ -139,7 +139,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         C: ?Sized + Context,
     {
         let Some((value, read)) = crate::dec2flt::dec2flt(self.slice) else {
-            return Err(cx.custom(ErrorMessage::ParseFloat));
+            return Err(cx.message(ErrorMessage::ParseFloat));
         };
 
         *self.slice = &self.slice[read..];
@@ -152,7 +152,7 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         C: ?Sized + Context,
     {
         let Some((value, read)) = crate::dec2flt::dec2flt(self.slice) else {
-            return Err(cx.custom(ErrorMessage::ParseFloat));
+            return Err(cx.message(ErrorMessage::ParseFloat));
         };
 
         *self.slice = &self.slice[read..];

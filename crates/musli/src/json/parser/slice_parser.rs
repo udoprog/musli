@@ -128,7 +128,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         C: ?Sized + Context,
     {
         let Some((value, read)) = crate::dec2flt::dec2flt(&self.slice[self.index..]) else {
-            return Err(cx.custom(ErrorMessage::ParseFloat));
+            return Err(cx.message(ErrorMessage::ParseFloat));
         };
 
         self.index += read;
@@ -141,7 +141,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
         C: ?Sized + Context,
     {
         let Some((value, read)) = crate::dec2flt::dec2flt(&self.slice[self.index..]) else {
-            return Err(cx.custom(ErrorMessage::ParseFloat));
+            return Err(cx.message(ErrorMessage::ParseFloat));
         };
 
         self.index += read;

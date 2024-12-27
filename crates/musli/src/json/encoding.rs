@@ -8,13 +8,14 @@ use rust_alloc::string::String;
 #[cfg(feature = "alloc")]
 use rust_alloc::vec::Vec;
 
-use crate::mode::Text;
 #[cfg(feature = "alloc")]
-use crate::{Context, Encode};
-use crate::{Decode, IntoWriter};
+use crate::alloc::System;
+use crate::mode::Text;
+use crate::{Context, Decode, Encode, IntoWriter};
 
 use super::de::JsonDecoder;
 use super::en::JsonEncoder;
+#[cfg(feature = "alloc")]
 use super::error::Error;
 use super::parser::IntoParser;
 
@@ -49,6 +50,7 @@ crate::macros::bare_encoding!(Text, DEFAULT, json, IntoParser, IntoWriter);
 /// # Ok::<(), Error>(())
 /// ```
 #[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[inline]
 pub fn to_string<T>(value: &T) -> Result<String, Error>
 where
@@ -83,6 +85,8 @@ where
 /// assert_eq!(person.age, 61);
 /// # Ok::<(), Error>(())
 /// ```
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[inline]
 pub fn from_str<'de, T>(string: &'de str) -> Result<T, Error>
 where
@@ -210,15 +214,14 @@ where
     /// # Ok::<(), Error>(())
     /// ```
     #[cfg(feature = "alloc")]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
     #[inline]
     pub fn to_string<T>(self, value: &T) -> Result<String, Error>
     where
         T: ?Sized + Encode<M>,
     {
-        crate::alloc::default(|alloc| {
-            let cx = crate::context::Same::with_alloc(alloc);
-            self.to_string_with(&cx, value)
-        })
+        let cx = crate::context::Same::with_alloc(System::new());
+        self.to_string_with(&cx, value)
     }
 
     /// Encode the given value to the given value to a [`String`] using the
@@ -257,6 +260,7 @@ where
     /// # Ok::<(), Error>(())
     /// ```
     #[cfg(feature = "alloc")]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
     #[inline]
     pub fn to_string_with<T, C>(self, cx: &C, value: &T) -> Result<String, C::Error>
     where
