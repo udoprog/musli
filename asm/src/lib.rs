@@ -204,25 +204,14 @@ pub mod musli {
 
     const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
-    pub fn encode_model<'buf>(
-        buffer: &'buf mut Vec<u8>,
-        value: &Model,
-    ) -> Result<&'buf [u8], Error> {
-        encode::<Model>(buffer, value)
-    }
-
-    pub fn decode_model<'buf>(buf: &'buf [u8]) -> Result<Model, Error> {
-        decode::<Model>(buf)
-    }
-
     #[inline(always)]
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T) -> Result<&'buf [u8], Error>
     where
         T: Encode<Packed>,
     {
         let cx = Ignore::new();
-        ENCODING.encode_with(&cx, &mut *buf, value)?;
-        Ok(buf)
+        let w = ENCODING.to_slice_with(&cx, &mut buf[..], value)?;
+        Ok(&buf[..w])
     }
 
     #[inline(always)]

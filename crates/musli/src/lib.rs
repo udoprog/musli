@@ -331,6 +331,111 @@
 //!
 //! <br>
 //!
+//! ## Going very fast
+//!
+//! With the previous sections it should be apparent that speed is primarily a
+//! game of tradeoffs. If we make every tradeoff in favor of speed Müsli is
+//! designed to be the fastest framework out there.
+//!
+//! The tradeoffs we will be showcasing to achieve speed here are:
+//!
+//! * *Pre-allocate serialization space*. This avoids all allocations during
+//!   serialization. The tradeoff is that if the data we are serializing
+//!   contains dynamically sized information which goes beyond the pre-allocated
+//!   space, we will error.
+//! * *Use fixed-sized integers and floats*. We use more space, but the cost of
+//!   serializing numerical fields essentially boils down to copying them.
+//! * *Use a native byte order*. With this we avoid any byte-swapping
+//!   operations. But our data becomes less portable.
+//! * *Use a packed format*. This doesn't allow for any upgrades, but we avoid
+//!   paying the overhead of serializing field identifiers.
+//! * *Use the [`Slice` allocator]*. This avoids all heap allocations using the
+//!   system allocator. While the system allocator is quite efficient and
+//!   normally shouldn't be avoided, the slice allocator is a fixed-slab
+//!   allocator. The tradeoff here is that we will error in case we run out of
+//!   memory, but we only need to use the allocator if the types being
+//!   serialized (or the format) demands it.
+//! * *Disable error handling*. Code generation will be able to remove
+//!   everything related to error handling, like allocations. To do this we can
+//!   make use of the [`Ignore`] context. If an error happens, we are only
+//!   informed of that fact through a zero-sized marker type.
+//!
+//! We achieve this through the following methods:
+//!
+//! ```
+//! use musli::context::{ErrorMarker as Error, Ignore};
+//! use musli::options::{self, Float, Integer, Options};
+//! use musli::storage::Encoding;
+//! use musli::{Decode, Encode};
+//! use musli::alloc::Slice;
+//!
+//! enum Packed {}
+//!
+//! const OPTIONS: Options = options::new()
+//!     .with_length(Integer::Fixed)
+//!     .with_integer(Integer::Fixed)
+//!     .with_float(Float::Fixed)
+//!     .build();
+//!
+//! const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
+//!
+//! #[inline]
+//! pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T, alloc: &Slice<'_>) -> Result<&'buf [u8], Error>
+//! where
+//!     T: Encode<Packed>,
+//! {
+//!     let cx = Ignore::with_alloc(alloc);
+//!     let w = ENCODING.to_slice_with(&cx, &mut buf[..], value)?;
+//!     Ok(&buf[..w])
+//! }
+//!
+//! #[inline]
+//! pub fn decode<'buf, T>(buf: &'buf [u8], alloc: &Slice<'_>) -> Result<T, Error>
+//! where
+//!     T: Decode<'buf, Packed>,
+//! {
+//!     let cx = Ignore::with_alloc(alloc);
+//!     ENCODING.from_slice_with(&cx, buf)
+//! }
+//! ```
+//!
+//! We also need some cooperation from the types being serialized since they
+//! need to use the `Packed` mode we defined just above:
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//! # enum Packed {}
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(mode = Packed, packed)]
+//! struct Person {
+//!     name: String,
+//!     age: u32,
+//! }
+//! ```
+//!
+//! Using the framework above also needs a bit of prep, namely the slice
+//! allocator need to be initialized:
+//!
+//! ```
+//! use musli::alloc::{ArrayBuffer, Slice};
+//!
+//! let mut buf = ArrayBuffer::new();
+//! let alloc = Slice::new(&mut buf);
+//! ```
+//!
+//! That's it! You are now using Müsli in the fastest possible mode. Feel free
+//! to use it to "beat" any benchmarks. In fact, the `musli_storage_packed` mode
+//! in our internal [benchmarks] beat pretty much every framework with these
+//! methods.
+//!
+//! > My hope is that this should illustrate why you shouldn't blindly trust
+//! > benchmarks. Sometimes code is not fully optimized, but most of the time
+//! > there is a tradeoff. If a benchmark doesn't tell you what tradeoffs are
+//! > being made, don't just naively trust a number.
+//!
+//! <br>
+//!
 //! ## Unsafety
 //!
 //! This is a non-exhaustive list of unsafe use in this crate, and why they are
@@ -370,6 +475,7 @@
 //! [`derives`]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
 //! [`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
 //! [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
+//! [`Ignore`]: <https://docs.rs/musli/latest/musli/context/struct.Ignore.html>
 //! [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/index.html>
 //! [`musli::json`]: <https://docs.rs/musli/latest/musli/json/index.html>
 //! [`musli::serde`]: <https://docs.rs/musli/latest/musli/serde/index.html>
@@ -379,6 +485,7 @@
 //! [`protobuf`]: <https://developers.google.com/protocol-buffers>
 //! [`serde`]: <https://serde.rs>
 //! [`simdutf8`]: <https://docs.rs/simdutf8>
+//! [`Slice` allocator]: <https://docs.rs/musli/latest/musli/alloc/struct.Slice.html>
 //! [`tests`]: <https://github.com/udoprog/musli/tree/main/tests>
 //! [`Text`]: <https://docs.rs/musli/latest/musli/mode/enum.Text.html>
 //! [`Visitor::visit_unknown`]: https://docs.rs/musli/latest/musli/de/trait.Visitor.html#method.visit_unknown
