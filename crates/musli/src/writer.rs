@@ -4,14 +4,41 @@
 //!
 //! [`wrap`]: crate::wrap::wrap
 
+mod slice_mut_writer;
+pub use self::slice_mut_writer::SliceMutWriter;
+
 use core::fmt;
-use core::mem::take;
 
 use crate::alloc::{Allocator, Vec};
 use crate::Context;
 
+mod sealed {
+    use super::Writer;
+
+    pub trait Sealed {}
+    impl<W> Sealed for &mut W where W: ?Sized + Writer {}
+    #[cfg(feature = "std")]
+    impl<W> Sealed for crate::wrap::Wrap<W> where W: std::io::Write {}
+    impl Sealed for &mut [u8] {}
+}
+
+/// Coerce a type into a [`Writer`].
+pub trait IntoWriter: self::sealed::Sealed {
+    /// The output of the writer which will be returned after writing.
+    type Ok;
+
+    /// The writer type.
+    type Writer: Writer<Ok = Self::Ok>;
+
+    /// Convert the type into a writer.
+    fn into_writer(self) -> Self::Writer;
+}
+
 /// The trait governing how a writer works.
 pub trait Writer {
+    /// The value returned from writing the value.
+    type Ok;
+
     /// Reborrowed type.
     ///
     /// Why oh why would we want to do this over having a simple `&'this mut T`?
@@ -25,6 +52,11 @@ pub trait Writer {
     type Mut<'this>: Writer
     where
         Self: 'this;
+
+    /// Finalize the writer and return the output.
+    fn finish<C>(&mut self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: ?Sized + Context;
 
     /// Reborrow the current type.
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
@@ -49,14 +81,36 @@ pub trait Writer {
     }
 }
 
+impl<'a, W> IntoWriter for &'a mut W
+where
+    W: ?Sized + Writer,
+{
+    type Ok = W::Ok;
+    type Writer = &'a mut W;
+
+    #[inline]
+    fn into_writer(self) -> Self::Writer {
+        self
+    }
+}
+
 impl<W> Writer for &mut W
 where
     W: ?Sized + Writer,
 {
+    type Ok = W::Ok;
     type Mut<'this>
         = &'this mut W
     where
         Self: 'this;
+
+    #[inline]
+    fn finish<C>(&mut self, cx: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        (*self).finish(cx)
+    }
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -90,10 +144,19 @@ where
 
 #[cfg(feature = "alloc")]
 impl Writer for rust_alloc::vec::Vec<u8> {
+    type Ok = ();
     type Mut<'this>
         = &'this mut Self
     where
         Self: 'this;
+
+    #[inline]
+    fn finish<C>(&mut self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        Ok(())
+    }
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -130,60 +193,13 @@ impl Writer for rust_alloc::vec::Vec<u8> {
     }
 }
 
-impl Writer for &mut [u8] {
-    type Mut<'this>
-        = &'this mut Self
-    where
-        Self: 'this;
+impl<'a> IntoWriter for &'a mut [u8] {
+    type Ok = usize;
+    type Writer = SliceMutWriter<'a>;
 
     #[inline]
-    fn borrow_mut(&mut self) -> Self::Mut<'_> {
-        self
-    }
-
-    #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        // SAFETY: the buffer never outlives this function call.
-        self.write_bytes(cx, buffer.as_slice())
-    }
-
-    #[inline]
-    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        if self.len() < bytes.len() {
-            return Err(cx.message(SliceOverflow {
-                n: bytes.len(),
-                capacity: self.len(),
-            }));
-        }
-
-        let next = take(self);
-        let (this, next) = next.split_at_mut(bytes.len());
-        this.copy_from_slice(bytes);
-        *self = next;
-        Ok(())
-    }
-
-    #[inline]
-    fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
-    where
-        C: ?Sized + Context,
-    {
-        if self.is_empty() {
-            return Err(cx.message(format_args!(
-                "Buffer overflow, remaining is {} while tried to write 1",
-                self.len()
-            )));
-        }
-
-        self[0] = b;
-        *self = &mut take(self)[1..];
-        Ok(())
+    fn into_writer(self) -> Self::Writer {
+        SliceMutWriter::new(self)
     }
 }
 
@@ -216,10 +232,19 @@ impl<'a, A> Writer for BufWriter<'a, A>
 where
     A: 'a + ?Sized + Allocator,
 {
+    type Ok = ();
     type Mut<'this>
         = &'this mut Self
     where
         Self: 'this;
+
+    #[inline]
+    fn finish<C>(&mut self, _: &C) -> Result<Self::Ok, C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        Ok(())
+    }
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {

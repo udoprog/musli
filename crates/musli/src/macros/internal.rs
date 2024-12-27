@@ -1,7 +1,7 @@
 //! Helper macros for use with Musli.
 
 macro_rules! bare_encoding {
-    ($mode:ident, $default:ident, $what:ident, $reader_trait:ident) => {
+    ($mode:ident, $default:ident, $what:ident, $reader_trait:ident, $writer_trait:ident) => {
         /// Encode the given value to the given [`Writer`] using the [`DEFAULT`]
         /// [`Encoding`].
         ///
@@ -33,9 +33,9 @@ macro_rules! bare_encoding {
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
-        pub fn encode<W, T>(writer: W, value: &T) -> Result<(), Error>
+        pub fn encode<W, T>(writer: W, value: &T) -> Result<W::Ok, Error>
         where
-            W: $crate::Writer,
+            W: $writer_trait,
             T: ?Sized + $crate::Encode<crate::mode::$mode>,
         {
             $default.encode(writer, value)
@@ -275,7 +275,14 @@ pub(crate) use bare_encoding;
 
 /// Generate all public encoding helpers.
 macro_rules! encoding_impls {
-    ($mode:ident, $what:ident, $encoder_new:path, $decoder_new:path, $reader_trait:ident :: $into_reader:ident $(,)?) => {
+    (
+        $mode:ident,
+        $what:ident,
+        $encoder_new:path,
+        $decoder_new:path,
+        $reader_trait:ident :: $into_reader:ident,
+        $writer_trait:ident :: $into_writer:ident $(,)?
+    ) => {
         /// Encode the given value to the given [`Writer`] using the current
         /// [`Encoding`].
         ///
@@ -309,9 +316,9 @@ macro_rules! encoding_impls {
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
-        pub fn encode<W, T>(self, writer: W, value: &T) -> Result<(), Error>
+        pub fn encode<W, T>(self, writer: W, value: &T) -> Result<W::Ok, Error>
         where
-            W: $crate::Writer,
+            W: $writer_trait,
             T: ?Sized + $crate::Encode<$mode>,
         {
             $crate::alloc::default!(|alloc| {
@@ -634,14 +641,17 @@ macro_rules! encoding_impls {
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
-        pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<(), C::Error>
+        pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<W::Ok, C::Error>
         where
             C: ?Sized + $crate::Context<Mode = $mode>,
-            W: $crate::Writer,
+            W: $writer_trait,
             T: ?Sized + $crate::Encode<C::Mode>,
         {
             cx.clear();
-            T::encode(value, cx, $encoder_new(cx, writer))
+            let mut writer = $writer_trait::$into_writer(writer);
+            let encoder = $encoder_new(cx, $crate::writer::Writer::borrow_mut(&mut writer));
+            T::encode(value, cx, encoder)?;
+            $crate::writer::Writer::finish(&mut writer, cx)
         }
 
         /// Encode the given value to the given slice using the current
@@ -690,7 +700,7 @@ macro_rules! encoding_impls {
         pub fn to_slice_with<C, T>(
             self,
             cx: &C,
-            mut out: &mut [u8],
+            out: &mut [u8],
             value: &T,
         ) -> Result<usize, C::Error>
         where
@@ -698,8 +708,8 @@ macro_rules! encoding_impls {
             T: ?Sized + $crate::Encode<C::Mode>,
         {
             let len = out.len();
-            self.encode_with(cx, &mut out, value)?;
-            Ok(len - out.len())
+            let remaining = self.encode_with(cx, out, value)?;
+            Ok(len - remaining)
         }
 
         /// Encode the given value to a [`Vec`] using the current [`Encoding`].

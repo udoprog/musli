@@ -21,6 +21,15 @@ mod sealed {
     impl<'de, R> Sealed for &mut R where R: ?Sized + Reader<'de> {}
 }
 
+/// Coerce a type into a [`Reader`].
+pub trait IntoReader<'de>: self::sealed::Sealed {
+    /// The reader type.
+    type Reader: Reader<'de>;
+
+    /// Convert the type into a reader.
+    fn into_reader(self) -> Self::Reader;
+}
+
 /// Trait governing how a source of bytes is read.
 ///
 /// This requires the reader to be able to hand out contiguous references to the
@@ -157,18 +166,6 @@ impl<'de> IntoReader<'de> for &'de [u8] {
     }
 }
 
-impl<'a, 'de, R> IntoReader<'de> for &'a mut R
-where
-    R: ?Sized + Reader<'de>,
-{
-    type Reader = &'a mut R;
-
-    #[inline]
-    fn into_reader(self) -> Self::Reader {
-        self
-    }
-}
-
 impl<'de> Reader<'de> for &'de [u8] {
     type Mut<'this>
         = &'this mut &'de [u8]
@@ -275,15 +272,6 @@ impl<'de> Reader<'de> for &'de [u8] {
     fn peek(&mut self) -> Option<u8> {
         self.first().copied()
     }
-}
-
-/// Coerce a type into a [`Reader`].
-pub trait IntoReader<'de>: self::sealed::Sealed {
-    /// The reader type.
-    type Reader: Reader<'de>;
-
-    /// Convert the type into a reader.
-    fn into_reader(self) -> Self::Reader;
 }
 
 /// An efficient [`Reader`] wrapper around a slice.
@@ -543,7 +531,17 @@ where
     }
 }
 
-// Forward implementations.
+impl<'a, 'de, R> IntoReader<'de> for &'a mut R
+where
+    R: ?Sized + Reader<'de>,
+{
+    type Reader = &'a mut R;
+
+    #[inline]
+    fn into_reader(self) -> Self::Reader {
+        self
+    }
+}
 
 impl<'de, R> Reader<'de> for &mut R
 where

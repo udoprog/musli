@@ -37,6 +37,7 @@ pub mod musli_json {
 #[cfg(feature = "musli-storage")]
 #[crate::benchmarker]
 pub mod musli_storage_packed {
+    use alloc::vec;
     use alloc::vec::Vec;
 
     use musli::context::{ErrorMarker as Error, Ignore};
@@ -55,20 +56,16 @@ pub mod musli_storage_packed {
     const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
     pub fn buffer() -> Vec<u8> {
-        Vec::with_capacity(4096)
+        vec![0u8; 524288]
     }
 
-    pub fn reset(buf: &mut Vec<u8>) {
-        buf.clear();
-    }
-
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T) -> Result<&'buf [u8], Error>
     where
         T: Encode<Packed>,
     {
         let cx = Ignore::new();
-        ENCODING.encode_with(&cx, &mut *buf, value)?;
-        Ok(buf)
+        let w = ENCODING.encode_with(&cx, &mut buf[..], value)?;
+        Ok(&buf[..w])
     }
 
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
