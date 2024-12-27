@@ -78,7 +78,8 @@
 mod tests;
 
 mod default;
-use self::default::{DefaultAllocator, DEFAULT_ARRAY_BUFFER};
+#[doc(inline)]
+pub use self::default::{DefaultAllocator, DEFAULT_ARRAY_BUFFER};
 
 #[doc(inline)]
 pub use musli_core::alloc::{Allocator, RawVec};
@@ -167,10 +168,10 @@ pub fn default<O>(body: impl FnOnce(&DefaultAllocator<'_, DEFAULT_ARRAY_BUFFER>)
     default_allocator_impl::<DEFAULT_ARRAY_BUFFER, O>(body)
 }
 
-/// Same as [`default`] but allows for specifying a default static buffer size
+/// Same as [`default()`] but allows for specifying a default static buffer size
 /// other than [`DEFAULT_ARRAY_BUFFER`].
 ///
-/// See [`default`] for more information.
+/// See [`default()`] for more information.
 ///
 /// # Examples
 ///
