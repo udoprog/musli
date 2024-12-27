@@ -168,18 +168,11 @@ impl<'a> Slice<'a> {
     }
 }
 
-impl Allocator for Slice<'_> {
-    type RawVec<'this, T>
-        = SliceBuf<'this, T>
-    where
-        Self: 'this,
-        T: 'this;
+impl<'a> Allocator for &'a Slice<'_> {
+    type RawVec<T> = SliceBuf<'a, T>;
 
     #[inline]
-    fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
-    where
-        T: 'a,
-    {
+    fn new_raw_vec<T>(self) -> Self::RawVec<T> {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
         let region = if size_of::<T>() == 0 {

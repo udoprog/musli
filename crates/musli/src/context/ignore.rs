@@ -21,11 +21,11 @@ pub struct Ignore<M, A> {
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M> Ignore<M, &'static System> {
+impl<M> Ignore<M, System> {
     /// Construct a new ignoring context with the [`System`] allocator.
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(crate::alloc::system())
+        Self::with_alloc(crate::alloc::System::new())
     }
 }
 
@@ -65,16 +65,13 @@ impl<M, A> Ignore<M, A> {
 impl<M, A> Context for Ignore<M, A>
 where
     M: 'static,
-    A: Allocator,
+    A: Clone + Allocator,
 {
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = ();
     type Allocator = A;
-    type String<'this>
-        = String<'this, A>
-    where
-        Self: 'this;
+    type String = String<A>;
 
     #[inline]
     fn clear(&self) {}
@@ -86,12 +83,12 @@ where
     fn advance(&self, _: usize) {}
 
     #[inline]
-    fn alloc(&self) -> &Self::Allocator {
-        &self.alloc
+    fn alloc(&self) -> Self::Allocator {
+        self.alloc.clone()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
@@ -119,7 +116,7 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M> Default for Ignore<M, &'static System> {
+impl<M> Default for Ignore<M, System> {
     #[inline]
     fn default() -> Self {
         Self::new()

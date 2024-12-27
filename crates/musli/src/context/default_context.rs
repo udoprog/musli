@@ -23,14 +23,14 @@ use super::{Access, ErrorMarker, Shared};
 /// enabled, and will use the [`System`] allocator.
 ///
 /// [`with_alloc`]: super::with_alloc
-pub struct DefaultContext<'a, A, M>
+pub struct DefaultContext<A, M>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
-    alloc: &'a A,
+    alloc: A,
     mark: Cell<usize>,
-    errors: UnsafeCell<Vec<'a, (Range<usize>, String<'a, A>), A>>,
-    path: UnsafeCell<Vec<'a, Step<'a, A>, A>>,
+    errors: UnsafeCell<Vec<(Range<usize>, String<A>), A>>,
+    path: UnsafeCell<Vec<Step<A>, A>>,
     // How many elements of `path` we've gone over capacity.
     cap: Cell<usize>,
     include_type: bool,
@@ -38,39 +38,39 @@ where
     _marker: PhantomData<M>,
 }
 
-impl<A, M> DefaultContext<'_, A, M> where A: ?Sized + Allocator {}
+impl<A, M> DefaultContext<A, M> where A: Allocator {}
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M> DefaultContext<'static, System, M> {
+impl<M> DefaultContext<System, M> {
     /// Construct a new fully featured context which uses the [`System`]
     /// allocator for memory.
     ///
     /// [`System`]: crate::alloc::System
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(crate::alloc::system())
+        Self::with_alloc(crate::alloc::System::new())
     }
 }
 
 #[cfg(feature = "alloc")]
-impl<M> Default for DefaultContext<'static, System, M> {
+impl<M> Default for DefaultContext<System, M> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, A, M> DefaultContext<'a, A, M>
+impl<A, M> DefaultContext<A, M>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Clone + Allocator,
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
     #[inline]
-    pub(super) fn with_alloc(alloc: &'a A) -> Self {
-        let errors = Vec::new_in(alloc);
-        let path = Vec::new_in(alloc);
+    pub(super) fn with_alloc(alloc: A) -> Self {
+        let errors = Vec::new_in(alloc.clone());
+        let path = Vec::new_in(alloc.clone());
 
         Self {
             alloc,
@@ -94,7 +94,7 @@ where
 
     /// Generate a line-separated report of all collected errors.
     #[inline]
-    pub fn report(&self) -> Report<'_, 'a, A> {
+    pub fn report(&self) -> Report<'_, A> {
         Report {
             errors: self.errors(),
         }
@@ -102,7 +102,7 @@ where
 
     /// Iterate over all collected errors.
     #[inline]
-    pub fn errors(&self) -> Errors<'_, 'a, A> {
+    pub fn errors(&self) -> Errors<'_, A> {
         let access = self.access.shared();
 
         Errors {
@@ -115,7 +115,7 @@ where
 
     /// Push an error into the collection.
     #[inline]
-    fn push_error(&self, range: Range<usize>, error: String<'a, A>) {
+    fn push_error(&self, range: Range<usize>, error: String<A>) {
         let _access = self.access.exclusive();
 
         // SAFETY: We've checked that we have exclusive access just above.
@@ -126,7 +126,7 @@ where
 
     /// Push a path.
     #[inline]
-    fn push_path(&self, step: Step<'a, A>) {
+    fn push_path(&self, step: Step<A>) {
         let _access = self.access.exclusive();
 
         // SAFETY: We've checked that we have exclusive access just above.
@@ -156,29 +156,26 @@ where
     }
 
     #[inline]
-    fn format_string<T>(&self, value: T) -> Option<String<'a, A>>
+    fn format_string<T>(&self, value: T) -> Option<String<A>>
     where
         T: fmt::Display,
     {
-        let mut string = String::new_in(self.alloc);
+        let mut string = String::new_in(self.alloc.clone());
         write!(string, "{value}").ok()?;
         Some(string)
     }
 }
 
-impl<'a, A, M> Context for DefaultContext<'a, A, M>
+impl<A, M> Context for DefaultContext<A, M>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Clone + Allocator,
     M: 'static,
 {
     type Mode = M;
     type Error = ErrorMarker;
     type Mark = usize;
     type Allocator = A;
-    type String<'this>
-        = String<'this, A>
-    where
-        Self: 'this;
+    type String = String<A>;
 
     #[inline]
     fn clear(&self) {
@@ -193,12 +190,12 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> &Self::Allocator {
-        self.alloc
+    fn alloc(&self) -> Self::Allocator {
+        self.alloc.clone()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
@@ -349,16 +346,16 @@ where
 }
 
 /// A line-separated report of all errors.
-pub struct Report<'b, 'a, A>
+pub struct Report<'a, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
-    errors: Errors<'b, 'a, A>,
+    errors: Errors<'a, A>,
 }
 
-impl<'a, A> fmt::Display for Report<'_, 'a, A>
+impl<A> fmt::Display for Report<'_, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -373,21 +370,21 @@ where
 /// An iterator over available errors.
 ///
 /// See [`DefaultContext::errors`].
-pub struct Errors<'b, 'a, A>
+pub struct Errors<'a, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
-    path: &'b [Step<'a, A>],
+    path: &'a [Step<A>],
     cap: usize,
-    errors: slice::Iter<'b, (Range<usize>, String<'a, A>)>,
-    _access: Shared<'b>,
+    errors: slice::Iter<'a, (Range<usize>, String<A>)>,
+    _access: Shared<'a>,
 }
 
-impl<'b, 'a, A> Iterator for Errors<'b, 'a, A>
+impl<'a, A> Iterator for Errors<'a, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
-    type Item = Error<'b, 'a, A>;
+    type Item = Error<'a, A>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -396,9 +393,9 @@ where
     }
 }
 
-impl<A> Clone for Errors<'_, '_, A>
+impl<A> Clone for Errors<'_, A>
 where
-    A: ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -412,22 +409,22 @@ where
 }
 
 /// A collected error which has been context decorated.
-pub struct Error<'b, 'a, A>
+pub struct Error<'a, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
-    path: &'b [Step<'a, A>],
+    path: &'a [Step<A>],
     cap: usize,
     range: Range<usize>,
-    error: &'b str,
+    error: &'a str,
 }
 
-impl<'b, 'a, A> Error<'b, 'a, A>
+impl<'a, A> Error<'a, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
-    fn new(path: &'b [Step<'a, A>], cap: usize, range: Range<usize>, error: &'b str) -> Self {
+    fn new(path: &'a [Step<A>], cap: usize, range: Range<usize>, error: &'a str) -> Self {
         Self {
             path,
             cap,
@@ -437,9 +434,9 @@ where
     }
 }
 
-impl<'a, A> fmt::Display for Error<'_, 'a, A>
+impl<A> fmt::Display for Error<'_, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -465,9 +462,9 @@ where
 
 /// A single traced step.
 #[derive(Debug)]
-pub(crate) enum Step<'a, A>
+pub(crate) enum Step<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     Struct(&'static str),
     Enum(&'static str),
@@ -475,30 +472,30 @@ where
     Named(&'static str),
     Unnamed(u32),
     Index(usize),
-    Key(String<'a, A>),
+    Key(String<A>),
 }
 
-struct FormatPath<'b, 'a, A>
+struct FormatPath<'a, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
-    path: &'b [Step<'a, A>],
+    path: &'a [Step<A>],
     cap: usize,
 }
 
-impl<'b, 'a, A> FormatPath<'b, 'a, A>
+impl<'a, A> FormatPath<'a, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
-    pub(crate) fn new(path: &'b [Step<'a, A>], cap: usize) -> Self {
+    pub(crate) fn new(path: &'a [Step<A>], cap: usize) -> Self {
         Self { path, cap }
     }
 }
 
-impl<'a, A> fmt::Display for FormatPath<'_, 'a, A>
+impl<A> fmt::Display for FormatPath<'_, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

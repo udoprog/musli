@@ -102,7 +102,7 @@ where
     pub(crate) fn parse_escape(
         &mut self,
         validate: bool,
-        scratch: &mut Vec<'_, u8, (impl Allocator + ?Sized)>,
+        scratch: &mut Vec<u8, C::Allocator>,
     ) -> Result<bool, C::Error> {
         let start = self.cx.mark();
         let b = self.next()?;
@@ -117,10 +117,7 @@ where
             b'r' => scratch.push(b'\r'),
             b't' => scratch.push(b'\t'),
             b'u' => {
-                fn encode_surrogate(
-                    scratch: &mut Vec<'_, u8, (impl Allocator + ?Sized)>,
-                    n: u16,
-                ) -> bool {
+                fn encode_surrogate(scratch: &mut Vec<u8, impl Allocator>, n: u16) -> bool {
                     scratch.write(&[
                         (n >> 12 & 0b0000_1111) as u8 | 0b1110_0000,
                         (n >> 6 & 0b0011_1111) as u8 | 0b1000_0000,
@@ -285,7 +282,7 @@ where
         &mut self,
         validate: bool,
         start: &C::Mark,
-        scratch: &'scratch mut Vec<'_, u8, (impl Allocator + ?Sized)>,
+        scratch: &'scratch mut Vec<u8, C::Allocator>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error> {
         // Index of the first byte not yet copied into the scratch space.
         let mut open_mark = self.cx.mark();

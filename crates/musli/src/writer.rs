@@ -62,7 +62,7 @@ pub trait Writer {
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write a buffer to the current writer.
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context;
 
@@ -118,7 +118,7 @@ where
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {
@@ -164,7 +164,7 @@ impl Writer for rust_alloc::vec::Vec<u8> {
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {
@@ -204,33 +204,33 @@ impl<'a> IntoWriter for &'a mut [u8] {
 }
 
 /// A writer that writes against an underlying [`Vec`].
-pub struct BufWriter<'a, A>
+pub struct BufWriter<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
-    buf: Vec<'a, u8, A>,
+    buf: Vec<u8, A>,
 }
 
-impl<'a, A> BufWriter<'a, A>
+impl<A> BufWriter<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     /// Construct a new buffer writer.
-    pub fn new(alloc: &'a A) -> Self {
+    pub fn new(alloc: A) -> Self {
         Self {
             buf: Vec::new_in(alloc),
         }
     }
 
     /// Coerce into inner buffer.
-    pub fn into_inner(self) -> Vec<'a, u8, A> {
+    pub fn into_inner(self) -> Vec<u8, A> {
         self.buf
     }
 }
 
-impl<'a, A> Writer for BufWriter<'a, A>
+impl<A> Writer for BufWriter<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     type Ok = ();
     type Mut<'this>
@@ -252,7 +252,7 @@ where
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<'_, u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: ?Sized + Context,
     {

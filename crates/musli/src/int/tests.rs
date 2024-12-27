@@ -17,12 +17,12 @@ const ITER: usize = 100;
 #[test]
 fn basic_continuation() {
     crate::alloc::default(|alloc| {
-        let cx = context::Ignore::with_marker(&alloc);
+        let cx = context::Ignore::with_marker(alloc);
         let mut bytes = FixedBytes::<8>::new();
         c::encode(&cx, &mut bytes, 5000u32).unwrap();
         assert_eq!(bytes.as_slice(), &[0b1000_1000, 0b0010_0111]);
 
-        let cx = context::Ignore::with_marker(&alloc);
+        let cx = context::Ignore::with_marker(alloc);
         let number: u32 = c::decode(&cx, bytes.as_slice()).unwrap();
         assert_eq!(number, 5000u32);
     })
@@ -38,11 +38,11 @@ fn test_continuation_encoding() {
     {
         crate::alloc::default(|alloc| {
             let mut out = Vec::new();
-            let cx = crate::context::Ignore::with_marker(&alloc);
+            let cx = crate::context::Ignore::with_marker(alloc);
             c::encode(&cx, &mut out, expected).unwrap();
             c::encode(&cx, &mut out, expected).unwrap();
             let mut data = out.as_slice();
-            let cx = context::Ignore::with_marker(&alloc);
+            let cx = context::Ignore::with_marker(alloc);
             let a: T = c::decode(&cx, &mut data).unwrap();
             let b: T = c::decode(&cx, &mut data).unwrap();
             assert!(data.is_empty());
@@ -57,7 +57,7 @@ fn test_continuation_encoding() {
     {
         crate::alloc::default(|alloc| {
             let mut out = Vec::new();
-            let cx = crate::context::Same::with_marker(&alloc);
+            let cx = crate::context::Same::with_marker(alloc);
             c::encode(&cx, crate::wrap::wrap(&mut out), value).unwrap();
             out
         })

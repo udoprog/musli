@@ -8,18 +8,18 @@ use crate::Context;
 use super::{Allocator, Vec};
 
 /// Wrapper around a buffer that is guaranteed to be a valid utf-8 string.
-pub struct String<'a, A>
+pub struct String<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
-    buf: Vec<'a, u8, A>,
+    buf: Vec<u8, A>,
 }
 
 /// Collect a string into a string buffer.
 pub(crate) fn collect_string<'cx, C, T>(
     cx: &'cx C,
     value: &T,
-) -> Result<String<'cx, C::Allocator>, C::Error>
+) -> Result<String<C::Allocator>, C::Error>
 where
     C: 'cx + ?Sized + Context,
     T: ?Sized + fmt::Display,
@@ -35,18 +35,15 @@ where
     Ok(string)
 }
 
-impl<'a, A> String<'a, A>
+impl<A> String<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     /// Construct a new string buffer in the provided allocator.
-    pub fn new_in(alloc: &'a A) -> Self {
-        Self::new(alloc.new_raw_vec::<u8>())
-    }
-
-    /// Construct a new fixed string.
-    pub(crate) const fn new(buf: A::RawVec<'a, u8>) -> Self {
-        Self { buf: Vec::new(buf) }
+    pub(crate) fn new_in(alloc: A) -> Self {
+        Self {
+            buf: Vec::new_in(alloc),
+        }
     }
 
     fn as_str(&self) -> &str {
@@ -71,9 +68,9 @@ where
     }
 }
 
-impl<'a, A> fmt::Write for String<'a, A>
+impl<A> fmt::Write for String<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
     fn write_char(&mut self, c: char) -> fmt::Result {
@@ -86,9 +83,9 @@ where
     }
 }
 
-impl<'a, A> Deref for String<'a, A>
+impl<A> Deref for String<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     type Target = str;
 
@@ -98,9 +95,9 @@ where
     }
 }
 
-impl<'a, A> fmt::Display for String<'a, A>
+impl<A> fmt::Display for String<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -108,9 +105,9 @@ where
     }
 }
 
-impl<'a, A> fmt::Debug for String<'a, A>
+impl<A> fmt::Debug for String<A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -118,9 +115,9 @@ where
     }
 }
 
-impl<A> AsRef<str> for String<'_, A>
+impl<A> AsRef<str> for String<A>
 where
-    A: ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
     fn as_ref(&self) -> &str {

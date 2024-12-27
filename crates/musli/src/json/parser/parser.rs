@@ -1,4 +1,4 @@
-use crate::alloc::{Allocator, Vec};
+use crate::alloc::Vec;
 use crate::de::Visitor;
 use crate::json::parser::integer::decode_signed_full;
 use crate::json::parser::{StringReference, Token};
@@ -36,7 +36,7 @@ pub trait Parser<'de>: private::Sealed {
         &mut self,
         cx: &C,
         validate: bool,
-        scratch: &'scratch mut Vec<'_, u8, (impl Allocator + ?Sized)>,
+        scratch: &'scratch mut Vec<u8, C::Allocator>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: ?Sized + Context;
@@ -234,7 +234,7 @@ where
         &mut self,
         cx: &C,
         validate: bool,
-        scratch: &'scratch mut Vec<'_, u8, (impl Allocator + ?Sized)>,
+        scratch: &'scratch mut Vec<u8, C::Allocator>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: ?Sized + Context,

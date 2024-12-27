@@ -8,22 +8,20 @@ use core::slice;
 use super::{Allocator, RawVec};
 
 /// A vector backed by an [`Allocator`].
-pub struct Vec<'a, T, A>
+pub struct Vec<T, A>
 where
-    A: 'a + ?Sized + Allocator,
-    T: 'a,
+    A: Allocator,
 {
-    buf: A::RawVec<'a, T>,
+    buf: A::RawVec<T>,
     len: usize,
 }
 
-impl<'a, T, A> Vec<'a, T, A>
+impl<T, A> Vec<T, A>
 where
-    A: 'a + ?Sized + Allocator,
-    T: 'a,
+    A: Allocator,
 {
     /// Construct a buffer vector from raw parts.
-    const unsafe fn from_raw_parts(buf: A::RawVec<'a, T>, len: usize) -> Self {
+    const unsafe fn from_raw_parts(buf: A::RawVec<T>, len: usize) -> Self {
         Self { buf, len }
     }
 
@@ -43,7 +41,7 @@ where
     ///     assert_eq!(a.as_slice(), ["Hello", "World"]);
     /// });
     /// ```
-    pub fn new_in(alloc: &'a A) -> Self {
+    pub fn new_in(alloc: A) -> Self {
         Self {
             buf: alloc.new_raw_vec::<T>(),
             len: 0,
@@ -52,7 +50,7 @@ where
 
     /// Construct a new buffer vector.
     #[inline]
-    pub const fn new(buf: A::RawVec<'a, T>) -> Self {
+    pub const fn new(buf: A::RawVec<T>) -> Self {
         Self { buf, len: 0 }
     }
 
@@ -212,7 +210,7 @@ where
     }
 
     #[inline]
-    fn into_raw_parts(self) -> (A::RawVec<'a, T>, usize) {
+    fn into_raw_parts(self) -> (A::RawVec<T>, usize) {
         let this = ManuallyDrop::new(self);
 
         // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
@@ -223,10 +221,10 @@ where
     }
 }
 
-impl<'a, T, A> Vec<'a, T, A>
+impl<T, A> Vec<T, A>
 where
-    A: 'a + ?Sized + Allocator,
-    T: 'a + Copy,
+    A: Allocator,
+    T: Copy,
 {
     /// Write the given number of bytes.
     ///
@@ -284,7 +282,7 @@ where
     /// });
     /// ```
     #[inline]
-    pub fn extend(&mut self, other: Vec<'_, T, A>) -> bool {
+    pub fn extend(&mut self, other: Vec<T, A>) -> bool {
         let (other, other_len) = other.into_raw_parts();
 
         // Try to merge one buffer with another.
@@ -318,9 +316,9 @@ where
 /// })?;
 /// # Ok::<(), core::fmt::Error>(())
 /// ```
-impl<'a, A> fmt::Write for Vec<'a, u8, A>
+impl<A> fmt::Write for Vec<u8, A>
 where
-    A: 'a + ?Sized + Allocator,
+    A: Allocator,
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -333,12 +331,11 @@ where
 }
 
 #[cfg(test)]
-impl<'a, T, A> Deref for Vec<'a, T, A>
+impl<T, A> Deref for Vec<T, A>
 where
-    A: 'a + ?Sized + Allocator,
-    T: 'a,
+    A: Allocator,
 {
-    type Target = A::RawVec<'a, T>;
+    type Target = A::RawVec<T>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -347,10 +344,9 @@ where
 }
 
 #[cfg(test)]
-impl<'a, T, A> DerefMut for Vec<'a, T, A>
+impl<T, A> DerefMut for Vec<T, A>
 where
-    A: 'a + ?Sized + Allocator,
-    T: 'a,
+    A: Allocator,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -358,10 +354,9 @@ where
     }
 }
 
-impl<'a, T, A> Drop for Vec<'a, T, A>
+impl<T, A> Drop for Vec<T, A>
 where
-    A: 'a + ?Sized + Allocator,
-    T: 'a,
+    A: Allocator,
 {
     fn drop(&mut self) {
         self.clear();

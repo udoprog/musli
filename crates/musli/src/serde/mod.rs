@@ -122,10 +122,7 @@ where
     type Error = error::SerdeError;
     type Mark = C::Mark;
     type Allocator = C::Allocator;
-    type String<'this>
-        = String<'this, C::Allocator>
-    where
-        Self: 'this;
+    type String = String<C::Allocator>;
 
     #[inline]
     fn clear(&self) {
@@ -144,12 +141,12 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> &Self::Allocator {
+    fn alloc(&self) -> Self::Allocator {
         self.inner.alloc()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String<'_>, Self::Error>
+    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {

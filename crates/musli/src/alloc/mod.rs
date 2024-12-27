@@ -90,17 +90,8 @@ mod system;
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub use self::system::System;
-
-/// The static system allocator instance.
 #[cfg(feature = "alloc")]
-pub(crate) static __SYSTEM: System = System::new();
-
-/// Get a reference to the static system allocator instance.
-#[cfg(feature = "alloc")]
-#[inline]
-pub fn system() -> &'static System {
-    &__SYSTEM
-}
+use self::system::SystemBuf;
 
 mod disabled;
 #[doc(inline)]
@@ -109,6 +100,8 @@ pub use self::disabled::Disabled;
 mod stack;
 #[doc(inline)]
 pub use self::stack::Slice;
+#[cfg(not(feature = "alloc"))]
+use self::stack::SliceBuf;
 
 mod array_buffer;
 pub use self::array_buffer::ArrayBuffer;
@@ -211,8 +204,8 @@ pub fn with_buffer<const BUF: usize, O>(body: impl FnOnce(&DefaultAllocator<'_, 
 fn default_allocator_impl<const BUF: usize, O>(
     body: impl FnOnce(&DefaultAllocator<'_, BUF>) -> O,
 ) -> O {
-    let alloc = DefaultAllocator::new(crate::alloc::system());
-    body(alloc)
+    let alloc = DefaultAllocator::new(System::new());
+    body(&alloc)
 }
 
 #[cfg(not(feature = "alloc"))]
@@ -222,6 +215,6 @@ fn default_allocator_impl<const BUF: usize, O>(
 ) -> O {
     let mut buf = crate::alloc::ArrayBuffer::<BUF>::with_size();
     let slice = crate::alloc::Slice::new(&mut buf);
-    let alloc = DefaultAllocator::new(&slice);
-    body(alloc)
+    let alloc = DefaultAllocator::new(slice);
+    body(&alloc)
 }

@@ -55,16 +55,10 @@ impl Default for Disabled {
 }
 
 impl Allocator for Disabled {
-    type RawVec<'this, T>
-        = EmptyBuf<T>
-    where
-        T: 'this;
+    type RawVec<T> = EmptyBuf<T>;
 
     #[inline]
-    fn new_raw_vec<'a, T>(&'a self) -> Self::RawVec<'a, T>
-    where
-        T: 'a,
-    {
+    fn new_raw_vec<T>(self) -> Self::RawVec<T> {
         EmptyBuf {
             _marker: PhantomData,
         }
