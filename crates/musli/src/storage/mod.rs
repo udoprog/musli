@@ -63,7 +63,7 @@
 //! use musli::options::{self, Options, Integer};
 //! use musli::storage::Encoding;
 //!
-//! const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+//! const OPTIONS: Options = options::new().integer(Integer::Fixed).build();
 //! const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]

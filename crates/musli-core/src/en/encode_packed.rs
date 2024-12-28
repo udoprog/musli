@@ -33,6 +33,8 @@ use crate::en::Encoder;
 /// }
 ///
 /// impl<M> Encode<M> for PackedType {
+///     type Encode = Self;
+///
 ///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
 ///     where
 ///         E: Encoder,
@@ -41,6 +43,11 @@ use crate::en::Encoder;
 ///         pack.push(&self.data.0);
 ///         pack.push(&self.data.1);
 ///         pack.finish_sequence()
+///     }
+///
+///     #[inline]
+///     fn as_encode(&self) -> &Self::Encode {
+///         self
 ///     }
 /// }
 /// ```

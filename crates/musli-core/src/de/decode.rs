@@ -38,6 +38,15 @@ use super::Decoder;
 /// }
 /// ```
 pub trait Decode<'de, M>: Sized {
+    /// Whether the type is packed. Packed types can be bitwise copied if the
+    /// representation of the serialization format is identical to the memory
+    /// layout of the type.
+    ///
+    /// Note that setting this to `true` has safety implications, since it
+    /// implies that assuming the type is correctly aligned it can be validly
+    /// bitwise copied when encoded. Setting it to `false` is always safe.
+    const DECODE_PACKED: bool = false;
+
     /// Decode the given input.
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where

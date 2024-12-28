@@ -36,9 +36,17 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         trace_body: true,
     };
 
+    let packed;
+
     let body = match &e.data {
-        BuildData::Struct(st) => decode_struct(&cx, &e, st)?,
-        BuildData::Enum(en) => decode_enum(&cx, &e, en)?,
+        BuildData::Struct(st) => {
+            packed = crate::packed::packed(&e, st, &e.tokens.decode_t, "DECODE_PACKED");
+            decode_struct(&cx, &e, st)?
+        }
+        BuildData::Enum(en) => {
+            packed = syn::parse_quote!(false);
+            decode_enum(&cx, &e, en)?
+        }
     };
 
     if e.cx.has_errors() {
@@ -94,7 +102,11 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         const _: () = {
             #[automatically_derived]
             #(#attributes)*
-            impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #type_generics #where_clause {
+            impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #type_generics
+            #where_clause
+            {
+                const DECODE_PACKED: bool = #packed;
+
                 #[inline]
                 fn decode<#d_param>(#ctx_var: &#d_param::Cx, #root_decoder_var: #d_param) -> #result<Self, <#d_param::Cx as #context_t>::Error>
                 where
@@ -112,7 +124,7 @@ fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
 
     let body = match (st.kind, st.packing) {
         (_, Packing::Transparent) => decode_transparent(cx, b, st)?,
-        (_, Packing::Packed) => decode_packed(cx, b, st)?,
+        (_, Packing::Packed(..)) => decode_packed(cx, b, st)?,
         (StructKind::Empty, _) => decode_empty(cx, b, st)?,
         (_, Packing::Tagged) => decode_tagged(cx, b, st, None)?,
     };
@@ -147,7 +159,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         ..
     } = b.tokens;
 
-    if let Some(&(span, Packing::Packed)) = en.packing_span {
+    if let Some(&(span, Packing::Packed(..))) = en.packing_span {
         b.decode_packed_enum_diagnostics(span);
         return Err(());
     }
@@ -716,7 +728,7 @@ fn decode_variant(
 
     Ok(match (v.st.kind, v.st.packing) {
         (_, Packing::Transparent) => decode_transparent(&cx, b, &v.st)?,
-        (_, Packing::Packed) => decode_packed(&cx, b, &v.st)?,
+        (_, Packing::Packed(..)) => decode_packed(&cx, b, &v.st)?,
         (StructKind::Empty, _) => decode_empty(&cx, b, &v.st)?,
         (_, Packing::Tagged) => decode_tagged(&cx, b, &v.st, Some(variant_tag))?,
     })

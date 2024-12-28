@@ -86,11 +86,7 @@ As an example of this, these two functions both produce the same assembly
 (built with `--release`):
 
 ```rust
-const OPTIONS: Options = options::new()
-    .with_integer(Integer::Fixed)
-    .with_byte_order(ByteOrder::NATIVE)
-    .build();
-
+const OPTIONS: Options = options::new().fixed().native_byte_order().build();
 const ENCODING: Encoding<OPTIONS> = Encoding::new().with_options();
 
 #[derive(Encode, Decode)]
@@ -353,19 +349,14 @@ We achieve this through the following methods:
 
 ```rust
 use musli::context::{ErrorMarker as Error, Ignore};
-use musli::options::{self, Float, Integer, Options};
+use musli::options::{self, Float, Integer, Width, Options};
 use musli::storage::Encoding;
 use musli::{Decode, Encode};
 use musli::alloc::Slice;
 
 enum Packed {}
 
-const OPTIONS: Options = options::new()
-    .with_length(Integer::Fixed)
-    .with_integer(Integer::Fixed)
-    .with_float(Float::Fixed)
-    .build();
-
+const OPTIONS: Options = options::new().fixed().native_byte_order().build();
 const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
 #[inline]
@@ -413,9 +404,8 @@ let alloc = Slice::new(&mut buf);
 ```
 
 That's it! You are now using Müsli in the fastest possible mode. Feel free
-to use it to "beat" any benchmarks. In fact, the `musli_storage_packed` mode
-in our internal [benchmarks] beat pretty much every framework with these
-methods.
+to use it to "beat" any benchmarks. In fact, the `musli_packed` mode in our
+internal [benchmarks] beat pretty much every framework with these methods.
 
 > My hope is that this should illustrate why you shouldn't blindly trust
 > benchmarks. Sometimes code is not fully optimized, but most of the time

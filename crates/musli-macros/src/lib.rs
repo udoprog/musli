@@ -16,6 +16,7 @@ mod de;
 mod en;
 mod expander;
 mod internals;
+mod packed;
 mod types;
 
 use proc_macro::TokenStream;

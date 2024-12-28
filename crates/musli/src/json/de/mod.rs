@@ -44,7 +44,7 @@ use super::parser::integer::{
 use super::parser::{integer, Parser, StringReference, Token};
 
 #[cfg(feature = "value")]
-const BUFFER_OPTIONS: Options = options::new().with_map_keys_as_numbers(true).build();
+const BUFFER_OPTIONS: Options = options::new().map_keys_as_numbers().build();
 
 /// A JSON decoder for Müsli.
 pub(crate) struct JsonDecoder<'a, P, C: ?Sized> {

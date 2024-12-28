@@ -88,11 +88,7 @@
 //! # use musli::options::{self, Options, Integer, ByteOrder};
 //! # use musli::storage::Encoding;
 //! # type Result<T, E = musli::storage::Error> = core::result::Result<T, E>;
-//! const OPTIONS: Options = options::new()
-//!     .with_integer(Integer::Fixed)
-//!     .with_byte_order(ByteOrder::NATIVE)
-//!     .build();
-//!
+//! const OPTIONS: Options = options::new().fixed().native_byte_order().build();
 //! const ENCODING: Encoding<OPTIONS> = Encoding::new().with_options();
 //!
 //! #[derive(Encode, Decode)]
@@ -364,19 +360,14 @@
 //!
 //! ```
 //! use musli::context::{ErrorMarker as Error, Ignore};
-//! use musli::options::{self, Float, Integer, Options};
+//! use musli::options::{self, Float, Integer, Width, Options};
 //! use musli::storage::Encoding;
 //! use musli::{Decode, Encode};
 //! use musli::alloc::Slice;
 //!
 //! enum Packed {}
 //!
-//! const OPTIONS: Options = options::new()
-//!     .with_length(Integer::Fixed)
-//!     .with_integer(Integer::Fixed)
-//!     .with_float(Float::Fixed)
-//!     .build();
-//!
+//! const OPTIONS: Options = options::new().fixed().native_byte_order().build();
 //! const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 //!
 //! #[inline]
@@ -425,9 +416,8 @@
 //! ```
 //!
 //! That's it! You are now using Müsli in the fastest possible mode. Feel free
-//! to use it to "beat" any benchmarks. In fact, the `musli_storage_packed` mode
-//! in our internal [benchmarks] beat pretty much every framework with these
-//! methods.
+//! to use it to "beat" any benchmarks. In fact, the `musli_packed` mode in our
+//! internal [benchmarks] beat pretty much every framework with these methods.
 //!
 //! > My hope is that this should illustrate why you shouldn't blindly trust
 //! > benchmarks. Sometimes code is not fully optimized, but most of the time
@@ -701,3 +691,33 @@ pub mod no_std;
 
 mod int;
 mod str;
+
+use crate::mode::Binary;
+
+/// Test if the given type `T` is marked with the `#[musli(bitwise)]` attribute,
+/// and is bitwise encodeable in the [`Binary`] mode.
+///
+/// See the [help section for `#[musli(bitwise)]`][help] for more information.
+///
+/// [help]: crate::help::derives#muslibitwise
+#[inline]
+pub const fn is_bitwise_encode<T>() -> bool
+where
+    T: Encode<Binary>,
+{
+    T::ENCODE_PACKED
+}
+
+/// Test if the given type `T` is marked with the `#[musli(bitwise)]` attribute,
+/// and is bitwise encodeable in the [`Binary`] mode.
+///
+/// See the [help section for `#[musli(bitwise)]`][help] for more information.
+///
+/// [help]: crate::help::derives#muslibitwise
+#[inline]
+pub const fn is_bitwise_decode<T>() -> bool
+where
+    T: for<'de> Decode<'de, Binary>,
+{
+    T::DECODE_PACKED
+}

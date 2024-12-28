@@ -37,9 +37,17 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
         ..
     } = e.tokens;
 
+    let packed;
+
     let body = match &e.data {
-        BuildData::Struct(st) => encode_map(&cx, &e, st)?,
-        BuildData::Enum(en) => encode_enum(&cx, &e, en)?,
+        BuildData::Struct(st) => {
+            packed = crate::packed::packed(&e, st, &e.tokens.encode_t, "ENCODE_PACKED");
+            encode_map(&cx, &e, st)?
+        }
+        BuildData::Enum(en) => {
+            packed = syn::parse_quote!(false);
+            encode_enum(&cx, &e, en)?
+        }
     };
 
     if e.cx.has_errors() {
@@ -71,13 +79,24 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
         const _: () = {
             #[automatically_derived]
             #(#attributes)*
-            impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics #where_clause {
+            impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics
+            #where_clause
+            {
+                const ENCODE_PACKED: bool = #packed;
+
+                type Encode = Self;
+
                 #[inline]
                 fn encode<#e_param>(&self, #ctx_var: &#e_param::Cx, #encoder_var: #e_param) -> #result<<#e_param as #encoder_t>::Ok, <#e_param as #encoder_t>::Error>
                 where
                     #e_param: #encoder_t<Mode = #mode_ident>,
                 {
                     #body
+                }
+
+                #[inline]
+                fn as_encode(&self) -> &Self::Encode {
+                    self
                 }
             }
         };
@@ -146,7 +165,7 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream
                 #output_var
             }};
         }
-        Packing::Packed => {
+        Packing::Packed(..) => {
             let decls = tests.iter().map(|t| &t.decl);
 
             encode = quote! {{
@@ -199,6 +218,7 @@ fn insert_fields<'st>(
     let field_encoder_var = b.cx.ident("field_encoder");
     let value_encoder_var = b.cx.ident("value_encoder");
     let field_name_static = b.cx.ident("FIELD_NAME");
+    let field_name_expr = st.name_expr(field_name_static.clone());
 
     let mut encoders = Vec::with_capacity(st.all_fields.len());
     let mut tests = Vec::with_capacity(st.all_fields.len());
@@ -239,7 +259,7 @@ fn insert_fields<'st>(
                     #map_encoder_t::encode_entry_fn(#encoder_var, move |#pair_encoder_var| {
                         static #field_name_static: #name_type = #name;
                         let #field_encoder_var = #map_entry_encoder_t::encode_key(#pair_encoder_var)?;
-                        #encode_t_encode(&#field_name_static, #ctx_var, #field_encoder_var)?;
+                        #encode_t_encode(#field_name_expr, #ctx_var, #field_encoder_var)?;
                         let #value_encoder_var = #map_entry_encoder_t::encode_value(#pair_encoder_var)?;
                         #encode_path(#access, #ctx_var, #value_encoder_var)?;
                         #result_ok(())
@@ -248,7 +268,7 @@ fn insert_fields<'st>(
                     #leave
                 };
             }
-            Packing::Packed => {
+            Packing::Packed(..) => {
                 encode = quote! {
                     #enter
                     let #sequence_decoder_next_var = #sequence_encoder_t::encode_next(#pack_var)?;
@@ -345,8 +365,10 @@ fn encode_variant(
     } = b.tokens;
 
     let content_static = b.cx.ident("CONTENT");
+    let content_expr = en.static_expr(content_static.clone());
     let hint = b.cx.ident("STRUCT_HINT");
     let name_static = b.cx.ident("NAME");
+    let name_expr = en.static_expr(name_static.clone());
     let tag_encoder = b.cx.ident("tag_encoder");
     let tag_static = b.cx.ident("TAG");
     let variant_encoder = b.cx.ident("variant_encoder");
@@ -363,7 +385,7 @@ fn encode_variant(
 
             encode = quote! {{
                 static #name_static: #static_type = #name;
-                #encode_t_encode(&#name_static, #ctx_var, #encoder_var)?
+                #encode_t_encode(#name_expr, #ctx_var, #encoder_var)?
             }};
         }
         EnumTagging::Default => {
@@ -375,7 +397,7 @@ fn encode_variant(
                     let var = &f.self_access;
                     encode = quote!(#encode_path(#var, #ctx_var, #encoder_var)?);
                 }
-                Packing::Packed => {
+                Packing::Packed(..) => {
                     let decls = tests.iter().map(|t| &t.decl);
 
                     encode = quote! {{
@@ -413,7 +435,7 @@ fn encode_variant(
                         let #tag_encoder = #variant_encoder_t::encode_tag(#variant_encoder)?;
                         static #name_static: #static_type = #name;
 
-                        #encode_t_encode(&#name_static, #ctx_var, #tag_encoder)?;
+                        #encode_t_encode(#name_expr, #ctx_var, #tag_encoder)?;
 
                         let #encoder_var = #variant_encoder_t::encode_data(#variant_encoder)?;
                         #encode;
@@ -476,7 +498,7 @@ fn encode_variant(
 
                     #map_encoder_t::encode_entry_fn(#struct_encoder, move |#pair| {
                         let #content_tag = #map_entry_encoder_t::encode_key(#pair)?;
-                        #encode_t_encode(&#content_static, #ctx_var, #content_tag)?;
+                        #encode_t_encode(#content_expr, #ctx_var, #content_tag)?;
 
                         let #content_struct = #map_entry_encoder_t::encode_value(#pair)?;
 

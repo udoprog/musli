@@ -23,6 +23,12 @@ enum SocketAddrTag {
 }
 
 impl Encode<Binary> for Ipv4Addr {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -30,9 +36,20 @@ impl Encode<Binary> for Ipv4Addr {
     {
         encoder.encode_array(&self.octets())
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl Encode<Text> for Ipv4Addr {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -40,9 +57,18 @@ impl Encode<Text> for Ipv4Addr {
     {
         encoder.collect_string(self)
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl<'de> Decode<'de, Binary> for Ipv4Addr {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -53,6 +79,10 @@ impl<'de> Decode<'de, Binary> for Ipv4Addr {
 }
 
 impl<'de> Decode<'de, Text> for Ipv4Addr {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -63,6 +93,12 @@ impl<'de> Decode<'de, Text> for Ipv4Addr {
 }
 
 impl Encode<Binary> for Ipv6Addr {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -70,9 +106,20 @@ impl Encode<Binary> for Ipv6Addr {
     {
         encoder.encode_array(&self.octets())
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl Encode<Text> for Ipv6Addr {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -80,9 +127,18 @@ impl Encode<Text> for Ipv6Addr {
     {
         encoder.collect_string(self)
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl<'de> Decode<'de, Binary> for Ipv6Addr {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -93,6 +149,10 @@ impl<'de> Decode<'de, Binary> for Ipv6Addr {
 }
 
 impl<'de> Decode<'de, Text> for Ipv6Addr {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -108,6 +168,10 @@ where
     Ipv4Addr: Encode<M>,
     Ipv6Addr: Encode<M>,
 {
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -116,9 +180,14 @@ where
         let variant = encoder.encode_variant()?;
 
         match self {
-            IpAddr::V4(v4) => variant.insert_variant(IpAddrTag::Ipv4, v4),
-            IpAddr::V6(v6) => variant.insert_variant(IpAddrTag::Ipv6, v6),
+            IpAddr::V4(v4) => variant.insert_variant(&IpAddrTag::Ipv4, v4),
+            IpAddr::V6(v6) => variant.insert_variant(&IpAddrTag::Ipv6, v6),
         }
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
     }
 }
 
@@ -128,6 +197,8 @@ where
     Ipv4Addr: Decode<'de, M>,
     Ipv6Addr: Decode<'de, M>,
 {
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -145,6 +216,12 @@ where
 }
 
 impl Encode<Binary> for SocketAddrV4 {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -156,9 +233,20 @@ impl Encode<Binary> for SocketAddrV4 {
             Ok(())
         })
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl Encode<Text> for SocketAddrV4 {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -166,9 +254,18 @@ impl Encode<Text> for SocketAddrV4 {
     {
         encoder.collect_string(self)
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl<'de> Decode<'de, Binary> for SocketAddrV4 {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -179,6 +276,10 @@ impl<'de> Decode<'de, Binary> for SocketAddrV4 {
 }
 
 impl<'de> Decode<'de, Text> for SocketAddrV4 {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -189,6 +290,12 @@ impl<'de> Decode<'de, Text> for SocketAddrV4 {
 }
 
 impl Encode<Binary> for SocketAddrV6 {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -202,9 +309,20 @@ impl Encode<Binary> for SocketAddrV6 {
             Ok(())
         })
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl Encode<Text> for SocketAddrV6 {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -212,9 +330,18 @@ impl Encode<Text> for SocketAddrV6 {
     {
         encoder.collect_string(self)
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl<'de> Decode<'de, Binary> for SocketAddrV6 {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -225,6 +352,10 @@ impl<'de> Decode<'de, Binary> for SocketAddrV6 {
 }
 
 impl<'de> Decode<'de, Text> for SocketAddrV6 {
+    // Not packed since it doesn't have a strongly defined memory layout, even
+    // though it has a particular size.
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -240,6 +371,8 @@ where
     SocketAddrV4: Encode<M>,
     SocketAddrV6: Encode<M>,
 {
+    const ENCODE_PACKED: bool = false;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -248,9 +381,16 @@ where
         let variant = encoder.encode_variant()?;
 
         match self {
-            SocketAddr::V4(v4) => variant.insert_variant(SocketAddrTag::V4, v4),
-            SocketAddr::V6(v6) => variant.insert_variant(SocketAddrTag::V6, v6),
+            SocketAddr::V4(v4) => variant.insert_variant(&SocketAddrTag::V4, v4),
+            SocketAddr::V6(v6) => variant.insert_variant(&SocketAddrTag::V6, v6),
         }
+    }
+
+    type Encode = Self;
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
     }
 }
 
@@ -260,6 +400,8 @@ where
     SocketAddrV4: Decode<'de, M>,
     SocketAddrV6: Decode<'de, M>,
 {
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where

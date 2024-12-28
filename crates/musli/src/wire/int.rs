@@ -17,7 +17,7 @@ where
     W: Writer,
 {
     match crate::options::length::<OPT>() {
-        crate::options::Integer::Variable => {
+        crate::options::Width::Variable => {
             if value.is_smaller_than(DATA_MASK) {
                 writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
             } else {
@@ -25,9 +25,8 @@ where
                 c::encode(cx, writer, value)
             }
         }
-        _ => {
+        width => {
             let bo = crate::options::byteorder::<OPT>();
-            let width = crate::options::length_width::<OPT>();
             let bytes = 1u8 << width as u8;
             writer.write_byte(cx, Tag::new(Kind::Prefix, bytes).byte())?;
 
@@ -57,7 +56,7 @@ where
     R: Reader<'de>,
 {
     match crate::options::length::<OPT>() {
-        crate::options::Integer::Variable => {
+        crate::options::Width::Variable => {
             let tag = Tag::from_byte(reader.read_byte(cx)?);
 
             if tag.kind() != Kind::Continuation {
@@ -70,9 +69,8 @@ where
                 c::decode(cx, reader)
             }
         }
-        _ => {
+        width => {
             let bo = crate::options::byteorder::<OPT>();
-            let width = crate::options::length_width::<OPT>();
 
             let bytes = 1u8 << width as u8;
             let tag = Tag::from_byte(reader.read_byte(cx)?);

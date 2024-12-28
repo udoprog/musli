@@ -10,6 +10,8 @@ macro_rules! implement {
         where
             $($type: Encode<M>,)*
         {
+            const ENCODE_PACKED: bool = false;
+
             #[inline]
             #[allow(unused)]
             fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
@@ -23,12 +25,21 @@ macro_rules! implement {
                     Ok(())
                 })
             }
+
+            type Encode = Self;
+
+            #[inline]
+            fn as_encode(&self) -> &Self::Encode {
+                self
+            }
         }
 
         impl<'de, M, $($type)*> Decode<'de, M> for $ty $(<$type>)*
         where
             $($type: Decode<'de, M>,)*
         {
+            const DECODE_PACKED: bool = false;
+
             #[inline]
             fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
@@ -47,6 +58,8 @@ macro_rules! implement_new {
         where
             T: Encode<M>,
         {
+            const ENCODE_PACKED: bool = false;
+
             #[inline]
             fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
@@ -59,12 +72,21 @@ macro_rules! implement_new {
                     Ok(())
                 })
             }
+
+            type Encode = Self;
+
+            #[inline]
+            fn as_encode(&self) -> &Self::Encode {
+                self
+            }
         }
 
         impl<'de, M, T> Decode<'de, M> for $ty<T>
         where
             T: Decode<'de, M>,
         {
+            const DECODE_PACKED: bool = false;
+
             #[inline]
             fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where

@@ -51,8 +51,8 @@ macro_rules! feature_matrix {
         $call!(musli_descriptive $(, $($tt)*)*);
         #[cfg(feature = "musli-storage")]
         $call!(musli_storage $(, $($tt)*)*);
-        #[cfg(feature = "musli-storage")]
-        $call!(musli_storage_packed $(, $($tt)*)*);
+        #[cfg(feature = "musli-packed")]
+        $call!(musli_packed $(, $($tt)*)*);
         #[cfg(feature = "musli-value")]
         $call!(musli_value $(, $($tt)*)*);
         #[cfg(feature = "musli-zerocopy")]
@@ -92,11 +92,13 @@ macro_rules! if_supported {
     (musli_zerocopy, large, $($tt:tt)*) => {};
     (musli_zerocopy, allocated, $($tt:tt)*) => {};
     (musli_zerocopy, medium_enum, $($tt:tt)*) => {};
+    (musli_zerocopy, mesh, $($tt:tt)*) => {};
 
     (zerocopy, primitives, $($tt:tt)*) => {};
     (zerocopy, large, $($tt:tt)*) => {};
     (zerocopy, allocated, $($tt:tt)*) => {};
     (zerocopy, medium_enum, $($tt:tt)*) => {};
+    (zerocopy, mesh, $($tt:tt)*) => {};
 
     ($framework:ident, $test:ident, $($tt:tt)*) => { $($tt)* };
 }
@@ -110,6 +112,7 @@ macro_rules! types {
         $call!(allocated, Allocated, ALLOCATED, 5000);
         #[cfg(any(not(feature = "no-empty"), not(feature = "no-nonunit-variant")))]
         $call!(medium_enum, MediumEnum, MEDIUM_ENUMS, 1000);
+        $call!(mesh, Mesh, MESHES, 1000);
     };
 }
 

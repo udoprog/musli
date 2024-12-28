@@ -5,9 +5,7 @@ use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
 #[cfg(feature = "rkyv")]
 use rkyv::rancor::Failure;
 #[cfg(feature = "rkyv")]
-use rkyv::vec::ArchivedVec;
-#[cfg(feature = "rkyv")]
-use rkyv::{Archive, Deserialize, Portable, Serialize};
+use rkyv::{Archive, Serialize};
 
 // Musli zero copy
 #[derive(ZeroCopy, Debug)]

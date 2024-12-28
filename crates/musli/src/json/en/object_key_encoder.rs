@@ -64,7 +64,7 @@ where
     where
         T: Encode<Self::Mode>,
     {
-        value.encode(self.cx, self)
+        value.as_encode().encode(self.cx, self)
     }
 
     #[inline]

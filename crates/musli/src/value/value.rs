@@ -158,6 +158,10 @@ from!(f32, F32);
 from!(f64, F64);
 
 impl<M> Encode<M> for Number {
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -178,6 +182,11 @@ impl<M> Encode<M> for Number {
             Number::F32(n) => encoder.encode_f32(*n),
             Number::F64(n) => encoder.encode_f64(*n),
         }
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
     }
 }
 
@@ -372,6 +381,8 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 }
 
 impl<'de, M> Decode<'de, M> for Value {
+    const DECODE_PACKED: bool = false;
+
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
@@ -429,6 +440,10 @@ impl<C: ?Sized + Context> UnsizedVisitor<'_, C, str> for StringVisitor {
 }
 
 impl<M> Encode<M> for Value {
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -482,6 +497,11 @@ impl<M> Encode<M> for Value {
                 None => encoder.encode_none(),
             },
         }
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
     }
 }
 

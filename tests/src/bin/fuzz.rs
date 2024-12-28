@@ -30,6 +30,7 @@ tests::miri! {
     const PRIMITIVES_PACKED: usize = 500, 2;
     const MEDIUM_ENUMS: usize = 500, 2;
     const ALLOCATED: usize = 100, 2;
+    const MESHES: usize = 10, 2;
 }
 
 fn main() -> Result<()> {
