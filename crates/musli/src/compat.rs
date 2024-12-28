@@ -26,6 +26,10 @@ impl<T> Sequence<T> {
 }
 
 impl<M> Encode<M> for Sequence<()> {
+    const ENCODE_PACKED: bool = true;
+
+    type Encode = Self;
+
     #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -35,9 +39,16 @@ impl<M> Encode<M> for Sequence<()> {
 
         encoder.encode_sequence_fn(&HINT, |_| Ok(()))
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl<'de, M> Decode<'de, M> for Sequence<()> {
+    const DECODE_PACKED: bool = true;
+
     #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where

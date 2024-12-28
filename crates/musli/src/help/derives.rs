@@ -288,6 +288,60 @@
 //!
 //! <br>
 //!
+//! #### `#[musli(bitwise)]`
+//!
+//! This attribute has the same requirements as `#[musli(packed)]` and also
+//! requires every field to implement `Encode` or `Decode`. It is also only
+//! supported on structs.
+//!
+//! If a struct is tagged with `#[musli(bitwise)]`, and the bitwise pattern of a
+//! given serialization is *identical* to the bitwise memory pattern of the
+//! struct, then serialization and deserialization can be made more efficient.
+//!
+//! Note that since [`#[repr(Rust)]`][repr-rust] is not strictly defined, it
+//! might be necessary to mark the struct with `#[repr(C)]` to benefit from this
+//! optimization.
+//!
+//! If the `#[musli(bitwise)]` optimization doesn't work, it will either have no
+//! effect or cause a compilation error.
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(bitwise)]
+//! struct Struct {
+//!     a: u32,
+//!     b: u32,
+//! }
+//!
+//! const _: () = assert!(musli::is_bitwise_encode::<Struct>());
+//! const _: () = assert!(musli::is_bitwise_decode::<Struct>());
+//! ```
+//!
+//! Note that some combinations of fields currently only support encoding in one
+//! direction. This is the case for `NonZero` types, since they cannot inhabit
+//! all possible bit patterns.
+//!
+//! ```
+//! use core::num::NonZero;
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Encode, Decode)]
+//! #[musli(bitwise)]
+//! struct Struct {
+//!     a: NonZero<u32>,
+//!     b: u32,
+//! }
+//!
+//! const _: () = assert!(musli::is_bitwise_encode::<Struct>());
+//! const _: () = assert!(!musli::is_bitwise_decode::<Struct>());
+//! ```
+//!
+//! [repr-rust]: <https://doc.rust-lang.org/nomicon/repr-rust.html>
+//!
+//! <br>
+//!
 //! #### `#[musli(name_type = ..)]`
 //!
 //! This indicates which type any contained `#[musli(name = ..)]` attributes

@@ -196,17 +196,14 @@ pub mod musli {
     use tests::models::Primitives as Model;
     use tests::Packed;
 
-    const OPTIONS: Options = options::new().with_fixed().build();
+    const OPTIONS: Options = options::new().fixed().native_byte_order().build();
     const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
-    pub fn encode_model<'buf>(
-        buffer: &'buf mut Vec<u8>,
-        value: &Model,
-    ) -> Result<&'buf [u8], Error> {
+    pub fn encode_model<'buf>(buffer: &'buf mut [u8], value: &Model) -> Result<&'buf [u8], Error> {
         encode::<Model>(buffer, value)
     }
 
-    pub fn decode_model<'buf>(buf: &'buf [u8]) -> Result<Model, Error> {
+    pub fn decode_model(buf: &[u8]) -> Result<Model, Error> {
         decode::<Model>(buf)
     }
 
@@ -242,7 +239,7 @@ pub mod speedy {
         encode::<Model>(buffer, value)
     }
 
-    pub fn decode_model<'buf>(buf: &'buf [u8]) -> Result<Model, Error> {
+    pub fn decode_model(buf: &[u8]) -> Result<Model, Error> {
         decode::<Model>(buf)
     }
 

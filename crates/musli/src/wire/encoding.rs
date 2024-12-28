@@ -57,7 +57,7 @@ impl Encoding<OPTIONS, Binary> {
     /// use musli::wire::Encoding;
     /// # use musli::wire::Error;
     ///
-    /// const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+    /// const OPTIONS: Options = options::new().integer(Integer::Fixed).build();
     /// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
     ///
     /// #[derive(Debug, PartialEq, Encode, Decode)]
@@ -115,7 +115,7 @@ where
     /// use musli::options::{self, Options, Integer};
     /// use musli::wire::Encoding;
     ///
-    /// const OPTIONS: Options = options::new().with_integer(Integer::Fixed).build();
+    /// const OPTIONS: Options = options::new().integer(Integer::Fixed).build();
     /// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
     /// ```
     pub const fn with_options<const U: Options>(self) -> Encoding<U, M> {

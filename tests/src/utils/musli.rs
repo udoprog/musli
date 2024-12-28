@@ -34,25 +34,20 @@ pub mod musli_json {
     }
 }
 
-#[cfg(feature = "musli-storage")]
+#[cfg(feature = "musli-packed")]
 #[crate::benchmarker]
-pub mod musli_storage_packed {
+pub mod musli_packed {
     use alloc::vec;
     use alloc::vec::Vec;
 
     use musli::context::{ErrorMarker as Error, Ignore};
-    use musli::options::{self, Float, Integer, Options};
+    use musli::options::{self, Options};
     use musli::storage::Encoding;
     use musli::{Decode, Encode};
 
     use crate::mode::Packed;
 
-    const OPTIONS: Options = options::new()
-        .with_length(Integer::Fixed)
-        .with_integer(Integer::Fixed)
-        .with_float(Float::Fixed)
-        .build();
-
+    const OPTIONS: Options = options::new().fixed().native_byte_order().build();
     const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
     pub fn buffer() -> Vec<u8> {
@@ -63,8 +58,10 @@ pub mod musli_storage_packed {
     where
         T: Encode<Packed>,
     {
+        let len = buf.len();
         let cx = Ignore::new();
         let w = ENCODING.encode_with(&cx, &mut buf[..], value)?;
+        let w = len - w;
         Ok(&buf[..w])
     }
 

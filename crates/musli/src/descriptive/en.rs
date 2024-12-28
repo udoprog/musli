@@ -1,13 +1,13 @@
 use core::fmt;
 
 use crate::en::{
-    Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
+    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
 use crate::storage::en::StorageEncoder;
 use crate::writer::BufWriter;
-use crate::{Context, Encode, Options, Writer};
+use crate::{Context, Options, Writer};
 
 use super::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use super::tag::{

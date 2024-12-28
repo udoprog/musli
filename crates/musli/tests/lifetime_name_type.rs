@@ -5,7 +5,7 @@ use bstr::BStr;
 use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
-#[musli(name_type = &str)]
+#[musli(name_type = str)]
 struct StructStr {
     #[musli(name = "field1")]
     field1: u32,

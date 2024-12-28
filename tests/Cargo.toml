@@ -31,10 +31,11 @@ parse-full = ["musli?/parse-full"]
 musli-wire = ["musli/wire"]
 musli-descriptive = ["musli/descriptive"]
 musli-storage = ["musli/storage"]
+musli-packed = ["musli/storage"]
 musli-json = ["musli/json"]
 musli-value = ["musli/value"]
 musli-zerocopy = ["dep:musli-zerocopy"]
-test = ["simdutf8", "musli-wire", "musli-storage", "musli-descriptive", "musli-json", "musli-value"]
+test = ["simdutf8", "musli-wire", "musli-storage", "musli-packed", "musli-descriptive", "musli-json", "musli-value"]
 # skips rt benchmarks
 no-rt = []
 

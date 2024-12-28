@@ -188,6 +188,7 @@ pub mod __priv {
     use crate::de::{Decoder, EntryDecoder};
 
     pub use ::core::fmt;
+    pub use ::core::mem::{offset_of, size_of};
     pub use ::core::option::Option;
     pub use ::core::result::Result;
 

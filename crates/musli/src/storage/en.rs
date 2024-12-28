@@ -66,7 +66,7 @@ where
     where
         T: Encode<Self::Mode>,
     {
-        value.encode(self.cx, self)
+        value.as_encode().encode(self.cx, self)
     }
 
     #[inline]
@@ -211,6 +211,37 @@ where
     #[inline]
     fn encode_none(mut self) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, 0)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn encode_slice<T>(mut self, slice: &[T]) -> Result<Self::Ok, C::Error>
+    where
+        T: Encode<Self::Mode>,
+    {
+        // NB: All of these *should* be constant values.
+        let is_native = const {
+            crate::options::is_native_fixed::<OPT>()
+                && T::ENCODE_PACKED
+                && size_of::<T>() % align_of::<T>() == 0
+        };
+
+        if !is_native {
+            return default_encode_slice(self.cx, self, slice);
+        }
+
+        let len = slice.len().to_ne_bytes();
+
+        // SAFETY: We've ensured the type is layout compatible with the current
+        // serialization just above.
+        let slice = unsafe {
+            let at = slice.as_ptr().cast::<u8>();
+            let size = core::mem::size_of_val(slice);
+            core::slice::from_raw_parts(at, size)
+        };
+
+        self.writer.write_bytes(self.cx, &len)?;
+        self.writer.write_bytes(self.cx, slice)?;
         Ok(())
     }
 
@@ -406,4 +437,23 @@ where
     fn finish_variant(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
+}
+
+#[inline]
+fn default_encode_slice<C, E, T>(cx: &C, encoder: E, slice: &[T]) -> Result<E::Ok, E::Error>
+where
+    C: ?Sized + Context,
+    E: Encoder,
+    T: Encode<E::Mode>,
+{
+    let hint = SequenceHint::with_size(slice.len());
+    let mut seq = encoder.encode_sequence(&hint)?;
+
+    for (index, item) in slice.iter().enumerate() {
+        cx.enter_sequence_index(index);
+        seq.push(item)?;
+        cx.leave_sequence_index();
+    }
+
+    seq.finish_sequence()
 }

@@ -15,9 +15,9 @@ use self::variant_encoder::JsonVariantEncoder;
 
 use core::fmt;
 
-use crate::en::{Encoder, SequenceEncoder};
+use crate::en::{Encode, Encoder, SequenceEncoder};
 use crate::hint::{MapHint, SequenceHint};
-use crate::{Context, Encode, Writer};
+use crate::{Context, Writer};
 
 /// A JSON encoder for Müsli.
 pub(crate) struct JsonEncoder<'a, W, C: ?Sized> {
@@ -79,7 +79,7 @@ where
     where
         T: Encode<Self::Mode>,
     {
-        value.encode(self.cx, self)
+        value.as_encode().encode(self.cx, self)
     }
 
     #[inline]

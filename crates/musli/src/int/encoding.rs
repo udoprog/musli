@@ -103,8 +103,8 @@ where
     W: Writer,
 {
     match crate::options::length::<OPT>() {
-        crate::options::Integer::Variable => c::encode(cx, writer, value),
-        _ => {
+        crate::options::Width::Variable => c::encode(cx, writer, value),
+        width => {
             let bo = crate::options::byteorder::<OPT>();
 
             macro_rules! fixed {
@@ -117,7 +117,7 @@ where
                 }};
             }
 
-            crate::options::width_arm!(crate::options::length_width::<OPT>(), fixed)
+            crate::options::width_arm!(width, fixed)
         }
     }
 }
@@ -133,8 +133,8 @@ where
     R: Reader<'de>,
 {
     match crate::options::length::<OPT>() {
-        crate::options::Integer::Variable => c::decode(cx, reader),
-        _ => {
+        crate::options::Width::Variable => c::decode(cx, reader),
+        width => {
             let bo = crate::options::byteorder::<OPT>();
 
             macro_rules! fixed {
@@ -150,7 +150,7 @@ where
                 }};
             }
 
-            crate::options::width_arm!(crate::options::length_width::<OPT>(), fixed)
+            crate::options::width_arm!(width, fixed)
         }
     }
 }

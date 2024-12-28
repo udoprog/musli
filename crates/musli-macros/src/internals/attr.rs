@@ -65,12 +65,19 @@ pub(crate) enum EnumTagging<'a> {
     },
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Packed {
+    #[default]
+    Default,
+    Bitwise,
+}
+
 /// If the type is tagged or not.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Packing {
+pub(crate) enum Packing {
     #[default]
     Tagged,
-    Packed,
+    Packed(Packed),
     Transparent,
 }
 
@@ -339,7 +346,15 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             // #[musli(packed)]
             if meta.path.is_ident("packed") {
-                new.packing.push((meta.path.span(), Packing::Packed));
+                new.packing
+                    .push((meta.path.span(), Packing::Packed(Packed::Default)));
+                return Ok(());
+            }
+
+            // #[musli(bitwise)]
+            if meta.path.is_ident("bitwise") {
+                new.packing
+                    .push((meta.path.span(), Packing::Packed(Packed::Bitwise)));
                 return Ok(());
             }
 
@@ -550,7 +565,15 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
             // #[musli(packed)]
             if meta.path.is_ident("packed") {
-                new.packing.push((meta.path.span(), Packing::Packed));
+                new.packing
+                    .push((meta.path.span(), Packing::Packed(Packed::Default)));
+                return Ok(());
+            }
+
+            // #[musli(bitwise)]
+            if meta.path.is_ident("bitwise") {
+                new.packing
+                    .push((meta.path.span(), Packing::Packed(Packed::Bitwise)));
                 return Ok(());
             }
 

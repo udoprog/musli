@@ -35,17 +35,28 @@ use crate::Context;
 use super::PlatformTag;
 
 impl<M> Encode<M> for String {
-    #[inline(always)]
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = str;
+
+    #[inline]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
         self.as_str().encode(cx, encoder)
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl<'de, M> Decode<'de, M> for String {
-    #[inline(always)]
+    const DECODE_PACKED: bool = false;
+
+    #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -58,22 +69,22 @@ impl<'de, M> Decode<'de, M> for String {
         {
             type Ok = String;
 
-            #[inline(always)]
+            #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "string")
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_owned(self, _: &C, value: String) -> Result<Self::Ok, C::Error> {
                 Ok(value)
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_borrowed(self, cx: &C, string: &'de str) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, string)
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_ref(self, _: &C, string: &str) -> Result<Self::Ok, C::Error> {
                 Ok(string.to_owned())
             }
@@ -84,7 +95,9 @@ impl<'de, M> Decode<'de, M> for String {
 }
 
 impl<'de, M> Decode<'de, M> for Box<str> {
-    #[inline(always)]
+    const DECODE_PACKED: bool = false;
+
+    #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -97,7 +110,9 @@ impl<'de, M, T> Decode<'de, M> for Box<[T]>
 where
     T: Decode<'de, M>,
 {
-    #[inline(always)]
+    const DECODE_PACKED: bool = false;
+
+    #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -109,7 +124,10 @@ where
 macro_rules! cow {
     (
         $encode:ident :: $encode_fn:ident,
+        $as_encode:ident,
         $decode:ident :: $decode_fn:ident,
+        $encode_packed:ident,
+        $decode_packed:ident,
         $ty:ty, $source:ty,
         $decode_method:ident, $cx:pat,
         |$owned:ident| $owned_expr:expr,
@@ -117,17 +135,28 @@ macro_rules! cow {
         |$reference:ident| $reference_expr:expr $(,)?
     ) => {
         impl<M> $encode<M> for Cow<'_, $ty> {
-            #[inline(always)]
+            const $encode_packed: bool = false;
+
+            type $encode = $ty;
+
+            #[inline]
             fn $encode_fn<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
                 self.as_ref().$encode_fn(cx, encoder)
             }
+
+            #[inline]
+            fn $as_encode(&self) -> &Self::$encode {
+                self
+            }
         }
 
         impl<'de, M> $decode<'de, M> for Cow<'de, $ty> {
-            #[inline(always)]
+            const $decode_packed: bool = false;
+
+            #[inline]
             fn $decode_fn<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
@@ -140,12 +169,12 @@ macro_rules! cow {
                 {
                     type Ok = Cow<'de, $ty>;
 
-                    #[inline(always)]
+                    #[inline]
                     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                         write!(f, "a string")
                     }
 
-                    #[inline(always)]
+                    #[inline]
                     fn visit_owned(
                         self,
                         $cx: &C,
@@ -154,7 +183,7 @@ macro_rules! cow {
                         Ok($owned_expr)
                     }
 
-                    #[inline(always)]
+                    #[inline]
                     fn visit_borrowed(
                         self,
                         $cx: &C,
@@ -163,7 +192,7 @@ macro_rules! cow {
                         Ok($borrowed_expr)
                     }
 
-                    #[inline(always)]
+                    #[inline]
                     fn visit_ref(
                         self,
                         $cx: &C,
@@ -181,7 +210,10 @@ macro_rules! cow {
 
 cow! {
     Encode::encode,
+    as_encode,
     Decode::decode,
+    ENCODE_PACKED,
+    DECODE_PACKED,
     str, str, decode_string, _,
     |owned| Cow::Owned(owned),
     |borrowed| Cow::Borrowed(borrowed),
@@ -190,7 +222,10 @@ cow! {
 
 cow! {
     Encode::encode,
+    as_encode,
     Decode::decode,
+    ENCODE_PACKED,
+    DECODE_PACKED,
     CStr, [u8], decode_bytes, cx,
     |owned| Cow::Owned(CString::from_vec_with_nul(owned).map_err(cx.map())?),
     |borrowed| Cow::Borrowed(CStr::from_bytes_with_nul(borrowed).map_err(cx.map())?),
@@ -199,14 +234,17 @@ cow! {
 
 cow! {
     EncodeBytes::encode_bytes,
+    as_encode_bytes,
     DecodeBytes::decode_bytes,
+    ENCODE_BYTES_PACKED,
+    DECODE_BYTES_PACKED,
     [u8], [u8], decode_bytes, _,
     |owned| Cow::Owned(owned),
     |borrowed| Cow::Borrowed(borrowed),
     |reference| Cow::Owned(reference.to_owned())
 }
 
-macro_rules! sequence {
+macro_rules! slice_sequence {
     (
         $(#[$($meta:meta)*])*
         $cx:ident,
@@ -221,25 +259,21 @@ macro_rules! sequence {
             T: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline(always)]
-            fn encode<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            const ENCODE_PACKED: bool = false;
+
+            type Encode = Self;
+
+            #[inline]
+            fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
-                let hint = SequenceHint::with_size(self.len());
+                encoder.encode_slice(self)
+            }
 
-                encoder.encode_sequence_fn(&hint, |seq| {
-                    let mut index = 0;
-
-                    for value in self {
-                        $cx.enter_sequence_index(index);
-                        seq.push(value)?;
-                        $cx.leave_sequence_index();
-                        index = index.wrapping_add(1);
-                    }
-
-                    Ok(())
-                })
+            #[inline]
+            fn as_encode(&self) -> &Self::Encode {
+                self
             }
         }
 
@@ -249,7 +283,9 @@ macro_rules! sequence {
             T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline(always)]
+            const DECODE_PACKED: bool = false;
+
+            #[inline]
             fn decode<D>($cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
@@ -277,7 +313,7 @@ macro_rules! sequence {
             T: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline(always)]
+            #[inline]
             fn encode_packed<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
@@ -299,7 +335,111 @@ macro_rules! sequence {
     }
 }
 
-sequence!(
+macro_rules! sequence {
+    (
+        $(#[$($meta:meta)*])*
+        $cx:ident,
+        $ty:ident <T $(: $trait0:ident $(+ $trait:ident)*)? $(, $extra:ident: $extra_bound0:ident $(+ $extra_bound:ident)*)*>,
+        $insert:ident,
+        $access:ident,
+        $factory:expr
+    ) => {
+        $(#[$($meta)*])*
+        impl<M, T $(, $extra)*> Encode<M> for $ty<T $(, $extra)*>
+        where
+            T: Encode<M>,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            const ENCODE_PACKED: bool = false;
+
+            type Encode = Self;
+
+            #[inline]
+            fn encode<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            where
+                E: Encoder<Mode = M>,
+            {
+                let hint = SequenceHint::with_size(self.len());
+
+                encoder.encode_sequence_fn(&hint, |seq| {
+                    let mut index = 0;
+
+                    for value in self {
+                        $cx.enter_sequence_index(index);
+                        seq.push(value)?;
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
+
+                    Ok(())
+                })
+            }
+
+            #[inline]
+            fn as_encode(&self) -> &Self::Encode {
+                self
+            }
+        }
+
+        $(#[$($meta)*])*
+        impl<'de, M, T $(, $extra)*> Decode<'de, M> for $ty<T $(, $extra)*>
+        where
+            T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            const DECODE_PACKED: bool = false;
+
+            #[inline]
+            fn decode<D>($cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            where
+                D: Decoder<'de, Mode = M>,
+            {
+                decoder.decode_sequence(|$access| {
+                    let mut out = $factory;
+
+                    let mut index = 0;
+
+                    while let Some(value) = $access.try_decode_next()? {
+                        $cx.enter_sequence_index(index);
+                        out.$insert(T::decode($cx, value)?);
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
+
+                    Ok(out)
+                })
+            }
+        }
+
+        $(#[$($meta)*])*
+        impl<M, T $(, $extra)*> EncodePacked<M> for $ty<T $(, $extra)*>
+        where
+            T: Encode<M>,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            #[inline]
+            fn encode_packed<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            where
+                E: Encoder<Mode = M>,
+            {
+                encoder.encode_pack_fn(|pack| {
+                    let mut index = 0;
+
+                    for value in self {
+                        $cx.enter_sequence_index(index);
+                        pack.push(value)?;
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
+
+                    Ok(())
+                })
+            }
+        }
+    }
+}
+
+slice_sequence!(
     cx,
     Vec<T>,
     push,
@@ -346,7 +486,11 @@ macro_rules! map {
             V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline(always)]
+            const ENCODE_PACKED: bool = false;
+
+            type Encode = Self;
+
+            #[inline]
             fn encode<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
@@ -361,6 +505,11 @@ macro_rules! map {
                     Ok(())
                 })
             }
+
+            #[inline]
+            fn as_encode(&self) -> &Self::Encode {
+                self
+            }
         }
 
         $(#[$($meta)*])*
@@ -370,7 +519,7 @@ macro_rules! map {
             V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline(always)]
+            #[inline]
             fn trace_encode<E>(&self, $cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
@@ -400,7 +549,9 @@ macro_rules! map {
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline(always)]
+            const DECODE_PACKED: bool = false;
+
+            #[inline]
             fn decode<D>($cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
@@ -424,7 +575,7 @@ macro_rules! map {
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            #[inline(always)]
+            #[inline]
             fn trace_decode<D>($cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
@@ -459,17 +610,28 @@ map!(
 );
 
 impl<M> Encode<M> for CString {
-    #[inline(always)]
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = CStr;
+
+    #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
         encoder.encode_bytes(self.to_bytes_with_nul())
     }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
 }
 
 impl<'de, M> Decode<'de, M> for CString {
-    #[inline(always)]
+    const DECODE_PACKED: bool = false;
+
+    #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
@@ -482,22 +644,22 @@ impl<'de, M> Decode<'de, M> for CString {
         {
             type Ok = CString;
 
-            #[inline(always)]
+            #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "a cstring")
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_owned(self, cx: &C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 CString::from_vec_with_nul(value).map_err(cx.map())
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, bytes)
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(CStr::from_bytes_with_nul(bytes)
                     .map_err(cx.map())?
@@ -516,12 +678,21 @@ macro_rules! smart_pointer {
             where
                 T: ?Sized + Encode<M>,
             {
-                #[inline(always)]
+                const ENCODE_PACKED: bool = false;
+
+                type Encode = T;
+
+                #[inline]
                 fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
                 where
                     E: Encoder<Mode = M>,
                 {
                     self.as_ref().encode(cx, encoder)
+                }
+
+                #[inline]
+                fn as_encode(&self) -> &Self::Encode {
+                    self
                 }
             }
 
@@ -529,7 +700,9 @@ macro_rules! smart_pointer {
             where
                 T: Decode<'de, M>,
             {
-                #[inline(always)]
+                const DECODE_PACKED: bool = false;
+
+                #[inline]
                 fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -539,7 +712,9 @@ macro_rules! smart_pointer {
             }
 
             impl<'de, M> DecodeBytes<'de, M> for $ty<[u8]> {
-                #[inline(always)]
+                const DECODE_BYTES_PACKED: bool = false;
+
+                #[inline]
                 fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -549,7 +724,9 @@ macro_rules! smart_pointer {
             }
 
             impl<'de, M> Decode<'de, M> for $ty<CStr> {
-                #[inline(always)]
+                const DECODE_PACKED: bool = false;
+
+                #[inline]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -561,7 +738,9 @@ macro_rules! smart_pointer {
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
             impl<'de, M> Decode<'de, M> for $ty<Path> where PlatformTag: Decode<'de, M> {
-                #[inline(always)]
+                const DECODE_PACKED: bool = false;
+
+                #[inline]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -573,7 +752,9 @@ macro_rules! smart_pointer {
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
             impl<'de, M> Decode<'de, M> for $ty<OsStr> where PlatformTag: Decode<'de, M> {
-                #[inline(always)]
+                const DECODE_PACKED: bool = false;
+
+                #[inline]
                 fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
                 where
                     D: Decoder<'de, Mode = M>,
@@ -593,8 +774,12 @@ impl<M> Encode<M> for OsStr
 where
     PlatformTag: Encode<M>,
 {
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
     #[cfg(unix)]
-    #[inline(always)]
+    #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -611,7 +796,7 @@ where
     }
 
     #[cfg(windows)]
-    #[inline(always)]
+    #[inline]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -645,10 +830,15 @@ where
             // SAFETY: Slice does not outlive the buffer it references.
             let bytes = unsafe { core::slice::from_raw_parts(buf.as_ptr(), len) };
 
-            variant.encode_tag()?.encode(PlatformTag::Windows)?;
+            variant.encode_tag()?.encode(&PlatformTag::Windows)?;
             variant.encode_data()?.encode_bytes(bytes)?;
             Ok(())
         })
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
     }
 }
 
@@ -658,12 +848,21 @@ impl<M> Encode<M> for OsString
 where
     PlatformTag: Encode<M>,
 {
-    #[inline(always)]
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = OsStr;
+
+    #[inline]
     fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
         encoder.encode(self.as_os_str())
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
     }
 }
 
@@ -673,7 +872,9 @@ impl<'de, M> Decode<'de, M> for OsString
 where
     PlatformTag: Decode<'de, M>,
 {
-    #[inline(always)]
+    const DECODE_PACKED: bool = false;
+
+    #[inline]
     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -705,12 +906,12 @@ where
                     {
                         type Ok = OsString;
 
-                        #[inline(always)]
+                        #[inline]
                         fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                             write!(f, "a literal byte reference")
                         }
 
-                        #[inline(always)]
+                        #[inline]
                         fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                             let mut buf = Vec::with_capacity(bytes.len() / 2);
 
@@ -739,12 +940,21 @@ impl<M> Encode<M> for Path
 where
     PlatformTag: Encode<M>,
 {
-    #[inline(always)]
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
+    #[inline]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
         self.as_os_str().encode(cx, encoder)
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
     }
 }
 
@@ -754,12 +964,21 @@ impl<M> Encode<M> for PathBuf
 where
     PlatformTag: Encode<M>,
 {
-    #[inline(always)]
+    const ENCODE_PACKED: bool = false;
+
+    type Encode = Self;
+
+    #[inline]
     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
         self.as_path().encode(cx, encoder)
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
     }
 }
 
@@ -769,7 +988,9 @@ impl<'de, M> Decode<'de, M> for PathBuf
 where
     PlatformTag: Decode<'de, M>,
 {
-    #[inline(always)]
+    const DECODE_PACKED: bool = false;
+
+    #[inline]
     fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -779,27 +1000,47 @@ where
 }
 
 impl<M> EncodeBytes<M> for Vec<u8> {
-    #[inline(always)]
+    const ENCODE_BYTES_PACKED: bool = false;
+
+    type EncodeBytes = [u8];
+
+    #[inline]
     fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
         encoder.encode_bytes(self.as_slice())
     }
+
+    #[inline]
+    fn as_encode_bytes(&self) -> &Self::EncodeBytes {
+        self
+    }
 }
 
 impl<M> EncodeBytes<M> for Box<[u8]> {
-    #[inline(always)]
+    const ENCODE_BYTES_PACKED: bool = false;
+
+    type EncodeBytes = [u8];
+
+    #[inline]
     fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
         encoder.encode_bytes(self.as_ref())
     }
+
+    #[inline]
+    fn as_encode_bytes(&self) -> &Self::EncodeBytes {
+        self
+    }
 }
 
 impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
-    #[inline(always)]
+    const DECODE_BYTES_PACKED: bool = false;
+
+    #[inline]
     fn decode_bytes<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
@@ -812,17 +1053,17 @@ impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
         {
             type Ok = Vec<u8>;
 
-            #[inline(always)]
+            #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "bytes")
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
 
-            #[inline(always)]
+            #[inline]
             fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
@@ -833,7 +1074,11 @@ impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
 }
 
 impl<M> EncodeBytes<M> for VecDeque<u8> {
-    #[inline(always)]
+    const ENCODE_BYTES_PACKED: bool = false;
+
+    type EncodeBytes = VecDeque<u8>;
+
+    #[inline]
     fn encode_bytes<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
@@ -841,10 +1086,17 @@ impl<M> EncodeBytes<M> for VecDeque<u8> {
         let (first, second) = self.as_slices();
         encoder.encode_bytes_vectored(self.len(), &[first, second])
     }
+
+    #[inline]
+    fn as_encode_bytes(&self) -> &Self::EncodeBytes {
+        self
+    }
 }
 
 impl<'de, M> DecodeBytes<'de, M> for VecDeque<u8> {
-    #[inline(always)]
+    const DECODE_BYTES_PACKED: bool = false;
+
+    #[inline]
     fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,

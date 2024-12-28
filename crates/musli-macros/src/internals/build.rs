@@ -121,6 +121,13 @@ impl Body<'_> {
         }
     }
 
+    pub(crate) fn name_expr(&self, ident: syn::Ident) -> syn::Expr {
+        match self.name_method {
+            NameMethod::Unsized(..) => syn::parse_quote!(#ident),
+            NameMethod::Value => syn::parse_quote!(&#ident),
+        }
+    }
+
     pub(crate) fn name_local_type(&self) -> syn::Type {
         match self.name_method {
             NameMethod::Unsized(..) => syn::Type::Reference(syn::TypeReference {
@@ -163,6 +170,13 @@ impl Enum<'_> {
                     syn::parse_quote!(&#static_var),
                 )
             }
+        }
+    }
+
+    pub(crate) fn static_expr(&self, ident: syn::Ident) -> syn::Expr {
+        match self.name_method {
+            NameMethod::Unsized(..) => syn::parse_quote!(#ident),
+            NameMethod::Value => syn::parse_quote!(&#ident),
         }
     }
 
@@ -321,7 +335,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> En
     if !matches!(enum_tagging, EnumTagging::Default | EnumTagging::Empty) {
         match packing_span {
             Some((_, Packing::Tagged)) => (),
-            Some(&(span, Packing::Packed)) => {
+            Some(&(span, Packing::Packed(..))) => {
                 e.cx.error_span(span, format_args!("#[{ATTR}(packed)] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
             }
             Some(&(span, Packing::Transparent)) => {

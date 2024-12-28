@@ -45,6 +45,10 @@ macro_rules! declare {
             $ty0: Encode<M>,
             $($ty: Encode<M>),*
         {
+            // It is harder to check that a tuple is packed, because we have to
+            // ensure it doesn't contain any padding.
+            const ENCODE_PACKED: bool = false;
+
             #[inline]
             fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
@@ -59,6 +63,13 @@ macro_rules! declare {
                     Ok(())
                 })
             }
+
+            type Encode = Self;
+
+            #[inline]
+            fn as_encode(&self) -> &Self::Encode {
+                self
+            }
         }
 
         impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*)
@@ -66,6 +77,10 @@ macro_rules! declare {
             $ty0: Decode<'de, M>,
             $($ty: Decode<'de, M>),*
         {
+            // It is harder to check that a tuple is packed, because we have to
+            // ensure it doesn't contain any padding.
+            const DECODE_PACKED: bool = false;
+
             #[inline]
             fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
             where
