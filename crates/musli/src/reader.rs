@@ -99,6 +99,21 @@ pub trait Reader<'de>: self::sealed::Sealed {
         C: ?Sized + Context,
         V: UnsizedVisitor<'de, C, [u8]>;
 
+    /// Read into the given buffer which might not have been initialized.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the buffer points to valid memory of length
+    /// `len`.
+    unsafe fn read_bytes_uninit<C>(
+        &mut self,
+        cx: &C,
+        ptr: *mut u8,
+        len: usize,
+    ) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context;
+
     /// Read a single byte.
     #[inline]
     fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
@@ -226,6 +241,26 @@ impl<'de> Reader<'de> for &'de [u8] {
         let ok = visitor.visit_borrowed(cx, head)?;
         cx.advance(n);
         Ok(ok)
+    }
+
+    #[inline]
+    unsafe fn read_bytes_uninit<C>(
+        &mut self,
+        cx: &C,
+        ptr: *mut u8,
+        n: usize,
+    ) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        if self.len() < n {
+            return Err(cx.custom(SliceUnderflow::new(n, self.len())));
+        }
+
+        ptr.copy_from_nonoverlapping(self.as_ptr(), n);
+        *self = &self[n..];
+        cx.advance(n);
+        Ok(())
     }
 
     #[inline]
@@ -383,6 +418,23 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
+    unsafe fn read_bytes_uninit<C>(
+        &mut self,
+        cx: &C,
+        ptr: *mut u8,
+        n: usize,
+    ) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        let outcome = bounds_check_add(cx, &self.range, n)?;
+        ptr.copy_from_nonoverlapping(self.range.start, n);
+        self.range.start = outcome;
+        cx.advance(n);
+        Ok(())
+    }
+
+    #[inline]
     fn peek(&mut self) -> Option<u8> {
         if self.range.start == self.range.end {
             return None;
@@ -399,8 +451,11 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     {
         let outcome = bounds_check_add(cx, &self.range, buf.len())?;
 
+        // SAFETY: We've checked that the updated pointer is in bounds.
         unsafe {
-            ptr::copy_nonoverlapping(self.range.start, buf.as_mut_ptr(), buf.len());
+            self.range
+                .start
+                .copy_to_nonoverlapping(buf.as_mut_ptr(), buf.len());
             self.range.start = outcome;
         }
 
@@ -495,6 +550,20 @@ where
     }
 
     #[inline]
+    unsafe fn read_bytes_uninit<C>(
+        &mut self,
+        cx: &C,
+        ptr: *mut u8,
+        n: usize,
+    ) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        self.bounds_check(cx, n)?;
+        self.reader.read_bytes_uninit(cx, ptr, n)
+    }
+
+    #[inline]
     fn peek(&mut self) -> Option<u8> {
         if self.remaining > 0 {
             self.reader.peek()
@@ -572,6 +641,19 @@ where
         V: UnsizedVisitor<'de, C, [u8]>,
     {
         (**self).read_bytes(cx, n, visitor)
+    }
+
+    #[inline]
+    unsafe fn read_bytes_uninit<C>(
+        &mut self,
+        cx: &C,
+        ptr: *mut u8,
+        n: usize,
+    ) -> Result<(), C::Error>
+    where
+        C: ?Sized + Context,
+    {
+        (**self).read_bytes_uninit(cx, ptr, n)
     }
 
     #[inline]

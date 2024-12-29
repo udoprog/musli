@@ -45,6 +45,9 @@ pub trait Decode<'de, M>: Sized {
     /// Note that setting this to `true` has safety implications, since it
     /// implies that assuming the type is correctly aligned it can be validly
     /// bitwise copied when encoded. Setting it to `false` is always safe.
+    ///
+    /// This being set to `true` also implies that the type is `Copy`, and must
+    /// not have a `Drop` implementation.
     const DECODE_PACKED: bool = false;
 
     /// Decode the given input.

@@ -7,8 +7,8 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::Context;
 
 use super::{
-    AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, EntriesDecoder, MapDecoder,
-    SequenceDecoder, Skip, UnsizedVisitor, VariantDecoder, Visitor,
+    utils, AsDecoder, Decode, DecodeSliceBuilder, DecodeUnsized, DecodeUnsizedBytes,
+    EntriesDecoder, MapDecoder, SequenceDecoder, Skip, UnsizedVisitor, VariantDecoder, Visitor,
 };
 
 /// Trait governing the implementation of a decoder.
@@ -1165,6 +1165,16 @@ pub trait Decoder<'de>: Sized {
             &expecting::Pack,
             ExpectingWrapper::new(&self),
         )))
+    }
+
+    /// Decode a sequence of values.
+    #[inline]
+    fn decode_slice<V, T>(self, cx: &Self::Cx) -> Result<V, <Self::Cx as Context>::Error>
+    where
+        V: DecodeSliceBuilder<T>,
+        T: Decode<'de, Self::Mode>,
+    {
+        utils::default_decode_slice(self, cx)
     }
 
     /// Decode a sequence.

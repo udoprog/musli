@@ -53,3 +53,6 @@ pub use self::sequence_encoder::SequenceEncoder;
 
 mod variant_encoder;
 pub use self::variant_encoder::VariantEncoder;
+
+#[doc(hidden)]
+pub mod utils;

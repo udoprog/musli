@@ -2,6 +2,7 @@ use core::ffi::CStr;
 use core::fmt;
 #[cfg(feature = "std")]
 use core::hash::{BuildHasher, Hash};
+use core::marker::PhantomData;
 
 use rust_alloc::borrow::{Cow, ToOwned};
 use rust_alloc::boxed::Box;
@@ -20,8 +21,8 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use crate::de::{
-    Decode, DecodeBytes, DecodeTrace, Decoder, EntryDecoder, MapDecoder, SequenceDecoder,
-    UnsizedVisitor,
+    Decode, DecodeBytes, DecodeSliceBuilder, DecodeTrace, Decoder, EntryDecoder, MapDecoder,
+    SequenceDecoder, UnsizedVisitor,
 };
 use crate::en::{
     Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntryEncoder, MapEncoder,
@@ -251,7 +252,6 @@ macro_rules! slice_sequence {
         $ty:ident <T $(: $trait0:ident $(+ $trait:ident)*)? $(, $extra:ident: $extra_bound0:ident $(+ $extra_bound:ident)*)*>,
         $insert:ident,
         $access:ident,
-        $factory:expr
     ) => {
         $(#[$($meta)*])*
         impl<M, T $(, $extra)*> Encode<M> for $ty<T $(, $extra)*>
@@ -264,11 +264,11 @@ macro_rules! slice_sequence {
             type Encode = Self;
 
             #[inline]
-            fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
-                encoder.encode_slice(self)
+                encoder.encode_slice(cx, self)
             }
 
             #[inline]
@@ -290,20 +290,60 @@ macro_rules! slice_sequence {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.decode_sequence(|$access| {
-                    let mut out = $factory;
+                struct Builder<'de, M, T $(, $extra)*>($ty<T $(, $extra)*>, PhantomData<(M, &'de ())>);
 
-                    let mut index = 0;
-
-                    while let Some(value) = $access.try_decode_next()? {
-                        $cx.enter_sequence_index(index);
-                        out.$insert(T::decode($cx, value)?);
-                        $cx.leave_sequence_index();
-                        index = index.wrapping_add(1);
+                impl<'de, M, T $(, $extra)*> DecodeSliceBuilder<T> for Builder<'de, M, T $(, $extra)*>
+                where
+                    T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
+                    $($extra: $extra_bound0 $(+ $extra_bound)*),*
+                {
+                    #[inline]
+                    fn new<C>(_: &C) -> Result<Self, C::Error>
+                    where
+                        C: ?Sized + Context,
+                    {
+                        Ok(Builder($ty::new(), PhantomData))
                     }
 
-                    Ok(out)
-                })
+                    #[inline]
+                    fn with_capacity<C>(_: &C, size: usize) -> Result<Self, C::Error>
+                    where
+                        C: ?Sized + Context,
+                    {
+                        Ok(Builder($ty::with_capacity(size), PhantomData))
+                    }
+
+                    #[inline]
+                    fn push<C>(&mut self, _: &C, value: T) -> Result<(), C::Error>
+                    where
+                        C: ?Sized + Context,
+                    {
+                        self.0.$insert(value);
+                        Ok(())
+                    }
+
+                    #[inline]
+                    fn reserve<C>(&mut self, _: &C, capacity: usize) -> Result<(), C::Error>
+                    where
+                        C: ?Sized + Context,
+                    {
+                        self.0.reserve(capacity);
+                        Ok(())
+                    }
+
+                    #[inline]
+                    unsafe fn set_len(&mut self, len: usize) {
+                        self.0.set_len(len);
+                    }
+
+                    #[inline]
+                    fn as_mut_ptr(&mut self) -> *mut T {
+                        self.0.as_mut_ptr()
+                    }
+                }
+
+                let Builder(value, PhantomData) = decoder.decode_slice($cx)?;
+                Ok(value)
             }
         }
 
@@ -439,13 +479,7 @@ macro_rules! sequence {
     }
 }
 
-slice_sequence!(
-    cx,
-    Vec<T>,
-    push,
-    seq,
-    Vec::with_capacity(size_hint::cautious(seq.size_hint()))
-);
+slice_sequence!(cx, Vec<T>, push, seq,);
 sequence!(
     cx,
     VecDeque<T>,
