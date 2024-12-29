@@ -21,3 +21,11 @@ pub use musli_core::en::{
     Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntriesEncoder, EntryEncoder,
     MapEncoder, SequenceEncoder, VariantEncoder,
 };
+
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "value"
+))]
+pub(crate) use musli_core::en::utils;

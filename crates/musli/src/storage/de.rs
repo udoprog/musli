@@ -1,12 +1,14 @@
 use core::fmt;
+use core::mem::MaybeUninit;
 
 #[cfg(feature = "alloc")]
 use rust_alloc::vec::Vec;
 
 use crate::de::{
-    DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint,
-    UnsizedVisitor, VariantDecoder,
+    utils, DecodeSliceBuilder, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
+    SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
 };
+use crate::options::is_native_fixed;
 use crate::{Context, Decode, Options, Reader};
 
 /// A very simple decoder suitable for storage decoding.
@@ -72,11 +74,24 @@ where
     }
 
     #[inline]
-    fn decode<T>(self) -> Result<T, Self::Error>
+    fn decode<T>(mut self) -> Result<T, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
     {
-        self.cx.decode(self)
+        if !const { is_native_fixed::<OPT>() && T::DECODE_PACKED } {
+            return self.cx.decode(self);
+        }
+
+        let mut value = MaybeUninit::<T>::uninit();
+
+        // SAFETY: We've ensured the type is layout compatible with the current
+        // serialization just above.
+        unsafe {
+            let ptr = value.as_mut_ptr().cast::<u8>();
+            let n = size_of::<T>();
+            self.reader.read_bytes_uninit(self.cx, ptr, n)?;
+            Ok(value.assume_init())
+        }
     }
 
     #[inline]
@@ -269,6 +284,82 @@ where
     fn decode_option(mut self) -> Result<Option<Self::DecodeSome>, C::Error> {
         let b = self.reader.read_byte(self.cx)?;
         Ok(if b == 1 { Some(self) } else { None })
+    }
+
+    /// Decode a sequence of values.
+    #[inline]
+    fn decode_slice<V, T>(mut self, cx: &Self::Cx) -> Result<V, <Self::Cx as Context>::Error>
+    where
+        V: DecodeSliceBuilder<T>,
+        T: Decode<'de, Self::Mode>,
+    {
+        // Check that the type is packed inside of the slice.
+        if !const {
+            is_native_fixed::<OPT>() && T::DECODE_PACKED && size_of::<T>() % align_of::<T>() == 0
+        } {
+            return utils::default_decode_slice(self, cx);
+        }
+
+        let len = self.reader.borrow_mut().read_array(cx)?;
+        let len = usize::from_ne_bytes(len);
+
+        let mut out = V::new(cx)?;
+
+        if size_of::<T>() > 0 {
+            // Calculate a max chunk size which takes the size of the current
+            // element into account.
+            //
+            // We obey by a max chunk size since we desperately want to avoid
+            // overallocating in case the data is garbage. The only reason data
+            // could be garbage in this instance is if we don't have enough to
+            // fill the buffer. But if we allocate too much space, we run the
+            // risk of blowing up the allocator instead which at best causes an
+            // error or more likely panics or aborts.
+            let max_chunk: usize = const {
+                // 64k is a reasonably good default max chunk size.
+                let base = 1usize << 16;
+
+                let size = match size_of::<T>() {
+                    0 => 1,
+                    size if size > base => base,
+                    size => size,
+                };
+
+                base.div_ceil(size)
+            };
+
+            let mut at = 0;
+
+            while at < len {
+                self.cx.enter_sequence_index(at);
+
+                // The size of the chunk to write.
+                let chunk = (len - at).min(max_chunk);
+
+                out.reserve(cx, chunk)?;
+
+                let ptr = out.as_mut_ptr().wrapping_add(at).cast::<u8>();
+                let n = chunk * size_of::<T>();
+
+                // Read into allocated space and mark as initialized.
+                unsafe {
+                    self.reader.read_bytes_uninit(cx, ptr, n)?;
+                    at += max_chunk;
+                }
+
+                self.cx.leave_sequence_index();
+            }
+        }
+
+        // SAFETY: If the type is zero-sized, we don't need to copy anything and
+        // can just set the length, otherwise setting the length here has no
+        // drop implications since `DECODE_PACKED` in particular essentially
+        // requires that the type is `Copy`.
+        unsafe {
+            out.set_len(len);
+        }
+
+        Ok(out)
     }
 
     #[inline]

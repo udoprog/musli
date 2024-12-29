@@ -6,7 +6,7 @@ use crate::expecting::{self, Expecting};
 use crate::hint::{MapHint, SequenceHint};
 use crate::Context;
 
-use super::{Encode, EntriesEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
+use super::{utils, Encode, EntriesEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
 
 /// Trait governing how the encoder works.
 #[must_use = "Encoders must be consumed through one of its encode_* methods"]
@@ -1330,7 +1330,7 @@ pub trait Encoder: Sized {
     ///     where
     ///         E: Encoder,
     ///     {
-    ///         encoder.encode_slice(&self.data)
+    ///         encoder.encode_slice(cx, &self.data)
     ///     }
     ///
     ///     #[inline]
@@ -1340,18 +1340,15 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_slice<T>(self, slice: &[T]) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    fn encode_slice<T>(
+        self,
+        cx: &Self::Cx,
+        slice: &[T],
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         T: Encode<Self::Mode>,
     {
-        let hint = SequenceHint::with_size(slice.len());
-        let mut seq = self.encode_sequence(&hint)?;
-
-        for item in slice {
-            seq.push(item)?;
-        }
-
-        seq.finish_sequence()
+        utils::default_encode_slice(cx, self, slice)
     }
 
     /// Encode a sequence with a known length `len`.

@@ -1,9 +1,12 @@
-use core::fmt;
+use core::mem::size_of_val;
+use core::{fmt, slice};
 
 use crate::en::{
-    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
+    utils, Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder,
+    VariantEncoder,
 };
 use crate::hint::{MapHint, SequenceHint};
+use crate::options::is_native_fixed;
 use crate::{Context, Options, Writer};
 
 /// A vaery simple encoder suitable for storage encoding.
@@ -62,11 +65,25 @@ where
     }
 
     #[inline]
-    fn encode<T>(self, value: T) -> Result<Self::Ok, Self::Error>
+    fn encode<T>(mut self, value: T) -> Result<Self::Ok, Self::Error>
     where
         T: Encode<Self::Mode>,
     {
-        value.as_encode().encode(self.cx, self)
+        let value = value.as_encode();
+
+        if !const { is_native_fixed::<OPT>() && T::Encode::ENCODE_PACKED } {
+            return value.encode(self.cx, self);
+        }
+
+        // SAFETY: We've ensured the type is layout compatible with the current
+        // serialization just above.
+        let slice = unsafe {
+            let at = (value as *const T::Encode).cast::<u8>();
+            slice::from_raw_parts(at, size_of_val(value))
+        };
+
+        self.writer.write_bytes(self.cx, slice)?;
+        Ok(())
     }
 
     #[inline]
@@ -215,33 +232,32 @@ where
     }
 
     #[inline]
-    fn encode_slice<T>(mut self, slice: &[T]) -> Result<Self::Ok, C::Error>
+    fn encode_slice<T>(mut self, cx: &Self::Cx, slice: &[T]) -> Result<Self::Ok, C::Error>
     where
         T: Encode<Self::Mode>,
     {
-        // NB: All of these *should* be constant values.
-        let is_native = const {
-            crate::options::is_native_fixed::<OPT>()
-                && T::ENCODE_PACKED
-                && size_of::<T>() % align_of::<T>() == 0
-        };
-
-        if !is_native {
-            return default_encode_slice(self.cx, self, slice);
+        // Check that the type is packed inside of the slice.
+        if !const {
+            is_native_fixed::<OPT>() && T::ENCODE_PACKED && size_of::<T>() % align_of::<T>() == 0
+        } {
+            return utils::default_encode_slice(cx, self, slice);
         }
 
         let len = slice.len().to_ne_bytes();
+        self.writer.write_bytes(cx, &len)?;
 
-        // SAFETY: We've ensured the type is layout compatible with the current
-        // serialization just above.
-        let slice = unsafe {
-            let at = slice.as_ptr().cast::<u8>();
-            let size = core::mem::size_of_val(slice);
-            core::slice::from_raw_parts(at, size)
-        };
+        if size_of::<T>() > 0 {
+            // SAFETY: We've ensured the type is layout compatible with the
+            // current serialization just above.
+            let slice = unsafe {
+                let at = slice.as_ptr().cast::<u8>();
+                let size = size_of_val(slice);
+                slice::from_raw_parts(at, size)
+            };
 
-        self.writer.write_bytes(self.cx, &len)?;
-        self.writer.write_bytes(self.cx, slice)?;
+            self.writer.write_bytes(cx, slice)?;
+        }
+
         Ok(())
     }
 
@@ -437,23 +453,4 @@ where
     fn finish_variant(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
-}
-
-#[inline]
-fn default_encode_slice<C, E, T>(cx: &C, encoder: E, slice: &[T]) -> Result<E::Ok, E::Error>
-where
-    C: ?Sized + Context,
-    E: Encoder,
-    T: Encode<E::Mode>,
-{
-    let hint = SequenceHint::with_size(slice.len());
-    let mut seq = encoder.encode_sequence(&hint)?;
-
-    for (index, item) in slice.iter().enumerate() {
-        cx.enter_sequence_index(index);
-        seq.push(item)?;
-        cx.leave_sequence_index();
-    }
-
-    seq.finish_sequence()
 }

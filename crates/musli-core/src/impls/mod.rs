@@ -206,11 +206,11 @@ where
     type Encode = [T; N];
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
-        encoder.encode_slice(self)
+        encoder.encode_slice(cx, self)
     }
 
     #[inline]
@@ -505,11 +505,11 @@ where
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
-        encoder.encode_slice(self)
+        encoder.encode_slice(cx, self)
     }
 
     #[inline]

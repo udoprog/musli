@@ -30,6 +30,9 @@ pub use self::as_decoder::AsDecoder;
 mod decode;
 pub use self::decode::Decode;
 
+mod decode_slice_builder;
+pub use self::decode_slice_builder::DecodeSliceBuilder;
+
 mod decode_bytes;
 pub use self::decode_bytes::DecodeBytes;
 
@@ -81,3 +84,6 @@ pub use self::visitor::Visitor;
 pub trait DecodeOwned<M>: for<'de> Decode<'de, M> {}
 
 impl<M, D> DecodeOwned<M> for D where D: for<'de> Decode<'de, M> {}
+
+#[doc(hidden)]
+pub mod utils;

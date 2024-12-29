@@ -18,7 +18,15 @@
 
 #[doc(inline)]
 pub use musli_core::de::{
-    AsDecoder, Decode, DecodeBytes, DecodeOwned, DecodePacked, DecodeTrace, DecodeUnsized,
-    DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
-    SizeHint, Skip, UnsizedVisitor, VariantDecoder, Visitor,
+    AsDecoder, Decode, DecodeBytes, DecodeOwned, DecodePacked, DecodeSliceBuilder, DecodeTrace,
+    DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
+    SequenceDecoder, SizeHint, Skip, UnsizedVisitor, VariantDecoder, Visitor,
 };
+
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "value"
+))]
+pub(crate) use musli_core::de::utils;
