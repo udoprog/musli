@@ -58,17 +58,19 @@ where
     type ItemRef = Ref<T, E, usize>;
 
     #[inline]
-    fn from_ref<A: ByteOrder, B: Size>(slice: Ref<[T], A, B>) -> Self
+    fn from_ref<A, B>(slice: Ref<[T], A, B>) -> Self
     where
-        T: ZeroCopy,
+        A: ByteOrder,
+        B: Size,
     {
         Self::with_metadata(slice.offset(), slice.len())
     }
 
     #[inline]
-    fn try_from_ref<A: ByteOrder, B: Size>(slice: Ref<[T], A, B>) -> Result<Self, Error>
+    fn try_from_ref<A, B>(slice: Ref<[T], A, B>) -> Result<Self, Error>
     where
-        T: ZeroCopy,
+        A: ByteOrder,
+        B: Size,
     {
         Self::try_with_metadata(slice.offset(), slice.len())
     }
@@ -123,9 +125,11 @@ where
 {
     /// Construct a packed slice from a reference.
     #[inline]
-    pub fn from_ref<A: ByteOrder, B: Size>(slice: Ref<[T], A, B>) -> Self
+    pub fn from_ref<A, B>(slice: Ref<[T], A, B>) -> Self
     where
         T: ZeroCopy,
+        A: ByteOrder,
+        B: Size,
     {
         Self::from_raw_parts(slice.offset(), slice.len())
     }

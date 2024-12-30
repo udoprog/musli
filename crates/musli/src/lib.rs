@@ -542,7 +542,10 @@ pub use musli_core::mode;
 /// }
 ///
 /// #[musli::encoder]
-/// impl<C: ?Sized + Context> Encoder for MyEncoder<'_, C> {
+/// impl<C> Encoder for MyEncoder<'_, C>
+/// where
+///     C: ?Sized + Context,
+/// {
 ///     type Cx = C;
 ///     type Ok = ();
 ///
