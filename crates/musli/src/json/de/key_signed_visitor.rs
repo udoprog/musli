@@ -21,8 +21,9 @@ impl<T> KeySignedVisitor<T> {
     }
 }
 
-impl<C: ?Sized + Context, T> UnsizedVisitor<'_, C, [u8]> for KeySignedVisitor<T>
+impl<C, T> UnsizedVisitor<'_, C, [u8]> for KeySignedVisitor<T>
 where
+    C: ?Sized + Context,
     T: Signed,
 {
     type Ok = T;

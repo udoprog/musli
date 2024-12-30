@@ -396,7 +396,10 @@ impl<'de, M> Decode<'de, M> for Value {
 struct BytesVisitor;
 
 #[cfg(feature = "alloc")]
-impl<C: ?Sized + Context> UnsizedVisitor<'_, C, [u8]> for BytesVisitor {
+impl<C> UnsizedVisitor<'_, C, [u8]> for BytesVisitor
+where
+    C: ?Sized + Context,
+{
     type Ok = Value;
 
     #[inline]
@@ -420,7 +423,10 @@ impl<C: ?Sized + Context> UnsizedVisitor<'_, C, [u8]> for BytesVisitor {
 struct StringVisitor;
 
 #[cfg(feature = "alloc")]
-impl<C: ?Sized + Context> UnsizedVisitor<'_, C, str> for StringVisitor {
+impl<C> UnsizedVisitor<'_, C, str> for StringVisitor
+where
+    C: ?Sized + Context,
+{
     type Ok = Value;
 
     #[inline]

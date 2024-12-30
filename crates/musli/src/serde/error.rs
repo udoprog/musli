@@ -17,7 +17,10 @@ pub enum SerdeError {
 }
 
 impl SerdeError {
-    pub(super) fn report<C: ?Sized + Context>(self, cx: &C) -> Option<C::Error> {
+    pub(super) fn report<C>(self, cx: &C) -> Option<C::Error>
+    where
+        C: ?Sized + Context,
+    {
         match self {
             SerdeError::Captured => None,
             #[cfg(not(feature = "alloc"))]
