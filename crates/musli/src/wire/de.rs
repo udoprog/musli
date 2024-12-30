@@ -5,8 +5,8 @@ use core::mem::take;
 use rust_alloc::vec::Vec;
 
 use crate::de::{
-    Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
-    SizeHint, Skip, UnsizedVisitor, VariantDecoder,
+    Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, Skip,
+    UnsizedVisitor, VariantDecoder,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::int::continuation as c;
@@ -223,8 +223,11 @@ where
     type DecodeVariant = Self;
 
     #[inline]
-    fn cx(&self) -> &C {
-        self.cx
+    fn cx<F, O>(self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, Self) -> O,
+    {
+        f(self.cx, self)
     }
 
     #[inline]
@@ -238,23 +241,6 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "type supported by the wire decoder")
-    }
-
-    #[inline]
-    fn decode<T>(self) -> Result<T, C::Error>
-    where
-        T: Decode<'de, Self::Mode>,
-    {
-        self.cx.decode(self)
-    }
-
-    #[inline]
-    fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
-    where
-        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
-        F: FnOnce(&T) -> Result<O, Self::Error>,
-    {
-        self.cx.decode_unsized(self, f)
     }
 
     #[inline]

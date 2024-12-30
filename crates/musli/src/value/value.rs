@@ -162,7 +162,7 @@ impl<M> Encode<M> for Number {
 
     type Encode = Self;
 
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -384,7 +384,7 @@ impl<'de, M> Decode<'de, M> for Value {
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {
@@ -450,7 +450,7 @@ impl<M> Encode<M> for Value {
 
     type Encode = Self;
 
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {

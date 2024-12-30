@@ -10,7 +10,7 @@ pub struct BytesReference<'de> {
 
 impl<'de, M> Decode<'de, M> for BytesReference<'de> {
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
@@ -67,7 +67,7 @@ pub struct StringReference<'de> {
 
 impl<'de, M> Decode<'de, M> for StringReference<'de> {
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
@@ -122,14 +122,18 @@ pub enum OwnedFn {
 }
 
 impl<'de, M> Decode<'de, M> for OwnedFn {
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        decoder.decode_unsized(|variant: &str| match variant {
-            "A" => Ok(OwnedFn::A),
-            "B" => Ok(OwnedFn::A),
-            other => Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}"))),
+        decoder.cx(|cx, decoder| {
+            decoder.decode_unsized(|variant: &str| match variant {
+                "A" => Ok(OwnedFn::A),
+                "B" => Ok(OwnedFn::A),
+                other => {
+                    Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}")))
+                }
+            })
         })
     }
 }

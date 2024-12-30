@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
+use syn::Token;
 
 use crate::internals::attr::{self, ModeIdent, ModeKind, TypeAttr};
 use crate::internals::build::Build;
@@ -21,6 +22,32 @@ impl UnsizedMethod {
         match self {
             Self::Default => syn::Ident::new("decode_unsized", Span::call_site()),
             Self::Bytes => syn::Ident::new("decode_unsized_bytes", Span::call_site()),
+        }
+    }
+}
+
+pub(crate) struct NameType {
+    pub(crate) ty: syn::Type,
+    pub(crate) method: NameMethod,
+}
+
+impl NameType {
+    pub(crate) fn expr(&self, ident: syn::Ident) -> syn::Expr {
+        match self.method {
+            NameMethod::Unsized(..) => syn::parse_quote!(#ident),
+            NameMethod::Value => syn::parse_quote!(&#ident),
+        }
+    }
+
+    pub(crate) fn ty(&self) -> syn::Type {
+        match self.method {
+            NameMethod::Unsized(..) => syn::Type::Reference(syn::TypeReference {
+                and_token: <Token![&]>::default(),
+                lifetime: None,
+                mutability: None,
+                elem: Box::new(self.ty.clone()),
+            }),
+            NameMethod::Value => self.ty.clone(),
         }
     }
 }

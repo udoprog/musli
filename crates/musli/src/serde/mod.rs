@@ -177,64 +177,68 @@ where
 
 /// Encode the given serde value `T` to the given [Encoder] using the serde
 /// compatibility layer.
-pub fn encode<E, T>(value: &T, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+pub fn encode<E, T>(value: &T, encoder: E) -> Result<E::Ok, E::Error>
 where
     E: Encoder,
     T: Serialize,
 {
-    let cx = SerdeContext {
-        error: RefCell::new(None),
-        inner: cx,
-    };
+    encoder.cx(|cx, encoder| {
+        let cx = SerdeContext {
+            error: RefCell::new(None),
+            inner: cx,
+        };
 
-    let encoder = encoder.with_context(&cx)?;
+        let encoder = encoder.with_context(&cx)?;
 
-    let serializer = Serializer::new(&cx, encoder);
+        let serializer = Serializer::new(encoder);
 
-    let error = match value.serialize(serializer) {
-        Ok(value) => return Ok(value),
-        Err(error) => error,
-    };
+        let error = match value.serialize(serializer) {
+            Ok(value) => return Ok(value),
+            Err(error) => error,
+        };
 
-    if let Some(error) = error.report(cx.inner) {
-        return Err(error);
-    }
+        if let Some(error) = error.report(cx.inner) {
+            return Err(error);
+        }
 
-    let Some(error) = cx.error.borrow_mut().take() else {
-        return Err(cx.inner.message("error during encoding (no information)"));
-    };
+        let Some(error) = cx.error.borrow_mut().take() else {
+            return Err(cx.inner.message("error during encoding (no information)"));
+        };
 
-    Err(error)
+        Err(error)
+    })
 }
 
 /// Decode the given serde value `T` from the given [Decoder] using the serde
 /// compatibility layer.
-pub fn decode<'de, D, T>(cx: &D::Cx, decoder: D) -> Result<T, D::Error>
+pub fn decode<'de, D, T>(decoder: D) -> Result<T, D::Error>
 where
     D: Decoder<'de>,
     T: Deserialize<'de>,
 {
-    let cx = SerdeContext {
-        error: RefCell::new(None),
-        inner: cx,
-    };
+    decoder.cx(|cx, decoder| {
+        let cx = SerdeContext {
+            error: RefCell::new(None),
+            inner: cx,
+        };
 
-    let decoder = decoder.with_context(&cx)?;
+        let decoder = decoder.with_context(&cx)?;
 
-    let deserializer = Deserializer::new(&cx, decoder);
+        let deserializer = Deserializer::new(&cx, decoder);
 
-    let error = match T::deserialize(deserializer) {
-        Ok(value) => return Ok(value),
-        Err(error) => error,
-    };
+        let error = match T::deserialize(deserializer) {
+            Ok(value) => return Ok(value),
+            Err(error) => error,
+        };
 
-    if let Some(error) = error.report(cx.inner) {
-        return Err(error);
-    }
+        if let Some(error) = error.report(cx.inner) {
+            return Err(error);
+        }
 
-    let Some(error) = cx.error.borrow_mut().take() else {
-        return Err(cx.inner.message("error during encoding (no information)"));
-    };
+        let Some(error) = cx.error.borrow_mut().take() else {
+            return Err(cx.inner.message("error during encoding (no information)"));
+        };
 
-    Err(error)
+        Err(error)
+    })
 }

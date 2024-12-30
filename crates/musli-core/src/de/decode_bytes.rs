@@ -5,7 +5,7 @@ use super::Decoder;
 /// This is typically used automatically through the `#[musli(bytes)]` attribute
 /// through the [`Decode` derive].
 ///
-/// [`Decode` derive]: https://docs.rs/musli/latest/musli/help/derives/
+/// [`Decode` derive]: https://docs.rs/musli/latest/musli/_help/derives/
 ///
 /// # Examples
 ///
@@ -30,12 +30,12 @@ use super::Decoder;
 /// }
 ///
 /// impl<'de, M> Decode<'de, M> for MyType {
-///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de>,
 ///     {
 ///         Ok(Self {
-///             data: DecodeBytes::decode_bytes(cx, decoder)?,
+///             data: DecodeBytes::decode_bytes(decoder)?,
 ///         })
 ///     }
 /// }
@@ -51,7 +51,7 @@ pub trait DecodeBytes<'de, M>: Sized {
     const DECODE_BYTES_PACKED: bool = false;
 
     /// Decode the given input as bytes.
-    fn decode_bytes<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode_bytes<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>;
 }

@@ -78,8 +78,11 @@ where
     type EncodeMapVariant = Self;
 
     #[inline]
-    fn cx(&self) -> &Self::Cx {
-        self.cx
+    fn cx<F, O>(self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, Self) -> O,
+    {
+        f(self.cx, self)
     }
 
     #[inline]
@@ -100,7 +103,7 @@ where
     where
         T: Encode<Self::Mode>,
     {
-        value.encode(self.cx, self)
+        value.encode(self)
     }
 
     #[inline]

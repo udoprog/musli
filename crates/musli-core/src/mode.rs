@@ -7,7 +7,7 @@
 ///
 /// See [modes] for more.
 ///
-/// [modes]: https://docs.rs/musli/latest/musli/help/derives/index.html#modes
+/// [modes]: https://docs.rs/musli/latest/musli/_help/derives/index.html#modes
 pub enum Binary {}
 
 /// The text encoding mode.
@@ -17,5 +17,5 @@ pub enum Binary {}
 ///
 /// See [modes] for more.
 ///
-/// [modes]: https://docs.rs/musli/latest/musli/help/derives/index.html#modes
+/// [modes]: https://docs.rs/musli/latest/musli/_help/derives/index.html#modes
 pub enum Text {}

@@ -663,7 +663,7 @@ macro_rules! encoding_impls {
             cx.clear();
             let mut writer = $writer_trait::$into_writer(writer);
             let encoder = $encoder_new(cx, $crate::writer::Writer::borrow_mut(&mut writer));
-            T::encode(value, cx, encoder)?;
+            T::encode(value, encoder)?;
             $crate::writer::Writer::finish(&mut writer, cx)
         }
 
@@ -922,7 +922,7 @@ macro_rules! encoding_impls {
         {
             cx.clear();
             let reader = $reader_trait::$into_reader(reader);
-            T::decode(cx, $decoder_new(cx, reader))
+            T::decode($decoder_new(cx, reader))
         }
 
         /// Decode the given type `T` from the given slice using the current

@@ -6,8 +6,8 @@ use syn::Token;
 
 use crate::de::{build_call, build_reference};
 use crate::expander::{
-    self, Data, EnumData, Expander, FieldData, NameMethod, StructData, StructKind, UnsizedMethod,
-    VariantData,
+    self, Data, EnumData, Expander, FieldData, NameMethod, NameType, StructData, StructKind,
+    UnsizedMethod, VariantData,
 };
 
 use super::attr::{EnumTagging, FieldEncoding, ModeKind, Packing};
@@ -99,8 +99,7 @@ pub(crate) struct Body<'a> {
     pub(crate) name: &'a syn::LitStr,
     pub(crate) unskipped_fields: Vec<Rc<Field<'a>>>,
     pub(crate) all_fields: Vec<Rc<Field<'a>>>,
-    pub(crate) name_type: syn::Type,
-    pub(crate) name_method: NameMethod,
+    pub(crate) name_type: NameType,
     pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing: Packing,
     pub(crate) kind: StructKind,
@@ -120,25 +119,6 @@ impl Body<'_> {
             None => build_reference(value.clone()),
         }
     }
-
-    pub(crate) fn name_expr(&self, ident: syn::Ident) -> syn::Expr {
-        match self.name_method {
-            NameMethod::Unsized(..) => syn::parse_quote!(#ident),
-            NameMethod::Value => syn::parse_quote!(&#ident),
-        }
-    }
-
-    pub(crate) fn name_local_type(&self) -> syn::Type {
-        match self.name_method {
-            NameMethod::Unsized(..) => syn::Type::Reference(syn::TypeReference {
-                and_token: <Token![&]>::default(),
-                lifetime: None,
-                mutability: None,
-                elem: Box::new(self.name_type.clone()),
-            }),
-            NameMethod::Value => self.name_type.clone(),
-        }
-    }
 }
 
 pub(crate) struct Enum<'a> {
@@ -148,8 +128,7 @@ pub(crate) struct Enum<'a> {
     pub(crate) enum_packing: Packing,
     pub(crate) variants: Vec<Variant<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
-    pub(crate) name_type: syn::Type,
-    pub(crate) name_method: NameMethod,
+    pub(crate) name_type: NameType,
     pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
     pub(crate) packing_span: Option<&'a (Span, Packing)>,
 }
@@ -163,32 +142,13 @@ impl Enum<'_> {
         match self.name_format_with {
             Some((_, path)) => (None, syn::parse_quote!(&#path(#static_var, #value))),
             None => {
-                let static_type = self.static_type();
+                let static_type = self.name_type.ty();
 
                 (
                     Some(syn::parse_quote!(static #static_var: #static_type = #value;)),
                     syn::parse_quote!(&#static_var),
                 )
             }
-        }
-    }
-
-    pub(crate) fn static_expr(&self, ident: syn::Ident) -> syn::Expr {
-        match self.name_method {
-            NameMethod::Unsized(..) => syn::parse_quote!(#ident),
-            NameMethod::Value => syn::parse_quote!(&#ident),
-        }
-    }
-
-    pub(crate) fn static_type(&self) -> syn::Type {
-        match self.name_method {
-            NameMethod::Unsized(..) => syn::Type::Reference(syn::TypeReference {
-                and_token: <Token![&]>::default(),
-                lifetime: None,
-                mutability: None,
-                elem: Box::new(self.name_type.clone()),
-            }),
-            NameMethod::Value => self.name_type.clone(),
         }
     }
 }
@@ -299,8 +259,10 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
         name: &data.name,
         unskipped_fields,
         all_fields,
-        name_type,
-        name_method,
+        name_type: NameType {
+            ty: name_type,
+            method: name_method,
+        },
         name_format_with: e.type_attr.name_format_with(mode),
         packing,
         kind: data.kind,
@@ -369,8 +331,10 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> En
         enum_packing,
         variants,
         fallback,
-        name_type,
-        name_method,
+        name_type: NameType {
+            ty: name_type,
+            method: name_method,
+        },
         name_format_with: e.type_attr.name_format_with(mode),
         packing_span,
     }
@@ -461,8 +425,10 @@ fn setup_variant<'a>(
         all_fields,
         packing: variant_packing,
         kind: data.kind,
-        name_type,
-        name_method,
+        name_type: NameType {
+            ty: name_type,
+            method: name_method,
+        },
         name_format_with: data.attr.name_format_with(mode),
         path,
     };
@@ -511,42 +477,86 @@ fn setup_field<'a>(
     let self_access = if let Some(patterns) = patterns {
         match data.ident {
             Some(ident) => {
-                patterns.push(syn::FieldPat {
-                    attrs: Vec::new(),
-                    member: syn::Member::Named(ident.clone()),
-                    colon_token: None,
-                    pat: Box::new(syn::Pat::Path(syn::PatPath {
+                let colon_token;
+                let pat;
+
+                let expr = if skip.is_none() {
+                    colon_token = None;
+
+                    pat = syn::Pat::Path(syn::PatPath {
                         attrs: Vec::new(),
                         qself: None,
                         path: syn::Path::from(ident.clone()),
-                    })),
+                    });
+
+                    syn::Expr::Path(syn::ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: ident.clone().into(),
+                    })
+                } else {
+                    colon_token = Some(<Token![:]>::default());
+
+                    pat = syn::Pat::Wild(syn::PatWild {
+                        attrs: Vec::new(),
+                        underscore_token: <Token![_]>::default(),
+                    });
+
+                    syn::Expr::Path(syn::ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: syn::Path::from(quote::format_ident!("skipped_{}", ident)),
+                    })
+                };
+
+                patterns.push(syn::FieldPat {
+                    attrs: Vec::new(),
+                    member: syn::Member::Named(ident.clone()),
+                    colon_token,
+                    pat: Box::new(pat),
                 });
 
-                syn::Expr::Path(syn::ExprPath {
-                    attrs: Vec::new(),
-                    qself: None,
-                    path: ident.clone().into(),
-                })
+                expr
             }
             None => {
-                let var = quote::format_ident!("v{}", data.index);
+                let pat;
+                let expr;
+
+                if skip.is_none() {
+                    let var = quote::format_ident!("v{}", data.index);
+
+                    pat = syn::Pat::Path(syn::PatPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: syn::Path::from(var.clone()),
+                    });
+
+                    expr = syn::Expr::Path(syn::ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: var.into(),
+                    });
+                } else {
+                    pat = syn::Pat::Wild(syn::PatWild {
+                        attrs: Vec::new(),
+                        underscore_token: <Token![_]>::default(),
+                    });
+
+                    expr = syn::Expr::Path(syn::ExprPath {
+                        attrs: Vec::new(),
+                        qself: None,
+                        path: syn::Path::from(quote::format_ident!("skipped_{}", data.index)),
+                    });
+                };
 
                 patterns.push(syn::FieldPat {
                     attrs: Vec::new(),
                     member: syn::Member::Unnamed(syn::Index::from(data.index)),
                     colon_token: Some(<Token![:]>::default()),
-                    pat: Box::new(syn::Pat::Path(syn::PatPath {
-                        attrs: Vec::new(),
-                        qself: None,
-                        path: syn::Path::from(var.clone()),
-                    })),
+                    pat: Box::new(pat),
                 });
 
-                syn::Expr::Path(syn::ExprPath {
-                    attrs: Vec::new(),
-                    qself: None,
-                    path: var.into(),
-                })
+                expr
             }
         }
     } else {

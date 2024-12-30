@@ -5,8 +5,6 @@ use core::fmt;
 use core::str;
 
 use crate::alloc::Allocator;
-use crate::de::{DecodeBytes, DecodeUnsized, DecodeUnsizedBytes};
-use crate::{Decode, Decoder};
 
 /// Provides ergonomic access to the serialization context.
 ///
@@ -41,48 +39,6 @@ pub trait Context {
     /// [`marked_message`][Context::marked_message] to report a spanned error.
     fn mark(&self) -> Self::Mark;
 
-    /// Decode the given input using the associated mode.
-    #[inline]
-    fn decode<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
-    where
-        T: Decode<'de, Self::Mode>,
-        D: Decoder<'de, Cx = Self, Mode = Self::Mode, Error = Self::Error>,
-    {
-        T::decode(self, decoder)
-    }
-
-    /// Decode the given unsized value using the associated mode.
-    #[inline]
-    fn decode_unsized<'de, T, D, F, O>(&self, decoder: D, f: F) -> Result<O, Self::Error>
-    where
-        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
-        D: Decoder<'de, Cx = Self, Mode = Self::Mode, Error = Self::Error>,
-        F: FnOnce(&T) -> Result<O, D::Error>,
-    {
-        T::decode_unsized(self, decoder, f)
-    }
-
-    /// Decode the given input as bytes using the associated mode.
-    #[inline]
-    fn decode_bytes<'de, T, D>(&self, decoder: D) -> Result<T, Self::Error>
-    where
-        T: DecodeBytes<'de, Self::Mode>,
-        D: Decoder<'de, Cx = Self, Mode = Self::Mode, Error = Self::Error>,
-    {
-        T::decode_bytes(self, decoder)
-    }
-
-    /// Decode the given unsized value as bytes using the associated mode.
-    #[inline]
-    fn decode_unsized_bytes<'de, T, D, F, O>(&self, decoder: D, f: F) -> Result<O, Self::Error>
-    where
-        T: ?Sized + DecodeUnsizedBytes<'de, Self::Mode>,
-        D: Decoder<'de, Cx = Self, Mode = Self::Mode, Error = Self::Error>,
-        F: FnOnce(&T) -> Result<O, D::Error>,
-    {
-        T::decode_unsized_bytes(self, decoder, f)
-    }
-
     /// Access the underlying allocator.
     fn alloc(&self) -> Self::Allocator;
 
@@ -108,15 +64,6 @@ pub trait Context {
     fn custom<T>(&self, error: T) -> Self::Error
     where
         T: 'static + Send + Sync + Error;
-
-    /// Generate a map function which maps an error using the `message` function.
-    #[inline]
-    fn map_message<T>(&self) -> impl FnOnce(T) -> Self::Error + '_
-    where
-        T: fmt::Display,
-    {
-        move |error| self.message(error)
-    }
 
     /// Report a message as an error.
     ///

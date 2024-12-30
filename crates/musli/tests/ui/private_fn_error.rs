@@ -10,7 +10,7 @@ mod array {
     use musli::{Encoder, Decoder};
 
     #[inline]
-    fn encode<E, T, const N: usize>(_this: &[T; N], _cx: &E::Cx, _encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E, T, const N: usize>(_this: &[T; N], __encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -18,7 +18,7 @@ mod array {
     }
 
     #[inline]
-    fn decode<'de, D, T, const N: usize>(_cx: &D::Cx, _decoder: D) -> Result<[T; N], D::Error>
+    fn decode<'de, D, T, const N: usize>(__decoder: D) -> Result<[T; N], D::Error>
     where
         D: Decoder<'de>,
     {

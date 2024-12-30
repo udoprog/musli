@@ -5,8 +5,8 @@ use core::mem::MaybeUninit;
 use rust_alloc::vec::Vec;
 
 use crate::de::{
-    utils, DecodeSliceBuilder, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
-    SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
+    utils, DecodeSliceBuilder, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
+    SizeHint, UnsizedVisitor, VariantDecoder,
 };
 use crate::options::is_native_fixed;
 use crate::{Context, Decode, Options, Reader};
@@ -56,8 +56,12 @@ where
     type DecodeMapEntries = LimitedStorageDecoder<'a, R, OPT, C>;
     type DecodeVariant = Self;
 
-    fn cx(&self) -> &C {
-        self.cx
+    #[inline]
+    fn cx<F, O>(self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, Self) -> O,
+    {
+        f(self.cx, self)
     }
 
     #[inline]
@@ -79,7 +83,7 @@ where
         T: Decode<'de, Self::Mode>,
     {
         if !const { is_native_fixed::<OPT>() && T::DECODE_PACKED } {
-            return self.cx.decode(self);
+            return T::decode(self);
         }
 
         let mut value = MaybeUninit::<T>::uninit();
@@ -92,15 +96,6 @@ where
             self.reader.read_bytes_uninit(self.cx, ptr, n)?;
             Ok(value.assume_init())
         }
-    }
-
-    #[inline]
-    fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
-    where
-        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
-        F: FnOnce(&T) -> Result<O, Self::Error>,
-    {
-        self.cx.decode_unsized(self, f)
     }
 
     #[inline]
@@ -288,7 +283,7 @@ where
 
     /// Decode a sequence of values.
     #[inline]
-    fn decode_slice<V, T>(mut self, cx: &Self::Cx) -> Result<V, <Self::Cx as Context>::Error>
+    fn decode_slice<V, T>(mut self) -> Result<V, <Self::Cx as Context>::Error>
     where
         V: DecodeSliceBuilder<T>,
         T: Decode<'de, Self::Mode>,
@@ -297,13 +292,13 @@ where
         if !const {
             is_native_fixed::<OPT>() && T::DECODE_PACKED && size_of::<T>() % align_of::<T>() == 0
         } {
-            return utils::default_decode_slice(self, cx);
+            return utils::default_decode_slice(self);
         }
 
-        let len = self.reader.borrow_mut().read_array(cx)?;
+        let len = self.reader.borrow_mut().read_array(self.cx)?;
         let len = usize::from_ne_bytes(len);
 
-        let mut out = V::new(cx)?;
+        let mut out = V::new(self.cx)?;
 
         if size_of::<T>() > 0 {
             // Calculate a max chunk size which takes the size of the current
@@ -336,14 +331,14 @@ where
                 // The size of the chunk to write.
                 let chunk = (len - at).min(max_chunk);
 
-                out.reserve(cx, chunk)?;
+                out.reserve(self.cx, chunk)?;
 
                 let ptr = out.as_mut_ptr().wrapping_add(at).cast::<u8>();
                 let n = chunk * size_of::<T>();
 
                 // Read into allocated space and mark as initialized.
                 unsafe {
-                    self.reader.read_bytes_uninit(cx, ptr, n)?;
+                    self.reader.read_bytes_uninit(self.cx, ptr, n)?;
                     at += max_chunk;
                 }
 

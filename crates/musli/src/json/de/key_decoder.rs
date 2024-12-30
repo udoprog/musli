@@ -1,7 +1,7 @@
 use core::fmt;
 
 use crate::alloc::Vec;
-use crate::de::{Decode, DecodeUnsized, Decoder, SizeHint, Skip, UnsizedVisitor, Visitor};
+use crate::de::{Decoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 use crate::Context;
 
 use super::super::parser::{Parser, Token};
@@ -53,8 +53,11 @@ where
         U: 'this + Context;
 
     #[inline]
-    fn cx(&self) -> &Self::Cx {
-        self.cx
+    fn cx<F, O>(self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, Self) -> O,
+    {
+        f(self.cx, self)
     }
 
     #[inline]
@@ -68,23 +71,6 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "value that can be decoded from a object key")
-    }
-
-    #[inline]
-    fn decode<T>(self) -> Result<T, Self::Error>
-    where
-        T: Decode<'de, Self::Mode>,
-    {
-        self.cx.decode(self)
-    }
-
-    #[inline]
-    fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
-    where
-        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
-        F: FnOnce(&T) -> Result<O, Self::Error>,
-    {
-        self.cx.decode_unsized(self, f)
     }
 
     #[inline]

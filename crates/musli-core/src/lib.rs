@@ -73,8 +73,12 @@ mod never;
 ///     type Cx = C;
 ///     type Ok = ();
 ///
-///     fn cx(&self) -> &C {
-///         self.cx
+///     #[inline]
+///     fn cx<F, O>(self, f: F) -> O
+///     where
+///         F: FnOnce(&Self::Cx, Self) -> O,
+///     {
+///         f(self.cx, self)
 ///     }
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -85,7 +89,7 @@ mod never;
 ///     where
 ///         T: Encode<Self::Mode>,
 ///     {
-///         value.encode(self.cx, self)
+///         value.encode(self)
 ///     }
 ///
 ///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
@@ -126,8 +130,12 @@ pub use musli_macros::encoder;
 /// impl<'de, C: ?Sized + Context> Decoder<'de> for MyDecoder<'_, C> {
 ///     type Cx = C;
 ///
-///     fn cx(&self) -> &C {
-///         self.cx
+///     #[inline]
+///     fn cx<F, O>(self, f: F) -> O
+///     where
+///         F: FnOnce(&Self::Cx, Self) -> O,
+///     {
+///         f(self.cx, self)
 ///     }
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -50,7 +50,7 @@ macro_rules! declare {
             const ENCODE_PACKED: bool = false;
 
             #[inline]
-            fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -82,7 +82,7 @@ macro_rules! declare {
             const DECODE_PACKED: bool = false;
 
             #[inline]
-            fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {
@@ -102,7 +102,7 @@ macro_rules! declare {
             $($ty: Encode<M>),*
         {
             #[inline]
-            fn encode_packed<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -121,7 +121,7 @@ macro_rules! declare {
             $($ty: Decode<'de, M>),*
         {
             #[inline]
-            fn decode_packed<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn decode_packed<D>(decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {

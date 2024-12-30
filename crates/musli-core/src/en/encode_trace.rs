@@ -10,7 +10,7 @@ use super::Encoder;
 /// [`fmt::Display`]: std::fmt::Display
 pub trait EncodeTrace<M> {
     /// Encode the given output.
-    fn trace_encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn trace_encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>;
 }

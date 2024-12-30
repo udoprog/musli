@@ -8,7 +8,7 @@ use crate::en::Encoder;
 /// This is typically used automatically through the `#[musli(packed)]`
 /// attribute through the [`Decode` derive].
 ///
-/// [`Decode` derive]: https://docs.rs/musli/latest/musli/help/derives/
+/// [`Decode` derive]: https://docs.rs/musli/latest/musli/_help/derives/
 ///
 /// # Examples
 ///
@@ -35,7 +35,7 @@ use crate::en::Encoder;
 /// impl<M> Encode<M> for PackedType {
 ///     type Encode = Self;
 ///
-///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
 ///     where
 ///         E: Encoder,
 ///     {
@@ -53,7 +53,7 @@ use crate::en::Encoder;
 /// ```
 pub trait EncodePacked<M> {
     /// Encode the given output as bytes.
-    fn encode_packed<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>;
 }
@@ -63,11 +63,11 @@ where
     T: ?Sized + EncodePacked<M>,
 {
     #[inline]
-    fn encode_packed<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
-        (**self).encode_packed(cx, encoder)
+        (**self).encode_packed(encoder)
     }
 }
 
@@ -76,10 +76,10 @@ where
     T: ?Sized + EncodePacked<M>,
 {
     #[inline]
-    fn encode_packed<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
-        (**self).encode_packed(cx, encoder)
+        (**self).encode_packed(encoder)
     }
 }

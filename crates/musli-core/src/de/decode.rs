@@ -4,7 +4,7 @@ use super::Decoder;
 ///
 /// This is typically implemented automatically using the [`Decode` derive].
 ///
-/// [`Decode` derive]: https://docs.rs/musli/latest/musli/help/derives/
+/// [`Decode` derive]: https://docs.rs/musli/latest/musli/_help/derives/
 ///
 /// # Examples
 ///
@@ -27,7 +27,7 @@ use super::Decoder;
 /// }
 ///
 /// impl<'de, M> Decode<'de, M> for MyType {
-///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de>,
 ///     {
@@ -51,7 +51,7 @@ pub trait Decode<'de, M>: Sized {
     const DECODE_PACKED: bool = false;
 
     /// Decode the given input.
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>;
 }

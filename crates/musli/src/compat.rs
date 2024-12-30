@@ -31,7 +31,7 @@ impl<M> Encode<M> for Sequence<()> {
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -50,7 +50,7 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
     const DECODE_PACKED: bool = true;
 
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
@@ -69,8 +69,8 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
 ///
 /// [`Vec`]: alloc::vec::Vec
 /// [`VecDeque`]: alloc::collections::VecDeque
-/// [bytes]: crate::help::derives
-/// [data model of Müsli]: crate::help::data_model
+/// [bytes]: crate::_help::derives
+/// [data model of Müsli]: crate::_help::data_model
 ///
 /// # Examples
 ///
@@ -86,11 +86,11 @@ impl<'de, M> Decode<'de, M> for Sequence<()> {
 /// where
 ///     Bytes<Vec<u8>>: Decode<'de, M>
 /// {
-///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de, Mode = M>,
 ///     {
-///         let Bytes(field) = Decode::decode(cx, decoder)?;
+///         let Bytes(field) = Decode::decode(decoder)?;
 ///
 ///         Ok(Struct {
 ///             field,
@@ -135,7 +135,7 @@ where
 /// the value already, this applies to types which implements [`EncodePacked`]
 /// and [`DecodePacked`].
 ///
-/// [packed]: crate::help::derives
+/// [packed]: crate::_help::derives
 ///
 /// # Examples
 ///
@@ -152,11 +152,11 @@ where
 /// where
 ///     Packed<(u8, u32)>: Decode<'de, M>
 /// {
-///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de, Mode = M>,
 ///     {
-///         let Packed((field, field2)) = Decode::decode(cx, decoder)?;
+///         let Packed((field, field2)) = Decode::decode(decoder)?;
 ///
 ///         Ok(Struct {
 ///             field,
