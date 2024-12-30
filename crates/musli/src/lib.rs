@@ -458,11 +458,11 @@
 //!
 //! [`Binary`]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
 //! [`bincode`]: <https://docs.rs/bincode>
-//! [`data_model`]: <https://docs.rs/musli/latest/musli/help/data_model/index.html>
+//! [`data_model`]: <https://docs.rs/musli/latest/musli/_help/data_model/index.html>
 //! [`decode_any`]: https://docs.rs/musli/latest/musli/trait.Decoder.html#method.decode_any
 //! [`Decode`]: <https://docs.rs/musli/latest/musli/de/trait.Decode.html>
 //! [`Decoder`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html>
-//! [`derives`]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
+//! [`derives`]: <https://docs.rs/musli/latest/musli/_help/derives/index.html>
 //! [`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
 //! [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
 //! [`Ignore`]: <https://docs.rs/musli/latest/musli/context/struct.Ignore.html>
@@ -483,7 +483,7 @@
 //! [bit packing]: <https://github.com/udoprog/musli/blob/main/crates/musli/src/descriptive/tag.rs>
 //! [completely uses visitors]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_u32
 //! [detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
-//! [musli-name-type]: <https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type-->
+//! [musli-name-type]: <https://docs.rs/musli/latest/musli/_help/derives/index.html#musliname_type-->
 //! [no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/>
 //! [scoped allocations]: <https://docs.rs/musli/latest/musli/trait.Context.html#tymethod.alloc>
 //! [size comparisons]: <https://udoprog.github.io/musli/benchmarks/#size-comparisons>
@@ -508,7 +508,18 @@ mod tests;
 #[cfg(feature = "json")]
 mod dec2flt;
 
-pub mod help;
+pub mod _help {
+    //! Detailed documentation for Müsli
+    //!
+    //! * [The data model of Müsli][data_model].
+    //! * [Deriving `Encode` and `Decode`][derives].
+
+    #[doc = include_str!("../help/data_model.md")]
+    pub mod data_model {}
+
+    #[doc = include_str!("../help/derives.md")]
+    pub mod derives {}
+}
 
 pub mod de;
 pub mod en;
@@ -549,8 +560,12 @@ pub use musli_core::mode;
 ///     type Cx = C;
 ///     type Ok = ();
 ///
-///     fn cx(&self) -> &C {
-///         self.cx
+///     #[inline]
+///     fn cx<F, O>(self, f: F) -> O
+///     where
+///         F: FnOnce(&Self::Cx, Self) -> O,
+///     {
+///         f(self.cx, self)
 ///     }
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -561,7 +576,7 @@ pub use musli_core::mode;
 ///     where
 ///         T: Encode<Self::Mode>,
 ///     {
-///         value.encode(self.cx, self)
+///         value.encode(self)
 ///     }
 ///
 ///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
@@ -599,8 +614,12 @@ pub use musli_core::encoder;
 /// impl<'de, C: ?Sized + Context> Decoder<'de> for MyDecoder<'_, C> {
 ///     type Cx = C;
 ///
-///     fn cx(&self) -> &C {
-///         self.cx
+///     #[inline]
+///     fn cx<F, O>(self, f: F) -> O
+///     where
+///         F: FnOnce(&Self::Cx, Self) -> O,
+///     {
+///         f(self.cx, self)
 ///     }
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -702,7 +721,7 @@ use crate::mode::Binary;
 ///
 /// See the [help section for `#[musli(bitwise)]`][help] for more information.
 ///
-/// [help]: crate::help::derives#muslibitwise
+/// [help]: crate::_help::derives#muslibitwise
 #[inline]
 pub const fn is_bitwise_encode<T>() -> bool
 where
@@ -716,7 +735,7 @@ where
 ///
 /// See the [help section for `#[musli(bitwise)]`][help] for more information.
 ///
-/// [help]: crate::help::derives#muslibitwise
+/// [help]: crate::_help::derives#muslibitwise
 #[inline]
 pub const fn is_bitwise_decode<T>() -> bool
 where

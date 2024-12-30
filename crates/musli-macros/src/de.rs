@@ -108,11 +108,13 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
                 const DECODE_PACKED: bool = #packed;
 
                 #[inline]
-                fn decode<#d_param>(#ctx_var: &#d_param::Cx, #root_decoder_var: #d_param) -> #result<Self, <#d_param::Cx as #context_t>::Error>
+                fn decode<#d_param>(#root_decoder_var: #d_param) -> #result<Self, <#d_param::Cx as #context_t>::Error>
                 where
                     #d_param: #decoder_t<#lt, Mode = #mode_ident>,
                 {
-                    #body
+                    #decoder_t::cx(#root_decoder_var, |#ctx_var, #root_decoder_var| {
+                        #body
+                    })
                 }
             }
         };
@@ -213,7 +215,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let output_enum;
     let name_type;
 
-    match en.name_method {
+    match en.name_type.method {
         NameMethod::Value => {
             for v in &en.variants {
                 let arm = output_arm(v.pattern, &v.name, &binding_var);
@@ -222,10 +224,10 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
             let decode_t_decode = &b.decode_t_decode;
 
-            decode_name = quote!(#decode_t_decode(#ctx_var, #variant_decoder_var));
+            decode_name = quote!(#decode_t_decode(#variant_decoder_var));
             output_enum = None;
             fallback = quote!(_ => #fallback);
-            name_type = en.name_type.clone();
+            name_type = en.name_type.ty.clone();
         }
         NameMethod::Unsized(method) => {
             let mut variants = Vec::new();
@@ -241,7 +243,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
 
             let arms = variants.iter().map(|o| o.as_arm(&binding_var, option_some));
 
-            let visit_type = &en.name_type;
+            let visit_type = &en.name_type.ty;
             let method = method.as_method_name();
 
             decode_name = quote! {
@@ -309,20 +311,20 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 }
             }
 
-            match en.name_method {
+            match en.name_type.method {
                 NameMethod::Value => {
                     let decode_t_decode = &b.decode_t_decode;
-                    let name_type = &en.name_type;
+                    let name_type = &en.name_type.ty;
 
                     Ok(quote! {{
-                        let #value_var: #name_type = #decode_t_decode(#ctx_var, #decoder_var)?;
+                        let #value_var: #name_type = #decode_t_decode(#decoder_var)?;
 
                         match #value_var { #(#arms,)* }
                     }})
                 }
                 NameMethod::Unsized(method) => {
                     let method = method.as_method_name();
-                    let visit_type = &en.name_type;
+                    let visit_type = &en.name_type.ty;
 
                     Ok(quote! {
                         #decoder_t::#method(#decoder_var, |#value_var: &#visit_type| {
@@ -436,17 +438,17 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             let outcome_enum;
             let decode_match;
 
-            match en.name_method {
+            match en.name_type.method {
                 NameMethod::Value => {
                     let decode_t_decode = &b.decode_t_decode;
 
                     outcome_enum = None;
 
-                    let name_type = &en.name_type;
+                    let name_type = &en.name_type.ty;
                     let tag_arm = output_arm(None, tag, &binding_var);
 
                     decode_match = quote! {
-                        let #value_var: #name_type = #decode_t_decode(#ctx_var, #field_name_var)?;
+                        let #value_var: #name_type = #decode_t_decode(#field_name_var)?;
 
                         match #value_var {
                             #tag_arm => {
@@ -465,7 +467,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                         enum #outcome_type<#buf_type> { Tag, Skip(#buf_type) }
                     });
 
-                    let visit_type = &en.name_type;
+                    let visit_type = &en.name_type.ty;
                     let method = method.as_method_name();
 
                     let tag_arm = output_arm(None, tag, &binding_var);
@@ -510,7 +512,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 }
             });
 
-            let static_type = en.static_type();
+            let static_type = en.name_type.ty();
 
             Ok(quote! {{
                 static #tag_static: #static_type = #tag;
@@ -581,16 +583,16 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             let outcome_enum;
             let decode_match;
 
-            match en.name_method {
+            match en.name_type.method {
                 NameMethod::Value => {
                     outcome_enum = None;
 
-                    let name_type = &en.name_type;
+                    let name_type = &en.name_type.ty;
                     let tag_arm = output_arm(None, tag, &binding_var);
                     let content_arm = output_arm(None, content, &binding_var);
 
                     decode_match = quote! {
-                        let #value_var: #name_type = #decode_t_decode(#ctx_var, #field_name_var)?;
+                        let #value_var: #name_type = #decode_t_decode(#field_name_var)?;
 
                         match #value_var {
                             #tag_arm => {
@@ -623,7 +625,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                         enum #outcome_type<#buf_type> { Tag, Content, Skip(#buf_type) }
                     });
 
-                    let visit_type = &en.name_type;
+                    let visit_type = &en.name_type.ty;
                     let method = method.as_method_name();
 
                     let tag_arm = output_arm(None, tag, &binding_var);
@@ -679,7 +681,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
                 }
             });
 
-            let static_type = en.static_type();
+            let static_type = en.name_type.ty();
 
             Ok(quote! {{
                 static #tag_static: #static_type = #tag;
@@ -866,7 +868,7 @@ fn decode_tagged(
                 });
 
                 let decode = quote! {
-                    #var = #option_some(#decode_path(#ctx_var, #struct_decoder_var)?);
+                    #var = #option_some(#decode_path(#struct_decoder_var)?);
                 };
 
                 fields_with.push((f, decode, (enter, leave)));
@@ -919,7 +921,7 @@ fn decode_tagged(
     let body;
     let name_type: syn::Type;
 
-    match st.name_method {
+    match st.name_type.method {
         NameMethod::Value => {
             let mut arms = Vec::with_capacity(fields_with.len());
 
@@ -941,10 +943,10 @@ fn decode_tagged(
             let decode_t_decode = &b.decode_t_decode;
 
             decode_tag = quote! {
-                #decode_t_decode(#ctx_var, #struct_decoder_var)?
+                #decode_t_decode(#struct_decoder_var)?
             };
 
-            name_type = st.name_type.clone();
+            name_type = st.name_type.ty.clone();
         }
         NameMethod::Unsized(method) => {
             let output_type =
@@ -984,7 +986,7 @@ fn decode_tagged(
 
             let arms = outputs.iter().map(|o| o.as_arm(&binding_var, option_some));
 
-            let visit_type = &st.name_type;
+            let visit_type = &st.name_type.ty;
             let method = method.as_method_name();
 
             decode_tag = quote! {
@@ -1103,7 +1105,7 @@ fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<Tok
         #enter
 
         let #output_var = #path {
-            #member: #decode_path(#ctx_var, #decoder_var)?
+            #member: #decode_path(#decoder_var)?
         };
 
         #leave
@@ -1145,7 +1147,7 @@ fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_>, st_: &Body<'_>) -> Result<TokenSt
             tokens.extend(quote! {
                 #member: {
                     let #field_decoder = #pack_decoder_t::decode_next(#ident)?;
-                    #decode_path(#ctx_var, #field_decoder)?
+                    #decode_path(#field_decoder)?
                 }
             })
         });

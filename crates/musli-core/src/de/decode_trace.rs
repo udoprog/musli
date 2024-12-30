@@ -10,7 +10,7 @@ use super::Decoder;
 /// [`fmt::Display`]: std::fmt::Display
 pub trait DecodeTrace<'de, M>: Sized {
     /// Decode the given input.
-    fn trace_decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn trace_decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>;
 }

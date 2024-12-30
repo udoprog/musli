@@ -47,8 +47,11 @@ where
     type EncodeMapVariant = Self;
 
     #[inline]
-    fn cx(&self) -> &Self::Cx {
-        self.cx
+    fn cx<F, O>(self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, Self) -> O,
+    {
+        f(self.cx, self)
     }
 
     #[inline]
@@ -72,7 +75,7 @@ where
         let value = value.as_encode();
 
         if !const { is_native_fixed::<OPT>() && T::Encode::ENCODE_PACKED } {
-            return value.encode(self.cx, self);
+            return value.encode(self);
         }
 
         // SAFETY: We've ensured the type is layout compatible with the current
@@ -232,7 +235,7 @@ where
     }
 
     #[inline]
-    fn encode_slice<T>(mut self, cx: &Self::Cx, slice: &[T]) -> Result<Self::Ok, C::Error>
+    fn encode_slice<T>(mut self, slice: &[T]) -> Result<Self::Ok, C::Error>
     where
         T: Encode<Self::Mode>,
     {
@@ -240,11 +243,11 @@ where
         if !const {
             is_native_fixed::<OPT>() && T::ENCODE_PACKED && size_of::<T>() % align_of::<T>() == 0
         } {
-            return utils::default_encode_slice(cx, self, slice);
+            return utils::default_encode_slice(self, slice);
         }
 
         let len = slice.len().to_ne_bytes();
-        self.writer.write_bytes(cx, &len)?;
+        self.writer.write_bytes(self.cx, &len)?;
 
         if size_of::<T>() > 0 {
             // SAFETY: We've ensured the type is layout compatible with the
@@ -255,7 +258,7 @@ where
                 slice::from_raw_parts(at, size)
             };
 
-            self.writer.write_bytes(cx, slice)?;
+            self.writer.write_bytes(self.cx, slice)?;
         }
 
         Ok(())

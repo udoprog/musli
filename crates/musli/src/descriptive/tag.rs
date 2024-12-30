@@ -271,7 +271,7 @@ impl<'de, M> Decode<'de, M> for Tag {
     const DECODE_PACKED: bool = true;
 
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {

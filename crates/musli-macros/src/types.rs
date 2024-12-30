@@ -28,12 +28,6 @@ pub(super) enum Extra {
     Visitor(Ty),
 }
 
-pub(crate) enum Fn {
-    Decode,
-    DecodeUnsized,
-    DecodeUnsizedBytes,
-}
-
 pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
@@ -59,12 +53,6 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("DecodeMap", Extra::None),
     ("DecodeMapEntries", Extra::None),
     ("DecodeVariant", Extra::None),
-];
-
-pub(super) const DECODER_FNS: &[(&str, Fn)] = &[
-    ("decode", Fn::Decode),
-    ("decode_unsized", Fn::DecodeUnsized),
-    ("decode_unsized_bytes", Fn::DecodeUnsizedBytes),
 ];
 
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
@@ -131,7 +119,6 @@ impl Types {
         attr: &Attr,
         what: &str,
         types: &[(&str, Extra)],
-        fns: &[(&str, Fn)],
         argument: Option<&str>,
         hint: &str,
         kind: Kind,
@@ -149,11 +136,6 @@ impl Types {
         let mut missing = types
             .iter()
             .map(|(ident, extra)| (syn::Ident::new(ident, Span::call_site()), *extra))
-            .collect::<BTreeMap<_, _>>();
-
-        let mut missing_fns = fns
-            .iter()
-            .map(|(name, f)| (syn::Ident::new(name, Span::call_site()), f))
             .collect::<BTreeMap<_, _>>();
 
         // List of associated types which are specified, but under a `cfg`
@@ -187,9 +169,6 @@ impl Types {
                         has_cfg = true;
                     }
                 }
-                syn::ImplItem::Fn(f) => {
-                    missing_fns.remove(&f.sig.ident);
-                }
                 _ => continue,
             }
         }
@@ -218,48 +197,6 @@ impl Types {
             });
 
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
-        }
-
-        for (_, f) in missing_fns {
-            match f {
-                Fn::Decode => {
-                    self.item_impl
-                        .items
-                        .push(syn::ImplItem::Verbatim(quote::quote! {
-                            #[inline(always)]
-                            fn decode<T>(self) -> Result<T, Self::Error>
-                            where
-                                T: #crate_path::de::Decode<'de, Self::Mode>
-                            {
-                                self.cx.decode(self)
-                            }
-                        }));
-                }
-                Fn::DecodeUnsized => {
-                    self.item_impl.items.push(syn::ImplItem::Verbatim(quote::quote! {
-                        #[inline(always)]
-                        fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
-                        where
-                            T: ?Sized + #crate_path::de::DecodeUnsized<'de, Self::Mode>,
-                            F: FnOnce(&T) -> Result<O, <Self::Cx as #crate_path::Context>::Error>
-                        {
-                            self.cx.decode_unsized(self, f)
-                        }
-                    }));
-                }
-                Fn::DecodeUnsizedBytes => {
-                    self.item_impl.items.push(syn::ImplItem::Verbatim(quote::quote! {
-                        #[inline(always)]
-                        fn decode_unsized_bytes<T, F, O>(self, f: F) -> Result<O, Self::Error>
-                        where
-                            T: ?Sized + #crate_path::de::DecodeUnsizedBytes<'de, Self::Mode>,
-                            F: FnOnce(&T) -> Result<O, <Self::Cx as #crate_path::Context>::Error>
-                        {
-                            self.cx.decode_unsized_bytes(self, f)
-                        }
-                    }));
-                }
-            }
         }
 
         for (ident, extra) in missing {

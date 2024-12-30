@@ -14,7 +14,7 @@ macro_rules! implement {
 
             #[inline]
             #[allow(unused)]
-            fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -41,7 +41,7 @@ macro_rules! implement {
             const DECODE_PACKED: bool = false;
 
             #[inline]
-            fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {
@@ -61,7 +61,7 @@ macro_rules! implement_new {
             const ENCODE_PACKED: bool = false;
 
             #[inline]
-            fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -88,11 +88,11 @@ macro_rules! implement_new {
             const DECODE_PACKED: bool = false;
 
             #[inline]
-            fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+            fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
                 D: Decoder<'de, Mode = M>,
             {
-                let ($($field,)*) = Decode::decode(cx, decoder)?;
+                let ($($field,)*) = Decode::decode(decoder)?;
                 Ok($ty::new($($field,)*))
             }
         }

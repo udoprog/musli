@@ -250,14 +250,16 @@ pub trait Visitor<'de, C: ?Sized + Context>: Sized {
 
     /// Indicates that the encoding does not support dynamic types.
     #[inline]
-    fn visit_unknown<D>(self, cx: &D::Cx, _: D) -> Result<Self::Ok, D::Error>
+    fn visit_unknown<D>(self, decoder: D) -> Result<Self::Ok, D::Error>
     where
         D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode>,
     {
-        Err(cx.message(expecting::unsupported_type(
-            &expecting::Any,
-            ExpectingWrapper::new(&self),
-        )))
+        decoder.cx(|cx, _| {
+            Err(cx.message(expecting::unsupported_type(
+                &expecting::Any,
+                ExpectingWrapper::new(&self),
+            )))
+        })
     }
 }
 

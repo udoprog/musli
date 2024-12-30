@@ -27,7 +27,7 @@ const CRATE_DEFAULT: &str = "musli";
 ///
 /// See the [`derives` module] for detailed documentation.
 ///
-/// [`derives` module]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
+/// [`derives` module]: <https://docs.rs/musli/latest/musli/_help/derives/index.html>
 /// [`Encode` trait]: <https://docs.rs/musli/latest/musli/trait.Encode.html>
 ///
 /// # Examples
@@ -49,7 +49,7 @@ pub fn musli_derive_encode(input: TokenStream) -> TokenStream {
 ///
 /// See the [`derives` module] for detailed documentation.
 ///
-/// [`derives` module]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
+/// [`derives` module]: <https://docs.rs/musli/latest/musli/_help/derives/index.html>
 /// [`Decode` trait]: <https://docs.rs/musli/latest/musli/trait.Decode.html>
 ///
 /// # Examples
@@ -97,7 +97,6 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
         &attr,
         "decoder",
         types::DECODER_TYPES,
-        types::DECODER_FNS,
         None,
         "__UseMusliDecoderAttributeMacro",
         types::Kind::SelfCx,
@@ -117,7 +116,6 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
         &attr,
         "encoder",
         types::ENCODER_TYPES,
-        &[],
         Some("Ok"),
         "__UseMusliEncoderAttributeMacro",
         types::Kind::SelfCx,
@@ -137,7 +135,6 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
         &attr,
         "visitor",
         types::VISITOR_TYPES,
-        &[],
         Some("Ok"),
         "__UseMusliVisitorAttributeMacro",
         types::Kind::GenericCx,

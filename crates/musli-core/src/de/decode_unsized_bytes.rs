@@ -13,7 +13,7 @@ use super::Decoder;
 /// [`DecodeUnsized`]: super::DecodeUnsized
 pub trait DecodeUnsizedBytes<'de, M> {
     /// Decode the given input using a closure as visitor.
-    fn decode_unsized_bytes<D, F, O>(cx: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
+    fn decode_unsized_bytes<D, F, O>(decoder: D, f: F) -> Result<O, D::Error>
     where
         D: Decoder<'de, Mode = M>,
         F: FnOnce(&Self) -> Result<O, D::Error>;

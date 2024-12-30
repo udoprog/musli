@@ -269,7 +269,7 @@ where
     {
         cx.clear();
         let mut data = Vec::with_capacity(128);
-        T::encode(value, cx, JsonEncoder::new(cx, &mut data))?;
+        T::encode(value, JsonEncoder::new(cx, &mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data) })
     }

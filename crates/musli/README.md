@@ -446,11 +446,11 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 
 [`Binary`]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
 [`bincode`]: <https://docs.rs/bincode>
-[`data_model`]: <https://docs.rs/musli/latest/musli/help/data_model/index.html>
+[`data_model`]: <https://docs.rs/musli/latest/musli/_help/data_model/index.html>
 [`decode_any`]: https://docs.rs/musli/latest/musli/trait.Decoder.html#method.decode_any
 [`Decode`]: <https://docs.rs/musli/latest/musli/de/trait.Decode.html>
 [`Decoder`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html>
-[`derives`]: <https://docs.rs/musli/latest/musli/help/derives/index.html>
+[`derives`]: <https://docs.rs/musli/latest/musli/_help/derives/index.html>
 [`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
 [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
 [`Ignore`]: <https://docs.rs/musli/latest/musli/context/struct.Ignore.html>
@@ -471,7 +471,7 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [bit packing]: <https://github.com/udoprog/musli/blob/main/crates/musli/src/descriptive/tag.rs>
 [completely uses visitors]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_u32
 [detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
-[musli-name-type]: <https://docs.rs/musli/latest/musli/help/derives/index.html#musliname_type-->
+[musli-name-type]: <https://docs.rs/musli/latest/musli/_help/derives/index.html#musliname_type-->
 [no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/>
 [scoped allocations]: <https://docs.rs/musli/latest/musli/trait.Context.html#tymethod.alloc>
 [size comparisons]: <https://udoprog.github.io/musli/benchmarks/#size-comparisons>

@@ -4,7 +4,7 @@ use crate::en::Encoder;
 ///
 /// This is typically implemented automatically using the [`Encode` derive].
 ///
-/// [`Encode` derive]: https://docs.rs/musli/latest/musli/help/derives/
+/// [`Encode` derive]: https://docs.rs/musli/latest/musli/_help/derives/
 ///
 /// # Examples
 ///
@@ -29,7 +29,7 @@ use crate::en::Encoder;
 /// impl<M> Encode<M> for MyType {
 ///     type Encode = Self;
 ///
-///     fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
 ///     where
 ///         E: Encoder<Mode = M>,
 ///     {
@@ -61,7 +61,7 @@ pub trait Encode<M> {
     type Encode: ?Sized + Encode<M>;
 
     /// Encode the given output.
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>;
 
@@ -76,11 +76,11 @@ where
     const ENCODE_PACKED: bool = false;
 
     #[inline]
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
-        (**self).encode(cx, encoder)
+        (**self).encode(encoder)
     }
 
     type Encode = T;
@@ -98,11 +98,11 @@ where
     const ENCODE_PACKED: bool = false;
 
     #[inline]
-    fn encode<E>(&self, cx: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
-        (**self).encode(cx, encoder)
+        (**self).encode(encoder)
     }
 
     type Encode = T;

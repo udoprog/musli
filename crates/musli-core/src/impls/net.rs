@@ -30,7 +30,7 @@ impl Encode<Binary> for Ipv4Addr {
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -51,7 +51,7 @@ impl Encode<Text> for Ipv4Addr {
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder,
     {
@@ -70,7 +70,7 @@ impl<'de> Decode<'de, Binary> for Ipv4Addr {
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
@@ -84,11 +84,13 @@ impl<'de> Decode<'de, Text> for Ipv4Addr {
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        decoder.decode_unsized(|string: &str| Ipv4Addr::from_str(string).map_err(cx.map()))
+        decoder.cx(|cx, decoder| {
+            decoder.decode_unsized(|string: &str| Ipv4Addr::from_str(string).map_err(cx.map()))
+        })
     }
 }
 
@@ -100,7 +102,7 @@ impl Encode<Binary> for Ipv6Addr {
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = Binary>,
     {
@@ -121,7 +123,7 @@ impl Encode<Text> for Ipv6Addr {
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = Text>,
     {
@@ -140,7 +142,7 @@ impl<'de> Decode<'de, Binary> for Ipv6Addr {
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
@@ -154,11 +156,13 @@ impl<'de> Decode<'de, Text> for Ipv6Addr {
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        decoder.decode_unsized(|string: &str| Ipv6Addr::from_str(string).map_err(cx.map()))
+        decoder.cx(|cx, decoder| {
+            decoder.decode_unsized(|string: &str| Ipv6Addr::from_str(string).map_err(cx.map()))
+        })
     }
 }
 
@@ -173,7 +177,7 @@ where
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -200,7 +204,7 @@ where
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {
@@ -223,7 +227,7 @@ impl Encode<Binary> for SocketAddrV4 {
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = Binary>,
     {
@@ -248,7 +252,7 @@ impl Encode<Text> for SocketAddrV4 {
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = Text>,
     {
@@ -267,7 +271,7 @@ impl<'de> Decode<'de, Binary> for SocketAddrV4 {
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = Binary>,
     {
@@ -281,11 +285,13 @@ impl<'de> Decode<'de, Text> for SocketAddrV4 {
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        decoder.decode_unsized(|string: &str| SocketAddrV4::from_str(string).map_err(cx.map()))
+        decoder.cx(|cx, decoder| {
+            decoder.decode_unsized(|string: &str| SocketAddrV4::from_str(string).map_err(cx.map()))
+        })
     }
 }
 
@@ -297,7 +303,7 @@ impl Encode<Binary> for SocketAddrV6 {
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = Binary>,
     {
@@ -324,7 +330,7 @@ impl Encode<Text> for SocketAddrV6 {
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = Text>,
     {
@@ -343,7 +349,7 @@ impl<'de> Decode<'de, Binary> for SocketAddrV6 {
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = Binary>,
     {
@@ -357,11 +363,13 @@ impl<'de> Decode<'de, Text> for SocketAddrV6 {
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,
     {
-        decoder.decode_unsized(|string: &str| SocketAddrV6::from_str(string).map_err(cx.map()))
+        decoder.cx(|cx, decoder| {
+            decoder.decode_unsized(|string: &str| SocketAddrV6::from_str(string).map_err(cx.map()))
+        })
     }
 }
 
@@ -374,7 +382,7 @@ where
     const ENCODE_PACKED: bool = false;
 
     #[inline]
-    fn encode<E>(&self, _: &E::Cx, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -403,7 +411,7 @@ where
     const DECODE_PACKED: bool = false;
 
     #[inline]
-    fn decode<D>(_: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>,
     {

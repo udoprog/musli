@@ -8,7 +8,7 @@ use super::Decoder;
 /// would demand an exact reference to data from the decoded source.
 pub trait DecodeUnsized<'de, M> {
     /// Decode the given input using a closure as visitor.
-    fn decode_unsized<D, F, O>(cx: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
+    fn decode_unsized<D, F, O>(decoder: D, f: F) -> Result<O, D::Error>
     where
         D: Decoder<'de, Mode = M>,
         F: FnOnce(&Self) -> Result<O, D::Error>;

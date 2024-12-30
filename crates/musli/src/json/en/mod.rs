@@ -57,8 +57,11 @@ where
     type EncodeMapVariant = JsonObjectEncoder<'a, W, C>;
 
     #[inline]
-    fn cx(&self) -> &C {
-        self.cx
+    fn cx<F, O>(self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, Self) -> O,
+    {
+        f(self.cx, self)
     }
 
     #[inline]
@@ -79,7 +82,7 @@ where
     where
         T: Encode<Self::Mode>,
     {
-        value.as_encode().encode(self.cx, self)
+        value.as_encode().encode(self)
     }
 
     #[inline]

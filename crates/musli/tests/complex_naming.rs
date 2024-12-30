@@ -82,7 +82,7 @@ fn bytes_name() {
 struct UnsizedBytes(#[musli(bytes)] [u8]);
 
 impl<'de, M> DecodeUnsized<'de, M> for UnsizedBytes {
-    fn decode_unsized<D, F, O>(_: &D::Cx, decoder: D, f: F) -> Result<O, D::Error>
+    fn decode_unsized<D, F, O>(decoder: D, f: F) -> Result<O, D::Error>
     where
         D: Decoder<'de, Mode = M>,
         F: FnOnce(&Self) -> Result<O, D::Error>,

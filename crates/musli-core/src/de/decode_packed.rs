@@ -8,7 +8,7 @@ use super::Decoder;
 /// This is typically used automatically through the `#[musli(packed)]`
 /// attribute through the [`Decode` derive].
 ///
-/// [`Decode` derive]: https://docs.rs/musli/latest/musli/help/derives/
+/// [`Decode` derive]: https://docs.rs/musli/latest/musli/_help/derives/
 ///
 /// # Examples
 ///
@@ -33,7 +33,7 @@ use super::Decoder;
 /// }
 ///
 /// impl<'de, M> Decode<'de, M> for Packed {
-///     fn decode<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de>,
 ///     {
@@ -47,7 +47,7 @@ use super::Decoder;
 /// ```
 pub trait DecodePacked<'de, M>: Sized {
     /// Decode the given input as bytes.
-    fn decode_packed<D>(cx: &D::Cx, decoder: D) -> Result<Self, D::Error>
+    fn decode_packed<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M>;
 }

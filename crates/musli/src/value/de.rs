@@ -4,8 +4,8 @@ use core::slice;
 #[cfg(feature = "alloc")]
 use crate::de::UnsizedVisitor;
 use crate::de::{
-    AsDecoder, Decode, DecodeUnsized, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
-    SequenceDecoder, SizeHint, Skip, VariantDecoder, Visitor,
+    AsDecoder, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, Skip,
+    VariantDecoder, Visitor,
 };
 #[cfg(feature = "alloc")]
 use crate::hint::SequenceHint;
@@ -51,7 +51,7 @@ impl<'a, 'de, const OPT: Options, C: ?Sized> ValueDecoder<'a, 'de, OPT, C> {
 macro_rules! ensure_number {
     ($self:expr, $opt:expr, $hint:ident, $ident:ident $tt:tt, Value::$variant:ident($block:ident) => $ty:ty) => {
         match $self.value {
-            Value::$variant($block) => <$ty>::from_number($block).map_err($self.cx.map_message()),
+            Value::$variant($block) => <$ty>::from_number($block).map_err(|e| $self.cx.message(e)),
             #[cfg(feature = "alloc")]
             Value::String(string) if crate::options::is_map_keys_as_numbers::<$opt>() && $self.map_key => {
                 match <$ty>::parse_number(string) {
@@ -99,8 +99,11 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     type DecodeVariant = IterValueVariantDecoder<'a, 'de, OPT, C>;
 
     #[inline]
-    fn cx(&self) -> &Self::Cx {
-        self.cx
+    fn cx<F, O>(self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, Self) -> O,
+    {
+        f(self.cx, self)
     }
 
     #[inline]
@@ -114,23 +117,6 @@ impl<'a, 'de, C: ?Sized + Context, const OPT: Options> Decoder<'de>
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "cannot be decoded from value")
-    }
-
-    #[inline]
-    fn decode<T>(self) -> Result<T, C::Error>
-    where
-        T: Decode<'de, Self::Mode>,
-    {
-        self.cx.decode(self)
-    }
-
-    #[inline]
-    fn decode_unsized<T, F, O>(self, f: F) -> Result<O, Self::Error>
-    where
-        T: ?Sized + DecodeUnsized<'de, Self::Mode>,
-        F: FnOnce(&T) -> Result<O, Self::Error>,
-    {
-        self.cx.decode_unsized(self, f)
     }
 
     #[inline]

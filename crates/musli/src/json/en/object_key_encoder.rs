@@ -42,8 +42,11 @@ where
         U: 'this + Context;
 
     #[inline]
-    fn cx(&self) -> &Self::Cx {
-        self.cx
+    fn cx<F, O>(self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, Self) -> O,
+    {
+        f(self.cx, self)
     }
 
     #[inline]
@@ -64,7 +67,7 @@ where
     where
         T: Encode<Self::Mode>,
     {
-        value.as_encode().encode(self.cx, self)
+        value.as_encode().encode(self)
     }
 
     #[inline]

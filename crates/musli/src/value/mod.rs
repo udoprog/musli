@@ -3,7 +3,7 @@
 //! The [`Value`] type can losslessly store and represent anything which is
 //! supported in the [Müsli data model].
 //!
-//! [Müsli data model]: crate::help::data_model
+//! [Müsli data model]: crate::_help::data_model
 
 #![cfg(feature = "value")]
 #![cfg_attr(doc_cfg, doc(cfg(feature = "value")))]
