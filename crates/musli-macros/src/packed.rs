@@ -3,12 +3,12 @@ use quote::quote;
 
 use crate::internals::attr::{Packed, Packing};
 use crate::internals::build::{Body, Build};
-use crate::internals::tokens::Tokens;
+use crate::internals::tokens::{Import, Tokens};
 
 pub(super) fn packed(
     e: &Build<'_>,
     st: &Body<'_>,
-    trait_t: &syn::Path,
+    trait_t: Import<'_>,
     packed_field: &str,
 ) -> syn::Expr {
     let Tokens {
@@ -18,7 +18,7 @@ pub(super) fn packed(
     match st.packing {
         Packing::Packed(Packed::Bitwise) if st.all_fields.len() == st.unskipped_fields.len() => {
             let packed_field = syn::Ident::new(packed_field, Span::call_site());
-            let mode_ident = e.expansion.mode_path(e.tokens).as_path();
+            let mode_ident = e.expansion.mode_path(&e.tokens);
 
             let mut offsets = Vec::with_capacity(st.all_fields.len().saturating_sub(1));
             let mut sizes = Vec::with_capacity(st.all_fields.len());

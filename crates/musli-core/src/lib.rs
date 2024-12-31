@@ -195,15 +195,22 @@ pub use musli_macros::visitor;
 /// Using these directly is not supported.
 #[doc(hidden)]
 pub mod __priv {
-    use crate::context::Context;
-    use crate::de::{Decoder, EntryDecoder};
+    pub use crate::context::Context;
+    pub use crate::de::{
+        AsDecoder, Decode, DecodeBytes, DecodePacked, DecodeTrace, Decoder, EntryDecoder,
+        MapDecoder, SequenceDecoder, VariantDecoder,
+    };
+    pub use crate::en::{
+        Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntryEncoder, MapEncoder,
+        SequenceEncoder, VariantEncoder,
+    };
+    pub use crate::hint::MapHint;
+    pub use crate::never::Never;
 
     pub use ::core::fmt;
     pub use ::core::mem::{offset_of, size_of};
     pub use ::core::option::Option;
     pub use ::core::result::Result;
-
-    pub use crate::never::Never;
 
     #[inline(always)]
     pub fn default<T>() -> T
@@ -230,7 +237,4 @@ pub mod __priv {
     {
         skip(decoder.decode_value()?)
     }
-
-    pub use Option::{None, Some};
-    pub use Result::{Err, Ok};
 }

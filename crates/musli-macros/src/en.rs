@@ -41,7 +41,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let body = match &e.data {
         BuildData::Struct(st) => {
-            packed = crate::packed::packed(&e, st, &e.tokens.encode_t, "ENCODE_PACKED");
+            packed = crate::packed::packed(&e, st, e.tokens.encode_t, "ENCODE_PACKED");
             encode_map(&cx, &e, st)?
         }
         BuildData::Enum(en) => {
@@ -73,7 +73,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
         attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
     }
 
-    let mode_ident = e.expansion.mode_path(e.tokens).as_path();
+    let mode_ident = e.expansion.mode_path(&e.tokens);
 
     Ok(quote! {
         const _: () = {
@@ -116,7 +116,7 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream
     let Tokens {
         context_t,
         encoder_t,
-        result_ok,
+        result,
         ..
     } = b.tokens;
 
@@ -161,7 +161,7 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream
 
                 let #output_var = #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
                     #(#encoders)*
-                    #result_ok(())
+                    #result::Ok(())
                 })?;
                 #leave
                 #output_var
@@ -175,7 +175,7 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream
                 let #output_var = #encoder_t::encode_pack_fn(#encoder_var, move |#pack_var| {
                     #(#decls)*
                     #(#encoders)*
-                    #result_ok(())
+                    #result::Ok(())
                 })?;
                 #leave
                 #output_var
@@ -183,7 +183,7 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream
         }
     }
 
-    Ok(quote!(#result_ok(#encode)))
+    Ok(quote!(#result::Ok(#encode)))
 }
 
 struct FieldTest<'st> {
@@ -206,7 +206,7 @@ fn insert_fields<'st>(
     let Tokens {
         context_t,
         sequence_encoder_t,
-        result_ok,
+        result,
 
         map_encoder_t,
         map_entry_encoder_t,
@@ -271,7 +271,7 @@ fn insert_fields<'st>(
                         #encode_t_encode(#field_name_expr, #field_encoder_var)?;
                         let #value_encoder_var = #map_entry_encoder_t::encode_value(#pair_encoder_var)?;
                         #encode_path(#access, #value_encoder_var)?;
-                        #result_ok(())
+                        #result::Ok(())
                     })?;
 
                     #leave
@@ -321,10 +321,7 @@ fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum<'_>) -> Result<TokenStrea
     let Ctxt { ctx_var, .. } = *cx;
 
     let Tokens {
-        context_t,
-        result_ok,
-        result_err,
-        ..
+        context_t, result, ..
     } = b.tokens;
 
     let type_name = en.name;
@@ -346,9 +343,9 @@ fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum<'_>) -> Result<TokenStrea
 
     // Special case: uninhabitable types.
     Ok(if variants.is_empty() {
-        quote!(#result_err(#context_t::uninhabitable(#ctx_var, #type_name)))
+        quote!(#result::Err(#context_t::uninhabitable(#ctx_var, #type_name)))
     } else {
-        quote!(#result_ok(match self { #(#variants),* }))
+        quote!(#result::Ok(match self { #(#variants),* }))
     })
 }
 
@@ -372,7 +369,7 @@ fn encode_variant(
     let Tokens {
         context_t,
         encoder_t,
-        result_ok,
+        result,
         map_encoder_t,
         map_entry_encoder_t,
         variant_encoder_t,
@@ -419,7 +416,7 @@ fn encode_variant(
                         #encoder_t::encode_pack_fn(#encoder_var, move |#pack_var| {
                             #(#decls)*
                             #(#encoders)*
-                            #result_ok(())
+                            #result::Ok(())
                         })?
                     }};
                 }
@@ -434,7 +431,7 @@ fn encode_variant(
                         #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
-                            #result_ok(())
+                            #result::Ok(())
                         })?
                     }};
                 }
@@ -454,7 +451,7 @@ fn encode_variant(
 
                         let #encoder_var = #variant_encoder_t::encode_data(#variant_encoder)?;
                         #encode;
-                        #result_ok(())
+                        #result::Ok(())
                     })?
                 }};
             }
@@ -486,7 +483,7 @@ fn encode_variant(
                     #map_encoder_t::insert_entry(#encoder_var, #tag_static, #name_static)?;
                     #(#decls)*
                     #(#encoders)*
-                    #result_ok(())
+                    #result::Ok(())
                 })?
             }};
         }
@@ -534,13 +531,13 @@ fn encode_variant(
                         #encoder_t::encode_map_fn(#content_struct, &#inner_hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
-                            #result_ok(())
+                            #result::Ok(())
                         })?;
 
-                        #result_ok(())
+                        #result::Ok(())
                     })?;
 
-                    #result_ok(())
+                    #result::Ok(())
                 })?
             }};
         }

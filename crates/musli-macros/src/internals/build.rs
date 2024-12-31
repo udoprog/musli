@@ -10,7 +10,8 @@ use crate::expander::{
     UnsizedMethod, VariantData,
 };
 
-use super::attr::{EnumTagging, FieldEncoding, ModeKind, Packing};
+use super::attr::{EnumTagging, FieldEncoding, MethodOrPath, ModeKind, Packing};
+use super::mode::Method;
 use super::name::NameAll;
 use super::tokens::Tokens;
 use super::ATTR;
@@ -19,13 +20,13 @@ use super::{Ctxt, Expansion, Mode, Only, Result};
 pub(crate) struct Build<'a> {
     pub(crate) input: &'a syn::DeriveInput,
     pub(crate) cx: &'a Ctxt,
-    pub(crate) tokens: &'a Tokens,
+    pub(crate) tokens: Tokens<'a>,
     pub(crate) bounds: &'a [(Span, syn::WherePredicate)],
     pub(crate) decode_bounds: &'a [(Span, syn::WherePredicate)],
     pub(crate) expansion: Expansion<'a>,
     pub(crate) data: BuildData<'a>,
-    pub(crate) decode_t_decode: syn::Path,
-    pub(crate) encode_t_encode: syn::Path,
+    pub(crate) decode_t_decode: Method<'a>,
+    pub(crate) encode_t_encode: Method<'a>,
     pub(crate) enum_tagging_span: Option<Span>,
 }
 
@@ -136,8 +137,8 @@ pub(crate) struct Variant<'a> {
 pub(crate) struct Field<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
-    pub(crate) encode_path: (Span, syn::Path),
-    pub(crate) decode_path: (Span, syn::Path),
+    pub(crate) encode_path: (Span, MethodOrPath<'a>),
+    pub(crate) decode_path: (Span, MethodOrPath<'a>),
     pub(crate) name: syn::Expr,
     pub(crate) pattern: Option<&'a syn::Pat>,
     /// Skip field entirely and always initialize with the specified expresion,
@@ -161,7 +162,8 @@ pub(crate) fn setup<'a>(
     expansion: Expansion<'a>,
     only: Only,
 ) -> Result<Build<'a>> {
-    let mode = expansion.as_mode(&e.tokens, only);
+    let tokens = e.tokens();
+    let mode = expansion.as_mode(&tokens, only);
 
     let data = match &e.data {
         Data::Struct(data) => BuildData::Struct(setup_struct(e, mode, data)),
@@ -179,7 +181,7 @@ pub(crate) fn setup<'a>(
     Ok(Build {
         input: e.input,
         cx: &e.cx,
-        tokens: &e.tokens,
+        tokens,
         bounds: e.type_attr.bounds(mode),
         decode_bounds: e.type_attr.decode_bounds(mode),
         expansion,
@@ -190,7 +192,7 @@ pub(crate) fn setup<'a>(
     })
 }
 
-fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -> Body<'a> {
+fn setup_struct<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a StructData<'a>) -> Body<'a> {
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
@@ -244,7 +246,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
     body
 }
 
-fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> Enum<'a> {
+fn setup_enum<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a EnumData<'a>) -> Enum<'a> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
 
@@ -313,7 +315,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> En
 
 fn setup_variant<'a>(
     e: &'a Expander<'_>,
-    mode: Mode<'_>,
+    mode: Mode<'a>,
     data: &'a VariantData<'a>,
     fallback: &mut Option<&'a syn::Ident>,
 ) -> Variant<'a> {
@@ -418,7 +420,7 @@ fn setup_variant<'a>(
 
 fn setup_field<'a>(
     e: &'a Expander,
-    mode: Mode<'_>,
+    mode: Mode<'a>,
     data: &'a FieldData<'a>,
     name_all: NameAll,
     packing: Packing,

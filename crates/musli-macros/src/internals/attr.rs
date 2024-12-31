@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::mem;
 
 use proc_macro2::Span;
+use quote::ToTokens;
 use syn::meta::ParseNestedMeta;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
@@ -13,6 +14,7 @@ use crate::internals::ATTR;
 use crate::internals::{Ctxt, Mode};
 
 use super::build;
+use super::mode::Method;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) enum ModeKind {
@@ -670,28 +672,51 @@ layer! {
 
 impl Field {
     /// Expand encode of the given field.
-    pub(crate) fn encode_path_expanded(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
+    pub(crate) fn encode_path_expanded<'a>(
+        &self,
+        mode: Mode<'a>,
+        span: Span,
+    ) -> (Span, MethodOrPath<'a>) {
         let encode_path = self.encode_path(mode);
 
         if let Some((span, encode_path)) = encode_path {
-            (*span, encode_path.clone())
+            (*span, MethodOrPath::Path(encode_path.clone()))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
             let encode_path = mode.encode_t_encode(field_encoding);
-            (span, encode_path)
+            (span, MethodOrPath::Method(encode_path))
         }
     }
 
     /// Expand decode of the given field.
-    pub(crate) fn decode_path_expanded(&self, mode: Mode<'_>, span: Span) -> (Span, syn::Path) {
+    pub(crate) fn decode_path_expanded<'a>(
+        &self,
+        mode: Mode<'a>,
+        span: Span,
+    ) -> (Span, MethodOrPath<'a>) {
         let decode_path = self.decode_path(mode);
 
         if let Some((span, decode_path)) = decode_path {
-            (*span, decode_path.clone())
+            (*span, MethodOrPath::Path(decode_path.clone()))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
             let decode_path = mode.decode_t_decode(field_encoding);
-            (span, decode_path)
+            (span, MethodOrPath::Method(decode_path))
+        }
+    }
+}
+
+pub(crate) enum MethodOrPath<'a> {
+    Method(Method<'a>),
+    Path(syn::Path),
+}
+
+impl ToTokens for MethodOrPath<'_> {
+    #[inline]
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            MethodOrPath::Method(method) => method.to_tokens(tokens),
+            MethodOrPath::Path(path) => path.to_tokens(tokens),
         }
     }
 }
