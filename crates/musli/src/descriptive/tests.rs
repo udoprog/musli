@@ -4,7 +4,7 @@ use super::tag::{Kind, Tag};
 use super::MAX_INLINE_LEN;
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(crate, name_type = usize)]
+#[musli(crate, name(type = usize))]
 struct From<const N: usize> {
     #[musli(name = 0)]
     prefix: Option<u32>,
@@ -15,7 +15,7 @@ struct From<const N: usize> {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(crate, name_type = usize)]
+#[musli(crate, name(type = usize))]
 struct To {
     #[musli(name = 0)]
     prefix: Option<u32>,

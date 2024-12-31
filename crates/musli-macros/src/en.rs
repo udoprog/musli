@@ -238,15 +238,21 @@ fn insert_fields<'st>(
                 let field_name = syn::LitStr::new(&ident.to_string(), ident.span());
 
                 cx.trace.then(|| {
-                    let name = st.name_format(name);
-                    quote!(#context_t::enter_named_field(#ctx_var, #field_name, #name);)
+                    let formatted_name = st.name_type.name_format(&field_name_static);
+
+                    quote! {
+                        #context_t::enter_named_field(#ctx_var, #field_name, #formatted_name);
+                    }
                 })
             }
             syn::Member::Unnamed(index) => {
                 let index = index.index;
                 cx.trace.then(|| {
-                    let name = st.name_format(name);
-                    quote!(#context_t::enter_unnamed_field(#ctx_var, #index, #name);)
+                    let formatted_name = st.name_type.name_format(&field_name_static);
+
+                    quote! {
+                        #context_t::enter_unnamed_field(#ctx_var, #index, #formatted_name);
+                    }
                 })
             }
         };
@@ -255,11 +261,12 @@ fn insert_fields<'st>(
 
         match f.packing {
             Packing::Tagged | Packing::Transparent => {
-                encode = quote! {
+                encode = quote! {{
+                    static #field_name_static: #name_type = #name;
+
                     #enter
 
                     #map_encoder_t::encode_entry_fn(#encoder_var, move |#pair_encoder_var| {
-                        static #field_name_static: #name_type = #name;
                         let #field_encoder_var = #map_entry_encoder_t::encode_key(#pair_encoder_var)?;
                         #encode_t_encode(#field_name_expr, #field_encoder_var)?;
                         let #value_encoder_var = #map_entry_encoder_t::encode_value(#pair_encoder_var)?;
@@ -268,15 +275,22 @@ fn insert_fields<'st>(
                     })?;
 
                     #leave
-                };
+                }};
             }
             Packing::Packed(..) => {
-                encode = quote! {
+                let decl = enter.is_some().then(|| {
+                    quote! {
+                        static #field_name_static: #name_type = #name;
+                    }
+                });
+
+                encode = quote! {{
+                    #decl
                     #enter
                     let #sequence_decoder_next_var = #sequence_encoder_t::encode_next(#pack_var)?;
                     #encode_path(#access, #sequence_decoder_next_var)?;
                     #leave
-                };
+                }};
             }
         };
 
@@ -367,7 +381,6 @@ fn encode_variant(
     } = b.tokens;
 
     let content_static = b.cx.ident("CONTENT");
-    let content_expr = en.name_type.expr(content_static.clone());
     let hint = b.cx.ident("STRUCT_HINT");
     let name_static = b.cx.ident("NAME");
     let name_expr = en.name_type.expr(name_static.clone());
@@ -379,14 +392,14 @@ fn encode_variant(
 
     let mut encode;
 
-    match en.enum_tagging {
+    match &en.enum_tagging {
         EnumTagging::Empty => {
-            let static_type = en.name_type.ty();
+            let name_type = en.name_type.ty();
             let encode_t_encode = &b.encode_t_encode;
             let name = &v.name;
 
             encode = quote! {{
-                static #name_static: #static_type = #name;
+                static #name_static: #name_type = #name;
                 #encode_t_encode(#name_expr, #encoder_var)?
             }};
         }
@@ -430,12 +443,12 @@ fn encode_variant(
             if let Packing::Tagged = en.enum_packing {
                 let encode_t_encode = &b.encode_t_encode;
                 let name = &v.name;
-                let static_type = en.name_type.ty();
+                let name_type = en.name_type.ty();
 
                 encode = quote! {{
                     #encoder_t::encode_variant_fn(#encoder_var, move |#variant_encoder| {
                         let #tag_encoder = #variant_encoder_t::encode_tag(#variant_encoder)?;
-                        static #name_static: #static_type = #name;
+                        static #name_static: #name_type = #name;
 
                         #encode_t_encode(#name_expr, #tag_encoder)?;
 
@@ -446,10 +459,13 @@ fn encode_variant(
                 }};
             }
         }
-        EnumTagging::Internal { tag } => {
+        EnumTagging::Internal {
+            tag_value,
+            tag_type,
+        } => {
             let name = &v.name;
 
-            let static_type = en.name_type.ty();
+            let name_type = en.name_type.ty();
 
             let decls = tests.iter().map(|t| &t.decl);
             let mut len = length_test(v.st.unskipped_fields.len(), &tests);
@@ -459,12 +475,14 @@ fn encode_variant(
 
             let (build_hint, hint) = len.build(b);
 
+            let tag_type = tag_type.ty();
+
             encode = quote! {{
                 #build_hint
 
                 #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
-                    static #tag_static: #static_type = #tag;
-                    static #name_static: #static_type = #name;
+                    static #tag_static: #tag_type = #tag_value;
+                    static #name_static: #name_type = #name;
                     #map_encoder_t::insert_entry(#encoder_var, #tag_static, #name_static)?;
                     #(#decls)*
                     #(#encoders)*
@@ -472,11 +490,16 @@ fn encode_variant(
                 })?
             }};
         }
-        EnumTagging::Adjacent { tag, content } => {
+        EnumTagging::Adjacent {
+            tag_value,
+            tag_type,
+            content_value,
+            content_type,
+        } => {
             let encode_t_encode = &b.encode_t_encode;
 
             let name = &v.name;
-            let static_type = en.name_type.ty();
+            let name_type = en.name_type.ty();
 
             let decls = tests.iter().map(|t| &t.decl);
 
@@ -487,20 +510,24 @@ fn encode_variant(
             let pair = b.cx.ident("pair");
             let content_tag = b.cx.ident("content_tag");
 
+            let tag_type = tag_type.ty();
+            let content_static_expr = content_type.expr(content_static.clone());
+            let content_type = content_type.ty();
+
             encode = quote! {{
                 static #hint: #map_hint = #map_hint::with_size(2);
                 #build_hint
 
                 #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#struct_encoder| {
-                    static #tag_static: #static_type = #tag;
-                    static #name_static: #static_type = #name;
-                    static #content_static: #static_type = #content;
+                    static #tag_static: #tag_type = #tag_value;
+                    static #content_static: #content_type = #content_value;
+                    static #name_static: #name_type = #name;
 
                     #map_encoder_t::insert_entry(#struct_encoder, #tag_static, #name_static)?;
 
                     #map_encoder_t::encode_entry_fn(#struct_encoder, move |#pair| {
                         let #content_tag = #map_entry_encoder_t::encode_key(#pair)?;
-                        #encode_t_encode(#content_expr, #content_tag)?;
+                        #encode_t_encode(#content_static_expr, #content_tag)?;
 
                         let #content_struct = #map_entry_encoder_t::encode_value(#pair)?;
 
@@ -531,15 +558,15 @@ fn encode_variant(
     if cx.trace {
         let output_var = b.cx.ident("output");
 
-        let (decl, name) = en.name_format(&name_static, &v.name);
-        let enter = quote!(#context_t::enter_variant(#ctx_var, #type_name, #name));
-        let leave = quote!(#context_t::leave_variant(#ctx_var));
+        let formatted_tag = en.name_type.name_format(&name_static);
+        let name_type = en.name_type.ty();
+        let name_value = &v.name;
 
         encode = quote! {{
-            #decl
-            #enter;
+            static #name_static: #name_type = #name_value;
+            #context_t::enter_variant(#ctx_var, #type_name, #formatted_tag);
             let #output_var = #encode;
-            #leave;
+            #context_t::leave_variant(#ctx_var);
             #output_var
         }};
     }

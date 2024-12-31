@@ -2,9 +2,9 @@ use std::rc::Rc;
 
 use proc_macro2::Span;
 use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
 use syn::Token;
 
-use crate::de::{build_call, build_reference};
 use crate::expander::{
     self, Data, EnumData, Expander, FieldData, NameMethod, NameType, StructData, StructKind,
     UnsizedMethod, VariantData,
@@ -99,8 +99,7 @@ pub(crate) struct Body<'a> {
     pub(crate) name: &'a syn::LitStr,
     pub(crate) unskipped_fields: Vec<Rc<Field<'a>>>,
     pub(crate) all_fields: Vec<Rc<Field<'a>>>,
-    pub(crate) name_type: NameType,
-    pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
+    pub(crate) name_type: NameType<'a>,
     pub(crate) packing: Packing,
     pub(crate) kind: StructKind,
     pub(crate) path: syn::Path,
@@ -112,13 +111,6 @@ impl Body<'_> {
             cx.transparent_diagnostics(self.span, &self.unskipped_fields);
         }
     }
-
-    pub(crate) fn name_format(&self, value: &syn::Expr) -> syn::Expr {
-        match self.name_format_with {
-            Some((_, path)) => build_call(path, [build_reference(value.clone())]),
-            None => build_reference(value.clone()),
-        }
-    }
 }
 
 pub(crate) struct Enum<'a> {
@@ -128,29 +120,8 @@ pub(crate) struct Enum<'a> {
     pub(crate) enum_packing: Packing,
     pub(crate) variants: Vec<Variant<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
-    pub(crate) name_type: NameType,
-    pub(crate) name_format_with: Option<&'a (Span, syn::Path)>,
+    pub(crate) name_type: NameType<'a>,
     pub(crate) packing_span: Option<&'a (Span, Packing)>,
-}
-
-impl Enum<'_> {
-    pub(crate) fn name_format(
-        &self,
-        static_var: &syn::Ident,
-        value: &syn::Expr,
-    ) -> (Option<syn::ItemStatic>, syn::Expr) {
-        match self.name_format_with {
-            Some((_, path)) => (None, syn::parse_quote!(&#path(#static_var, #value))),
-            None => {
-                let static_type = self.name_type.ty();
-
-                (
-                    Some(syn::parse_quote!(static #static_var: #static_type = #value;)),
-                    syn::parse_quote!(&#static_var),
-                )
-            }
-        }
-    }
 }
 
 pub(crate) struct Variant<'a> {
@@ -262,8 +233,8 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a StructData<'a>) -
         name_type: NameType {
             ty: name_type,
             method: name_method,
+            format_with: e.type_attr.name_format_with(mode),
         },
-        name_format_with: e.type_attr.name_format_with(mode),
         packing,
         kind: data.kind,
         path,
@@ -334,8 +305,8 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'_>, data: &'a EnumData<'a>) -> En
         name_type: NameType {
             ty: name_type,
             method: name_method,
+            format_with: e.type_attr.name_format_with(mode),
         },
-        name_format_with: e.type_attr.name_format_with(mode),
         packing_span,
     }
 }
@@ -428,8 +399,8 @@ fn setup_variant<'a>(
         name_type: NameType {
             ty: name_type,
             method: name_method,
+            format_with: data.attr.name_format_with(mode),
         },
-        name_format_with: data.attr.name_format_with(mode),
         path,
     };
 
@@ -604,30 +575,65 @@ fn setup_field<'a>(
     }
 }
 
-fn split_name(
+pub(crate) fn split_name(
     kind: Option<&ModeKind>,
-    name_type: Option<&(Span, syn::Type)>,
-    name_all: Option<&(Span, NameAll)>,
-    name_method: Option<&(Span, NameMethod)>,
+    ty: Option<&(Span, syn::Type)>,
+    all: Option<&(Span, NameAll)>,
+    method: Option<&(Span, NameMethod)>,
 ) -> (NameAll, syn::Type, NameMethod) {
     let kind_name_all = kind.and_then(ModeKind::default_name_all);
 
-    let name_all = name_all.map(|&(_, v)| v);
-    let name_method = name_method.map(|&(_, v)| v);
+    let all = all.map(|&(_, v)| v);
+    let method = method.map(|&(_, v)| v);
 
-    let Some((_, name_type)) = name_type else {
-        let name_all = name_all.or(kind_name_all).unwrap_or_default();
-        let name_method = name_method.unwrap_or_else(|| name_all.name_method());
-        return (name_all, name_all.ty(), name_method);
+    let Some((_, ty)) = ty else {
+        let all = all.or(kind_name_all).unwrap_or_default();
+        let method = method.unwrap_or_else(|| all.name_method());
+        return (all, all.ty(), method);
     };
 
-    let (name_method, default_name_all) = match name_method {
-        Some(name_method) => (name_method, name_method.name_all()),
-        None => determine_name_method(name_type),
+    let (method, default_all) = match method {
+        Some(method) => (method, method.name_all()),
+        None => determine_name_method(ty),
     };
 
-    let name_all = name_all.or(default_name_all).unwrap_or_default();
-    (name_all, name_type.clone(), name_method)
+    let all = all.or(default_all).unwrap_or_default();
+    (all, ty.clone(), method)
+}
+
+pub(crate) fn determine_type(expr: &syn::Expr) -> Option<(Span, syn::Type)> {
+    Some((expr.span(), determine_type_inner(expr, false)?))
+}
+
+fn determine_type_inner(expr: &syn::Expr, neg: bool) -> Option<syn::Type> {
+    match expr {
+        syn::Expr::Lit(syn::ExprLit { lit, .. }) => match lit {
+            syn::Lit::Str(..) => {
+                return Some(syn::parse_quote!(str));
+            }
+            syn::Lit::ByteStr(..) => {
+                return Some(syn::parse_quote!([u8]));
+            }
+            syn::Lit::Int(..) => {
+                if neg {
+                    return Some(syn::parse_quote!(isize));
+                } else {
+                    return Some(syn::parse_quote!(usize));
+                }
+            }
+            _ => {}
+        },
+        syn::Expr::Unary(syn::ExprUnary {
+            op: syn::UnOp::Neg(..),
+            expr,
+            ..
+        }) => {
+            return determine_type_inner(expr, !neg);
+        }
+        _ => {}
+    }
+
+    None
 }
 
 fn determine_name_method(ty: &syn::Type) -> (NameMethod, Option<NameAll>) {

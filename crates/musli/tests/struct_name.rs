@@ -10,7 +10,7 @@ pub struct Named {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = str)]
+#[musli(name(type = str))]
 pub struct NamedByType {
     string: String,
     number: u32,

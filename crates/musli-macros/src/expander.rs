@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
 use proc_macro2::{Span, TokenStream};
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::Token;
 
+use crate::de;
 use crate::internals::attr::{self, ModeIdent, ModeKind, TypeAttr};
 use crate::internals::build::Build;
 use crate::internals::name::NameAll;
@@ -26,12 +27,13 @@ impl UnsizedMethod {
     }
 }
 
-pub(crate) struct NameType {
+pub(crate) struct NameType<'a> {
     pub(crate) ty: syn::Type,
     pub(crate) method: NameMethod,
+    pub(crate) format_with: Option<&'a (Span, syn::Path)>,
 }
 
-impl NameType {
+impl NameType<'_> {
     pub(crate) fn expr(&self, ident: syn::Ident) -> syn::Expr {
         match self.method {
             NameMethod::Unsized(..) => syn::parse_quote!(#ident),
@@ -41,13 +43,18 @@ impl NameType {
 
     pub(crate) fn ty(&self) -> syn::Type {
         match self.method {
-            NameMethod::Unsized(..) => syn::Type::Reference(syn::TypeReference {
-                and_token: <Token![&]>::default(),
-                lifetime: None,
-                mutability: None,
-                elem: Box::new(self.ty.clone()),
-            }),
+            NameMethod::Unsized(..) => {
+                let ty = &self.ty;
+                syn::parse_quote!(&#ty)
+            }
             NameMethod::Value => self.ty.clone(),
+        }
+    }
+
+    pub(crate) fn name_format(&self, value: &syn::Ident) -> syn::Expr {
+        match self.format_with {
+            Some((_, path)) => de::build_call(path, [syn::parse_quote!(&#value)]),
+            None => syn::parse_quote!(&#value),
         }
     }
 }
@@ -66,6 +73,23 @@ impl NameMethod {
         match self {
             Self::Value => None,
             Self::Unsized(_) => Some(NameAll::Name),
+        }
+    }
+}
+
+impl Parse for NameMethod {
+    fn parse(input: ParseStream<'_>) -> Result<Self, syn::Error> {
+        let string: syn::LitStr = input.parse()?;
+        let s = string.value();
+
+        match s.as_str() {
+            "value" => Ok(Self::Value),
+            "unsized" => Ok(Self::Unsized(UnsizedMethod::Default)),
+            "unsized_bytes" => Ok(Self::Unsized(UnsizedMethod::Bytes)),
+            _ => Err(syn::Error::new_spanned(
+                string,
+                "#[musli(name(method = ..))]: Bad value, expected one of \"value\", \"unsized\", \"unsized_bytes\"",
+            )),
         }
     }
 }
@@ -331,7 +355,7 @@ impl Taggable for VariantData<'_> {
     }
 
     fn name(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
-        self.attr.name(mode)
+        self.attr.name_expr(mode)
     }
 
     fn index(&self) -> usize {

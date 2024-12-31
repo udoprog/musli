@@ -3,7 +3,7 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = usize)]
+#[musli(name(type = usize))]
 pub struct Struct {
     field1: u32,
     field2: u32,
@@ -12,7 +12,7 @@ pub struct Struct {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = usize)]
+#[musli(name(type = usize))]
 pub struct StructPattern {
     field1: u32,
     #[musli(pattern = 1..=2)]
@@ -40,7 +40,7 @@ fn struct_pattern() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = usize)]
+#[musli(name(type = usize))]
 pub struct StructRename {
     #[musli(name = 3)]
     field4: u32,

@@ -32,7 +32,7 @@ const CUSTOM_TAG1: FieldVariantTag = FieldVariantTag { name: "field1" };
 const CUSTOM_TAG2: FieldVariantTag = FieldVariantTag { name: "field2" };
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = FieldVariantTag)]
+#[musli(name(type = FieldVariantTag))]
 pub struct StructCustomFieldAsStruct {
     #[musli(name = CUSTOM_TAG1)]
     field1: u32,
@@ -57,7 +57,7 @@ fn custom_struct_tag() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = Bytes<[u8; 4]>, name_format_with = BStr::new)]
+#[musli(name(type = Bytes<[u8; 4]>, format_with = BStr::new))]
 pub struct BytesName {
     #[musli(name = Bytes([1, 2, 3, 4]))]
     field1: u32,
@@ -119,7 +119,7 @@ impl fmt::Debug for UnsizedBytes {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = UnsizedBytes, name_method = "unsized")]
+#[musli(name(type = UnsizedBytes, method = "unsized"))]
 pub struct StructUnsizedBytes {
     #[musli(name = UnsizedBytes::new(&[1, 2, 3, 4]), pattern = UnsizedBytes([1, 2, 3, 4]))]
     field1: u32,
@@ -139,7 +139,7 @@ fn struct_unsized_bytes() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = UnsizedBytes, name_method = "unsized")]
+#[musli(name(type = UnsizedBytes, method = "unsized"))]
 pub enum EnumUnsizedBytes {
     #[musli(name = UnsizedBytes::new(&[1, 2, 3, 4]), pattern = UnsizedBytes([1, 2, 3, 4]))]
     Variant1 { field1: u32 },
@@ -164,7 +164,7 @@ impl fmt::Display for CustomBytes<'_> {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = CustomBytes)]
+#[musli(name(type = CustomBytes))]
 struct StructWithCustomBytes {
     #[musli(name = CustomBytes(b"name in bytes"))]
     string: String,
@@ -181,11 +181,11 @@ fn struct_with_bytes_name() {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = CustomBytes)]
+#[musli(name(type = CustomBytes))]
 enum EnumWithCustomBytes {
     #[musli(name = CustomBytes(b"a"))]
     Variant1 { string: String },
-    #[musli(name = CustomBytes(b"b"), name_type = CustomBytes)]
+    #[musli(name = CustomBytes(b"b"), name(type = CustomBytes))]
     Variant2 {
         #[musli(name = CustomBytes(b"c"))]
         string: String,
