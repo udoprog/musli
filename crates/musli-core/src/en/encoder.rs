@@ -8,6 +8,18 @@ use crate::Context;
 
 use super::{utils, Encode, EntriesEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
 
+/// An outcome of a fast encode attempt.
+#[non_exhaustive]
+pub enum TryFastEncode<T, E>
+where
+    E: Encoder,
+{
+    /// The encode attempt was successful.
+    Ok(E::Ok),
+    /// The encode was unsupported.
+    Unsupported(T, E),
+}
+
 /// Trait governing how the encoder works.
 #[must_use = "Encoders must be consumed through one of its encode_* methods"]
 pub trait Encoder: Sized {
@@ -73,12 +85,34 @@ pub trait Encoder: Sized {
     /// report that something unexpected happened.
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
+    /// Try to quickly encode the specified value.
+    ///
+    /// The default implementation simply returns the current encoder as
+    /// `Err(Self)`.
+    ///
+    /// This is intended to be a fast path when encoding a value when an
+    /// encoding permits it.
+    #[inline]
+    fn try_fast_encode<T>(self, value: T) -> Result<TryFastEncode<T, Self>, Self::Error>
+    where
+        T: Encode<Self::Mode>,
+    {
+        Ok(TryFastEncode::Unsupported(value, self))
+    }
+
     /// Encode the value `T` into the current encoder.
     ///
     /// This calls the appropriate [`Encode`] implementation for the given type.
+    #[inline]
     fn encode<T>(self, value: T) -> Result<Self::Ok, Self::Error>
     where
-        T: Encode<Self::Mode>;
+        T: Encode<Self::Mode>,
+    {
+        match self.try_fast_encode(value)? {
+            TryFastEncode::Ok(ok) => Ok(ok),
+            TryFastEncode::Unsupported(value, this) => value.encode(this),
+        }
+    }
 
     /// Encode a unit or something that is completely empty.
     ///

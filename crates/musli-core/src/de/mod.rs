@@ -49,7 +49,7 @@ mod decode_unsized_bytes;
 pub use self::decode_unsized_bytes::DecodeUnsizedBytes;
 
 mod decoder;
-pub use self::decoder::Decoder;
+pub use self::decoder::{Decoder, TryFastDecode};
 
 mod entries_decoder;
 pub use self::entries_decoder::EntriesDecoder;

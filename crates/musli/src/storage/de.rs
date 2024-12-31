@@ -6,7 +6,7 @@ use rust_alloc::vec::Vec;
 
 use crate::de::{
     utils, DecodeSliceBuilder, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
-    SizeHint, UnsizedVisitor, VariantDecoder,
+    SizeHint, TryFastDecode, UnsizedVisitor, VariantDecoder,
 };
 use crate::options::is_native_fixed;
 use crate::{Context, Decode, Options, Reader};
@@ -78,12 +78,12 @@ where
     }
 
     #[inline]
-    fn decode<T>(mut self) -> Result<T, Self::Error>
+    fn try_fast_decode<T>(mut self) -> Result<TryFastDecode<T, Self>, Self::Error>
     where
         T: Decode<'de, Self::Mode>,
     {
         if !const { is_native_fixed::<OPT>() && T::DECODE_PACKED } {
-            return T::decode(self);
+            return Ok(TryFastDecode::Unsupported(self));
         }
 
         let mut value = MaybeUninit::<T>::uninit();
@@ -94,7 +94,7 @@ where
             let ptr = value.as_mut_ptr().cast::<u8>();
             let n = size_of::<T>();
             self.reader.read_bytes_uninit(self.cx, ptr, n)?;
-            Ok(value.assume_init())
+            Ok(TryFastDecode::Ok(value.assume_init()))
         }
     }
 

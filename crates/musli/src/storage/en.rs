@@ -3,7 +3,7 @@ use core::{fmt, slice};
 
 use crate::en::{
     utils, Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder,
-    VariantEncoder,
+    TryFastEncode, VariantEncoder,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::options::is_native_fixed;
@@ -68,15 +68,15 @@ where
     }
 
     #[inline]
-    fn encode<T>(mut self, value: T) -> Result<Self::Ok, Self::Error>
+    fn try_fast_encode<T>(mut self, value: T) -> Result<TryFastEncode<T, Self>, Self::Error>
     where
         T: Encode<Self::Mode>,
     {
-        let value = value.as_encode();
-
         if !const { is_native_fixed::<OPT>() && T::Encode::ENCODE_PACKED } {
-            return value.encode(self);
+            return Ok(TryFastEncode::Unsupported(value, self));
         }
+
+        let value = value.as_encode();
 
         // SAFETY: We've ensured the type is layout compatible with the current
         // serialization just above.
@@ -86,7 +86,7 @@ where
         };
 
         self.writer.write_bytes(self.cx, slice)?;
-        Ok(())
+        Ok(TryFastEncode::Ok(()))
     }
 
     #[inline]

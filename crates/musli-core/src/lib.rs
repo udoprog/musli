@@ -198,11 +198,11 @@ pub mod __priv {
     pub use crate::context::Context;
     pub use crate::de::{
         AsDecoder, Decode, DecodeBytes, DecodePacked, DecodeTrace, Decoder, EntryDecoder,
-        MapDecoder, SequenceDecoder, VariantDecoder,
+        MapDecoder, SequenceDecoder, TryFastDecode, VariantDecoder,
     };
     pub use crate::en::{
         Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntryEncoder, MapEncoder,
-        SequenceEncoder, VariantEncoder,
+        SequenceEncoder, TryFastEncode, VariantEncoder,
     };
     pub use crate::hint::MapHint;
     pub use crate::never::Never;
