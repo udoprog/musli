@@ -1,10 +1,10 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use proc_macro2::{Span, TokenStream};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 
-use crate::de;
 use crate::internals::attr::{self, ModeIdent, ModeKind, TypeAttr};
 use crate::internals::build::Build;
 use crate::internals::name::NameAll;
@@ -41,19 +41,19 @@ impl NameType<'_> {
         }
     }
 
-    pub(crate) fn ty(&self) -> syn::Type {
+    pub(crate) fn ty(&self) -> Cow<'_, syn::Type> {
         match self.method {
             NameMethod::Unsized(..) => {
                 let ty = &self.ty;
-                syn::parse_quote!(&#ty)
+                Cow::Owned(syn::parse_quote!(&#ty))
             }
-            NameMethod::Value => self.ty.clone(),
+            NameMethod::Value => Cow::Borrowed(&self.ty),
         }
     }
 
     pub(crate) fn name_format(&self, value: &syn::Ident) -> syn::Expr {
         match self.format_with {
-            Some((_, path)) => de::build_call(path, [syn::parse_quote!(&#value)]),
+            Some((_, path)) => syn::parse_quote!(#path(&#value)),
             None => syn::parse_quote!(&#value),
         }
     }
@@ -143,7 +143,7 @@ pub(crate) struct Expander<'a> {
     pub(crate) cx: Ctxt,
     pub(crate) type_attr: TypeAttr,
     pub(crate) data: Data<'a>,
-    pub(crate) tokens: Tokens,
+    pub(crate) prefix: syn::Path,
     pub(crate) default: Vec<ModeIdent>,
 }
 
@@ -223,9 +223,13 @@ impl<'a> Expander<'a> {
             cx,
             type_attr,
             data,
-            tokens: Tokens::new(input.ident.span(), prefix),
+            prefix,
             default,
         }
+    }
+
+    pub(crate) fn tokens(&self) -> Tokens<'_> {
+        Tokens::new(&self.prefix)
     }
 
     /// Coerce into errors.
