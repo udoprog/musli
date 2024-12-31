@@ -37,7 +37,7 @@ impl NameType<'_> {
     pub(crate) fn expr(&self, ident: syn::Ident) -> syn::Expr {
         match self.method {
             NameMethod::Unsized(..) => syn::parse_quote!(#ident),
-            NameMethod::Value => syn::parse_quote!(&#ident),
+            NameMethod::Sized => syn::parse_quote!(&#ident),
         }
     }
 
@@ -47,7 +47,7 @@ impl NameType<'_> {
                 let ty = &self.ty;
                 Cow::Owned(syn::parse_quote!(&#ty))
             }
-            NameMethod::Value => Cow::Borrowed(&self.ty),
+            NameMethod::Sized => Cow::Borrowed(&self.ty),
         }
     }
 
@@ -63,7 +63,7 @@ impl NameType<'_> {
 pub(crate) enum NameMethod {
     /// Load the tag by value.
     #[default]
-    Value,
+    Sized,
     /// Load the tag by visit.
     Unsized(UnsizedMethod),
 }
@@ -71,7 +71,7 @@ pub(crate) enum NameMethod {
 impl NameMethod {
     pub(crate) fn name_all(&self) -> Option<NameAll> {
         match self {
-            Self::Value => None,
+            Self::Sized => None,
             Self::Unsized(_) => Some(NameAll::Name),
         }
     }
@@ -83,7 +83,7 @@ impl Parse for NameMethod {
         let s = string.value();
 
         match s.as_str() {
-            "value" => Ok(Self::Value),
+            "sized" => Ok(Self::Sized),
             "unsized" => Ok(Self::Unsized(UnsizedMethod::Default)),
             "unsized_bytes" => Ok(Self::Unsized(UnsizedMethod::Bytes)),
             _ => Err(syn::Error::new_spanned(

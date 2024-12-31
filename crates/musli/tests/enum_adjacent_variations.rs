@@ -10,7 +10,7 @@ macro_rules! integer_tag {
         }
 
         #[derive(Encode, Decode)]
-        #[musli(tag(value = 10, type = $ty, method = "value"), content(value = 20, type = $ty, method = "value"))]
+        #[musli(tag(value = 10, type = $ty, method = "sized"), content(value = 20, type = $ty, method = "sized"))]
         pub enum $name_value {
             Value,
         }
@@ -38,8 +38,8 @@ pub enum Integer {
 
 #[derive(Encode, Decode)]
 #[musli(
-    tag(value = 10, method = "value"),
-    content(value = 20, method = "value")
+    tag(value = 10, method = "sized"),
+    content(value = 20, method = "sized")
 )]
 pub enum IntegerValue {
     Value,

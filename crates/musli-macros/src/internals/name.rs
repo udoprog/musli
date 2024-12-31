@@ -40,7 +40,7 @@ impl NameAll {
 
     pub(crate) fn name_method(&self) -> NameMethod {
         match self {
-            NameAll::Index => NameMethod::Value,
+            NameAll::Index => NameMethod::Sized,
             _ => NameMethod::Unsized(UnsizedMethod::Default),
         }
     }

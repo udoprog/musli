@@ -425,20 +425,20 @@ struct StructBytesArray {
 
 <br>
 
-#### `#[musli(name(method = "method"))]`
+#### `#[musli(name(method = "sized" | "unsized" | "unsized_bytes"))]`
 
 This allows for explicitly setting which method should be used to decode
 names. Available options are:
 
-* `"value"` (default) - the name is decoded as a value.
+* `"sized"` (default) - decode as a sized value.
 * `"unsized"` - the name is decoded as an unsized value, this is the default if
   for example `#[musli(name(type = str))]` is used.
 * `"unsized_bytes"` - the name is decoded as a unsized bytes, this is the
   default if for example `#[musli(name(type = [u8]))]` is used.
 
 This can be overrided for values which are unsized, but cannot be determined
-through heuristics. Such a type must also implement [`Decode`] (for
-`"value"`), `DecodeUnsized`, or `DecodeUnsizedBytes` as appropriate.
+through heuristics. Such a type must also implement [`Decode`] (for `"sized"`),
+`DecodeUnsized`, or `DecodeUnsizedBytes` as appropriate.
 
 <br>
 
@@ -733,20 +733,20 @@ enum Enum {
 
 <br>
 
-#### `#[musli(name(method = "method"))]`
+#### `#[musli(name(method = "sized" | "unsized" | "unsized_bytes"))]`
 
 This allows for explicitly setting which method should be used to decode
 field names. Available options are:
 
-* `"value"` (default) - the name is decoded as a value.
+* `"sized"` (default) - the name is decoded as a sized value.
 * `"unsized"` - the name is decoded as an unsized value, this is the default if
   for example `#[musli(name(type = str))]` is used.
 * `"unsized_bytes"` - the name is decoded as a unsized bytes, this is the
   default if for example `#[musli(name(type = [u8]))]` is used.
 
 This can be overrided for values which are unsized, but cannot be determined
-through heuristics. Such a type must also implement [`Decode`] (for
-`"value"`), `DecodeUnsized`, or `DecodeUnsizedBytes` as appropriate.
+through heuristics. Such a type must also implement [`Decode`] (for `"sized"`),
+`DecodeUnsized`, or `DecodeUnsizedBytes` as appropriate.
 
 ##### Examples
 

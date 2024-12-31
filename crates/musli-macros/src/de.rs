@@ -213,7 +213,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let name_type;
 
     match en.name_type.method {
-        NameMethod::Value => {
+        NameMethod::Sized => {
             for v in &en.variants {
                 let arm = output_arm(v.pattern, &v.name, &binding_var);
                 output_arms.push((v, arm, &v.name));
@@ -309,7 +309,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             }
 
             match en.name_type.method {
-                NameMethod::Value => {
+                NameMethod::Sized => {
                     let decode_t_decode = &b.decode_t_decode;
                     let name_type = &en.name_type.ty;
 
@@ -441,7 +441,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             let decode_match;
 
             match tag_type.method {
-                NameMethod::Value => {
+                NameMethod::Sized => {
                     let decode_t_decode = &b.decode_t_decode;
 
                     outcome_enum = None;
@@ -595,7 +595,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
             let decode_match;
 
             match tag_type.method {
-                NameMethod::Value => {
+                NameMethod::Sized => {
                     outcome_enum = None;
 
                     let value_type = &tag_type.ty;
@@ -931,7 +931,7 @@ fn decode_tagged(
     let name_type: syn::Type;
 
     match st.name_type.method {
-        NameMethod::Value => {
+        NameMethod::Sized => {
             let mut arms = Vec::with_capacity(fields_with.len());
 
             for (tag, f, decode, (enter, leave)) in fields_with {
