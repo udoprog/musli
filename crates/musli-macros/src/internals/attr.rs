@@ -88,35 +88,20 @@ pub(crate) enum Packing {
     Transparent,
 }
 
-macro_rules! merge {
-    ($self:expr, $cx:expr, $new:expr, $field:ident, $only:expr) => {{
-        for $field in $new.$field {
-            let out = match $only {
-                None => &mut $self.$field.any,
-                Some(Only::Decode) => &mut $self.$field.decode,
-                Some(Only::Encode) => &mut $self.$field.encode,
-            };
-
-            if out.is_some() {
-                $cx.error_span(
-                    $field.0,
-                    format_args!(
-                        "#[{}] multiple {} attributes specified",
-                        ATTR,
-                        stringify!($field)
-                    ),
-                );
-            } else {
-                *out = Some($field);
-            }
-        }
-    }};
+macro_rules! first {
+    (, $b:expr) => {
+        $b
+    };
+    ($a:expr, $_:expr) => {
+        $a
+    };
 }
 
 macro_rules! layer {
     ($attr:ident, $new:ident, $layer:ident {
         $(
-            $(#[$($single_meta:meta)*])*
+            $(#[doc = $single_doc:literal])*
+            $(#[example = $single_example:literal])?
             $single:ident: $single_ty:ty
         ),*
         $(
@@ -175,13 +160,20 @@ macro_rules! layer {
 
         #[derive(Default)]
         struct $new {
-            $($(#[$($single_meta)*])* $single: Vec<(Span, $single_ty)>,)*
-            $($($(#[$($multiple_meta)*])* $multiple: Vec<(Span, $multiple_ty)>,)*)*
+            $(
+                $(#[doc = $single_doc])*
+                $single: Vec<(Span, $single_ty)>,
+            )*
+            $($($(#[$($multiple_meta)*])*
+            $multiple: Vec<(Span, $multiple_ty)>,)*)*
         }
 
         #[derive(Default)]
         struct $layer {
-            $($(#[$($single_meta)*])* $single: OneOf<Option<(Span, $single_ty)>>,)*
+            $(
+                $(#[doc = $single_doc])*
+                $single: OneOf<Option<(Span, $single_ty)>>,
+            )*
             $($($(#[$($multiple_meta)*])* $multiple: OneOf<Vec<(Span, $multiple_ty)>>,)*)*
         }
 
@@ -189,7 +181,26 @@ macro_rules! layer {
             /// Merge attributes.
             fn merge_with(&mut self, cx: &Ctxt, new: $new, only: Option<Only>) {
                 $(
-                    merge!(self, cx, new, $single, only);
+                    for $single in new.$single {
+                        let out = match only {
+                            None => &mut self.$single.any,
+                            Some(Only::Decode) => &mut self.$single.decode,
+                            Some(Only::Encode) => &mut self.$single.encode,
+                        };
+
+                        if out.is_some() {
+                            cx.error_span(
+                                $single.0,
+                                format_args!(
+                                    "#[{}] multiple {} attributes specified",
+                                    ATTR,
+                                    first!($($single_example)?, stringify!($single))
+                                ),
+                            );
+                        } else {
+                            *out = Some($single);
+                        }
+                    }
                 )*
 
                 $($(
@@ -216,29 +227,40 @@ layer! {
     TypeAttr, TypeLayerNew, TypeLayer {
         /// `#[musli(crate = <path>)]`.
         krate: syn::Path,
-        /// `#[musli(name_type)]`.
-        name_type: syn::Type,
-        /// `#[musli(name(method = "method"))]`.
-        name_method: NameMethod,
-        /// `#[musli(name(format_with = <path>))]`.
-        name_format_with: syn::Path,
         /// `#[musli(name_all = "..")]`.
         name_all: NameAll,
+        /// `#[musli(name(type = <type>))]`.
+        #[example = "name(type = <type>)"]
+        name_type: syn::Type,
+        /// `#[musli(name(method = "method"))]`.
+        #[example = "name(method = \"method\")"]
+        name_method: NameMethod,
+        /// `#[musli(name(format_with = ..))]`.
+        #[example = "name(format_with = ..)"]
+        name_format_with: syn::Path,
         /// If `#[musli(tag = <expr>)]` is specified.
+        #[example = "tag = <expr>"]
         tag_value: syn::Expr,
         /// If `#[musli(tag(type = <type>))]` is specified.
+        #[example = "tag(type = <type>)"]
         tag_type: syn::Type,
         /// If `#[musli(tag(method = <type>))]` is specified.
+        #[example = "tag(method = \"method\")"]
         tag_method: NameMethod,
         /// If `#[musli(tag(format_with = ..))]` is specified.
+        #[example = "tag(format_with = .)"]
         tag_format_with: syn::Path,
-        /// If `#[musli(tag(method = "method"))]` is specified.
+        /// If `#[musli(content = <expr>)]` is specified.
+        #[example = "content = <expr>"]
         content_value: syn::Expr,
         /// If `#[musli(content(type = <expr>))]` is specified.
+        #[example = "content(type = <expr>)"]
         content_type: syn::Type,
         /// If `#[musli(content(method = "method"))]` is specified.
+        #[example = "content(method = \"method\")"]
         content_method: NameMethod,
         /// If `#[musli(content(format_with = ..))]` is specified.
+        #[example = "content(format_with = ..)"]
         content_format_with: syn::Path,
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
         packing: Packing,
@@ -499,13 +521,17 @@ fn parse_bounds(
 
 layer! {
     VariantAttr, VariantLayerNew, VariantLayer {
-        /// Name a variant with the given expression.
+        /// `#[musli(name = ..)]`.
+        #[example = "name = .."]
         name_expr: syn::Expr,
-        /// `#[musli(name_type)]`.
+        /// `#[musli(name(type = <type>))]`.
+        #[example = "name(type = <type>)"]
         name_type: syn::Type,
         /// `#[musli(name(method = "method"))]`.
+        #[example = "name(method = \"method\")"]
         name_method: NameMethod,
         /// `#[musli(name(format_with = <path>))]`.
+        #[example = "name(format_with = <path>)"]
         name_format_with: syn::Path,
         /// Pattern used to match the given field when decoding.
         pattern: syn::Pat,
