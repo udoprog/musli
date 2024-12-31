@@ -75,6 +75,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         result,
         decode_t,
         decoder_t,
+        try_fast_decode,
         ..
     } = e.tokens;
 
@@ -108,11 +109,17 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
                 const DECODE_PACKED: bool = #packed;
 
                 #[inline]
-                fn decode<#d_param>(#root_decoder_var: #d_param) -> #result<Self, <#d_param::Cx as #context_t>::Error>
+                fn decode<#d_param>(#root_decoder_var: #d_param) -> #result<Self, <#d_param as #decoder_t<#lt>>::Error>
                 where
                     #d_param: #decoder_t<#lt, Mode = #mode_ident>,
                 {
                     #decoder_t::cx(#root_decoder_var, |#ctx_var, #root_decoder_var| {
+                        let #root_decoder_var = match #decoder_t::try_fast_decode(#root_decoder_var)? {
+                            #try_fast_decode::Ok(value) => return #result::Ok(value),
+                            #try_fast_decode::Unsupported(#root_decoder_var) => #root_decoder_var,
+                            _ => return #result::Err(#context_t::message(#ctx_var, "fast decoding failed")),
+                        };
+
                         #body
                     })
                 }

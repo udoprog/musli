@@ -20,7 +20,7 @@
 pub use musli_core::de::{
     AsDecoder, Decode, DecodeBytes, DecodeOwned, DecodePacked, DecodeSliceBuilder, DecodeTrace,
     DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
-    SequenceDecoder, SizeHint, Skip, UnsizedVisitor, VariantDecoder, Visitor,
+    SequenceDecoder, SizeHint, Skip, TryFastDecode, UnsizedVisitor, VariantDecoder, Visitor,
 };
 
 #[cfg(any(

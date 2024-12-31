@@ -37,7 +37,7 @@ mod encode_trace;
 pub use self::encode_trace::EncodeTrace;
 
 mod encoder;
-pub use self::encoder::Encoder;
+pub use self::encoder::{Encoder, TryFastEncode};
 
 mod entries_encoder;
 pub use self::entries_encoder::EntriesEncoder;

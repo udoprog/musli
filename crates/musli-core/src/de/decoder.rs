@@ -11,6 +11,15 @@ use super::{
     EntriesDecoder, MapDecoder, SequenceDecoder, Skip, UnsizedVisitor, VariantDecoder, Visitor,
 };
 
+/// An outcome of a fast decode attempt.
+#[non_exhaustive]
+pub enum TryFastDecode<T, D> {
+    /// The decode attempt was successful.
+    Ok(T),
+    /// The decode was unsupported.
+    Unsupported(D),
+}
+
 /// Trait governing the implementation of a decoder.
 #[must_use = "Decoders must be consumed through one of its decode_* methods"]
 pub trait Decoder<'de>: Sized {
@@ -106,6 +115,21 @@ pub trait Decoder<'de>: Sized {
     /// ```
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
+    /// Try to quickly decode the specified value.
+    ///
+    /// The default implementation simply returns the current decoder as
+    /// `Err(Self)`.
+    ///
+    /// This is intended to be a fast path when decoding a value when an
+    /// encoding permits it.
+    #[inline]
+    fn try_fast_decode<T>(self) -> Result<TryFastDecode<T, Self>, Self::Error>
+    where
+        T: Decode<'de, Self::Mode>,
+    {
+        Ok(TryFastDecode::Unsupported(self))
+    }
+
     /// Decode the current decoder into the value `T`.
     ///
     /// This calls the appropriate [`Decode`] implementation for the given type.
@@ -114,7 +138,10 @@ pub trait Decoder<'de>: Sized {
     where
         T: Decode<'de, Self::Mode>,
     {
-        T::decode(self)
+        match self.try_fast_decode::<T>()? {
+            TryFastDecode::Ok(value) => Ok(value),
+            TryFastDecode::Unsupported(decoder) => T::decode(decoder),
+        }
     }
 
     /// Decode an unsized value by reference through the specified closure.

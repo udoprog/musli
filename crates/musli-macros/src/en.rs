@@ -34,6 +34,8 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
         encode_t,
         encoder_t,
         result,
+        try_fast_encode,
+        context_t,
         ..
     } = e.tokens;
 
@@ -92,6 +94,12 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
                     #e_param: #encoder_t<Mode = #mode_ident>,
                 {
                     #encoder_t::cx(#encoder_var, |#ctx_var, #encoder_var| {
+                        let #encoder_var = match #encoder_t::try_fast_encode(#encoder_var, self)? {
+                            #try_fast_encode::Ok(value) => return #result::Ok(value),
+                            #try_fast_encode::Unsupported(_, #encoder_var) => #encoder_var,
+                            _ => return #result::Err(#context_t::message(#ctx_var, "fast encoding failed")),
+                        };
+
                         #body
                     })
                 }

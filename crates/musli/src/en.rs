@@ -19,7 +19,7 @@
 #[doc(inline)]
 pub use musli_core::en::{
     Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntriesEncoder, EntryEncoder,
-    MapEncoder, SequenceEncoder, VariantEncoder,
+    MapEncoder, SequenceEncoder, TryFastEncode, VariantEncoder,
 };
 
 #[cfg(any(
