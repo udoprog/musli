@@ -232,8 +232,8 @@ layer! {
         /// `#[musli(name(type = <type>))]`.
         #[example = "name(type = <type>)"]
         name_type: syn::Type,
-        /// `#[musli(name(method = "method"))]`.
-        #[example = "name(method = \"method\")"]
+        /// `#[musli(name(method = "sized" | "unsized" | "unsized_bytes"))]`.
+        #[example = "name(method = \"sized\" | \"unsized\" | \"unsized_bytes\")"]
         name_method: NameMethod,
         /// `#[musli(name(format_with = ..))]`.
         #[example = "name(format_with = ..)"]
@@ -256,8 +256,8 @@ layer! {
         /// If `#[musli(content(type = <expr>))]` is specified.
         #[example = "content(type = <expr>)"]
         content_type: syn::Type,
-        /// If `#[musli(content(method = "method"))]` is specified.
-        #[example = "content(method = \"method\")"]
+        /// If `#[musli(content(method = "sized" | "unsized" | "unsized_bytes"))]` is specified.
+        #[example = "content(method = \"sized\" | \"unsized\" | \"unsized_bytes\")"]
         content_method: NameMethod,
         /// If `#[musli(content(format_with = ..))]` is specified.
         #[example = "content(format_with = ..)"]
@@ -527,8 +527,8 @@ layer! {
         /// `#[musli(name(type = <type>))]`.
         #[example = "name(type = <type>)"]
         name_type: syn::Type,
-        /// `#[musli(name(method = "method"))]`.
-        #[example = "name(method = \"method\")"]
+        /// `#[musli(name(method = "sized" | "unsized" | "unsized_bytes"))]`.
+        #[example = "name(method = \"sized\" | \"unsized\" | \"unsized_bytes\")"]
         name_method: NameMethod,
         /// `#[musli(name(format_with = <path>))]`.
         #[example = "name(format_with = <path>)"]

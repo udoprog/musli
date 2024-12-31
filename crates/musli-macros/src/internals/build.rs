@@ -205,7 +205,7 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a StructData<'a>) -
     let (name_all, name_type, name_method) = match data.kind {
         StructKind::Indexed(..) if e.type_attr.is_name_type_ambiguous(mode) => {
             let name_all = NameAll::Index;
-            (name_all, name_all.ty(), NameMethod::Value)
+            (name_all, name_all.ty(), NameMethod::Sized)
         }
         _ => split_name(
             mode.kind,
@@ -332,7 +332,7 @@ fn setup_variant<'a>(
     let (name_all, name_type, name_method) = match data.kind {
         StructKind::Indexed(..) if data.attr.is_name_type_ambiguous(mode) => {
             let name_all = NameAll::Index;
-            (name_all, name_all.ty(), NameMethod::Value)
+            (name_all, name_all.ty(), NameMethod::Sized)
         }
         _ => split_name(
             mode.kind,
@@ -658,5 +658,5 @@ fn determine_name_method(ty: &syn::Type) -> (NameMethod, Option<NameAll>) {
         _ => {}
     }
 
-    (NameMethod::Value, None)
+    (NameMethod::Sized, None)
 }
