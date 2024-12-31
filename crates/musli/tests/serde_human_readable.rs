@@ -16,7 +16,7 @@ struct StringField {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(name_type = str)]
+#[musli(name(type = str))]
 enum IpRepr {
     #[musli(name = "V4", transparent)]
     V4([u8; 4]),

@@ -5,7 +5,7 @@ fn struct_fields() {
     macro_rules! test_case {
         ($ty:ty) => {{
             #[derive(Debug, PartialEq, Encode, Decode)]
-            #[musli(name_type = $ty)]
+            #[musli(name(type = $ty))]
             struct Struct {
                 #[musli(name = <$ty>::MIN)]
                 min: u32,
@@ -40,7 +40,7 @@ fn variant_names() {
     macro_rules! test_case {
         ($ty:ty) => {{
             #[derive(Debug, PartialEq, Encode, Decode)]
-            #[musli(name_type = $ty)]
+            #[musli(name(type = $ty))]
             enum Enum {
                 #[musli(packed, name = <$ty>::MAX)]
                 Variant1(u32),

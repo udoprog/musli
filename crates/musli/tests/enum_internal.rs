@@ -42,7 +42,7 @@ fn indexed() {
     macro_rules! test_case {
         ($ty:ty) => {{
             #[derive(Debug, PartialEq, Encode, Decode)]
-            #[musli(name_type = $ty, tag = 11)]
+            #[musli(name(type = $ty), tag(value = 11, type = $ty))]
             pub enum Indexed {
                 #[musli(name = 22)]
                 Variant1 { variant1: u32 },
@@ -63,7 +63,7 @@ fn indexed() {
             };
 
             #[derive(Debug, PartialEq, Encode, Decode)]
-            #[musli(name_type = $ty, tag = 11)]
+            #[musli(name(type = $ty), tag(value = 11, type = $ty))]
             pub enum IndexedBounds {
                 #[musli(name = <$ty>::MAX)]
                 Variant1 { variant1: u32 },

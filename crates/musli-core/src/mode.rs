@@ -3,7 +3,7 @@
 /// The binary encoding mode.
 ///
 /// The key of fields and variants are encoded by their index, as if
-/// `#[musli(name_type = usize)]` was specified.
+/// `#[musli(name(type = usize))]` was specified.
 ///
 /// See [modes] for more.
 ///
@@ -13,7 +13,7 @@ pub enum Binary {}
 /// The text encoding mode.
 ///
 /// The key of fields and variants are encoded by their name, as if
-/// `#[musli(name_type = str)]` was specified.
+/// `#[musli(name(type = str))]` was specified.
 ///
 /// See [modes] for more.
 ///

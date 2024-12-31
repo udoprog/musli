@@ -502,6 +502,37 @@ impl<'de, M> DecodeUnsized<'de, M> for str {
     }
 }
 
+impl<'de, M> DecodeUnsized<'de, M> for [u8] {
+    #[inline]
+    fn decode_unsized<D, F, O>(decoder: D, f: F) -> Result<O, D::Error>
+    where
+        D: Decoder<'de>,
+        F: FnOnce(&Self) -> Result<O, D::Error>,
+    {
+        struct Visitor<F>(F);
+
+        impl<C, F, O> UnsizedVisitor<'_, C, [u8]> for Visitor<F>
+        where
+            C: ?Sized + Context,
+            F: FnOnce(&[u8]) -> Result<O, C::Error>,
+        {
+            type Ok = O;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "bytes visited from source")
+            }
+
+            #[inline]
+            fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+                (self.0)(bytes)
+            }
+        }
+
+        decoder.decode_bytes(Visitor(f))
+    }
+}
+
 impl<M, T> Encode<M> for [T]
 where
     T: Encode<M>,

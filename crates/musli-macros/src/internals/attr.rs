@@ -3,15 +3,16 @@ use std::mem;
 
 use proc_macro2::Span;
 use syn::meta::ParseNestedMeta;
-use syn::parse::Parse;
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::Token;
 
-use crate::expander::NameMethod;
-use crate::expander::UnsizedMethod;
+use crate::expander::{NameMethod, NameType};
 use crate::internals::name::NameAll;
 use crate::internals::ATTR;
 use crate::internals::{Ctxt, Mode};
+
+use super::build;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) enum ModeKind {
@@ -49,7 +50,6 @@ struct OneOf<T> {
     any: T,
 }
 
-#[derive(Clone, Copy)]
 pub(crate) enum EnumTagging<'a> {
     /// Use the default tagging method, as provided by the encoder-specific
     /// method.
@@ -57,11 +57,16 @@ pub(crate) enum EnumTagging<'a> {
     /// Only the tag is encoded.
     Empty,
     /// The type is internally tagged by the field given by the expression.
-    Internal { tag: &'a syn::Expr },
+    Internal {
+        tag_value: &'a syn::Expr,
+        tag_type: NameType<'a>,
+    },
     /// An enumerator is adjacently tagged.
     Adjacent {
-        tag: &'a syn::Expr,
-        content: &'a syn::Expr,
+        tag_value: &'a syn::Expr,
+        tag_type: NameType<'a>,
+        content_value: &'a syn::Expr,
+        content_type: NameType<'a>,
     },
 }
 
@@ -108,9 +113,16 @@ macro_rules! merge {
 
 macro_rules! layer {
     ($attr:ident, $new:ident, $layer:ident {
-        $($(#[$($single_meta:meta)*])* $single:ident: $single_ty:ty,)* $(,)?
-        @multiple
-        $($(#[$($multiple_meta:meta)*])* $multiple:ident: $multiple_ty:ty,)* $(,)?
+        $(
+            $(#[$($single_meta:meta)*])*
+            $single:ident: $single_ty:ty
+        ),*
+        $(
+            , @multiple
+            $($(#[$($multiple_meta:meta)*])*
+            $multiple:ident: $multiple_ty:ty,)* $(,)?
+        )?
+        $(,)?
     }) => {
         #[derive(Default)]
         pub(crate) struct $attr {
@@ -144,7 +156,7 @@ macro_rules! layer {
                 }
             )*
 
-            $(
+            $($(
                 #[allow(unused)]
                 pub(crate) fn $multiple(&self, mode: Mode<'_>) -> &[(Span, $multiple_ty)] {
                     self.by_mode(mode, |m| {
@@ -156,19 +168,19 @@ macro_rules! layer {
                         }
                     }).unwrap_or_default()
                 }
-            )*
+            )*)*
         }
 
         #[derive(Default)]
         struct $new {
             $($(#[$($single_meta)*])* $single: Vec<(Span, $single_ty)>,)*
-            $($(#[$($multiple_meta)*])* $multiple: Vec<(Span, $multiple_ty)>,)*
+            $($($(#[$($multiple_meta)*])* $multiple: Vec<(Span, $multiple_ty)>,)*)*
         }
 
         #[derive(Default)]
         struct $layer {
             $($(#[$($single_meta)*])* $single: OneOf<Option<(Span, $single_ty)>>,)*
-            $($(#[$($multiple_meta)*])* $multiple: OneOf<Vec<(Span, $multiple_ty)>>,)*
+            $($($(#[$($multiple_meta)*])* $multiple: OneOf<Vec<(Span, $multiple_ty)>>,)*)*
         }
 
         impl $layer {
@@ -178,7 +190,7 @@ macro_rules! layer {
                     merge!(self, cx, new, $single, only);
                 )*
 
-                $(
+                $($(
                     let list = match only {
                         None => {
                             &mut self.$multiple.any
@@ -192,7 +204,7 @@ macro_rules! layer {
                     };
 
                     list.extend(new.$multiple);
-                )*
+                )*)*
             }
         }
     }
@@ -204,16 +216,28 @@ layer! {
         krate: syn::Path,
         /// `#[musli(name_type)]`.
         name_type: syn::Type,
+        /// `#[musli(name(method = "method"))]`.
+        name_method: NameMethod,
+        /// `#[musli(name(format_with = <path>))]`.
+        name_format_with: syn::Path,
         /// `#[musli(name_all = "..")]`.
         name_all: NameAll,
-        /// `#[musli(name_method = "..")]`.
-        name_method: NameMethod,
-        /// `#[musli(name_format_with)]`.
-        name_format_with: syn::Path,
         /// If `#[musli(tag = <expr>)]` is specified.
-        tag: syn::Expr,
-        /// If `#[musli(content = <expr>)]` is specified.
-        content: syn::Expr,
+        tag_value: syn::Expr,
+        /// If `#[musli(tag(type = <type>))]` is specified.
+        tag_type: syn::Type,
+        /// If `#[musli(tag(method = <type>))]` is specified.
+        tag_method: NameMethod,
+        /// If `#[musli(tag(format_with = ..))]` is specified.
+        tag_format_with: syn::Path,
+        /// If `#[musli(tag(method = "method"))]` is specified.
+        content_value: syn::Expr,
+        /// If `#[musli(content(type = <expr>))]` is specified.
+        content_type: syn::Type,
+        /// If `#[musli(content(method = "method"))]` is specified.
+        content_method: NameMethod,
+        /// If `#[musli(content(format_with = ..))]` is specified.
+        content_format_with: syn::Path,
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
         packing: Packing,
         @multiple
@@ -232,18 +256,54 @@ impl TypeAttr {
     }
 
     pub(crate) fn enum_tagging_span(&self, mode: Mode<'_>) -> Option<Span> {
-        let tag = self.tag(mode);
-        let content = self.content(mode);
+        let tag = self.tag_value(mode);
+        let content = self.content_value(mode);
         Some(tag.or(content)?.0)
     }
 
     /// Indicates the state of enum tagging.
     pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
-        let (_, tag) = self.tag(mode)?;
+        let (_, tag_value) = self.tag_value(mode)?;
 
-        Some(match self.content(mode) {
-            Some((_, content)) => EnumTagging::Adjacent { tag, content },
-            _ => EnumTagging::Internal { tag },
+        let default_tag_type = build::determine_type(tag_value);
+        let (_, ty, method) = build::split_name(
+            mode.kind,
+            self.tag_type(mode).or(default_tag_type.as_ref()),
+            None,
+            self.tag_method(mode),
+        );
+
+        let tag_type = NameType {
+            ty,
+            method,
+            format_with: self.tag_format_with(mode),
+        };
+
+        Some(match self.content_value(mode) {
+            Some((_, content_value)) => {
+                let default_content_type = build::determine_type(content_value);
+                let (_, ty, method) = build::split_name(
+                    mode.kind,
+                    self.content_type(mode).or(default_content_type.as_ref()),
+                    None,
+                    self.content_method(mode),
+                );
+
+                EnumTagging::Adjacent {
+                    tag_value,
+                    tag_type,
+                    content_value,
+                    content_type: NameType {
+                        ty,
+                        method,
+                        format_with: self.content_format_with(mode),
+                    },
+                }
+            }
+            _ => EnumTagging::Internal {
+                tag_value,
+                tag_type,
+            },
         })
     }
 
@@ -291,15 +351,21 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             // #[musli(tag = <expr>)]
             if meta.path.is_ident("tag") {
-                meta.input.parse::<Token![=]>()?;
-                new.tag.push((meta.path.span(), meta.input.parse()?));
+                let ty = TypeConfig::parse("name", meta.input, true, true)?;
+                new.tag_value.extend(ty.value);
+                new.tag_type.extend(ty.ty);
+                new.tag_method.extend(ty.method);
+                new.tag_format_with.extend(ty.format_with);
                 return Ok(());
             }
 
             // #[musli(content = <expr>)]
             if meta.path.is_ident("content") {
-                meta.input.parse::<Token![=]>()?;
-                new.content.push((meta.path.span(), meta.input.parse()?));
+                let ty = TypeConfig::parse("content", meta.input, true, true)?;
+                new.content_value.extend(ty.value);
+                new.content_type.extend(ty.ty);
+                new.content_method.extend(ty.method);
+                new.content_format_with.extend(ty.format_with);
                 return Ok(());
             }
 
@@ -315,18 +381,12 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // #[musli(name_type = <type>)]
-            if meta.path.is_ident("name_type") {
-                meta.input.parse::<Token![=]>()?;
-                new.name_type.push((meta.path.span(), meta.input.parse()?));
-                return Ok(());
-            }
-
-            // #[musli(name_format_with = <path>)]
-            if meta.path.is_ident("name_format_with") {
-                meta.input.parse::<Token![=]>()?;
-                new.name_format_with
-                    .push((meta.path.span(), meta.input.parse()?));
+            // #[musli(name)]
+            if meta.path.is_ident("name") {
+                let ty = TypeConfig::parse("name", meta.input, false, true)?;
+                new.name_type.extend(ty.ty);
+                new.name_method.extend(ty.method);
+                new.name_format_with.extend(ty.format_with);
                 return Ok(());
             }
 
@@ -371,13 +431,6 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // #[musli(name_method = "..")]
-            if meta.path.is_ident("name_method") {
-                new.name_method
-                    .push((meta.path.span(), parse_name_method(&meta)?));
-                return Ok(());
-            }
-
             Err(syn::Error::new_spanned(
                 meta.path,
                 format_args!("#[{ATTR}] Unsupported type attribute"),
@@ -401,23 +454,6 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
     }
 
     attr
-}
-
-fn parse_name_method(meta: &syn::meta::ParseNestedMeta<'_>) -> Result<NameMethod, syn::Error> {
-    meta.input.parse::<Token![=]>()?;
-
-    let string: syn::LitStr = meta.input.parse()?;
-    let s = string.value();
-
-    match s.as_str() {
-        "value" => Ok(NameMethod::Value),
-        "unsized" => Ok(NameMethod::Unsized(UnsizedMethod::Default)),
-        "unsized_bytes" => Ok(NameMethod::Unsized(UnsizedMethod::Bytes)),
-        _ => Err(syn::Error::new_spanned(
-            string,
-            "#[musli(name_method = ..)]: Bad value, expected one of \"value\", \"unsized\", \"unsized_bytes\"",
-        )),
-    }
 }
 
 fn parse_name_all(meta: &syn::meta::ParseNestedMeta<'_>) -> Result<NameAll, syn::Error> {
@@ -461,23 +497,22 @@ fn parse_bounds(
 
 layer! {
     VariantAttr, VariantLayerNew, VariantLayer {
+        /// Name a variant with the given expression.
+        name_expr: syn::Expr,
         /// `#[musli(name_type)]`.
         name_type: syn::Type,
-        /// `#[musli(name_format_with)]`.
+        /// `#[musli(name(method = "method"))]`.
+        name_method: NameMethod,
+        /// `#[musli(name(format_with = <path>))]`.
         name_format_with: syn::Path,
-        /// Name a variant with the given expression.
-        name: syn::Expr,
         /// Pattern used to match the given field when decoding.
         pattern: syn::Pat,
         /// `#[musli(name_all = "..")]`.
         name_all: NameAll,
-        /// `#[musli(name_method = "..")]`.
-        name_method: NameMethod,
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
         packing: Packing,
         /// `#[musli(default)]`.
         default_variant: (),
-        @multiple
     }
 }
 
@@ -520,33 +555,11 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
-            // #[musli(name_type = <type>)]
-            if meta.path.is_ident("name_type") {
-                meta.input.parse::<Token![=]>()?;
-                new.name_type.push((meta.path.span(), meta.input.parse()?));
-                return Ok(());
-            }
-
-            // #[musli(name_format_with = <path>)]
-            if meta.path.is_ident("name_format_with") {
-                meta.input.parse::<Token![=]>()?;
-                new.name_format_with
-                    .push((meta.path.span(), meta.input.parse()?));
-                return Ok(());
-            }
-
             if meta.path.is_ident("rename") {
                 return Err(syn::Error::new_spanned(
                     meta.path,
                     "#[musli(rename = ..)] has been changed to #[musli(name = ..)]",
                 ));
-            }
-
-            // #[musli(name = <expr>)]
-            if meta.path.is_ident("name") {
-                meta.input.parse::<Token![=]>()?;
-                new.name.push((meta.path.span(), meta.input.parse()?));
-                return Ok(());
             }
 
             // #[musli(pattern = <expr>)]
@@ -590,10 +603,13 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
-            // #[musli(name_method = "..")]
-            if meta.path.is_ident("name_method") {
-                new.name_method
-                    .push((meta.path.span(), parse_name_method(&meta)?));
+            // #[musli(name)]
+            if meta.path.is_ident("name") {
+                let ty = TypeConfig::parse("name", meta.input, true, true)?;
+                new.name_expr.extend(ty.value);
+                new.name_type.extend(ty.ty);
+                new.name_method.extend(ty.method);
+                new.name_format_with.extend(ty.format_with);
                 return Ok(());
             }
 
@@ -649,7 +665,6 @@ layer! {
         skip: (),
         /// Field encoding to use.
         encoding: FieldEncoding,
-        @multiple
     }
 }
 
@@ -848,4 +863,112 @@ fn parse_mode(meta: &ParseNestedMeta<'_>) -> syn::Result<ModeIdent> {
     };
 
     Ok(ModeIdent { ident, kind })
+}
+
+#[derive(Clone, Default)]
+struct TypeConfig {
+    /// Either the inherent expression parameter, or the associated `expr = ..` value.
+    value: Option<(Span, syn::Expr)>,
+    /// The `type = ..` parameter.
+    ty: Option<(Span, syn::Type)>,
+    /// The `method = ".."` parameter`.
+    method: Option<(Span, NameMethod)>,
+    /// The `format_with = ..` parameter`.
+    format_with: Option<(Span, syn::Path)>,
+}
+
+impl TypeConfig {
+    fn parse(
+        name: &str,
+        input: ParseStream,
+        as_expr: bool,
+        format_with: bool,
+    ) -> syn::Result<Self> {
+        let mut this = Self::default();
+
+        if as_expr && input.parse::<Option<Token![=]>>()?.is_some() {
+            if let Some((s, _)) = this.value.replace((input.span(), input.parse()?)) {
+                return Err(syn::Error::new(
+                    s,
+                    format_args!("#[musli({name} = ..)]: Duplicate value for attribute"),
+                ));
+            }
+
+            return Ok(this);
+        }
+
+        let content;
+        _ = syn::parenthesized!(content in input);
+
+        while !content.is_empty() {
+            'ok: {
+                if let Some(ty) = content.parse::<Option<Token![type]>>()? {
+                    content.parse::<Token![=]>()?;
+
+                    if let Some((s, _)) = this.ty.replace((ty.span(), content.parse()?)) {
+                        return Err(syn::Error::new(
+                            s,
+                            format_args!("#[musli({name}(type = ..))]: Duplicate attribute"),
+                        ));
+                    }
+
+                    break 'ok;
+                }
+
+                let id = content.parse::<syn::Ident>()?;
+
+                if as_expr && id == "value" {
+                    content.parse::<Token![=]>()?;
+
+                    if let Some((s, _)) = this.value.replace((id.span(), content.parse()?)) {
+                        return Err(syn::Error::new(
+                            s,
+                            format_args!(
+                                "#[musli({name}(value = ..))]: Duplicate value for attribute"
+                            ),
+                        ));
+                    }
+
+                    break 'ok;
+                }
+
+                if id == "method" {
+                    content.parse::<Token![=]>()?;
+
+                    if let Some((s, _)) = this.method.replace((id.span(), content.parse()?)) {
+                        return Err(syn::Error::new(
+                            s,
+                            format_args!("#[musli({name}(method = ..))]: Duplicate attribute"),
+                        ));
+                    }
+
+                    break 'ok;
+                }
+
+                if format_with && id == "format_with" {
+                    content.parse::<Token![=]>()?;
+
+                    if let Some((s, _)) = this.format_with.replace((id.span(), content.parse()?)) {
+                        return Err(syn::Error::new(
+                            s,
+                            format_args!("#[musli({name}(format_with = ..))]: Duplicate attribute"),
+                        ));
+                    }
+
+                    break 'ok;
+                }
+
+                return Err(syn::Error::new_spanned(
+                    &id,
+                    format_args!("#[musli({name}({id} = ..))]: Unsupported attribute"),
+                ));
+            };
+
+            if content.parse::<Option<Token![,]>>()?.is_none() {
+                break;
+            }
+        }
+
+        Ok(this)
+    }
 }

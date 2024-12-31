@@ -67,7 +67,7 @@ use musli::{Encode, Decode};
 use musli::mode::Text;
 
 #[derive(Encode, Decode)]
-#[musli(mode = Text, name_type = usize)]
+#[musli(mode = Text, name(type = usize))]
 struct Person<'a> {
     name: &'a str,
     age: u32,
@@ -339,7 +339,7 @@ const _: () = assert!(!musli::is_bitwise_decode::<Struct>());
 
 <br>
 
-#### `#[musli(name_type = ..)]`
+#### `#[musli(name(type = <type>))]`
 
 This indicates which type any contained `#[musli(name = ..)]` attributes
 should have. Tags can usually be inferred, but specifying this field ensures
@@ -349,14 +349,14 @@ The following values are treated specially:
 * `str` applies `#[musli(name_all = "name")]` by default.
 * `[u8]` applies `#[musli(name_all = "name")]` by default.
 
-Apart from those two types, the `name_type` must be a sized type which
+Apart from those two types, the `name(type)` must be a sized type which
 implements [`Encode`] and [`Decode`].
 
 The default type depends on the mode in use:
 * [`Binary`] and any other custom mode uses indexed fields, the equivalent
-  of `#[musli(name_type = usize)]`.
+  of `#[musli(name(type = usize))]`.
 * [`Text`] uses literal text fields by their name, the equivalent of
-  `#[musli(name_type = str)]`.
+  `#[musli(name(type = str))]`.
 
 <br>
 
@@ -378,14 +378,14 @@ impl fmt::Display for CustomTag<'_> {
 }
 
 #[derive(Encode, Decode)]
-#[musli(name_type = CustomTag)]
+#[musli(name(type = CustomTag))]
 struct Struct {
     #[musli(name = CustomTag(b"name in bytes"))]
     name: String,
 }
 
 #[derive(Encode, Decode)]
-#[musli(name_type = CustomTag)]
+#[musli(name(type = CustomTag))]
 enum EnumWithCustomTag {
     #[musli(name = CustomTag(b"variant one"))]
     Variant1 {
@@ -396,16 +396,45 @@ enum EnumWithCustomTag {
 
 <br>
 
-#### `#[musli(name_method = ..)]`
+#### `#[musli(name(format_with = <path>))]`
+
+This indicates the method which should be used to format `#[musli(name = ..)]`
+attributes for diagnostics.
+
+This can be useful if the default [`Debug`] implementation might not be
+particularly helpful, one example is `#[musli(name(type = [u8]))]` which formats
+the value as an array of numbers. Here `#[musli(name(format_with = BStr::new))]`
+might be more helpful.
+
+##### Examples
+
+```rust
+use bstr::BStr;
+use musli::{Encode, Decode};
+
+#[derive(Encode, Decode)]
+#[musli(name(type = [u8], format_with = BStr::new))]
+struct StructBytesArray {
+    #[musli(name = b"field1")]
+    field1: u32,
+    #[musli(name = b"field2")]
+    field2: u32,
+}
+
+```
+
+<br>
+
+#### `#[musli(name(method = "method"))]`
 
 This allows for explicitly setting which method should be used to decode
 names. Available options are:
 
 * `"value"` (default) - the name is decoded as a value.
-* `"unsized"` - the name is decoded as an unsized value, this is the default
-  if for example `#[musli(name_type = str)]` is used.
+* `"unsized"` - the name is decoded as an unsized value, this is the default if
+  for example `#[musli(name(type = str))]` is used.
 * `"unsized_bytes"` - the name is decoded as a unsized bytes, this is the
-  default if for example `#[musli(name_type = [u8])]` is used.
+  default if for example `#[musli(name(type = [u8]))]` is used.
 
 This can be overrided for values which are unsized, but cannot be determined
 through heuristics. Such a type must also implement [`Decode`] (for
@@ -456,6 +485,11 @@ representation.
 
 The value of the attributes specifies the name of the tag to use for this.
 
+The `tag` attribute supports the same options such as `name`, which are:
+* `#[tag(value = ..)]` - Specify the value of the tag when list options are used.
+* `#[tag(type = ..)]` - Specify the type of the tag.
+* `#[tag(format_with = ..)]` - Specify how to format the tag for diagnostics.
+
 <br>
 
 ##### Using a string tag
@@ -482,6 +516,15 @@ representation.
 The value of the attributes specifies the name of the tag to use and the content
 where the data will be stored.
 
+The `tag` and `content` attributes support the same options such as `name`,
+which are:
+* `#[tag(value = ..)]` or `#[content(value = ..)]` - Specify the value of the
+  tag or content when list options are used.
+* `#[tag(type = ..)]` or `#[content(type = ..)]` - Specify the type of the tag
+  or content.
+* `#[tag(format_with = ..)]` or `#[content(format?with = ..)]` - Specify how to
+  format the tag or content for diagnostics.
+
 <br>
 
 ##### Using a string tag
@@ -497,6 +540,20 @@ enum Message {
 }
 ```
 
+##### Using a tag with custom formatting
+
+```rust
+use bstr::BStr;
+use musli::{Encode, Decode};
+
+#[derive(Encode, Decode)]
+#[musli(name_all = "name", tag(value = b"type", format_with = BStr::new), content(value = b"data", format_with = BStr::new))]
+enum Message {
+    Request { id: String, method: String },
+    Reply { id: String, body: Vec<u8> },
+}
+```
+
 <br>
 
 ##### Using numerical tagging
@@ -505,7 +562,7 @@ enum Message {
 use musli::{Encode, Decode};
 
 #[derive(Encode, Decode)]
-#[musli(name_all = "name", name_type = usize, tag = 10)]
+#[musli(name_all = "name", name(type = usize), tag = 10)]
 enum Message {
     #[musli(name = 1)]
     Request { id: String, method: String },
@@ -625,7 +682,7 @@ enum NamedEnum {
 
 <br>
 
-#### `#[musli(name_type = ..)]`
+#### `#[musli(name(type = <type>))]`
 
 This indicates which type any contained `#[musli(tag = ..)]` attributes
 should have. Tags can usually be inferred, but specifying this field ensures
@@ -655,9 +712,9 @@ impl fmt::Display for CustomTag<'_> {
 }
 
 #[derive(Encode, Decode)]
-#[musli(name_type = usize)]
+#[musli(name(type = usize))]
 enum Enum {
-    #[musli(name = 0usize, name_type = CustomTag)]
+    #[musli(name = 0usize, name(type = CustomTag))]
     Variant {
         #[musli(name = CustomTag(b"field1"))]
         field1: u32,
@@ -676,20 +733,82 @@ enum Enum {
 
 <br>
 
-#### `#[musli(name_method = ..)]`
+#### `#[musli(name(method = "method"))]`
 
 This allows for explicitly setting which method should be used to decode
 field names. Available options are:
 
 * `"value"` (default) - the name is decoded as a value.
-* `"unsized"` - the name is decoded as an unsized value, this is the default
-  if for example `#[musli(name_type = str)]` is used.
+* `"unsized"` - the name is decoded as an unsized value, this is the default if
+  for example `#[musli(name(type = str))]` is used.
 * `"unsized_bytes"` - the name is decoded as a unsized bytes, this is the
-  default if for example `#[musli(name_type = [u8])]` is used.
+  default if for example `#[musli(name(type = [u8]))]` is used.
 
 This can be overrided for values which are unsized, but cannot be determined
 through heuristics. Such a type must also implement [`Decode`] (for
 `"value"`), `DecodeUnsized`, or `DecodeUnsizedBytes` as appropriate.
+
+##### Examples
+
+```rust
+use bstr::BStr;
+use musli::{Encode, Decode};
+use musli::de::{Decoder, DecodeUnsized};
+
+use core::fmt;
+use core::ops::Deref;
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(name(type = UnsizedBytes, method = "unsized"))]
+pub struct StructWithUnsizedBytes {
+    #[musli(name = UnsizedBytes::new(&[1, 2, 3, 4]), pattern = UnsizedBytes([1, 2, 3, 4]))]
+    field1: u32,
+    #[musli(name = UnsizedBytes::new(&[2, 3, 4, 5]), pattern = UnsizedBytes([2, 3, 4, 5]))]
+    field2: u32,
+}
+
+#[derive(Encode)]
+#[repr(transparent)]
+#[musli(transparent)]
+struct UnsizedBytes(#[musli(bytes)] [u8]);
+
+impl<'de, M> DecodeUnsized<'de, M> for UnsizedBytes {
+    fn decode_unsized<D, F, O>(decoder: D, f: F) -> Result<O, D::Error>
+    where
+        D: Decoder<'de, Mode = M>,
+        F: FnOnce(&Self) -> Result<O, D::Error>,
+    {
+        decoder.decode_unsized_bytes(|bytes: &[u8]| f(UnsizedBytes::new(bytes)))
+    }
+}
+
+impl UnsizedBytes {
+    const fn new(data: &[u8]) -> &Self {
+        // SAFETY: `UnsizedBytes` is a transparent wrapper around `[u8]`.
+        unsafe { &*(data as *const [u8] as *const UnsizedBytes) }
+    }
+}
+
+impl Deref for UnsizedBytes {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl fmt::Display for UnsizedBytes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        BStr::new(&self.0).fmt(f)
+    }
+}
+
+impl fmt::Debug for UnsizedBytes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        BStr::new(&self.0).fmt(f)
+    }
+}
+```
 
 <br>
 
@@ -841,8 +960,8 @@ encoding, such as:
 * `#[musli(name = SomeStruct { field: 42 })]` (if `SomeStruct` implements
   [`Encode`] and [`Decode`] as appropriate).
 
-If the type of the tag is ambiguous it can be explicitly specified through
-the `#[musli(name_type)]` variant or container attributes.
+If the type of the tag is ambiguous it can be explicitly specified through the
+`#[musli(name(type))]` variant or container attributes.
 
 <br>
 
@@ -1155,9 +1274,9 @@ the same type.
 By default we implement two special modes, which each have subtly different
 default behaviors:
 * [`Binary`] and any other custom mode uses indexed fields, the equivalent of
-  `#[musli(name_type = usize)]`.
+  `#[musli(name(type = usize))]`.
 * [`Text`] uses literal text fields by their name, the equivalent of
-  `#[musli(name_type = str)]`.
+  `#[musli(name(type = str))]`.
 
 When it comes to deriving these traits you can scope attributes to apply to any
 mode including custom local ones. This is done using the `#[musli(mode = ..)]`
