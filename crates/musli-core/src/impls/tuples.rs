@@ -47,7 +47,7 @@ macro_rules! declare {
         {
             // It is harder to check that a tuple is packed, because we have to
             // ensure it doesn't contain any padding.
-            const ENCODE_PACKED: bool = false;
+            const IS_BITWISE_ENCODE: bool = false;
 
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -79,7 +79,7 @@ macro_rules! declare {
         {
             // It is harder to check that a tuple is packed, because we have to
             // ensure it doesn't contain any padding.
-            const DECODE_PACKED: bool = false;
+            const IS_BITWISE_DECODE: bool = false;
 
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>

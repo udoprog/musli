@@ -8,8 +8,7 @@ use crate::expander::{NameMethod, StructKind};
 use crate::internals::apply;
 use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
-use crate::internals::tokens::{Import, Tokens};
-use crate::internals::Result;
+use crate::internals::{Import, Only, Result, Tokens};
 
 struct Ctxt<'a> {
     ctx_var: &'a Ident,
@@ -24,13 +23,13 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     e.cx.reset();
 
     let ctx_var = e.cx.ident("ctx");
-    let root_decoder_var = e.cx.ident("decoder");
+    let decoder_var = e.cx.ident("decoder");
     let tag_var = e.cx.ident("tag");
     let d_param = e.cx.type_with_span("D", Span::call_site());
 
     let cx = Ctxt {
         ctx_var: &ctx_var,
-        decoder_var: &root_decoder_var,
+        decoder_var: &decoder_var,
         name_var: &tag_var,
         trace: true,
         trace_body: true,
@@ -40,7 +39,13 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let body = match &e.data {
         BuildData::Struct(st) => {
-            packed = crate::packed::packed(&e, st, e.tokens.decode_t, "DECODE_PACKED");
+            packed = crate::internals::packed(
+                &e,
+                st,
+                e.tokens.decode_t,
+                "IS_BITWISE_DECODE",
+                Only::Decode,
+            );
             decode_struct(&cx, &e, st)?
         }
         BuildData::Enum(en) => {
@@ -106,18 +111,18 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
             impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #type_generics
             #where_clause
             {
-                const DECODE_PACKED: bool = #packed;
+                const IS_BITWISE_DECODE: bool = #packed;
 
                 #[inline]
-                fn decode<#d_param>(#root_decoder_var: #d_param) -> #result<Self, <#d_param as #decoder_t<#lt>>::Error>
+                fn decode<#d_param>(#decoder_var: #d_param) -> #result<Self, <#d_param as #decoder_t<#lt>>::Error>
                 where
                     #d_param: #decoder_t<#lt, Mode = #mode_ident>,
                 {
-                    #decoder_t::cx(#root_decoder_var, |#ctx_var, #root_decoder_var| {
-                        let #root_decoder_var = match #decoder_t::try_fast_decode(#root_decoder_var)? {
+                    #decoder_t::cx(#decoder_var, |#ctx_var, #decoder_var| {
+                        let #decoder_var = match #decoder_t::try_fast_decode(#decoder_var)? {
                             #try_fast_decode::Ok(value) => return #result::Ok(value),
-                            #try_fast_decode::Unsupported(#root_decoder_var) => #root_decoder_var,
-                            _ => return #result::Err(#context_t::message(#ctx_var, "fast decoding failed")),
+                            #try_fast_decode::Unsupported(#decoder_var) => #decoder_var,
+                            _ => return #result::Err(#context_t::message(#ctx_var, "Fast decoding failed")),
                         };
 
                         #body
@@ -133,7 +138,7 @@ fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
 
     let body = match (st.kind, st.packing) {
         (_, Packing::Transparent) => decode_transparent(cx, b, st)?,
-        (_, Packing::Packed(..)) => decode_packed(cx, b, st)?,
+        (_, Packing::Packed) => decode_packed(cx, b, st)?,
         (StructKind::Empty, _) => decode_empty(cx, b, st)?,
         (_, Packing::Tagged) => decode_tagged(cx, b, st, None)?,
     };
@@ -165,7 +170,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
         ..
     } = b.tokens;
 
-    if let Some(&(span, Packing::Packed(..))) = en.packing_span {
+    if let Some(&(span, Packing::Packed)) = en.packing_span {
         b.decode_packed_enum_diagnostics(span);
         return Err(());
     }
@@ -749,7 +754,7 @@ fn decode_variant(
 
     Ok(match (v.st.kind, v.st.packing) {
         (_, Packing::Transparent) => decode_transparent(&cx, b, &v.st)?,
-        (_, Packing::Packed(..)) => decode_packed(&cx, b, &v.st)?,
+        (_, Packing::Packed) => decode_packed(&cx, b, &v.st)?,
         (StructKind::Empty, _) => decode_empty(&cx, b, &v.st)?,
         (_, Packing::Tagged) => decode_tagged(&cx, b, &v.st, Some(variant_tag))?,
     })

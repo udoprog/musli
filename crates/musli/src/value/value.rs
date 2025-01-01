@@ -158,7 +158,7 @@ from!(f32, F32);
 from!(f64, F64);
 
 impl<M> Encode<M> for Number {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -381,7 +381,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 }
 
 impl<'de, M> Decode<'de, M> for Value {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -446,7 +446,7 @@ where
 }
 
 impl<M> Encode<M> for Value {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 

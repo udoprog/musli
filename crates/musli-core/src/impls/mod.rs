@@ -32,7 +32,7 @@ enum PlatformTag {
 
 impl<M> Encode<M> for () {
     // Unit is always packed, since it is a ZST.
-    const ENCODE_PACKED: bool = true;
+    const IS_BITWISE_ENCODE: bool = true;
 
     type Encode = Self;
 
@@ -52,7 +52,7 @@ impl<M> Encode<M> for () {
 
 impl<'de, M> Decode<'de, M> for () {
     // Unit is always packed, since it is a ZST.
-    const DECODE_PACKED: bool = true;
+    const IS_BITWISE_DECODE: bool = true;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -65,7 +65,7 @@ impl<'de, M> Decode<'de, M> for () {
 
 impl<T, M> Encode<M> for marker::PhantomData<T> {
     // PhantomData is always packed, since it is a ZST.
-    const ENCODE_PACKED: bool = true;
+    const IS_BITWISE_ENCODE: bool = true;
 
     type Encode = Self;
 
@@ -85,7 +85,7 @@ impl<T, M> Encode<M> for marker::PhantomData<T> {
 
 impl<'de, M, T> Decode<'de, M> for marker::PhantomData<T> {
     // PhantomData is always packed, since it is a ZST.
-    const DECODE_PACKED: bool = true;
+    const IS_BITWISE_DECODE: bool = true;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -102,7 +102,7 @@ macro_rules! atomic_impl {
         $(
             #[cfg(target_has_atomic = $size)]
             impl<'de, M> Decode<'de, M> for core::sync::atomic::$ty {
-                const DECODE_PACKED: bool = true;
+                const IS_BITWISE_DECODE: bool = true;
 
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
                 where
@@ -124,7 +124,7 @@ atomic_impl!("ptr", AtomicIsize, AtomicUsize);
 macro_rules! non_zero {
     ($ty:ty) => {
         impl<M> Encode<M> for $ty {
-            const ENCODE_PACKED: bool = true;
+            const IS_BITWISE_ENCODE: bool = true;
 
             type Encode = Self;
 
@@ -145,7 +145,7 @@ macro_rules! non_zero {
         impl<'de, M> Decode<'de, M> for $ty {
             // Non zero types are not considered packed during decoding, because
             // they cannot inhabit the bit pattern of all zeros.
-            const DECODE_PACKED: bool = false;
+            const IS_BITWISE_DECODE: bool = false;
 
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
@@ -202,8 +202,8 @@ impl<M, T, const N: usize> Encode<M> for [T; N]
 where
     T: Encode<M>,
 {
-    const ENCODE_PACKED: bool =
-        T::ENCODE_PACKED && core::mem::size_of::<T>() % core::mem::align_of::<T>() == 0;
+    const IS_BITWISE_ENCODE: bool =
+        T::IS_BITWISE_ENCODE && core::mem::size_of::<T>() % core::mem::align_of::<T>() == 0;
 
     type Encode = [T; N];
 
@@ -225,8 +225,8 @@ impl<'de, M, T, const N: usize> Decode<'de, M> for [T; N]
 where
     T: Decode<'de, M>,
 {
-    const DECODE_PACKED: bool =
-        T::DECODE_PACKED && core::mem::size_of::<T>() % core::mem::align_of::<T>() == 0;
+    const IS_BITWISE_DECODE: bool =
+        T::IS_BITWISE_DECODE && core::mem::size_of::<T>() % core::mem::align_of::<T>() == 0;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -305,7 +305,7 @@ where
 macro_rules! impl_number {
     ($ty:ty, $read:ident, $write:ident) => {
         impl<M> Encode<M> for $ty {
-            const ENCODE_PACKED: bool = true;
+            const IS_BITWISE_ENCODE: bool = true;
 
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -324,7 +324,7 @@ macro_rules! impl_number {
         }
 
         impl<'de, M> Decode<'de, M> for $ty {
-            const DECODE_PACKED: bool = true;
+            const IS_BITWISE_DECODE: bool = true;
 
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -340,7 +340,7 @@ macro_rules! impl_number {
 impl<M> Encode<M> for bool {
     // A boolean is packed since it's guaranteed to inhabit a valid bit pattern
     // of one byte without padding.
-    const ENCODE_PACKED: bool = true;
+    const IS_BITWISE_ENCODE: bool = true;
 
     type Encode = Self;
 
@@ -361,7 +361,7 @@ impl<M> Encode<M> for bool {
 impl<'de, M> Decode<'de, M> for bool {
     // A boolean is not packed during decoding since every bit pattern that
     // comes in is not necessarily valid.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -375,7 +375,7 @@ impl<'de, M> Decode<'de, M> for bool {
 impl<M> Encode<M> for char {
     // A char is packed since it's guaranteed to inhabit a valid bit pattern of
     // a u32 and can be bitwise copied when encoded.
-    const ENCODE_PACKED: bool = true;
+    const IS_BITWISE_ENCODE: bool = true;
 
     type Encode = Self;
 
@@ -396,7 +396,7 @@ impl<M> Encode<M> for char {
 impl<'de, M> Decode<'de, M> for char {
     // A char is not packed during decoding since it's not guaranteed to inhabit
     // a valid bit pattern of a u32 and can not be bitwise copied when encoded.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -423,7 +423,7 @@ impl_number!(f32, decode_f32, encode_f32);
 impl_number!(f64, decode_f64, encode_f64);
 
 impl<M> Encode<M> for str {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -441,7 +441,7 @@ impl<M> Encode<M> for str {
 }
 
 impl<'de, M> Decode<'de, M> for &'de str {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -537,7 +537,7 @@ impl<M, T> Encode<M> for [T]
 where
     T: Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -556,7 +556,7 @@ where
 }
 
 impl<'de, M> Decode<'de, M> for &'de [u8] {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -621,7 +621,7 @@ impl<T, M> Encode<M> for Option<T>
 where
     T: Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -646,7 +646,7 @@ impl<'de, M, T> Decode<'de, M> for Option<T>
 where
     T: Decode<'de, M>,
 {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -674,7 +674,7 @@ where
     U: Encode<M>,
     ResultTag: Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -703,7 +703,7 @@ where
     U: Decode<'de, M>,
     ResultTag: Decode<'de, M>,
 {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -725,7 +725,7 @@ impl<T, M> Encode<M> for Wrapping<T>
 where
     T: Encode<M>,
 {
-    const ENCODE_PACKED: bool = T::ENCODE_PACKED;
+    const IS_BITWISE_ENCODE: bool = T::IS_BITWISE_ENCODE;
 
     type Encode = Self;
 
@@ -747,7 +747,7 @@ impl<'de, M, T> Decode<'de, M> for Wrapping<T>
 where
     T: Decode<'de, M>,
 {
-    const DECODE_PACKED: bool = T::DECODE_PACKED;
+    const IS_BITWISE_DECODE: bool = T::IS_BITWISE_DECODE;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -759,7 +759,7 @@ where
 }
 
 impl<M> Encode<M> for CStr {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -778,7 +778,7 @@ impl<M> Encode<M> for CStr {
 }
 
 impl<'de, M> Decode<'de, M> for &'de CStr {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>

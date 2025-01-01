@@ -268,7 +268,7 @@ impl fmt::Debug for Tag {
 
 impl<'de, M> Decode<'de, M> for Tag {
     // Every bit pattern is valid for a tag.
-    const DECODE_PACKED: bool = true;
+    const IS_BITWISE_DECODE: bool = true;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>

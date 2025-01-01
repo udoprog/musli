@@ -343,6 +343,14 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx_mut<F, O>(&mut self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, &mut Self) -> O,
+    {
+        f(self.cx, self)
+    }
+
+    #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, &mut self.buffer))
     }
@@ -367,6 +375,14 @@ where
         = SelfEncoder<'a, W::Mut<'this>, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx_mut<F, O>(&mut self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, &mut Self) -> O,
+    {
+        f(self.cx, self)
+    }
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {

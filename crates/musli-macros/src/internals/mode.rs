@@ -32,12 +32,12 @@ impl ToTokens for ModePath<'_> {
     }
 }
 
-pub(crate) struct Method<'a>(Import<'a>, ModePath<'a>, &'static str);
+pub(crate) struct ImportedMethod<'a>(Import<'a>, ModePath<'a>, &'static str);
 
-impl ToTokens for Method<'_> {
+impl ToTokens for ImportedMethod<'_> {
     #[inline]
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let Method(import, mode_path, name) = *self;
+        let ImportedMethod(import, mode_path, name) = *self;
 
         import.to_tokens(tokens);
         <Token![::]>::default().to_tokens(tokens);
@@ -66,7 +66,7 @@ pub(crate) struct Mode<'a> {
 
 impl<'a> Mode<'a> {
     /// Construct a typed encode call.
-    pub(crate) fn encode_t_encode(&self, encoding: FieldEncoding) -> Method<'a> {
+    pub(crate) fn encode_t_encode(&self, encoding: FieldEncoding) -> ImportedMethod<'a> {
         let (encode_t, name) = match encoding {
             FieldEncoding::Packed => (self.encode_packed_t, "encode_packed"),
             FieldEncoding::Bytes => (self.encode_bytes_t, "encode_bytes"),
@@ -74,11 +74,11 @@ impl<'a> Mode<'a> {
             FieldEncoding::Default => (self.encode_t, "encode"),
         };
 
-        Method(encode_t, self.mode_path, name)
+        ImportedMethod(encode_t, self.mode_path, name)
     }
 
     /// Construct a typed decode call.
-    pub(crate) fn decode_t_decode(&self, encoding: FieldEncoding) -> Method<'a> {
+    pub(crate) fn decode_t_decode(&self, encoding: FieldEncoding) -> ImportedMethod<'a> {
         let (decode_t, name) = match encoding {
             FieldEncoding::Packed => (self.decode_packed_t, "decode_packed"),
             FieldEncoding::Bytes => (self.decode_bytes_t, "decode_bytes"),
@@ -86,6 +86,6 @@ impl<'a> Mode<'a> {
             FieldEncoding::Default => (self.decode_t, "decode"),
         };
 
-        Method(decode_t, self.mode_path, name)
+        ImportedMethod(decode_t, self.mode_path, name)
     }
 }

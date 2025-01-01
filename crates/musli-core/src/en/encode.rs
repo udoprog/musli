@@ -53,7 +53,7 @@ pub trait Encode<M> {
     ///
     /// This being set to `true` also implies that the type is `Copy`, and must
     /// not have a `Drop` implementation.
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     /// The underlying type being encoded.
     ///
@@ -73,7 +73,7 @@ impl<T, M> Encode<M> for &T
 where
     T: ?Sized + Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -95,7 +95,7 @@ impl<T, M> Encode<M> for &mut T
 where
     T: ?Sized + Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>

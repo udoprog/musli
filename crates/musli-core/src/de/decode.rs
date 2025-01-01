@@ -48,7 +48,7 @@ pub trait Decode<'de, M>: Sized {
     ///
     /// This being set to `true` also implies that the type is `Copy`, and must
     /// not have a `Drop` implementation.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     /// Decode the given input.
     fn decode<D>(decoder: D) -> Result<Self, D::Error>

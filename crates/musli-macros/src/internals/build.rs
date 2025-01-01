@@ -10,12 +10,11 @@ use crate::expander::{
     UnsizedMethod, VariantData,
 };
 
-use super::attr::{EnumTagging, FieldEncoding, MethodOrPath, ModeKind, Packing};
-use super::mode::Method;
+use super::attr::{DefaultOrCustom, EnumTagging, FieldEncoding, ModeKind, Packing};
+use super::mode::ImportedMethod;
 use super::name::NameAll;
-use super::tokens::Tokens;
 use super::ATTR;
-use super::{Ctxt, Expansion, Mode, Only, Result};
+use super::{Ctxt, Expansion, Mode, Only, Result, Tokens};
 
 pub(crate) struct Build<'a> {
     pub(crate) input: &'a syn::DeriveInput,
@@ -25,8 +24,8 @@ pub(crate) struct Build<'a> {
     pub(crate) decode_bounds: &'a [(Span, syn::WherePredicate)],
     pub(crate) expansion: Expansion<'a>,
     pub(crate) data: BuildData<'a>,
-    pub(crate) decode_t_decode: Method<'a>,
-    pub(crate) encode_t_encode: Method<'a>,
+    pub(crate) decode_t_decode: ImportedMethod<'a>,
+    pub(crate) encode_t_encode: ImportedMethod<'a>,
     pub(crate) enum_tagging_span: Option<Span>,
 }
 
@@ -137,8 +136,8 @@ pub(crate) struct Variant<'a> {
 pub(crate) struct Field<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
-    pub(crate) encode_path: (Span, MethodOrPath<'a>),
-    pub(crate) decode_path: (Span, MethodOrPath<'a>),
+    pub(crate) encode_path: (Span, DefaultOrCustom<'a>),
+    pub(crate) decode_path: (Span, DefaultOrCustom<'a>),
     pub(crate) name: syn::Expr,
     pub(crate) pattern: Option<&'a syn::Pat>,
     /// Skip field entirely and always initialize with the specified expresion,
@@ -178,6 +177,9 @@ pub(crate) fn setup<'a>(
         return Err(());
     }
 
+    let decode_t_decode = mode.decode_t_decode(FieldEncoding::Default);
+    let encode_t_encode = mode.encode_t_encode(FieldEncoding::Default);
+
     Ok(Build {
         input: e.input,
         cx: &e.cx,
@@ -186,8 +188,8 @@ pub(crate) fn setup<'a>(
         decode_bounds: e.type_attr.decode_bounds(mode),
         expansion,
         data,
-        decode_t_decode: mode.decode_t_decode(FieldEncoding::Default),
-        encode_t_encode: mode.encode_t_encode(FieldEncoding::Default),
+        decode_t_decode,
+        encode_t_encode,
         enum_tagging_span: e.type_attr.enum_tagging_span(mode),
     })
 }
@@ -270,7 +272,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a EnumData<'a>) -> En
     if !matches!(enum_tagging, EnumTagging::Default | EnumTagging::Empty) {
         match packing_span {
             Some((_, Packing::Tagged)) => (),
-            Some(&(span, Packing::Packed(..))) => {
+            Some(&(span, Packing::Packed)) => {
                 e.cx.error_span(span, format_args!("#[{ATTR}(packed)] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
             }
             Some(&(span, Packing::Transparent)) => {

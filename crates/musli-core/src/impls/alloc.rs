@@ -36,7 +36,7 @@ use crate::Context;
 use super::PlatformTag;
 
 impl<M> Encode<M> for String {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = str;
 
@@ -55,7 +55,7 @@ impl<M> Encode<M> for String {
 }
 
 impl<'de, M> Decode<'de, M> for String {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -96,7 +96,7 @@ impl<'de, M> Decode<'de, M> for String {
 }
 
 impl<'de, M> Decode<'de, M> for Box<str> {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -111,7 +111,7 @@ impl<'de, M, T> Decode<'de, M> for Box<[T]>
 where
     T: Decode<'de, M>,
 {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -213,8 +213,8 @@ cow! {
     Encode::encode,
     as_encode,
     Decode::decode,
-    ENCODE_PACKED,
-    DECODE_PACKED,
+    IS_BITWISE_ENCODE,
+    IS_BITWISE_DECODE,
     str, str, decode_string, _,
     |owned| Cow::Owned(owned),
     |borrowed| Cow::Borrowed(borrowed),
@@ -225,8 +225,8 @@ cow! {
     Encode::encode,
     as_encode,
     Decode::decode,
-    ENCODE_PACKED,
-    DECODE_PACKED,
+    IS_BITWISE_ENCODE,
+    IS_BITWISE_DECODE,
     CStr, [u8], decode_bytes, cx,
     |owned| Cow::Owned(CString::from_vec_with_nul(owned).map_err(cx.map())?),
     |borrowed| Cow::Borrowed(CStr::from_bytes_with_nul(borrowed).map_err(cx.map())?),
@@ -259,7 +259,7 @@ macro_rules! slice_sequence {
             T: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            const ENCODE_PACKED: bool = false;
+            const IS_BITWISE_ENCODE: bool = false;
 
             type Encode = Self;
 
@@ -283,7 +283,7 @@ macro_rules! slice_sequence {
             T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            const DECODE_PACKED: bool = false;
+            const IS_BITWISE_DECODE: bool = false;
 
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -358,19 +358,8 @@ macro_rules! slice_sequence {
             where
                 E: Encoder<Mode = M>,
             {
-                encoder.cx(|cx, encoder| {
-                    encoder.encode_pack_fn(|pack| {
-                        let mut index = 0;
-
-                        for value in self {
-                            cx.enter_sequence_index(index);
-                            pack.push(value)?;
-                            cx.leave_sequence_index();
-                            index = index.wrapping_add(1);
-                        }
-
-                        Ok(())
-                    })
+                encoder.encode_pack_fn(|pack| {
+                    pack.encode_slice(self)
                 })
             }
         }
@@ -392,7 +381,7 @@ macro_rules! sequence {
             T: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            const ENCODE_PACKED: bool = false;
+            const IS_BITWISE_ENCODE: bool = false;
 
             type Encode = Self;
 
@@ -431,7 +420,7 @@ macro_rules! sequence {
             T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            const DECODE_PACKED: bool = false;
+            const IS_BITWISE_DECODE: bool = false;
 
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -528,7 +517,7 @@ macro_rules! map {
             V: Encode<M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            const ENCODE_PACKED: bool = false;
+            const IS_BITWISE_ENCODE: bool = false;
 
             type Encode = Self;
 
@@ -593,7 +582,7 @@ macro_rules! map {
             V: Decode<'de, M>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
-            const DECODE_PACKED: bool = false;
+            const IS_BITWISE_DECODE: bool = false;
 
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -656,7 +645,7 @@ map!(
 );
 
 impl<M> Encode<M> for CString {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = CStr;
 
@@ -675,7 +664,7 @@ impl<M> Encode<M> for CString {
 }
 
 impl<'de, M> Decode<'de, M> for CString {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -724,7 +713,7 @@ macro_rules! smart_pointer {
             where
                 T: ?Sized + Encode<M>,
             {
-                const ENCODE_PACKED: bool = false;
+                const IS_BITWISE_ENCODE: bool = false;
 
                 type Encode = T;
 
@@ -746,7 +735,7 @@ macro_rules! smart_pointer {
             where
                 T: Decode<'de, M>,
             {
-                const DECODE_PACKED: bool = false;
+                const IS_BITWISE_DECODE: bool = false;
 
                 #[inline]
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -770,7 +759,7 @@ macro_rules! smart_pointer {
             }
 
             impl<'de, M> Decode<'de, M> for $ty<CStr> {
-                const DECODE_PACKED: bool = false;
+                const IS_BITWISE_DECODE: bool = false;
 
                 #[inline]
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -784,7 +773,7 @@ macro_rules! smart_pointer {
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
             impl<'de, M> Decode<'de, M> for $ty<Path> where PlatformTag: Decode<'de, M> {
-                const DECODE_PACKED: bool = false;
+                const IS_BITWISE_DECODE: bool = false;
 
                 #[inline]
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -798,7 +787,7 @@ macro_rules! smart_pointer {
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
             impl<'de, M> Decode<'de, M> for $ty<OsStr> where PlatformTag: Decode<'de, M> {
-                const DECODE_PACKED: bool = false;
+                const IS_BITWISE_DECODE: bool = false;
 
                 #[inline]
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -820,7 +809,7 @@ impl<M> Encode<M> for OsStr
 where
     PlatformTag: Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -896,7 +885,7 @@ impl<M> Encode<M> for OsString
 where
     PlatformTag: Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = OsStr;
 
@@ -920,7 +909,7 @@ impl<'de, M> Decode<'de, M> for OsString
 where
     PlatformTag: Decode<'de, M>,
 {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -992,7 +981,7 @@ impl<M> Encode<M> for Path
 where
     PlatformTag: Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -1016,7 +1005,7 @@ impl<M> Encode<M> for PathBuf
 where
     PlatformTag: Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -1040,7 +1029,7 @@ impl<'de, M> Decode<'de, M> for PathBuf
 where
     PlatformTag: Decode<'de, M>,
 {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>

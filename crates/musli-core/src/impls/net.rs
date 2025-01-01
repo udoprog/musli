@@ -25,7 +25,7 @@ enum SocketAddrTag {
 impl Encode<Binary> for Ipv4Addr {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -46,7 +46,7 @@ impl Encode<Binary> for Ipv4Addr {
 impl Encode<Text> for Ipv4Addr {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -67,7 +67,7 @@ impl Encode<Text> for Ipv4Addr {
 impl<'de> Decode<'de, Binary> for Ipv4Addr {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -81,7 +81,7 @@ impl<'de> Decode<'de, Binary> for Ipv4Addr {
 impl<'de> Decode<'de, Text> for Ipv4Addr {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -97,7 +97,7 @@ impl<'de> Decode<'de, Text> for Ipv4Addr {
 impl Encode<Binary> for Ipv6Addr {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -118,7 +118,7 @@ impl Encode<Binary> for Ipv6Addr {
 impl Encode<Text> for Ipv6Addr {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -139,7 +139,7 @@ impl Encode<Text> for Ipv6Addr {
 impl<'de> Decode<'de, Binary> for Ipv6Addr {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -153,7 +153,7 @@ impl<'de> Decode<'de, Binary> for Ipv6Addr {
 impl<'de> Decode<'de, Text> for Ipv6Addr {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -172,7 +172,7 @@ where
     Ipv4Addr: Encode<M>,
     Ipv6Addr: Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -201,7 +201,7 @@ where
     Ipv4Addr: Decode<'de, M>,
     Ipv6Addr: Decode<'de, M>,
 {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -222,7 +222,7 @@ where
 impl Encode<Binary> for SocketAddrV4 {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -247,7 +247,7 @@ impl Encode<Binary> for SocketAddrV4 {
 impl Encode<Text> for SocketAddrV4 {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -268,7 +268,7 @@ impl Encode<Text> for SocketAddrV4 {
 impl<'de> Decode<'de, Binary> for SocketAddrV4 {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -282,7 +282,7 @@ impl<'de> Decode<'de, Binary> for SocketAddrV4 {
 impl<'de> Decode<'de, Text> for SocketAddrV4 {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -298,7 +298,7 @@ impl<'de> Decode<'de, Text> for SocketAddrV4 {
 impl Encode<Binary> for SocketAddrV6 {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -325,7 +325,7 @@ impl Encode<Binary> for SocketAddrV6 {
 impl Encode<Text> for SocketAddrV6 {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
 
@@ -346,7 +346,7 @@ impl Encode<Text> for SocketAddrV6 {
 impl<'de> Decode<'de, Binary> for SocketAddrV6 {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -360,7 +360,7 @@ impl<'de> Decode<'de, Binary> for SocketAddrV6 {
 impl<'de> Decode<'de, Text> for SocketAddrV6 {
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -379,7 +379,7 @@ where
     SocketAddrV4: Encode<M>,
     SocketAddrV6: Encode<M>,
 {
-    const ENCODE_PACKED: bool = false;
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -408,7 +408,7 @@ where
     SocketAddrV4: Decode<'de, M>,
     SocketAddrV6: Decode<'de, M>,
 {
-    const DECODE_PACKED: bool = false;
+    const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>

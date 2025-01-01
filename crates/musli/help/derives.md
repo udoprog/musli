@@ -244,19 +244,37 @@ Ok::<_, musli::wire::Error>(())
 #### `#[musli(packed)]`
 
 This attribute will disable all *tagging* and the structure will simply be
-encoded with one field following another in the order in which they are
-defined.
+encoded with one field following another in the order in which they are defined.
 
-A caveat of *packed* structures is that they cannot be safely versioned and
-the two systems communicating through them need to be using strictly
-synchronized representations.
+A caveat of *packed* structures is that they cannot be safely versioned and the
+two systems communicating through them need to be using strictly synchronized
+representations.
 
-This attribute is useful for performing simple decoding over "raw" bytes
-when combined with an encoder which does minimal prefixing and packs fields.
+This attribute is useful for performing simple decoding over "raw" bytes when
+combined with an encoder which does minimal prefixing and packs fields.
+
+##### Bitwise optimizations
+
+If a struct is tagged with `#[musli(packed)]`, and the bitwise pattern of a
+given serialization is *identical* to the bitwise memory pattern of the struct,
+then serialization and deserialization can be made more efficient.
+
+Note that since [`#[repr(Rust)]`][repr-rust] is not strictly defined, it might
+be necessary to mark the struct with `#[repr(C)]` to benefit from this
+optimization. But this has no safety implications.
+
+If the bitwise optimizations does not work. You can test if bitwise
+optimizations are possible through [`musli::is_bitwise_encode`] and
+[`musli::is_bitwise_decode`].
+
+Bitwise optimizations are disabled if:
+* Any of the field uses a custom encoding method through for example
+  [`#[musli(with = <path>)]`](#musliwith--path).
+* If the type implements `Drop`.
 
 <br>
 
-##### Examples
+##### Packed struct
 
 ```rust
 use musli::{Encode, Decode};
@@ -265,48 +283,27 @@ use musli::{Encode, Decode};
 #[musli(packed)]
 struct Struct {
     field1: u32,
-    field2: u32,
-    field3: u32,
+    field2: u64,
 }
 
 let data = musli::storage::to_vec(&Struct {
     field1: 1,
     field2: 2,
-    field3: 3,
 })?;
 
-assert_eq!(data.as_slice(), [1, 2, 3]);
+assert_eq!(data.as_slice(), [1, 2]);
 Ok::<_, musli::storage::Error>(())
 ```
 
 <br>
 
-#### `#[musli(bitwise)]`
-
-This attribute has the same requirements as `#[musli(packed)]` and also
-requires every field to implement `Encode` or `Decode`. It is also only
-supported on structs.
-
-If a struct is tagged with `#[musli(bitwise)]`, and the bitwise pattern of a
-given serialization is *identical* to the bitwise memory pattern of the
-struct, then serialization and deserialization can be made more efficient.
-
-Note that since [`#[repr(Rust)]`][repr-rust] is not strictly defined, it
-might be necessary to mark the struct with `#[repr(C)]` to benefit from this
-optimization.
-
-If the `#[musli(bitwise)]` optimization doesn't work, it will either have no
-effect or cause a compilation error.
-
-<br>
-
-##### Examples
+##### Bitwise encoded fields
 
 ```rust
 use musli::{Encode, Decode};
 
 #[derive(Encode, Decode)]
-#[musli(bitwise)]
+#[musli(packed)]
 struct Struct {
     a: u32,
     b: u32,
@@ -317,15 +314,15 @@ const _: () = assert!(musli::is_bitwise_decode::<Struct>());
 ```
 
 Note that some combinations of fields currently only support encoding in one
-direction. This is the case for `NonZero` types, since they cannot inhabit
-all possible bit patterns.
+direction. This is the case for `NonZero` types, since they cannot inhabit all
+possible bit patterns.
 
 ```rust
 use core::num::NonZero;
 use musli::{Encode, Decode};
 
 #[derive(Encode, Decode)]
-#[musli(bitwise)]
+#[musli(packed)]
 struct Struct {
     a: NonZero<u32>,
     b: u32,
@@ -335,7 +332,43 @@ const _: () = assert!(musli::is_bitwise_encode::<Struct>());
 const _: () = assert!(!musli::is_bitwise_decode::<Struct>());
 ```
 
-[repr-rust]: <https://doc.rust-lang.org/nomicon/repr-rust.html>
+Bitwise optimizations are disabled if custom encoding is specified:
+
+```rust
+use musli::{Encode, Decode};
+
+#[derive(Encode, Decode)]
+#[musli(packed)]
+struct Struct {
+    a: u32,
+    #[musli(with = musli::serde)]
+    b: u32,
+}
+
+const _: () = assert!(!musli::is_bitwise_encode::<Struct>());
+const _: () = assert!(!musli::is_bitwise_decode::<Struct>());
+```
+
+Bitwise optimizations are disabled if the type implements [`Drop`]:
+
+```rust
+use musli::{Encode, Decode};
+
+#[derive(Encode, Decode)]
+#[musli(packed)]
+struct Struct {
+    a: u32,
+    b: u32,
+}
+
+const _: () = assert!(!musli::is_bitwise_encode::<Struct>());
+const _: () = assert!(!musli::is_bitwise_decode::<Struct>());
+
+impl Drop for Struct {
+    fn drop(&mut self) {
+    }
+}
+```
 
 <br>
 
@@ -427,8 +460,8 @@ struct StructBytesArray {
 
 #### `#[musli(name(method = "sized" | "unsized" | "unsized_bytes"))]`
 
-This allows for explicitly setting which method should be used to decode
-names. Available options are:
+This allows for explicitly setting which method should be used to decode names.
+Available options are:
 
 * `"sized"` (default) - decode as a sized value.
 * `"unsized"` - the name is decoded as an unsized value, this is the default if
@@ -1416,11 +1449,15 @@ which decoder implementation to call.
 [`Decoder::decode_variant`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html#method.decode_variant>
 [`Decoder`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html>
 [`DecodeTrace`]: <https://docs.rs/musli/latest/musli/trait.DecodeTrace.html>
+[`Drop`]: <https://doc.rust-lang.org/std/ops/trait.Drop.html>
 [`Encode`]: <https://docs.rs/musli/latest/musli/trait.Encode.html>
 [`EncodeBytes`]: <https://docs.rs/musli/latest/musli/en/trait.EncodeBytes.html>
 [`EncodePacked`]: <https://docs.rs/musli/latest/musli/en/trait.EncodePacked.html>
 [`Encoder::encode_variant`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html#method.encode_variant>
 [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
 [`EncodeTrace`]: <https://docs.rs/musli/latest/musli/en/trait.EncodeTrace.html>
+[`musli::is_bitwise_decode`]: https://docs.rs/musli/latest/musli/fn.is_bitwise_decode.html
+[`musli::is_bitwise_encode`]: https://docs.rs/musli/latest/musli/fn.is_bitwise_encode.html
 [`Text`]: <https://docs.rs/musli/latest/musli/mode/enum.Text.html>
 [default mode]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
+[repr-rust]: <https://doc.rust-lang.org/nomicon/repr-rust.html>

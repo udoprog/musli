@@ -389,6 +389,14 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx_mut<F, O>(&mut self, _: F) -> O
+    where
+        F: FnOnce(&Self::Cx, &mut Self) -> O,
+    {
+        match self._never {}
+    }
+
+    #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         match self._never {}
     }

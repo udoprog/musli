@@ -2,19 +2,18 @@
 
 use core::num::NonZero;
 
-use musli::mode::Binary;
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Decode, Encode)]
-#[musli(bitwise)]
+#[musli(packed)]
 #[repr(C)]
 struct BitwiseTuple(u32, u32, ());
 
-const _: () = assert!(<BitwiseTuple as Encode<Binary>>::ENCODE_PACKED);
-const _: () = assert!(<BitwiseTuple as Decode<Binary>>::DECODE_PACKED);
+const _: () = assert!(musli::is_bitwise_encode::<BitwiseTuple>());
+const _: () = assert!(musli::is_bitwise_decode::<BitwiseTuple>());
 
 #[derive(Debug, PartialEq, Decode, Encode)]
-#[musli(bitwise)]
+#[musli(packed)]
 #[repr(C)]
 struct Bitwise {
     a: u32,
@@ -22,54 +21,54 @@ struct Bitwise {
     pad: (),
 }
 
-const _: () = assert!(<Bitwise as Encode<Binary>>::ENCODE_PACKED);
-const _: () = assert!(<Bitwise as Decode<Binary>>::DECODE_PACKED);
+const _: () = assert!(musli::is_bitwise_encode::<Bitwise>());
+const _: () = assert!(musli::is_bitwise_decode::<Bitwise>());
 
 #[derive(Debug, PartialEq, Decode, Encode)]
-#[musli(bitwise)]
+#[musli(packed)]
 struct Zst {}
 
-const _: () = assert!(<Zst as Encode<Binary>>::ENCODE_PACKED);
-const _: () = assert!(<Zst as Decode<Binary>>::DECODE_PACKED);
+const _: () = assert!(musli::is_bitwise_encode::<Zst>());
+const _: () = assert!(musli::is_bitwise_decode::<Zst>());
 
 #[derive(Debug, PartialEq, Decode, Encode)]
-#[musli(bitwise)]
+#[musli(packed)]
 struct Zst2 {
     a: (),
 }
 
-const _: () = assert!(<Zst2 as Encode<Binary>>::ENCODE_PACKED);
-const _: () = assert!(<Zst2 as Decode<Binary>>::DECODE_PACKED);
+const _: () = assert!(musli::is_bitwise_encode::<Zst2>());
+const _: () = assert!(musli::is_bitwise_decode::<Zst2>());
 
 #[derive(Debug, PartialEq, Decode, Encode)]
-#[musli(bitwise)]
+#[musli(packed)]
 #[repr(C)]
 struct NotBitwise {
     a: u32,
     b: u16,
 }
 
-const _: () = assert!(!<NotBitwise as Encode<Binary>>::ENCODE_PACKED);
-const _: () = assert!(!<NotBitwise as Decode<Binary>>::DECODE_PACKED);
+const _: () = assert!(!musli::is_bitwise_encode::<NotBitwise>());
+const _: () = assert!(!musli::is_bitwise_decode::<NotBitwise>());
 
 #[derive(Debug, PartialEq, Decode, Encode)]
-#[musli(bitwise)]
+#[musli(packed)]
 #[repr(C)]
 struct BitwiseChar {
     a: char,
     b: u32,
 }
 
-const _: () = assert!(<BitwiseChar as Encode<Binary>>::ENCODE_PACKED);
-const _: () = assert!(!<BitwiseChar as Decode<Binary>>::DECODE_PACKED);
+const _: () = assert!(musli::is_bitwise_encode::<BitwiseChar>());
+const _: () = assert!(!musli::is_bitwise_decode::<BitwiseChar>());
 
 #[derive(Debug, PartialEq, Decode, Encode)]
-#[musli(bitwise)]
+#[musli(packed)]
 #[repr(C)]
 struct BitwiseNonZero {
     a: NonZero<u32>,
     b: u32,
 }
 
-const _: () = assert!(<BitwiseNonZero as Encode<Binary>>::ENCODE_PACKED);
-const _: () = assert!(!<BitwiseNonZero as Decode<Binary>>::DECODE_PACKED);
+const _: () = assert!(musli::is_bitwise_encode::<BitwiseNonZero>());
+const _: () = assert!(!musli::is_bitwise_decode::<BitwiseNonZero>());

@@ -716,30 +716,30 @@ mod str;
 
 use crate::mode::Binary;
 
-/// Test if the given type `T` is marked with the `#[musli(bitwise)]` attribute,
+/// Test if the given type `T` is marked with the `#[musli(packed)]` attribute,
 /// and is bitwise encodeable in the [`Binary`] mode.
 ///
-/// See the [help section for `#[musli(bitwise)]`][help] for more information.
+/// See the [help section for `#[musli(packed)]`][help] for more information.
 ///
-/// [help]: crate::_help::derives#muslibitwise
+/// [help]: crate::_help::derives#muslipacked
 #[inline]
 pub const fn is_bitwise_encode<T>() -> bool
 where
     T: Encode<Binary>,
 {
-    T::ENCODE_PACKED
+    T::IS_BITWISE_ENCODE
 }
 
-/// Test if the given type `T` is marked with the `#[musli(bitwise)]` attribute,
+/// Test if the given type `T` is marked with the `#[musli(packed)]` attribute,
 /// and is bitwise encodeable in the [`Binary`] mode.
 ///
-/// See the [help section for `#[musli(bitwise)]`][help] for more information.
+/// See the [help section for `#[musli(packed)]`][help] for more information.
 ///
-/// [help]: crate::_help::derives#muslibitwise
+/// [help]: crate::_help::derives#muslipacked
 #[inline]
 pub const fn is_bitwise_decode<T>() -> bool
 where
     T: for<'de> Decode<'de, Binary>,
 {
-    T::DECODE_PACKED
+    T::IS_BITWISE_DECODE
 }

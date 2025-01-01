@@ -422,7 +422,7 @@ impl PartialEq<Mesh> for &ArchivedMesh {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]
-#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, bitwise))]
+#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
@@ -443,7 +443,7 @@ pub struct Triangle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]
-#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, bitwise))]
+#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
