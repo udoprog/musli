@@ -49,6 +49,14 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx_mut<F, O>(&mut self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, &mut Self) -> O,
+    {
+        f(self.cx, self)
+    }
+
+    #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         if !take(&mut self.first) {
             self.writer.write_byte(self.cx, b',')?;

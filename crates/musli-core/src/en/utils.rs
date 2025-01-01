@@ -23,3 +23,26 @@ where
         seq.finish_sequence()
     })
 }
+
+#[inline]
+pub fn default_sequence_encode_slice<E, T>(
+    seq: &mut E,
+    slice: &[T],
+) -> Result<(), <E::Cx as Context>::Error>
+where
+    E: ?Sized + SequenceEncoder,
+    T: Encode<<E::Cx as Context>::Mode>,
+{
+    seq.cx_mut(|cx, this| {
+        let mut index = 0usize;
+
+        for value in slice {
+            cx.enter_sequence_index(index);
+            this.push(value)?;
+            cx.leave_sequence_index();
+            index = index.wrapping_add(1);
+        }
+
+        Ok(())
+    })
+}

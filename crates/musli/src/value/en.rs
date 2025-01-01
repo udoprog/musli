@@ -413,6 +413,14 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx_mut<F, U>(&mut self, f: F) -> U
+    where
+        F: FnOnce(&Self::Cx, &mut Self) -> U,
+    {
+        f(self.cx, self)
+    }
+
+    #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.values))
     }
@@ -462,6 +470,14 @@ where
         = StorageEncoder<'a, &'this mut BufWriter<C::Allocator>, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx_mut<F, U>(&mut self, f: F) -> U
+    where
+        F: FnOnce(&Self::Cx, &mut Self) -> U,
+    {
+        f(self.cx, self)
+    }
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
@@ -707,6 +723,14 @@ where
         = ValueEncoder<'a, OPT, &'this mut Vec<Value>, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx_mut<F, U>(&mut self, f: F) -> U
+    where
+        F: FnOnce(&Self::Cx, &mut Self) -> U,
+    {
+        f(self.cx, self)
+    }
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {

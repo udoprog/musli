@@ -1,6 +1,6 @@
 use crate::Context;
 
-use super::{Encode, Encoder};
+use super::{utils, Encode, Encoder};
 
 /// Trait governing how to encode a sequence.
 pub trait SequenceEncoder {
@@ -18,12 +18,17 @@ pub trait SequenceEncoder {
     where
         Self: 'this;
 
+    /// Perform an operation while accessing the context.
+    ///
+    /// This access the context while providing a mutable reference to the
+    /// sequence encoder.
+    fn cx_mut<F, O>(&mut self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, &mut Self) -> O;
+
     /// Return encoder for the next element.
     #[must_use = "Encoders must be consumed"]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, <Self::Cx as Context>::Error>;
-
-    /// Finish encoding the sequence.
-    fn finish_sequence(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 
     /// Push an element into the sequence.
     #[inline]
@@ -34,4 +39,19 @@ pub trait SequenceEncoder {
         self.encode_next()?.encode(value)?;
         Ok(())
     }
+
+    /// Encode a slice of values.
+    ///
+    /// This can be called multiple types and has the same effect as calling
+    /// `push` for each value.
+    #[inline]
+    fn encode_slice<T>(&mut self, slice: &[T]) -> Result<(), <Self::Cx as Context>::Error>
+    where
+        T: Encode<<Self::Cx as Context>::Mode>,
+    {
+        utils::default_sequence_encode_slice(self, slice)
+    }
+
+    /// Finish encoding the sequence.
+    fn finish_sequence(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
 }

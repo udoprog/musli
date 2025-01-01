@@ -248,22 +248,7 @@ where
             return utils::default_encode_slice(self, slice);
         }
 
-        let len = slice.len().to_ne_bytes();
-        self.writer.write_bytes(self.cx, &len)?;
-
-        if size_of::<T>() > 0 {
-            // SAFETY: We've ensured the type is layout compatible with the
-            // current serialization just above.
-            let slice = unsafe {
-                let at = slice.as_ptr().cast::<u8>();
-                let size = size_of_val(slice);
-                slice::from_raw_parts(at, size)
-            };
-
-            self.writer.write_bytes(self.cx, slice)?;
-        }
-
-        Ok(())
+        encode_packed_slice(self.writer.borrow_mut(), self.cx, slice)
     }
 
     #[inline]
@@ -331,8 +316,33 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx_mut<F, O>(&mut self, f: F) -> O
+    where
+        F: FnOnce(&Self::Cx, &mut Self) -> O,
+    {
+        f(self.cx, self)
+    }
+
+    #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
         Ok(StorageEncoder::new(self.cx, self.writer.borrow_mut()))
+    }
+
+    #[inline]
+    fn encode_slice<T>(&mut self, slice: &[T]) -> Result<(), <Self::Cx as Context>::Error>
+    where
+        T: Encode<<Self::Cx as Context>::Mode>,
+    {
+        // Check that the type is packed inside of the slice.
+        if !const {
+            is_native_fixed::<OPT>()
+                && T::IS_BITWISE_ENCODE
+                && size_of::<T>() % align_of::<T>() == 0
+        } {
+            return utils::default_sequence_encode_slice(self, slice);
+        }
+
+        encode_packed_slice(self.writer.borrow_mut(), self.cx, slice)
     }
 
     #[inline]
@@ -458,4 +468,29 @@ where
     fn finish_variant(self) -> Result<Self::Ok, C::Error> {
         Ok(())
     }
+}
+
+#[inline]
+fn encode_packed_slice<W, C, T, M>(mut writer: W, cx: &C, slice: &[T]) -> Result<(), C::Error>
+where
+    W: Writer,
+    C: ?Sized + Context,
+    T: Encode<M>,
+{
+    let len = slice.len().to_ne_bytes();
+    writer.write_bytes(cx, &len)?;
+
+    if size_of::<T>() > 0 {
+        // SAFETY: We've ensured the type is layout compatible with the
+        // current serialization just above.
+        let slice = unsafe {
+            let at = slice.as_ptr().cast::<u8>();
+            let size = size_of_val(slice);
+            slice::from_raw_parts(at, size)
+        };
+
+        writer.write_bytes(cx, slice)?;
+    }
+
+    Ok(())
 }

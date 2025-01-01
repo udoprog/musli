@@ -358,19 +358,8 @@ macro_rules! slice_sequence {
             where
                 E: Encoder<Mode = M>,
             {
-                encoder.cx(|cx, encoder| {
-                    encoder.encode_pack_fn(|pack| {
-                        let mut index = 0;
-
-                        for value in self {
-                            cx.enter_sequence_index(index);
-                            pack.push(value)?;
-                            cx.leave_sequence_index();
-                            index = index.wrapping_add(1);
-                        }
-
-                        Ok(())
-                    })
+                encoder.encode_pack_fn(|pack| {
+                    pack.encode_slice(self)
                 })
             }
         }
