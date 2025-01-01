@@ -45,11 +45,29 @@ pub trait SequenceEncoder {
     /// This can be called multiple types and has the same effect as calling
     /// `push` for each value.
     #[inline]
-    fn encode_slice<T>(&mut self, slice: &[T]) -> Result<(), <Self::Cx as Context>::Error>
+    fn encode_slice<T>(
+        &mut self,
+        slice: impl AsRef<[T]>,
+    ) -> Result<(), <Self::Cx as Context>::Error>
     where
         T: Encode<<Self::Cx as Context>::Mode>,
     {
         utils::default_sequence_encode_slice(self, slice)
+    }
+
+    /// Encode an iterator of contiguous slices of values.
+    ///
+    /// This can be called multiple types and has the same effect as calling
+    /// `push` for each value.
+    #[inline]
+    fn encode_slices<T>(
+        &mut self,
+        slices: impl IntoIterator<Item: AsRef<[T]>>,
+    ) -> Result<(), <Self::Cx as Context>::Error>
+    where
+        T: Encode<<Self::Cx as Context>::Mode>,
+    {
+        utils::default_sequence_encode_slices(self, slices)
     }
 
     /// Finish encoding the sequence.

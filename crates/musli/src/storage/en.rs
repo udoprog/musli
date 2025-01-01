@@ -9,7 +9,18 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::options::is_native_fixed;
 use crate::{Context, Options, Writer};
 
-/// A vaery simple encoder suitable for storage encoding.
+/// Test if the current options and `$t` is suitable for bitwise slice encoding.
+macro_rules! is_bitwise_slice {
+    ($opt:ident, $t:ident) => {
+        const {
+            is_native_fixed::<$opt>()
+                && <$t>::IS_BITWISE_ENCODE
+                && size_of::<$t>() % align_of::<$t>() == 0
+        }
+    };
+}
+
+/// A very simple encoder suitable for storage encoding.
 pub struct StorageEncoder<'a, W, const OPT: Options, C: ?Sized> {
     cx: &'a C,
     writer: W,
@@ -235,20 +246,37 @@ where
     }
 
     #[inline]
-    fn encode_slice<T>(mut self, slice: &[T]) -> Result<Self::Ok, C::Error>
+    fn encode_slice<T>(mut self, slice: impl AsRef<[T]>) -> Result<Self::Ok, C::Error>
     where
         T: Encode<Self::Mode>,
     {
         // Check that the type is packed inside of the slice.
-        if !const {
-            is_native_fixed::<OPT>()
-                && T::IS_BITWISE_ENCODE
-                && size_of::<T>() % align_of::<T>() == 0
-        } {
+        if !is_bitwise_slice!(OPT, T) {
             return utils::default_encode_slice(self, slice);
         }
 
-        encode_packed_slice(self.writer.borrow_mut(), self.cx, slice)
+        // SAFETY: We've ensured the type is layout compatible with the current
+        // serialization just above.
+        unsafe { encode_packed_len_slice(self.writer.borrow_mut(), self.cx, slice) }
+    }
+
+    #[inline]
+    fn encode_slices<T>(
+        mut self,
+        len: usize,
+        slices: impl IntoIterator<Item: AsRef<[T]>>,
+    ) -> Result<Self::Ok, C::Error>
+    where
+        T: Encode<Self::Mode>,
+    {
+        // Check that the type is packed inside of the slice.
+        if !is_bitwise_slice!(OPT, T) {
+            return utils::default_encode_slices(self, len, slices);
+        }
+
+        // SAFETY: We've ensured the type is layout compatible with the current
+        // serialization just above.
+        unsafe { encode_packed_len_slices(self.writer.borrow_mut(), self.cx, len, slices) }
     }
 
     #[inline]
@@ -329,20 +357,39 @@ where
     }
 
     #[inline]
-    fn encode_slice<T>(&mut self, slice: &[T]) -> Result<(), <Self::Cx as Context>::Error>
+    fn encode_slice<T>(
+        &mut self,
+        slice: impl AsRef<[T]>,
+    ) -> Result<(), <Self::Cx as Context>::Error>
     where
         T: Encode<<Self::Cx as Context>::Mode>,
     {
         // Check that the type is packed inside of the slice.
-        if !const {
-            is_native_fixed::<OPT>()
-                && T::IS_BITWISE_ENCODE
-                && size_of::<T>() % align_of::<T>() == 0
-        } {
+        if !is_bitwise_slice!(OPT, T) {
             return utils::default_sequence_encode_slice(self, slice);
         }
 
-        encode_packed_slice(self.writer.borrow_mut(), self.cx, slice)
+        // SAFETY: We've ensured the type is layout compatible with the current
+        // serialization just above.
+        unsafe { encode_packed_slice(self.writer.borrow_mut(), self.cx, slice) }
+    }
+
+    #[inline]
+    fn encode_slices<T>(
+        &mut self,
+        slices: impl IntoIterator<Item: AsRef<[T]>>,
+    ) -> Result<(), <Self::Cx as Context>::Error>
+    where
+        T: Encode<<Self::Cx as Context>::Mode>,
+    {
+        // Check that the type is packed inside of the slice.
+        if !is_bitwise_slice!(OPT, T) {
+            return utils::default_sequence_encode_slices(self, slices);
+        }
+
+        // SAFETY: We've ensured the type is layout compatible with the current
+        // serialization just above.
+        unsafe { encode_packed_slices(self.writer.borrow_mut(), self.cx, slices) }
     }
 
     #[inline]
@@ -470,26 +517,141 @@ where
     }
 }
 
+/// Encode a packed length-prefixed slice.
+///
+/// # Safety
+///
+/// The caller must ensure that the format in use is compatible with the native
+/// format of the slice.
 #[inline]
-fn encode_packed_slice<W, C, T, M>(mut writer: W, cx: &C, slice: &[T]) -> Result<(), C::Error>
+unsafe fn encode_packed_len_slice<W, C, T, M>(
+    mut writer: W,
+    cx: &C,
+    slice: impl AsRef<[T]>,
+) -> Result<(), C::Error>
 where
     W: Writer,
     C: ?Sized + Context,
     T: Encode<M>,
 {
+    let slice = slice.as_ref();
     let len = slice.len().to_ne_bytes();
     writer.write_bytes(cx, &len)?;
 
     if size_of::<T>() > 0 {
-        // SAFETY: We've ensured the type is layout compatible with the
-        // current serialization just above.
-        let slice = unsafe {
+        let slice = {
             let at = slice.as_ptr().cast::<u8>();
             let size = size_of_val(slice);
             slice::from_raw_parts(at, size)
         };
 
         writer.write_bytes(cx, slice)?;
+    }
+
+    Ok(())
+}
+
+/// Encode a packed length-prefixed slice from an iterator of slices.
+///
+/// # Safety
+///
+/// The caller must ensure that the format in use is compatible with the native
+/// format of the slice.
+#[inline]
+unsafe fn encode_packed_len_slices<W, C, I, T, M>(
+    mut writer: W,
+    cx: &C,
+    len: usize,
+    slices: I,
+) -> Result<(), C::Error>
+where
+    W: Writer,
+    C: ?Sized + Context,
+    I: IntoIterator<Item: AsRef<[T]>>,
+    T: Encode<M>,
+{
+    let len = len.to_ne_bytes();
+    writer.write_bytes(cx, &len)?;
+
+    if size_of::<T>() > 0 {
+        for slice in slices {
+            let slice = slice.as_ref();
+
+            let slice = {
+                let at = slice.as_ptr().cast::<u8>();
+                let size = size_of_val(slice);
+                slice::from_raw_parts(at, size)
+            };
+
+            writer.write_bytes(cx, slice)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Encode a packed slice.
+///
+/// # Safety
+///
+/// The caller must ensure that the format in use is compatible with the native
+/// format of the slice.
+#[inline]
+unsafe fn encode_packed_slice<W, C, T, M>(
+    mut writer: W,
+    cx: &C,
+    slice: impl AsRef<[T]>,
+) -> Result<(), C::Error>
+where
+    W: Writer,
+    C: ?Sized + Context,
+    T: Encode<M>,
+{
+    if size_of::<T>() > 0 {
+        let slice = slice.as_ref();
+
+        let slice = {
+            let at = slice.as_ptr().cast::<u8>();
+            let size = size_of_val(slice);
+            slice::from_raw_parts(at, size)
+        };
+
+        writer.write_bytes(cx, slice)?;
+    }
+
+    Ok(())
+}
+
+/// Encode a packed slice from an iterator of slices.
+///
+/// # Safety
+///
+/// The caller must ensure that the format in use is compatible with the native
+/// format of the slice.
+#[inline]
+unsafe fn encode_packed_slices<W, C, I, T, M>(
+    mut writer: W,
+    cx: &C,
+    slices: I,
+) -> Result<(), C::Error>
+where
+    W: Writer,
+    C: ?Sized + Context,
+    I: IntoIterator<Item: AsRef<[T]>>,
+    T: Encode<M>,
+{
+    if size_of::<T>() > 0 {
+        for slice in slices {
+            let slice = slice.as_ref();
+
+            let slice = {
+                let at = slice.as_ptr().cast::<u8>();
+                let size = size_of_val(slice);
+                slice::from_raw_parts(at, size)
+            };
+
+            writer.write_bytes(cx, slice)?;
+        }
     }
 
     Ok(())

@@ -9,26 +9,18 @@ use crate::mode::Binary;
 use crate::options;
 use crate::{Context, Decode, Encode, IntoReader, IntoWriter, Options};
 
-use super::de::WireDecoder;
-use super::en::WireEncoder;
 #[cfg(feature = "alloc")]
 use super::error::Error;
+use crate::storage::de::StorageDecoder;
+use crate::storage::en::StorageEncoder;
 
-/// The default flavor used by the [`DEFAULT`] configuration.
-pub const OPTIONS: options::Options = options::new().build();
+/// Default options to use with [`Encoding`].
+pub const OPTIONS: Options = options::new().fixed().native_byte_order().build();
 
 /// The default encoding instance using the default [`OPTIONS`].
-///
-/// Uses variable-encoded numerical fields and variable-encoded prefix lengths.
-///
-/// The variable length encoding uses [`zigzag`] with [`variable length`]
-/// encoding for numbers.
-///
-/// [`zigzag`]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
-/// [`variable length`]: https://en.wikipedia.org/wiki/Variable-length_quantity
 pub const DEFAULT: Encoding = Encoding::new();
 
-crate::macros::bare_encoding!(Binary, DEFAULT, wire, IntoReader, IntoWriter);
+crate::macros::bare_encoding!(Binary, DEFAULT, packed, IntoReader, IntoWriter);
 
 /// Setting up encoding with parameters.
 pub struct Encoding<const OPT: Options = OPTIONS, M = Binary>
@@ -46,16 +38,15 @@ impl Default for Encoding<OPTIONS, Binary> {
 }
 
 impl Encoding<OPTIONS, Binary> {
-    /// Construct a new [`Encoding`] instance with the [`OPTIONS`]
-    /// configuration.
+    /// Construct a new [`Encoding`] instance which uses [`OPTIONS`].
     ///
-    /// You can modify this using the available factory methods:
+    /// You can modify this behavior by using a custom [`Options`] instance:
     ///
     /// ```
     /// use musli::{Encode, Decode};
     /// use musli::options::{self, Options, Integer};
-    /// use musli::wire::Encoding;
-    /// # use musli::wire::Error;
+    /// use musli::packed::Encoding;
+    /// # use musli::packed::Error;
     ///
     /// const OPTIONS: Options = options::new().integer(Integer::Fixed).build();
     /// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
@@ -94,8 +85,8 @@ where
     ///
     /// # Examples
     ///
-    /// ```
-    /// use musli::wire::{OPTIONS, Encoding};
+    /// ```rust
+    /// use musli::packed::{OPTIONS, Encoding};
     ///
     /// enum Custom {}
     ///
@@ -113,9 +104,9 @@ where
     ///
     /// ```
     /// use musli::options::{self, Options, Integer};
-    /// use musli::wire::Encoding;
+    /// use musli::packed::Encoding;
     ///
-    /// const OPTIONS: Options = options::new().integer(Integer::Fixed).build();
+    /// const OPTIONS: Options = options::new().build();
     /// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
     /// ```
     pub const fn with_options<const U: Options>(self) -> Encoding<U, M> {
@@ -126,9 +117,9 @@ where
 
     crate::macros::encoding_impls!(
         M,
-        wire,
-        WireEncoder::<_, OPT, _>::new,
-        WireDecoder::<_, OPT, _>::new,
+        packed,
+        StorageEncoder::<_, OPT, _>::new,
+        StorageDecoder::<_, OPT, _>::new,
         IntoReader::into_reader,
         IntoWriter::into_writer,
     );

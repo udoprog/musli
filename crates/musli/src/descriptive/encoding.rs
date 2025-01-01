@@ -17,7 +17,7 @@ use super::error::Error;
 /// The default flavor used by the [`DEFAULT`] configuration.
 pub const OPTIONS: options::Options = options::new().build();
 
-/// The default configuration.
+/// The default encoding instance using the default [`OPTIONS`].
 ///
 /// Uses variable-encoded numerical fields and variable-encoded prefix lengths.
 ///

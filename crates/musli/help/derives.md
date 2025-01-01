@@ -246,12 +246,12 @@ Ok::<_, musli::wire::Error>(())
 This attribute will disable all *tagging* and the structure will simply be
 encoded with one field following another in the order in which they are defined.
 
-A caveat of *packed* structures is that they cannot be safely versioned and the
-two systems communicating through them need to be using strictly synchronized
-representations.
+Structures which are *packed* cannot be easily versioned and the two systems
+communicating using them need to handle field versioning out of bounds.
 
 This attribute is useful for performing simple decoding over "raw" bytes when
-combined with an encoder which does minimal prefixing and packs fields.
+combined with an encoder which does minimal prefixing and packs fields. Using a
+packed format is typically also the most efficient mode of operation in Müsli.
 
 ##### Bitwise optimizations
 
@@ -1025,13 +1025,13 @@ struct Struct {
 #### `#[musli(packed)]`
 
 This specifies that encoding and decoding should happen through the
-[`EncodePacked`] and [`DecodePacked`] traits, instead of the default
-[`Encode`] and [`Decode`].
+[`EncodePacked`] and [`DecodePacked`] traits, instead of the default [`Encode`]
+and [`Decode`].
 
 These traits contained implementations which are biased towards encoding the
 field as a compact, non-future compatible pack. In essense, the fields are
-encoded "one after another" without any metadata separating them. So for
-packed fields, the order, types and number of the fields are important.
+encoded "one after another" without any metadata separating them. So for packed
+fields, the order, types and number of the fields are important.
 
 <br>
 

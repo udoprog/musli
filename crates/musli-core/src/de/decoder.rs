@@ -104,10 +104,12 @@ pub trait Decoder<'de>: Sized {
     ///         f(self.cx, self)
     ///     }
     ///
+    ///     #[inline]
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     ///         write!(f, "32-bit unsigned integers")
     ///     }
     ///
+    ///     #[inline]
     ///     fn decode_u32(self) -> Result<u32, <Self::Cx as Context>::Error> {
     ///         Ok(42)
     ///     }
@@ -212,6 +214,7 @@ pub trait Decoder<'de>: Sized {
     /// }
     ///
     /// impl<'de> Decode<'de, Binary> for Enum {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de, Mode = Binary>,
@@ -274,6 +277,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct UnitType;
     ///
     /// impl<'de, M> Decode<'de, M> for UnitType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -316,6 +320,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct BooleanField { field: bool }
     ///
     /// impl<'de, M> Decode<'de, M> for BooleanField {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -359,6 +364,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: char }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -402,6 +408,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: u8 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -445,6 +452,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: u16 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -488,6 +496,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: u32 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -531,6 +540,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: u64 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -574,6 +584,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: u128 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -617,6 +628,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: i8 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -660,6 +672,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: i16 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -703,6 +716,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: i32 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -746,6 +760,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: i64 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -789,6 +804,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: i128 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -832,6 +848,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: usize }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -875,6 +892,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: isize }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -918,6 +936,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: f32 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -961,6 +980,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: f64 }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1004,6 +1024,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MyType { data: [u8; 128] }
     ///
     /// impl<'de, M> Decode<'de, M> for MyType {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1184,6 +1205,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct OptionalField { data: Option<String>}
     ///
     /// impl<'de, M> Decode<'de, M> for OptionalField {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1300,6 +1322,7 @@ pub trait Decoder<'de>: Sized {
     /// }
     ///
     /// impl<'de, M> Decode<'de, M> for VectorField {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1335,6 +1358,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct TupleStruct(String, u32);
     ///
     /// impl<'de, M> Decode<'de, M> for TupleStruct {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1371,6 +1395,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct TupleStruct(String, u32);
     ///
     /// impl<'de, M> Decode<'de, M> for TupleStruct {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1407,6 +1432,7 @@ pub trait Decoder<'de>: Sized {
     /// # struct MapStruct { data: HashMap<String, u32> }
     ///
     /// impl<'de, M> Decode<'de, M> for MapStruct {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1469,6 +1495,7 @@ pub trait Decoder<'de>: Sized {
     /// }
     ///
     /// impl<'de, M> Decode<'de, M> for Struct {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,
@@ -1545,6 +1572,7 @@ pub trait Decoder<'de>: Sized {
     /// }
     ///
     /// impl<'de, M> Decode<'de, M> for Enum {
+    ///     #[inline]
     ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     ///     where
     ///         D: Decoder<'de>,

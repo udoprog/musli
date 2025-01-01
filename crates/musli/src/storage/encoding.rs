@@ -17,7 +17,7 @@ use super::error::Error;
 /// Default options to use with [`Encoding`].
 pub const OPTIONS: Options = options::new().build();
 
-/// The default configuration.
+/// The default encoding instance using the default [`OPTIONS`].
 ///
 /// Uses variable-encoded numerical fields and variable-encoded prefix lengths.
 ///
