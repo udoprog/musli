@@ -193,6 +193,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        match self._never {}
+    }
+
+    #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         match self._never {}
     }
@@ -223,6 +228,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        match self._never {}
+    }
+
+    #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
         match self._never {}
     }
@@ -246,6 +256,11 @@ where
         = Self
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        match self._never {}
+    }
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -277,6 +292,11 @@ where
     type DecodeValue = Self;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        match self._never {}
+    }
+
+    #[inline]
     fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         match self._never {}
     }
@@ -296,6 +316,11 @@ where
         = Self
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        match self._never {}
+    }
 
     #[inline]
     fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
@@ -411,6 +436,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        match self._never {}
+    }
+
+    #[inline]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         match self._never {}
     }
@@ -435,6 +465,11 @@ where
         = Self
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        match self._never {}
+    }
 
     #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
@@ -469,6 +504,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        match self._never {}
+    }
+
+    #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         match self._never {}
     }
@@ -499,6 +539,11 @@ where
         = Self
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        match self._never {}
+    }
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {

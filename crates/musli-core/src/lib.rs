@@ -174,7 +174,7 @@ pub use musli_macros::decoder;
 /// #[musli_core::visitor(crate = musli_core)]
 /// impl<'de, C> Visitor<'de, C> for AnyVisitor
 /// where
-///     C: ?Sized + Context,
+///     C: Context,
 /// {
 ///     type Ok = ();
 ///

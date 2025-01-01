@@ -34,6 +34,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         if !self.empty {
             self.writer.write_byte(self.cx, b',')?;

@@ -5,7 +5,7 @@ use super::{Decoder, SizeHint};
 /// Trait governing how to decode a map entry.
 pub trait EntryDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: ?Sized + Context;
+    type Cx: Context;
     /// The decoder to use for a tuple field index.
     type DecodeKey<'this>: Decoder<
         'de,
@@ -22,6 +22,9 @@ pub trait EntryDecoder<'de> {
         Error = <Self::Cx as Context>::Error,
         Mode = <Self::Cx as Context>::Mode,
     >;
+
+    /// Access the context associated with the decoder.
+    fn cx(&self) -> Self::Cx;
 
     /// Get a size hint for the size of the map being decoded.
     #[inline]

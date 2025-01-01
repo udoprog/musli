@@ -38,6 +38,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
         Ok(JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()))
     }

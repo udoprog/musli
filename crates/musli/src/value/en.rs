@@ -517,6 +517,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(PairValueEncoder::new(self.cx, &mut self.values))
     }
@@ -544,6 +549,11 @@ where
         = ValueEncoder<OPT, &'this mut Value, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
@@ -609,6 +619,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
         Ok(ValueEncoder::new(self.cx, &mut self.pair.0))
     }
@@ -661,6 +676,11 @@ where
         = ValueEncoder<OPT, &'this mut Value, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
@@ -770,6 +790,11 @@ where
         = PairValueEncoder<'this, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {

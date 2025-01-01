@@ -399,6 +399,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
@@ -424,6 +429,11 @@ where
         = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
@@ -458,6 +468,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
         Ok(SelfEncoder::new(self.cx, self.writer.borrow_mut()))
     }
@@ -488,6 +503,11 @@ where
         = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {

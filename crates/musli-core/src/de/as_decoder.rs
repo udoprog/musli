@@ -5,7 +5,7 @@ use super::Decoder;
 /// Trait that allows a type to be repeatedly coerced into a decoder.
 pub trait AsDecoder {
     /// Context associated with the decoder.
-    type Cx: ?Sized + Context;
+    type Cx: Context;
     /// The decoder we reborrow as.
     type Decoder<'this>: Decoder<
         'this,

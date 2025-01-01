@@ -24,7 +24,7 @@ where
 #[must_use = "Encoders must be consumed through one of its encode_* methods"]
 pub trait Encoder: Sized {
     /// Context associated with the encoder.
-    type Cx: ?Sized + Context<Error = Self::Error, Mode = Self::Mode>;
+    type Cx: Context<Error = Self::Error, Mode = Self::Mode>;
     /// The type returned by the encoder. For [Encode] implementations ensures
     /// that they are used correctly, since only functions returned by the
     /// [Encoder] is capable of returning this value.
@@ -60,7 +60,7 @@ pub trait Encoder: Sized {
     #[doc(hidden)]
     type __UseMusliEncoderAttributeMacro;
 
-    /// Perform an operation while accessing the context.
+    /// Access the context associated with the encoder.
     fn cx(&self) -> Self::Cx;
 
     /// Construct an encoder with a different context.

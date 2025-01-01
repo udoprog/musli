@@ -24,7 +24,7 @@ pub enum TryFastDecode<T, D> {
 #[must_use = "Decoders must be consumed through one of its decode_* methods"]
 pub trait Decoder<'de>: Sized {
     /// Context associated with the decoder.
-    type Cx: ?Sized + Context<Error = Self::Error, Mode = Self::Mode>;
+    type Cx: Context<Error = Self::Error, Mode = Self::Mode>;
     /// Error associated with decoding.
     type Error;
     /// Mode associated with decoding.
@@ -55,10 +55,11 @@ pub trait Decoder<'de>: Sized {
     #[doc(hidden)]
     type __UseMusliDecoderAttributeMacro;
 
-    /// Perform an operation while accessing the context.
+    /// Access the context associated with the decoder.
     fn cx(&self) -> Self::Cx;
 
     /// Construct an decoder with a different context.
+    #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, <Self::Cx as Context>::Error>
     where
         U: Context,

@@ -323,7 +323,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_sequence<D>(self, _: C, seq: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, seq: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + SequenceDecoder<'de, Cx = C>,
     {
@@ -338,7 +338,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_map<D>(self, _: C, map: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, map: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + MapDecoder<'de, Cx = C>,
     {
@@ -367,7 +367,7 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_variant<D>(self, _: C, variant: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_variant<D>(self, variant: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: VariantDecoder<'de, Cx = C>,
     {

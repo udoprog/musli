@@ -5,7 +5,7 @@ use super::{Decode, Decoder, SizeHint};
 /// Trait governing how to decode a sequence.
 pub trait SequenceDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: ?Sized + Context;
+    type Cx: Context;
     /// The decoder for individual items.
     type DecodeNext<'this>: Decoder<
         'de,
@@ -15,6 +15,9 @@ pub trait SequenceDecoder<'de> {
     >
     where
         Self: 'this;
+
+    /// Access the context associated with the decoder.
+    fn cx(&self) -> Self::Cx;
 
     /// Get a size hint of known remaining elements.
     #[inline]

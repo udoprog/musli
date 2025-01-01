@@ -5,7 +5,7 @@ use super::{Decode, Decoder, EntriesDecoder, EntryDecoder, SizeHint};
 /// Trait governing how to decode a sequence of pairs.
 pub trait MapDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: ?Sized + Context;
+    type Cx: Context;
     /// The decoder to use for a key.
     type DecodeEntry<'this>: EntryDecoder<'de, Cx = Self::Cx>
     where
@@ -14,6 +14,9 @@ pub trait MapDecoder<'de> {
     type DecodeRemainingEntries<'this>: EntriesDecoder<'de, Cx = Self::Cx>
     where
         Self: 'this;
+
+    /// Access the context associated with the decoder.
+    fn cx(&self) -> Self::Cx;
 
     /// Get a size hint of known remaining elements.
     #[inline]

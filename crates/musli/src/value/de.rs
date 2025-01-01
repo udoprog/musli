@@ -355,18 +355,15 @@ where
                 visitor.visit_borrowed(self.cx, string)
             }
             #[cfg(feature = "alloc")]
-            Value::Sequence(values) => visitor.visit_sequence(
-                self.cx,
-                &mut IterValueDecoder::<OPT, _>::new(self.cx, values),
-            ),
+            Value::Sequence(values) => {
+                visitor.visit_sequence(&mut IterValueDecoder::<OPT, _>::new(self.cx, values))
+            }
             #[cfg(feature = "alloc")]
-            Value::Map(values) => visitor.visit_map(
-                self.cx,
-                &mut IterValuePairsDecoder::<OPT, _>::new(self.cx, values),
-            ),
+            Value::Map(values) => {
+                visitor.visit_map(&mut IterValuePairsDecoder::<OPT, _>::new(self.cx, values))
+            }
             #[cfg(feature = "alloc")]
             Value::Variant(variant) => visitor.visit_variant(
-                self.cx,
                 &mut IterValueVariantDecoder::<OPT, _>::new(self.cx, variant),
             ),
             #[cfg(feature = "alloc")]
@@ -424,6 +421,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.iter.size_hint().1)
     }
@@ -476,6 +478,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.iter.size_hint().1)
     }
@@ -512,6 +519,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         let Some((name, _)) = self.iter.clone().next() else {
             return Ok(None);
@@ -545,6 +557,11 @@ where
     where
         Self: 'this;
     type DecodeValue = ValueDecoder<'de, OPT, C>;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
@@ -597,6 +614,11 @@ where
         = ValueDecoder<'de, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {

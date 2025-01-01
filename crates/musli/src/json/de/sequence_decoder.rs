@@ -101,6 +101,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.len)
     }

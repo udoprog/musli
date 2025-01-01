@@ -12,7 +12,7 @@ use super::{Decoder, SizeHint};
 #[must_use = "Must call end_entries to complete decoding"]
 pub trait EntriesDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: ?Sized + Context;
+    type Cx: Context;
     /// The decoder to use for a tuple field index.
     type DecodeEntryKey<'this>: Decoder<
         'de,
@@ -31,6 +31,9 @@ pub trait EntriesDecoder<'de> {
     >
     where
         Self: 'this;
+
+    /// Access the context associated with the decoder.
+    fn cx(&self) -> Self::Cx;
 
     /// Get a size hint for the size of the map being decoded.
     #[inline]
