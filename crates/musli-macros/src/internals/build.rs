@@ -13,9 +13,8 @@ use crate::expander::{
 use super::attr::{EnumTagging, FieldEncoding, MethodOrPath, ModeKind, Packing};
 use super::mode::Method;
 use super::name::NameAll;
-use super::tokens::Tokens;
 use super::ATTR;
-use super::{Ctxt, Expansion, Mode, Only, Result};
+use super::{Ctxt, Expansion, Mode, Only, Result, Tokens};
 
 pub(crate) struct Build<'a> {
     pub(crate) input: &'a syn::DeriveInput,
@@ -178,6 +177,9 @@ pub(crate) fn setup<'a>(
         return Err(());
     }
 
+    let decode_t_decode = mode.decode_t_decode(FieldEncoding::Default);
+    let encode_t_encode = mode.encode_t_encode(FieldEncoding::Default);
+
     Ok(Build {
         input: e.input,
         cx: &e.cx,
@@ -186,8 +188,8 @@ pub(crate) fn setup<'a>(
         decode_bounds: e.type_attr.decode_bounds(mode),
         expansion,
         data,
-        decode_t_decode: mode.decode_t_decode(FieldEncoding::Default),
-        encode_t_encode: mode.encode_t_encode(FieldEncoding::Default),
+        decode_t_decode,
+        encode_t_encode,
         enum_tagging_span: e.type_attr.enum_tagging_span(mode),
     })
 }

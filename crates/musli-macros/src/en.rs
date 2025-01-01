@@ -5,8 +5,7 @@ use syn::Token;
 
 use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Variant};
-use crate::internals::tokens::Tokens;
-use crate::internals::Result;
+use crate::internals::{Result, Tokens};
 
 struct Ctxt<'a> {
     ctx_var: &'a syn::Ident,
@@ -43,7 +42,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let body = match &e.data {
         BuildData::Struct(st) => {
-            packed = crate::packed::packed(&e, st, e.tokens.encode_t, "ENCODE_PACKED");
+            packed = crate::internals::packed(&e, st, e.tokens.encode_t, "ENCODE_PACKED");
             encode_map(&cx, &e, st)?
         }
         BuildData::Enum(en) => {
@@ -97,7 +96,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
                         let #encoder_var = match #encoder_t::try_fast_encode(#encoder_var, self)? {
                             #try_fast_encode::Ok(value) => return #result::Ok(value),
                             #try_fast_encode::Unsupported(_, #encoder_var) => #encoder_var,
-                            _ => return #result::Err(#context_t::message(#ctx_var, "fast encoding failed")),
+                            _ => return #result::Err(#context_t::message(#ctx_var, "Fast encoding failed")),
                         };
 
                         #body

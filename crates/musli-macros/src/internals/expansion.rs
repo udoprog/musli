@@ -1,8 +1,6 @@
-use crate::internals::tokens::Tokens;
-use crate::internals::{Mode, Only};
-
 use super::attr::{ModeIdent, ModeKind};
 use super::mode::ModePath;
+use super::{Mode, Only, Tokens};
 
 #[derive(Clone, Copy)]
 pub(crate) struct Expansion<'a> {

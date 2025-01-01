@@ -6,10 +6,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 
 use crate::internals::attr::{self, ModeIdent, ModeKind, TypeAttr};
-use crate::internals::build::Build;
-use crate::internals::name::NameAll;
-use crate::internals::tokens::Tokens;
-use crate::internals::{Ctxt, Expansion, Mode, Only, Result};
+use crate::internals::{Build, Ctxt, Expansion, Mode, NameAll, Only, Result, Tokens};
 
 #[derive(Clone, Copy)]
 pub(crate) enum UnsizedMethod {

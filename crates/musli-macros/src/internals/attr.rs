@@ -9,12 +9,10 @@ use syn::spanned::Spanned;
 use syn::Token;
 
 use crate::expander::{NameMethod, NameType};
-use crate::internals::name::NameAll;
-use crate::internals::ATTR;
-use crate::internals::{Ctxt, Mode};
 
 use super::build;
-use super::mode::Method;
+use super::ATTR;
+use super::{Ctxt, Method, Mode, NameAll};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) enum ModeKind {

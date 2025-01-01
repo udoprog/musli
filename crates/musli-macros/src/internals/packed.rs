@@ -1,11 +1,11 @@
 use proc_macro2::Span;
 use quote::quote;
 
-use crate::internals::attr::{Packed, Packing};
-use crate::internals::build::{Body, Build};
-use crate::internals::tokens::{Import, Tokens};
+use super::attr::{Packed, Packing};
+use super::build::{Body, Build};
+use super::{Import, Tokens};
 
-pub(super) fn packed(
+pub(crate) fn packed(
     e: &Build<'_>,
     st: &Body<'_>,
     trait_t: Import<'_>,
