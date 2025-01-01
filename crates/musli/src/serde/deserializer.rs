@@ -35,8 +35,7 @@ where
 
 impl<'de, D> de::Deserializer<'de> for Deserializer<'de, '_, D>
 where
-    D: Decoder<'de>,
-    <D::Cx as Context>::Error: de::Error,
+    D: Decoder<'de, Cx: Context<Error: de::Error>>,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -362,8 +361,7 @@ where
 
 impl<'de, D> de::SeqAccess<'de> for SequenceAccess<'de, '_, D>
 where
-    D: SequenceDecoder<'de>,
-    <D::Cx as Context>::Error: de::Error,
+    D: SequenceDecoder<'de, Cx: Context<Error: de::Error>>,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -405,8 +403,7 @@ where
 
 impl<'de, D> de::MapAccess<'de> for StructAccess<'de, '_, D>
 where
-    D: EntriesDecoder<'de>,
-    <D::Cx as Context>::Error: de::Error,
+    D: EntriesDecoder<'de, Cx: Context<Error: de::Error>>,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -452,8 +449,7 @@ impl<V> BytesVisitor<V> {
 
 impl<'de, C, V> crate::de::UnsizedVisitor<'de, C, [u8]> for BytesVisitor<V>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
+    C: ?Sized + Context<Error: de::Error>,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
@@ -499,8 +495,7 @@ where
 
 impl<'de, D> de::SeqAccess<'de> for SeqAccess<'de, '_, D>
 where
-    D: ?Sized + SequenceDecoder<'de>,
-    <D::Cx as Context>::Error: de::Error,
+    D: ?Sized + SequenceDecoder<'de, Cx: Context<Error: de::Error>>,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -542,8 +537,7 @@ where
 
 impl<'de, D> de::MapAccess<'de> for MapAccess<'de, '_, D>
 where
-    D: ?Sized + EntriesDecoder<'de>,
-    <D::Cx as Context>::Error: de::Error,
+    D: ?Sized + EntriesDecoder<'de, Cx: Context<Error: de::Error>>,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -583,8 +577,7 @@ impl<V> StringVisitor<V> {
 
 impl<'de, C, V> crate::de::UnsizedVisitor<'de, C, str> for StringVisitor<V>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
+    C: ?Sized + Context<Error: de::Error>,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
@@ -630,8 +623,7 @@ where
 
 impl<'de, D> de::VariantAccess<'de> for EnumAccess<'de, '_, D>
 where
-    D: VariantDecoder<'de>,
-    <D::Cx as Context>::Error: de::Error,
+    D: VariantDecoder<'de, Cx: Context<Error: de::Error>>,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -679,8 +671,7 @@ where
 
 impl<'de, D> de::EnumAccess<'de> for EnumAccess<'de, '_, D>
 where
-    D: VariantDecoder<'de>,
-    <D::Cx as Context>::Error: de::Error,
+    D: VariantDecoder<'de, Cx: Context<Error: de::Error>>,
 {
     type Error = <D::Cx as Context>::Error;
     type Variant = Self;
@@ -709,8 +700,7 @@ impl<V> AnyVisitor<V> {
 #[crate::visitor(crate)]
 impl<'de, C, V> Visitor<'de, C> for AnyVisitor<V>
 where
-    C: ?Sized + Context,
-    C::Error: de::Error,
+    C: ?Sized + Context<Error: de::Error>,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;

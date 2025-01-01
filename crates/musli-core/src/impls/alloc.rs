@@ -477,13 +477,61 @@ macro_rules! sequence {
 }
 
 slice_sequence!(cx, Vec<T>, push, seq,);
-sequence!(
-    cx,
-    VecDeque<T>,
-    push_back,
-    seq,
-    VecDeque::with_capacity(size_hint::cautious(seq.size_hint()))
-);
+
+impl<M, T> Encode<M> for VecDeque<T>
+where
+    T: Encode<M>,
+{
+    const IS_BITWISE_ENCODE: bool = false;
+
+    type Encode = Self;
+
+    #[inline]
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder<Mode = M>,
+    {
+        let (a, b) = self.as_slices();
+        encoder.encode_slices(self.len(), [a, b])
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
+}
+
+impl<'de, M, T> Decode<'de, M> for VecDeque<T>
+where
+    T: Decode<'de, M>,
+{
+    const IS_BITWISE_DECODE: bool = false;
+
+    #[inline]
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Mode = M>,
+    {
+        Ok(VecDeque::from(Vec::decode(decoder)?))
+    }
+}
+
+impl<M, T> EncodePacked<M> for VecDeque<T>
+where
+    T: Encode<M>,
+{
+    #[inline]
+    fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder<Mode = M>,
+    {
+        encoder.encode_pack_fn(|pack| {
+            let (a, b) = self.as_slices();
+            pack.encode_slices([a, b])
+        })
+    }
+}
+
 sequence!(cx, BTreeSet<T: Ord>, insert, seq, BTreeSet::new());
 sequence!(
     #[cfg(feature = "std")]

@@ -28,8 +28,7 @@ where
 
 impl<E> ser::Serializer for Serializer<E>
 where
-    E: Encoder,
-    <E::Cx as Context>::Error: ser::Error,
+    E: Encoder<Cx: Context<Error: ser::Error>>,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -286,12 +285,9 @@ fn encode_variant<E, T, F, O>(
     f: F,
 ) -> Result<O, <E::Cx as Context>::Error>
 where
-    <E::Cx as Context>::Error: ser::Error,
-    E: Encoder,
+    E: Encoder<Cx: Context<Error: ser::Error>>,
     T: ?Sized + Serialize,
-    F: FnOnce(
-        <E::EncodeVariant as VariantEncoder>::EncodeData<'_>,
-    ) -> Result<O, <E::Cx as Context>::Error>,
+    F: FnOnce(<E::EncodeVariant as VariantEncoder>::EncodeData<'_>) -> Result<O, E::Error>,
 {
     let mut variant = encoder.encode_variant()?;
     variant_tag.serialize(Serializer::new(variant.encode_tag()?))?;
@@ -318,8 +314,7 @@ where
 
 impl<E> ser::SerializeSeq for SerializeSeq<E>
 where
-    <E::Cx as Context>::Error: ser::Error,
-    E: SequenceEncoder,
+    E: SequenceEncoder<Cx: Context<Error: ser::Error>>,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -342,8 +337,7 @@ where
 
 impl<E> ser::SerializeTupleStruct for SerializeSeq<E>
 where
-    <E::Cx as Context>::Error: ser::Error,
-    E: SequenceEncoder,
+    E: SequenceEncoder<Cx: Context<Error: ser::Error>>,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -364,8 +358,7 @@ where
 
 impl<E> ser::SerializeTuple for SerializeSeq<E>
 where
-    <E::Cx as Context>::Error: ser::Error,
-    E: SequenceEncoder,
+    E: SequenceEncoder<Cx: Context<Error: ser::Error>>,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -386,8 +379,7 @@ where
 
 impl<E> ser::SerializeTupleVariant for SerializeSeq<E>
 where
-    <E::Cx as Context>::Error: ser::Error,
-    E: SequenceEncoder,
+    E: SequenceEncoder<Cx: Context<Error: ser::Error>>,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -424,8 +416,7 @@ where
 
 impl<E> ser::SerializeMap for SerializeMap<E>
 where
-    <E::Cx as Context>::Error: ser::Error,
-    E: EntriesEncoder,
+    E: EntriesEncoder<Cx: Context<Error: ser::Error>>,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -474,8 +465,7 @@ where
 
 impl<E> ser::SerializeStruct for SerializeStruct<E>
 where
-    <E::Cx as Context>::Error: ser::Error,
-    E: MapEncoder,
+    E: MapEncoder<Cx: Context<Error: ser::Error>>,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;
@@ -516,8 +506,7 @@ where
 
 impl<E> ser::SerializeStructVariant for SerializeStructVariant<E>
 where
-    <E::Cx as Context>::Error: ser::Error,
-    E: MapEncoder,
+    E: MapEncoder<Cx: Context<Error: ser::Error>>,
 {
     type Ok = E::Ok;
     type Error = <E::Cx as Context>::Error;

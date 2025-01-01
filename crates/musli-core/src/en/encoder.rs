@@ -136,6 +136,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for UnitStruct {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -184,6 +185,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -232,6 +234,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -280,6 +283,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -328,6 +332,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -376,6 +381,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -424,6 +430,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -472,6 +479,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -520,6 +528,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -568,6 +577,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -616,6 +626,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -664,6 +675,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -712,6 +724,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -760,6 +773,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -808,6 +822,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -856,6 +871,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -904,6 +920,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -952,6 +969,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1004,6 +1022,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1063,6 +1082,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1119,6 +1139,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1158,6 +1179,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1209,6 +1231,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1264,6 +1287,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1315,6 +1339,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for PackedStruct {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1357,6 +1382,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for PackedStruct {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1407,13 +1433,12 @@ pub trait Encoder: Sized {
     ///
     /// ```
     /// use musli::{Encode, Encoder};
-    /// use musli::en::SequenceEncoder;
-    /// use musli::hint::SequenceHint;
     /// # struct MyType { data: Vec<String> }
     ///
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1428,11 +1453,73 @@ pub trait Encoder: Sized {
     /// }
     /// ```
     #[inline]
-    fn encode_slice<T>(self, slice: &[T]) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    fn encode_slice<T>(
+        self,
+        slice: impl AsRef<[T]>,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         T: Encode<Self::Mode>,
     {
         utils::default_encode_slice(self, slice)
+    }
+
+    /// Encode a sequence extracted from an iterator of slices with a trusted
+    /// length.
+    ///
+    /// This defaults to using [`Encoder::encode_sequence`] and if specialized
+    /// must implement the same format as would calling that method.
+    ///
+    /// # Examples
+    ///
+    /// Deriving an implementation:
+    ///
+    /// ```
+    /// use std::collections::VecDeque;
+    /// use musli::Encode;
+    ///
+    /// #[derive(Encode)]
+    /// #[musli(packed)]
+    /// struct MyType {
+    ///     data: VecDeque<String>,
+    /// }
+    /// ```
+    ///
+    /// Implementing manually:
+    ///
+    /// ```
+    /// # use musli::Encode;
+    /// # use std::collections::VecDeque;
+    /// # struct MyType { data: VecDeque<String> }
+    /// use musli::Encoder;
+    ///
+    /// impl<M> Encode<M> for MyType {
+    ///     type Encode = Self;
+    ///
+    ///     #[inline]
+    ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    ///     where
+    ///         E: Encoder,
+    ///     {
+    ///         let (a, b) = self.data.as_slices();
+    ///         encoder.encode_slices(self.data.len(), [a, b])
+    ///     }
+    ///
+    ///     #[inline]
+    ///     fn as_encode(&self) -> &Self::Encode {
+    ///         self
+    ///     }
+    /// }
+    /// ```
+    #[inline]
+    fn encode_slices<T>(
+        self,
+        len: usize,
+        slices: impl IntoIterator<Item: AsRef<[T]>>,
+    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    where
+        T: Encode<Self::Mode>,
+    {
+        utils::default_encode_slices(self, len, slices)
     }
 
     /// Encode a sequence with a known length `len`.
@@ -1468,6 +1555,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1502,6 +1590,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for PackedTuple {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1546,6 +1635,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for MyType {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1580,6 +1670,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for PackedTuple {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1640,6 +1731,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Struct {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1685,6 +1777,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Struct {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1735,6 +1828,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Struct {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1800,6 +1894,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Enum {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1873,6 +1968,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Enum {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -1954,6 +2050,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Enum {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -2009,6 +2106,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Enum {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,
@@ -2076,6 +2174,7 @@ pub trait Encoder: Sized {
     /// impl<M> Encode<M> for Enum {
     ///     type Encode = Self;
     ///
+    ///     #[inline]
     ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     ///     where
     ///         E: Encoder,

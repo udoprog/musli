@@ -166,11 +166,11 @@ The available formats and their capabilities are:
 
 | | `reorder` | `missing` | `unknown` | `self` |
 |-|-|-|-|-|
-| [`musli::storage`] `#[musli(packed)]` | ✗ | ✗ | ✗ | ✗ |
-| [`musli::storage`]                    | ✔ | ✔ | ✗ | ✗ |
-| [`musli::wire`]                       | ✔ | ✔ | ✔ | ✗ |
-| [`musli::descriptive`]                | ✔ | ✔ | ✔ | ✔ |
-| [`musli::json`] [^json]               | ✔ | ✔ | ✔ | ✔ |
+| [`musli::packed`] (with `#[musli(packed)]`) | ✗ | ✗ | ✗ | ✗ |
+| [`musli::storage`]                          | ✔ | ✔ | ✗ | ✗ |
+| [`musli::wire`]                             | ✔ | ✔ | ✔ | ✗ |
+| [`musli::descriptive`]                      | ✔ | ✔ | ✔ | ✔ |
+| [`musli::json`] [^json]                     | ✔ | ✔ | ✔ | ✔ |
 
 `reorder` determines whether fields must occur in exactly the order in which
 they are specified in their type. Reordering fields in such a type would
@@ -456,6 +456,7 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [`Ignore`]: <https://docs.rs/musli/latest/musli/context/struct.Ignore.html>
 [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/index.html>
 [`musli::json`]: <https://docs.rs/musli/latest/musli/json/index.html>
+[`musli::packed`]: <https://docs.rs/musli/latest/musli/packed/index.html>
 [`musli::serde`]: <https://docs.rs/musli/latest/musli/serde/index.html>
 [`musli::storage`]: <https://docs.rs/musli/latest/musli/storage/index.html>
 [`musli::value`]: <https://docs.rs/musli/latest/musli/value/index.html>

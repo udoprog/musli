@@ -26,6 +26,7 @@ error[E0277]: `ContextError` must be implemented for `MyError`, or any error typ
    = help: the following other types implement trait `ContextError<A>`:
              musli::descriptive::Error<A>
              musli::json::Error<A>
+             musli::packed::Error<A>
              musli::storage::Error<A>
              musli::value::Error
              musli::wire::Error<A>

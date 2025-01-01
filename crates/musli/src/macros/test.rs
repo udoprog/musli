@@ -384,6 +384,7 @@ pub use __test_extra;
 macro_rules! __test_matrix {
     (full, $call:path) => {
         $call!(storage, Binary);
+        $call!(packed, Binary);
         $call!(wire, Binary);
         $call!(descriptive, Binary);
         $call!(json, Text);
@@ -398,6 +399,7 @@ macro_rules! __test_matrix {
 
     (binary_mode, $call:path) => {
         $call!(storage, Binary);
+        $call!(packed, Binary);
         $call!(wire, Binary);
         $call!(descriptive, Binary);
         $call!(json, Binary);
@@ -405,6 +407,7 @@ macro_rules! __test_matrix {
 
     (no_json, $call:path) => {
         $call!(storage, Binary);
+        $call!(packed, Binary);
         $call!(wire, Binary);
         $call!(descriptive, Binary);
     };
@@ -416,6 +419,10 @@ macro_rules! __test_matrix {
 
     (json, $call:path) => {
         $call!(json, Text);
+    };
+
+    (packed, $call:path) => {
+        $call!(packed, Binary);
     };
 
     (upgrade_stable, $call:path) => {
