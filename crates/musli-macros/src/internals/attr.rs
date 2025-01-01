@@ -12,7 +12,7 @@ use crate::expander::{NameMethod, NameType};
 
 use super::build;
 use super::ATTR;
-use super::{Ctxt, Method, Mode, NameAll};
+use super::{Ctxt, ImportedMethod, Mode, NameAll};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) enum ModeKind {
@@ -70,19 +70,12 @@ pub(crate) enum EnumTagging<'a> {
     },
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Packed {
-    #[default]
-    Default,
-    Bitwise,
-}
-
 /// If the type is tagged or not.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Packing {
     #[default]
     Tagged,
-    Packed(Packed),
+    Packed,
     Transparent,
 }
 
@@ -428,15 +421,7 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             // #[musli(packed)]
             if meta.path.is_ident("packed") {
-                new.packing
-                    .push((meta.path.span(), Packing::Packed(Packed::Default)));
-                return Ok(());
-            }
-
-            // #[musli(bitwise)]
-            if meta.path.is_ident("bitwise") {
-                new.packing
-                    .push((meta.path.span(), Packing::Packed(Packed::Bitwise)));
+                new.packing.push((meta.path.span(), Packing::Packed));
                 return Ok(());
             }
 
@@ -604,15 +589,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
             // #[musli(packed)]
             if meta.path.is_ident("packed") {
-                new.packing
-                    .push((meta.path.span(), Packing::Packed(Packed::Default)));
-                return Ok(());
-            }
-
-            // #[musli(bitwise)]
-            if meta.path.is_ident("bitwise") {
-                new.packing
-                    .push((meta.path.span(), Packing::Packed(Packed::Bitwise)));
+                new.packing.push((meta.path.span(), Packing::Packed));
                 return Ok(());
             }
 
@@ -700,15 +677,13 @@ impl Field {
         &self,
         mode: Mode<'a>,
         span: Span,
-    ) -> (Span, MethodOrPath<'a>) {
-        let encode_path = self.encode_path(mode);
-
-        if let Some((span, encode_path)) = encode_path {
-            (*span, MethodOrPath::Path(encode_path.clone()))
+    ) -> (Span, DefaultOrCustom<'a>) {
+        if let Some((span, encode_path)) = self.encode_path(mode) {
+            (*span, DefaultOrCustom::Custom(encode_path.clone()))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
             let encode_path = mode.encode_t_encode(field_encoding);
-            (span, MethodOrPath::Method(encode_path))
+            (span, DefaultOrCustom::Default(encode_path))
         }
     }
 
@@ -717,30 +692,13 @@ impl Field {
         &self,
         mode: Mode<'a>,
         span: Span,
-    ) -> (Span, MethodOrPath<'a>) {
-        let decode_path = self.decode_path(mode);
-
-        if let Some((span, decode_path)) = decode_path {
-            (*span, MethodOrPath::Path(decode_path.clone()))
+    ) -> (Span, DefaultOrCustom<'a>) {
+        if let Some((span, decode_path)) = self.decode_path(mode) {
+            (*span, DefaultOrCustom::Custom(decode_path.clone()))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
             let decode_path = mode.decode_t_decode(field_encoding);
-            (span, MethodOrPath::Method(decode_path))
-        }
-    }
-}
-
-pub(crate) enum MethodOrPath<'a> {
-    Method(Method<'a>),
-    Path(syn::Path),
-}
-
-impl ToTokens for MethodOrPath<'_> {
-    #[inline]
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        match self {
-            MethodOrPath::Method(method) => method.to_tokens(tokens),
-            MethodOrPath::Path(path) => path.to_tokens(tokens),
+            (span, DefaultOrCustom::Default(decode_path))
         }
     }
 }
@@ -1019,5 +977,30 @@ impl TypeConfig {
         }
 
         Ok(this)
+    }
+}
+
+/// A default or custom path to use.
+pub(crate) enum DefaultOrCustom<'a> {
+    /// A default method call from [`Tokens`][super::Tokens].
+    Default(ImportedMethod<'a>),
+    /// A custom specified path.
+    Custom(syn::Path),
+}
+
+impl DefaultOrCustom<'_> {
+    #[inline]
+    pub(crate) fn is_default(&self) -> bool {
+        matches!(self, DefaultOrCustom::Default(..))
+    }
+}
+
+impl ToTokens for DefaultOrCustom<'_> {
+    #[inline]
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            DefaultOrCustom::Default(method) => method.to_tokens(tokens),
+            DefaultOrCustom::Custom(path) => path.to_tokens(tokens),
+        }
     }
 }

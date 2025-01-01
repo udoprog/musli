@@ -208,7 +208,7 @@ pub mod __priv {
     pub use crate::never::Never;
 
     pub use ::core::fmt;
-    pub use ::core::mem::{offset_of, size_of};
+    pub use ::core::mem::{needs_drop, offset_of, size_of};
     pub use ::core::option::Option;
     pub use ::core::result::Result;
 

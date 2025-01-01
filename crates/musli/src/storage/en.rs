@@ -72,7 +72,7 @@ where
     where
         T: Encode<Self::Mode>,
     {
-        if !const { is_native_fixed::<OPT>() && T::Encode::ENCODE_PACKED } {
+        if !const { is_native_fixed::<OPT>() && T::Encode::IS_BITWISE_ENCODE } {
             return Ok(TryFastEncode::Unsupported(value, self));
         }
 
@@ -241,7 +241,9 @@ where
     {
         // Check that the type is packed inside of the slice.
         if !const {
-            is_native_fixed::<OPT>() && T::ENCODE_PACKED && size_of::<T>() % align_of::<T>() == 0
+            is_native_fixed::<OPT>()
+                && T::IS_BITWISE_ENCODE
+                && size_of::<T>() % align_of::<T>() == 0
         } {
             return utils::default_encode_slice(self, slice);
         }

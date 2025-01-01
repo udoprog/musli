@@ -5,7 +5,7 @@ use syn::Token;
 
 use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Variant};
-use crate::internals::{Result, Tokens};
+use crate::internals::{Only, Result, Tokens};
 
 struct Ctxt<'a> {
     ctx_var: &'a syn::Ident,
@@ -42,7 +42,13 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let body = match &e.data {
         BuildData::Struct(st) => {
-            packed = crate::internals::packed(&e, st, e.tokens.encode_t, "ENCODE_PACKED");
+            packed = crate::internals::packed(
+                &e,
+                st,
+                e.tokens.encode_t,
+                "IS_BITWISE_ENCODE",
+                Only::Encode,
+            );
             encode_map(&cx, &e, st)?
         }
         BuildData::Enum(en) => {
@@ -83,7 +89,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
             impl #impl_generics #encode_t<#mode_ident> for #type_ident #type_generics
             #where_clause
             {
-                const ENCODE_PACKED: bool = #packed;
+                const IS_BITWISE_ENCODE: bool = #packed;
 
                 type Encode = Self;
 
@@ -174,7 +180,7 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream
                 #output_var
             }};
         }
-        Packing::Packed(..) => {
+        Packing::Packed => {
             let decls = tests.iter().map(|t| &t.decl);
 
             encode = quote! {{
@@ -284,7 +290,7 @@ fn insert_fields<'st>(
                     #leave
                 }};
             }
-            Packing::Packed(..) => {
+            Packing::Packed => {
                 let decl = enter.is_some().then(|| {
                     quote! {
                         static #field_name_static: #name_type = #name;
@@ -416,7 +422,7 @@ fn encode_variant(
                     let var = &f.self_access;
                     encode = quote!(#encode_path(#var, #encoder_var)?);
                 }
-                Packing::Packed(..) => {
+                Packing::Packed => {
                     let decls = tests.iter().map(|t| &t.decl);
 
                     encode = quote! {{

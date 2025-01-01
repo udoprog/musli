@@ -82,7 +82,7 @@ where
     where
         T: Decode<'de, Self::Mode>,
     {
-        if !const { is_native_fixed::<OPT>() && T::DECODE_PACKED } {
+        if !const { is_native_fixed::<OPT>() && T::IS_BITWISE_DECODE } {
             return Ok(TryFastDecode::Unsupported(self));
         }
 
@@ -290,7 +290,9 @@ where
     {
         // Check that the type is packed inside of the slice.
         if !const {
-            is_native_fixed::<OPT>() && T::DECODE_PACKED && size_of::<T>() % align_of::<T>() == 0
+            is_native_fixed::<OPT>()
+                && T::IS_BITWISE_DECODE
+                && size_of::<T>() % align_of::<T>() == 0
         } {
             return utils::default_decode_slice(self);
         }
@@ -348,7 +350,7 @@ where
 
         // SAFETY: If the type is zero-sized, we don't need to copy anything and
         // can just set the length, otherwise setting the length here has no
-        // drop implications since `DECODE_PACKED` in particular essentially
+        // drop implications since bitwise encoding in particular essentially
         // requires that the type is `Copy`.
         unsafe {
             out.set_len(len);

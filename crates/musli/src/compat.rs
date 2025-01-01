@@ -26,7 +26,7 @@ impl<T> Sequence<T> {
 }
 
 impl<M> Encode<M> for Sequence<()> {
-    const ENCODE_PACKED: bool = true;
+    const IS_BITWISE_ENCODE: bool = true;
 
     type Encode = Self;
 
@@ -47,7 +47,7 @@ impl<M> Encode<M> for Sequence<()> {
 }
 
 impl<'de, M> Decode<'de, M> for Sequence<()> {
-    const DECODE_PACKED: bool = true;
+    const IS_BITWISE_DECODE: bool = true;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>

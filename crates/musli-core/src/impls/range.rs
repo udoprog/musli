@@ -10,7 +10,7 @@ macro_rules! implement {
         where
             $($type: Encode<M>,)*
         {
-            const ENCODE_PACKED: bool = false;
+            const IS_BITWISE_ENCODE: bool = false;
 
             #[inline]
             #[allow(unused)]
@@ -38,7 +38,7 @@ macro_rules! implement {
         where
             $($type: Decode<'de, M>,)*
         {
-            const DECODE_PACKED: bool = false;
+            const IS_BITWISE_DECODE: bool = false;
 
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
@@ -58,7 +58,7 @@ macro_rules! implement_new {
         where
             T: Encode<M>,
         {
-            const ENCODE_PACKED: bool = false;
+            const IS_BITWISE_ENCODE: bool = false;
 
             #[inline]
             fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -85,7 +85,7 @@ macro_rules! implement_new {
         where
             T: Decode<'de, M>,
         {
-            const DECODE_PACKED: bool = false;
+            const IS_BITWISE_DECODE: bool = false;
 
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>

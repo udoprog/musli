@@ -10,8 +10,8 @@ use crate::expander::{
     UnsizedMethod, VariantData,
 };
 
-use super::attr::{EnumTagging, FieldEncoding, MethodOrPath, ModeKind, Packing};
-use super::mode::Method;
+use super::attr::{DefaultOrCustom, EnumTagging, FieldEncoding, ModeKind, Packing};
+use super::mode::ImportedMethod;
 use super::name::NameAll;
 use super::ATTR;
 use super::{Ctxt, Expansion, Mode, Only, Result, Tokens};
@@ -24,8 +24,8 @@ pub(crate) struct Build<'a> {
     pub(crate) decode_bounds: &'a [(Span, syn::WherePredicate)],
     pub(crate) expansion: Expansion<'a>,
     pub(crate) data: BuildData<'a>,
-    pub(crate) decode_t_decode: Method<'a>,
-    pub(crate) encode_t_encode: Method<'a>,
+    pub(crate) decode_t_decode: ImportedMethod<'a>,
+    pub(crate) encode_t_encode: ImportedMethod<'a>,
     pub(crate) enum_tagging_span: Option<Span>,
 }
 
@@ -136,8 +136,8 @@ pub(crate) struct Variant<'a> {
 pub(crate) struct Field<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
-    pub(crate) encode_path: (Span, MethodOrPath<'a>),
-    pub(crate) decode_path: (Span, MethodOrPath<'a>),
+    pub(crate) encode_path: (Span, DefaultOrCustom<'a>),
+    pub(crate) decode_path: (Span, DefaultOrCustom<'a>),
     pub(crate) name: syn::Expr,
     pub(crate) pattern: Option<&'a syn::Pat>,
     /// Skip field entirely and always initialize with the specified expresion,
@@ -272,7 +272,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a EnumData<'a>) -> En
     if !matches!(enum_tagging, EnumTagging::Default | EnumTagging::Empty) {
         match packing_span {
             Some((_, Packing::Tagged)) => (),
-            Some(&(span, Packing::Packed(..))) => {
+            Some(&(span, Packing::Packed)) => {
                 e.cx.error_span(span, format_args!("#[{ATTR}(packed)] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
             }
             Some(&(span, Packing::Transparent)) => {
