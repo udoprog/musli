@@ -8,19 +8,19 @@ use super::super::parser::{Parser, Token};
 use super::{JsonDecoder, KeySignedVisitor, KeyUnsignedVisitor, StringReference};
 
 /// A JSON object key decoder for Müsli.
-pub(crate) struct JsonKeyDecoder<'a, P, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonKeyDecoder<P, C> {
+    cx: C,
     parser: P,
 }
 
-impl<'a, 'de, P, C> JsonKeyDecoder<'a, P, C>
+impl<'de, P, C> JsonKeyDecoder<P, C>
 where
     P: Parser<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, parser: P) -> Self {
+    pub(crate) fn new(cx: C, parser: P) -> Self {
         Self { cx, parser }
     }
 
@@ -39,29 +39,26 @@ where
 }
 
 #[crate::decoder(crate)]
-impl<'de, P, C> Decoder<'de> for JsonKeyDecoder<'_, P, C>
+impl<'de, P, C> Decoder<'de> for JsonKeyDecoder<P, C>
 where
     P: Parser<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = JsonKeyDecoder<'this, P, U>
+    type WithContext<U>
+        = JsonKeyDecoder<P, U>
     where
-        U: 'this + Context;
+        U: Context;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {

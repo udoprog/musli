@@ -4,18 +4,18 @@ use crate::Context;
 
 use super::{JsonDecoder, JsonKeyDecoder};
 
-pub(crate) struct JsonVariantDecoder<'a, P, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonVariantDecoder<P, C> {
+    cx: C,
     parser: P,
 }
 
-impl<'a, 'de, P, C> JsonVariantDecoder<'a, P, C>
+impl<'de, P, C> JsonVariantDecoder<P, C>
 where
     P: Parser<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     #[inline]
-    pub(super) fn new(cx: &'a C, mut parser: P) -> Result<Self, C::Error> {
+    pub(super) fn new(cx: C, mut parser: P) -> Result<Self, C::Error> {
         let actual = parser.lex(cx);
 
         if !matches!(actual, Token::OpenBrace) {
@@ -41,18 +41,18 @@ where
     }
 }
 
-impl<'a, 'de, P, C> VariantDecoder<'de> for JsonVariantDecoder<'a, P, C>
+impl<'de, P, C> VariantDecoder<'de> for JsonVariantDecoder<P, C>
 where
     P: Parser<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type DecodeTag<'this>
-        = JsonKeyDecoder<'a, P::Mut<'this>, C>
+        = JsonKeyDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
     type DecodeValue<'this>
-        = JsonDecoder<'a, P::Mut<'this>, C>
+        = JsonDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
 

@@ -6,7 +6,7 @@ use musli::Context;
 struct AnyVisitor;
 
 #[musli::visitor]
-impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
+impl<'de, C> Visitor<'de, C> for AnyVisitor where C: Context {
     type Ok = ();
 
     #[inline]

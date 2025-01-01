@@ -20,52 +20,49 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::{Context, Writer};
 
 /// A JSON encoder for Müsli.
-pub(crate) struct JsonEncoder<'a, W, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonEncoder<W, C> {
+    cx: C,
     writer: W,
 }
 
-impl<'a, W, C: ?Sized> JsonEncoder<'a, W, C> {
+impl<W, C> JsonEncoder<W, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W) -> Self {
+    pub(crate) fn new(cx: C, writer: W) -> Self {
         Self { cx, writer }
     }
 }
 
 #[crate::encoder(crate)]
-impl<'a, C, W> Encoder for JsonEncoder<'a, W, C>
+impl<C, W> Encoder for JsonEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = JsonEncoder<'this, W, U>
+    type WithContext<U>
+        = JsonEncoder<W, U>
     where
-        U: 'this + Context;
-    type EncodePack = JsonArrayEncoder<'a, W, C>;
+        U: Context;
+    type EncodePack = JsonArrayEncoder<W, C>;
     type EncodeSome = Self;
-    type EncodeSequence = JsonArrayEncoder<'a, W, C>;
-    type EncodeMap = JsonObjectEncoder<'a, W, C>;
-    type EncodeMapEntries = JsonObjectEncoder<'a, W, C>;
-    type EncodeVariant = JsonVariantEncoder<'a, W, C>;
-    type EncodeSequenceVariant = JsonArrayEncoder<'a, W, C>;
-    type EncodeMapVariant = JsonObjectEncoder<'a, W, C>;
+    type EncodeSequence = JsonArrayEncoder<W, C>;
+    type EncodeMap = JsonObjectEncoder<W, C>;
+    type EncodeMapEntries = JsonObjectEncoder<W, C>;
+    type EncodeVariant = JsonVariantEncoder<W, C>;
+    type EncodeSequenceVariant = JsonArrayEncoder<W, C>;
+    type EncodeMapVariant = JsonObjectEncoder<W, C>;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -329,9 +326,9 @@ where
 
 /// Encode a sequence of chars as a string.
 #[inline]
-fn encode_string<C, W>(cx: &C, mut w: W, bytes: &[u8]) -> Result<(), C::Error>
+fn encode_string<C, W>(cx: C, mut w: W, bytes: &[u8]) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     w.write_byte(cx, b'"')?;
@@ -400,9 +397,9 @@ static ESCAPE: [u8; 256] = [
 // Hex digits.
 static HEX_DIGITS: [u8; 16] = *b"0123456789abcdef";
 
-fn write_escape<C, W>(cx: &C, mut writer: W, escape: u8, byte: u8) -> Result<(), C::Error>
+fn write_escape<C, W>(cx: C, mut writer: W, escape: u8, byte: u8) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     let s = match escape {

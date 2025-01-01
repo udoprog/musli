@@ -4,32 +4,32 @@ use crate::{Context, Writer};
 use super::{JsonEncoder, JsonObjectKeyEncoder};
 
 /// Encoder for a JSON object pair.
-pub(crate) struct JsonObjectPairEncoder<'a, W, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonObjectPairEncoder<W, C> {
+    cx: C,
     empty: bool,
     writer: W,
 }
 
-impl<'a, W, C: ?Sized> JsonObjectPairEncoder<'a, W, C> {
+impl<W, C> JsonObjectPairEncoder<W, C> {
     #[inline]
-    pub(super) const fn new(cx: &'a C, empty: bool, writer: W) -> Self {
+    pub(super) const fn new(cx: C, empty: bool, writer: W) -> Self {
         Self { cx, empty, writer }
     }
 }
 
-impl<'a, W, C> EntryEncoder for JsonObjectPairEncoder<'a, W, C>
+impl<W, C> EntryEncoder for JsonObjectPairEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeKey<'this>
-        = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
+        = JsonObjectKeyEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = JsonEncoder<'a, W::Mut<'this>, C>
+        = JsonEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
 

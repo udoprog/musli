@@ -4,29 +4,29 @@ use crate::Context;
 
 use super::{JsonDecoder, JsonKeyDecoder};
 
-pub(crate) struct JsonObjectPairDecoder<'a, P, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonObjectPairDecoder<P, C> {
+    cx: C,
     parser: P,
 }
 
-impl<'a, P, C: ?Sized> JsonObjectPairDecoder<'a, P, C> {
+impl<P, C> JsonObjectPairDecoder<P, C> {
     #[inline]
-    pub(super) fn new(cx: &'a C, parser: P) -> Self {
+    pub(super) fn new(cx: C, parser: P) -> Self {
         Self { cx, parser }
     }
 }
 
-impl<'a, 'de, P, C> EntryDecoder<'de> for JsonObjectPairDecoder<'a, P, C>
+impl<'de, P, C> EntryDecoder<'de> for JsonObjectPairDecoder<P, C>
 where
     P: Parser<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type DecodeKey<'this>
-        = JsonKeyDecoder<'a, P::Mut<'this>, C>
+        = JsonKeyDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
-    type DecodeValue = JsonDecoder<'a, P, C>;
+    type DecodeValue = JsonDecoder<P, C>;
 
     #[inline]
     fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {

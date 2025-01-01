@@ -548,25 +548,22 @@ pub use musli_core::mode;
 /// use musli::Context;
 /// use musli::en::{Encoder, Encode};
 ///
-/// struct MyEncoder<'a, C: ?Sized> {
+/// struct MyEncoder<'a, C> {
+///     cx: C,
 ///     value: &'a mut Option<u32>,
-///     cx: &'a C,
 /// }
 ///
 /// #[musli::encoder]
 /// impl<C> Encoder for MyEncoder<'_, C>
 /// where
-///     C: ?Sized + Context,
+///     C: Context,
 /// {
 ///     type Cx = C;
 ///     type Ok = ();
 ///
 ///     #[inline]
-///     fn cx<F, O>(self, f: F) -> O
-///     where
-///         F: FnOnce(&Self::Cx, Self) -> O,
-///     {
-///         f(self.cx, self)
+///     fn cx(&self) -> Self::Cx {
+///         self.cx
 ///     }
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -607,20 +604,20 @@ pub use musli_core::encoder;
 /// use musli::Context;
 /// use musli::de::{Decoder, Decode};
 ///
-/// struct MyDecoder<'a, C: ?Sized> {
-///     cx: &'a C,
+/// struct MyDecoder<C> {
+///     cx: C,
 /// }
 ///
 /// #[musli::decoder]
-/// impl<'de, C: ?Sized + Context> Decoder<'de> for MyDecoder<'_, C> {
+/// impl<'de, C> Decoder<'de> for MyDecoder<C>
+/// where
+///     C: Context,
+/// {
 ///     type Cx = C;
 ///
 ///     #[inline]
-///     fn cx<F, O>(self, f: F) -> O
-///     where
-///         F: FnOnce(&Self::Cx, Self) -> O,
-///     {
-///         f(self.cx, self)
+///     fn cx(&self) -> Self::Cx {
+///         self.cx
 ///     }
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -658,7 +655,10 @@ pub use musli_core::decoder;
 /// struct AnyVisitor;
 ///
 /// #[musli::visitor]
-/// impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
+/// impl<'de, C> Visitor<'de, C> for AnyVisitor
+/// where
+///     C: Context,
+/// {
 ///     type Ok = ();
 ///
 ///     #[inline]

@@ -166,7 +166,7 @@ where
     }
 }
 
-impl<A, M> Context for DefaultContext<A, M>
+impl<A, M> Context for &DefaultContext<A, M>
 where
     A: Clone + Allocator,
     M: 'static,
@@ -178,7 +178,7 @@ where
     type String = String<A>;
 
     #[inline]
-    fn clear(&self) {
+    fn clear(self) {
         self.mark.set(0);
         let _access = self.access.exclusive();
 
@@ -190,12 +190,12 @@ where
     }
 
     #[inline]
-    fn alloc(&self) -> Self::Allocator {
+    fn alloc(self) -> Self::Allocator {
         self.alloc.clone()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
+    fn collect_string<T>(self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
@@ -206,7 +206,7 @@ where
     }
 
     #[inline]
-    fn custom<T>(&self, message: T) -> Self::Error
+    fn custom<T>(self, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -218,7 +218,7 @@ where
     }
 
     #[inline]
-    fn message<T>(&self, message: T) -> Self::Error
+    fn message<T>(self, message: T) -> Self::Error
     where
         T: fmt::Display,
     {
@@ -230,7 +230,7 @@ where
     }
 
     #[inline]
-    fn marked_message<T>(&self, mark: &Self::Mark, message: T) -> Self::Error
+    fn marked_message<T>(self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: fmt::Display,
     {
@@ -242,7 +242,7 @@ where
     }
 
     #[inline]
-    fn marked_custom<T>(&self, mark: &Self::Mark, message: T) -> Self::Error
+    fn marked_custom<T>(self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -254,17 +254,17 @@ where
     }
 
     #[inline]
-    fn mark(&self) -> Self::Mark {
+    fn mark(self) -> Self::Mark {
         self.mark.get()
     }
 
     #[inline]
-    fn advance(&self, n: usize) {
+    fn advance(self, n: usize) {
         self.mark.set(self.mark.get().wrapping_add(n));
     }
 
     #[inline]
-    fn enter_named_field<T>(&self, name: &'static str, _: &T)
+    fn enter_named_field<T>(self, name: &'static str, _: &T)
     where
         T: ?Sized + fmt::Display,
     {
@@ -272,7 +272,7 @@ where
     }
 
     #[inline]
-    fn enter_unnamed_field<T>(&self, index: u32, _: &T)
+    fn enter_unnamed_field<T>(self, index: u32, _: &T)
     where
         T: ?Sized + fmt::Display,
     {
@@ -280,60 +280,60 @@ where
     }
 
     #[inline]
-    fn leave_field(&self) {
+    fn leave_field(self) {
         self.pop_path();
     }
 
     #[inline]
-    fn enter_struct(&self, name: &'static str) {
+    fn enter_struct(self, name: &'static str) {
         if self.include_type {
             self.push_path(Step::Struct(name));
         }
     }
 
     #[inline]
-    fn leave_struct(&self) {
+    fn leave_struct(self) {
         if self.include_type {
             self.pop_path();
         }
     }
 
     #[inline]
-    fn enter_enum(&self, name: &'static str) {
+    fn enter_enum(self, name: &'static str) {
         if self.include_type {
             self.push_path(Step::Enum(name));
         }
     }
 
     #[inline]
-    fn leave_enum(&self) {
+    fn leave_enum(self) {
         if self.include_type {
             self.pop_path();
         }
     }
 
     #[inline]
-    fn enter_variant<T>(&self, name: &'static str, _: T) {
+    fn enter_variant<T>(self, name: &'static str, _: T) {
         self.push_path(Step::Variant(name));
     }
 
     #[inline]
-    fn leave_variant(&self) {
+    fn leave_variant(self) {
         self.pop_path();
     }
 
     #[inline]
-    fn enter_sequence_index(&self, index: usize) {
+    fn enter_sequence_index(self, index: usize) {
         self.push_path(Step::Index(index));
     }
 
     #[inline]
-    fn leave_sequence_index(&self) {
+    fn leave_sequence_index(self) {
         self.pop_path();
     }
 
     #[inline]
-    fn enter_map_key<T>(&self, field: T)
+    fn enter_map_key<T>(self, field: T)
     where
         T: fmt::Display,
     {
@@ -343,7 +343,7 @@ where
     }
 
     #[inline]
-    fn leave_map_key(&self) {
+    fn leave_map_key(self) {
         self.pop_path();
     }
 }

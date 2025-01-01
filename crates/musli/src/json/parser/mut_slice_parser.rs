@@ -42,12 +42,12 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     #[inline]
     fn parse_string<'scratch, C>(
         &mut self,
-        cx: &C,
+        cx: C,
         validate: bool,
         scratch: &'scratch mut Vec<u8, C::Allocator>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let start = cx.mark();
         let actual = self.lex(cx);
@@ -66,9 +66,9 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     }
 
     #[inline]
-    fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    fn skip_string<C>(&mut self, cx: C) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let mut access = SliceAccess::new(cx, self.slice, 0);
         let out = access.skip_string();
@@ -77,9 +77,9 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     }
 
     #[inline]
-    fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if self.slice.len() < n {
             return Err(cx.custom(SliceUnderflow::new(n, self.slice.len())));
@@ -91,9 +91,9 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     }
 
     #[inline]
-    fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if self.slice.len() < buf.len() {
             return Err(cx.custom(SliceUnderflow::new(buf.len(), self.slice.len())));
@@ -107,9 +107,9 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
     }
 
     #[inline]
-    fn skip_whitespace<C>(&mut self, cx: &C)
+    fn skip_whitespace<C>(&mut self, cx: C)
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let n = 0;
 
@@ -134,9 +134,9 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         self.slice.first().copied()
     }
 
-    fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>
+    fn parse_f32<C>(&mut self, cx: C) -> Result<f32, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let Some((value, read)) = crate::dec2flt::dec2flt(self.slice) else {
             return Err(cx.message(ErrorMessage::ParseFloat));
@@ -147,9 +147,9 @@ impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
         Ok(value)
     }
 
-    fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
+    fn parse_f64<C>(&mut self, cx: C) -> Result<f64, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let Some((value, read)) = crate::dec2flt::dec2flt(self.slice) else {
             return Err(cx.message(ErrorMessage::ParseFloat));

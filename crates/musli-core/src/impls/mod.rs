@@ -151,17 +151,16 @@ macro_rules! non_zero {
             where
                 D: Decoder<'de>,
             {
-                decoder.cx(|cx, decoder| {
-                    let value = decoder.decode()?;
+                let cx = decoder.cx();
+                let value = decoder.decode()?;
 
-                    match Self::new(value) {
-                        Some(value) => Ok(value),
-                        None => Err(cx.message(NonZeroUnsupportedValue {
-                            type_name: stringify!($ty),
-                            value,
-                        })),
-                    }
-                })
+                match Self::new(value) {
+                    Some(value) => Ok(value),
+                    None => Err(cx.message(NonZeroUnsupportedValue {
+                        type_name: stringify!($ty),
+                        value,
+                    })),
+                }
             }
         }
     };
@@ -233,28 +232,27 @@ where
     where
         D: Decoder<'de, Mode = M>,
     {
-        decoder.cx(|cx, decoder| {
-            let mark = cx.mark();
+        let cx = decoder.cx();
+        let mark = cx.mark();
 
-            decoder.decode_sequence(|seq| {
-                let mut array = crate::internal::FixedVec::new();
+        decoder.decode_sequence(|seq| {
+            let mut array = crate::internal::FixedVec::new();
 
-                while let Some(item) = seq.try_decode_next()? {
-                    array.try_push(item.decode()?).map_err(cx.map())?;
-                }
+            while let Some(item) = seq.try_decode_next()? {
+                array.try_push(item.decode()?).map_err(cx.map())?;
+            }
 
-                if array.len() != N {
-                    return Err(cx.marked_message(
-                        &mark,
-                        format_args!(
-                            "Array with length {} does not have the expected {N} number of elements",
-                            array.len()
-                        ),
-                    ));
-                }
+            if array.len() != N {
+                return Err(cx.marked_message(
+                    &mark,
+                    format_args!(
+                        "Array with length {} does not have the expected {N} number of elements",
+                        array.len()
+                    ),
+                ));
+            }
 
-                Ok(array.into_inner())
-            })
+            Ok(array.into_inner())
         })
     }
 }
@@ -287,17 +285,17 @@ where
     where
         D: Decoder<'de, Mode = M>,
     {
-        decoder.cx(|cx, decoder| {
-            decoder.decode_pack(|pack| {
-                let mut array = crate::internal::FixedVec::new();
+        let cx = decoder.cx();
 
-                while array.len() < N {
-                    let item = pack.decode_next()?;
-                    array.try_push(item.decode()?).map_err(cx.map())?;
-                }
+        decoder.decode_pack(|pack| {
+            let mut array = crate::internal::FixedVec::new();
 
-                Ok(array.into_inner())
-            })
+            while array.len() < N {
+                let item = pack.decode_next()?;
+                array.try_push(item.decode()?).map_err(cx.map())?;
+            }
+
+            Ok(array.into_inner())
         })
     }
 }
@@ -452,7 +450,7 @@ impl<'de, M> Decode<'de, M> for &'de str {
 
         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
         where
-            C: ?Sized + Context,
+            C: Context,
         {
             type Ok = &'de str;
 
@@ -462,7 +460,7 @@ impl<'de, M> Decode<'de, M> for &'de str {
             }
 
             #[inline]
-            fn visit_borrowed(self, _: &C, string: &'de str) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, string: &'de str) -> Result<Self::Ok, C::Error> {
                 Ok(string)
             }
         }
@@ -482,7 +480,7 @@ impl<'de, M> DecodeUnsized<'de, M> for str {
 
         impl<C, F, O> UnsizedVisitor<'_, C, str> for Visitor<F>
         where
-            C: ?Sized + Context,
+            C: Context,
             F: FnOnce(&str) -> Result<O, C::Error>,
         {
             type Ok = O;
@@ -493,7 +491,7 @@ impl<'de, M> DecodeUnsized<'de, M> for str {
             }
 
             #[inline]
-            fn visit_ref(self, _: &C, string: &str) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: C, string: &str) -> Result<Self::Ok, C::Error> {
                 (self.0)(string)
             }
         }
@@ -513,7 +511,7 @@ impl<'de, M> DecodeUnsized<'de, M> for [u8] {
 
         impl<C, F, O> UnsizedVisitor<'_, C, [u8]> for Visitor<F>
         where
-            C: ?Sized + Context,
+            C: Context,
             F: FnOnce(&[u8]) -> Result<O, C::Error>,
         {
             type Ok = O;
@@ -524,7 +522,7 @@ impl<'de, M> DecodeUnsized<'de, M> for [u8] {
             }
 
             #[inline]
-            fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 (self.0)(bytes)
             }
         }
@@ -567,7 +565,7 @@ impl<'de, M> Decode<'de, M> for &'de [u8] {
 
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
-            C: ?Sized + Context,
+            C: Context,
         {
             type Ok = &'de [u8];
 
@@ -577,7 +575,7 @@ impl<'de, M> Decode<'de, M> for &'de [u8] {
             }
 
             #[inline]
-            fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes)
             }
         }
@@ -597,7 +595,7 @@ impl<'de, M> DecodeUnsizedBytes<'de, M> for [u8] {
 
         impl<C, F, O> UnsizedVisitor<'_, C, [u8]> for Visitor<F>
         where
-            C: ?Sized + Context,
+            C: Context,
             F: FnOnce(&[u8]) -> Result<O, C::Error>,
         {
             type Ok = O;
@@ -608,7 +606,7 @@ impl<'de, M> DecodeUnsizedBytes<'de, M> for [u8] {
             }
 
             #[inline]
-            fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 (self.0)(bytes)
             }
         }
@@ -785,10 +783,9 @@ impl<'de, M> Decode<'de, M> for &'de CStr {
     where
         D: Decoder<'de>,
     {
-        decoder.cx(|cx, decoder| {
-            let bytes = decoder.decode()?;
-            CStr::from_bytes_with_nul(bytes).map_err(cx.map())
-        })
+        let cx = decoder.cx();
+        let bytes = decoder.decode()?;
+        CStr::from_bytes_with_nul(bytes).map_err(cx.map())
     }
 }
 
@@ -799,11 +796,11 @@ impl<'de, M> DecodeUnsized<'de, M> for CStr {
         D: Decoder<'de, Mode = M>,
         F: FnOnce(&Self) -> Result<O, D::Error>,
     {
-        decoder.cx(|cx, decoder| {
-            DecodeUnsizedBytes::decode_unsized_bytes(decoder, |bytes: &[u8]| {
-                let cstr = CStr::from_bytes_with_nul(bytes).map_err(cx.map())?;
-                f(cstr)
-            })
+        let cx = decoder.cx();
+
+        DecodeUnsizedBytes::decode_unsized_bytes(decoder, |bytes: &[u8]| {
+            let cstr = CStr::from_bytes_with_nul(bytes).map_err(cx.map())?;
+            f(cstr)
         })
     }
 }

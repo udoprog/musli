@@ -23,7 +23,7 @@ impl<T> KeySignedVisitor<T> {
 
 impl<C, T> UnsizedVisitor<'_, C, [u8]> for KeySignedVisitor<T>
 where
-    C: ?Sized + Context,
+    C: Context,
     T: Signed,
 {
     type Ok = T;
@@ -34,7 +34,7 @@ where
     }
 
     #[inline]
-    fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         parse_signed(cx, &mut SliceParser::new(bytes))
     }
 }

@@ -654,9 +654,9 @@ macro_rules! encoding_impls {
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
-        pub fn encode_with<C, W, T>(self, cx: &C, writer: W, value: &T) -> Result<W::Ok, C::Error>
+        pub fn encode_with<C, W, T>(self, cx: C, writer: W, value: &T) -> Result<W::Ok, C::Error>
         where
-            C: ?Sized + Context<Mode = $mode>,
+            C: Context<Mode = $mode>,
             W: $writer_trait,
             T: ?Sized + Encode<C::Mode>,
         {
@@ -712,12 +712,12 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn to_slice_with<C, T>(
             self,
-            cx: &C,
+            cx: C,
             out: &mut [u8],
             value: &T,
         ) -> Result<usize, C::Error>
         where
-            C: ?Sized + Context<Mode = $mode>,
+            C: Context<Mode = $mode>,
             T: ?Sized + Encode<C::Mode>,
         {
             let len = out.len();
@@ -767,11 +767,11 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn to_vec_with<C, T>(
             self,
-            cx: &C,
+            cx: C,
             value: &T,
         ) -> Result<rust_alloc::vec::Vec<u8>, C::Error>
         where
-            C: ?Sized + Context<Mode = $mode>,
+            C: Context<Mode = $mode>,
             T: ?Sized + Encode<C::Mode>,
         {
             let mut vec = rust_alloc::vec::Vec::new();
@@ -814,11 +814,11 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn to_fixed_bytes_with<C, const N: usize, T>(
             self,
-            cx: &C,
+            cx: C,
             value: &T,
         ) -> Result<$crate::FixedBytes<N>, C::Error>
         where
-            C: ?Sized + Context<Mode = $mode>,
+            C: Context<Mode = $mode>,
             T: ?Sized + Encode<C::Mode>,
         {
             let mut bytes = $crate::FixedBytes::new();
@@ -864,9 +864,9 @@ macro_rules! encoding_impls {
         /// ```
         #[cfg(feature = "std")]
         #[inline]
-        pub fn to_writer_with<C, W, T>(self, cx: &C, write: W, value: &T) -> Result<(), C::Error>
+        pub fn to_writer_with<C, W, T>(self, cx: C, write: W, value: &T) -> Result<(), C::Error>
         where
-            C: ?Sized + Context<Mode = $mode>,
+            C: Context<Mode = $mode>,
             W: std::io::Write,
             T: ?Sized + Encode<C::Mode>,
         {
@@ -914,9 +914,9 @@ macro_rules! encoding_impls {
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
-        pub fn decode_with<'de, C, R, T>(self, cx: &C, reader: R) -> Result<T, C::Error>
+        pub fn decode_with<'de, C, R, T>(self, cx: C, reader: R) -> Result<T, C::Error>
         where
-            C: ?Sized + Context<Mode = $mode>,
+            C: Context<Mode = $mode>,
             R: $reader_trait<'de>,
             T: Decode<'de, C::Mode>,
         {
@@ -963,9 +963,9 @@ macro_rules! encoding_impls {
         /// # Ok::<(), Error>(())
         /// ```
         #[inline]
-        pub fn from_slice_with<'de, C, T>(self, cx: &C, bytes: &'de [u8]) -> Result<T, C::Error>
+        pub fn from_slice_with<'de, C, T>(self, cx: C, bytes: &'de [u8]) -> Result<T, C::Error>
         where
-            C: ?Sized + Context<Mode = $mode>,
+            C: Context<Mode = $mode>,
             T: Decode<'de, $mode>,
         {
             self.decode_with(cx, bytes)
@@ -982,9 +982,9 @@ macro_rules! encoding_impls {
         ///
         /// [`Context`]: crate::Context
         #[inline]
-        pub fn from_str_with<'de, C, T>(self, cx: &C, string: &'de str) -> Result<T, C::Error>
+        pub fn from_str_with<'de, C, T>(self, cx: C, string: &'de str) -> Result<T, C::Error>
         where
-            C: ?Sized + Context<Mode = M>,
+            C: Context<Mode = M>,
             T: Decode<'de, M>,
         {
             self.from_slice_with(cx, string.as_bytes())

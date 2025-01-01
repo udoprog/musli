@@ -262,9 +262,9 @@ where
     #[cfg(feature = "alloc")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
     #[inline]
-    pub fn to_string_with<T, C>(self, cx: &C, value: &T) -> Result<String, C::Error>
+    pub fn to_string_with<T, C>(self, cx: C, value: &T) -> Result<String, C::Error>
     where
-        C: ?Sized + Context<Mode = M>,
+        C: Context<Mode = M>,
         T: ?Sized + Encode<M>,
     {
         cx.clear();

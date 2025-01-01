@@ -60,19 +60,13 @@ impl Value {
     /// Construct a [AsValueDecoder] implementation out of this value which
     /// emits the specified error `E`.
     #[inline]
-    pub fn into_value_decoder<const OPT: Options, C: ?Sized>(
-        self,
-        cx: &C,
-    ) -> AsValueDecoder<'_, OPT, C> {
+    pub fn into_value_decoder<const OPT: Options, C>(self, cx: C) -> AsValueDecoder<OPT, C> {
         AsValueDecoder::new(cx, self)
     }
 
     /// Get a decoder associated with a value.
     #[inline]
-    pub(crate) fn decoder<'a, 'de, const OPT: Options, C: ?Sized>(
-        &'de self,
-        cx: &'a C,
-    ) -> ValueDecoder<'a, 'de, OPT, C> {
+    pub(crate) fn decoder<const OPT: Options, C>(&self, cx: C) -> ValueDecoder<'_, OPT, C> {
         ValueDecoder::new(cx, self)
     }
 
@@ -215,7 +209,10 @@ impl Number {
 struct AnyVisitor;
 
 #[crate::visitor(crate)]
-impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
+impl<'de, C> Visitor<'de, C> for AnyVisitor
+where
+    C: Context,
+{
     type Ok = Value;
     #[cfg(feature = "alloc")]
     type String = StringVisitor;
@@ -228,93 +225,93 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
     }
 
     #[inline]
-    fn visit_empty(self, _: &C) -> Result<Self::Ok, C::Error> {
+    fn visit_empty(self, _: C) -> Result<Self::Ok, C::Error> {
         Ok(Value::Unit)
     }
 
     #[inline]
-    fn visit_bool(self, _: &C, value: bool) -> Result<Self::Ok, C::Error> {
+    fn visit_bool(self, _: C, value: bool) -> Result<Self::Ok, C::Error> {
         Ok(Value::Bool(value))
     }
 
     #[inline]
-    fn visit_char(self, _: &C, value: char) -> Result<Self::Ok, C::Error> {
+    fn visit_char(self, _: C, value: char) -> Result<Self::Ok, C::Error> {
         Ok(Value::Char(value))
     }
 
     #[inline]
-    fn visit_u8(self, _: &C, value: u8) -> Result<Self::Ok, C::Error> {
+    fn visit_u8(self, _: C, value: u8) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U8(value)))
     }
 
     #[inline]
-    fn visit_u16(self, _: &C, value: u16) -> Result<Self::Ok, C::Error> {
+    fn visit_u16(self, _: C, value: u16) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U16(value)))
     }
 
     #[inline]
-    fn visit_u32(self, _: &C, value: u32) -> Result<Self::Ok, C::Error> {
+    fn visit_u32(self, _: C, value: u32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U32(value)))
     }
 
     #[inline]
-    fn visit_u64(self, _: &C, value: u64) -> Result<Self::Ok, C::Error> {
+    fn visit_u64(self, _: C, value: u64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U64(value)))
     }
 
     #[inline]
-    fn visit_u128(self, _: &C, value: u128) -> Result<Self::Ok, C::Error> {
+    fn visit_u128(self, _: C, value: u128) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::U128(value)))
     }
 
     #[inline]
-    fn visit_i8(self, _: &C, value: i8) -> Result<Self::Ok, C::Error> {
+    fn visit_i8(self, _: C, value: i8) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I8(value)))
     }
 
     #[inline]
-    fn visit_i16(self, _: &C, value: i16) -> Result<Self::Ok, C::Error> {
+    fn visit_i16(self, _: C, value: i16) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I16(value)))
     }
 
     #[inline]
-    fn visit_i32(self, _: &C, value: i32) -> Result<Self::Ok, C::Error> {
+    fn visit_i32(self, _: C, value: i32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I32(value)))
     }
 
     #[inline]
-    fn visit_i64(self, _: &C, value: i64) -> Result<Self::Ok, C::Error> {
+    fn visit_i64(self, _: C, value: i64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I64(value)))
     }
 
     #[inline]
-    fn visit_i128(self, _: &C, value: i128) -> Result<Self::Ok, C::Error> {
+    fn visit_i128(self, _: C, value: i128) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::I128(value)))
     }
 
     #[inline]
-    fn visit_usize(self, _: &C, value: usize) -> Result<Self::Ok, C::Error> {
+    fn visit_usize(self, _: C, value: usize) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::Usize(value)))
     }
 
     #[inline]
-    fn visit_isize(self, _: &C, value: isize) -> Result<Self::Ok, C::Error> {
+    fn visit_isize(self, _: C, value: isize) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::Isize(value)))
     }
 
     #[inline]
-    fn visit_f32(self, _: &C, value: f32) -> Result<Self::Ok, C::Error> {
+    fn visit_f32(self, _: C, value: f32) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::F32(value)))
     }
 
     #[inline]
-    fn visit_f64(self, _: &C, value: f64) -> Result<Self::Ok, C::Error> {
+    fn visit_f64(self, _: C, value: f64) -> Result<Self::Ok, C::Error> {
         Ok(Value::Number(Number::F64(value)))
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_option<D>(self, _: &C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
+    fn visit_option<D>(self, _: C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
     where
         D: Decoder<'de, Cx = C, Error = C::Error>,
     {
@@ -326,7 +323,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_sequence<D>(self, _: &C, seq: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, _: C, seq: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + SequenceDecoder<'de, Cx = C>,
     {
@@ -341,7 +338,7 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_map<D>(self, _: &C, map: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, _: C, map: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + MapDecoder<'de, Cx = C>,
     {
@@ -358,19 +355,19 @@ impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_bytes(self, _: &C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
+    fn visit_bytes(self, _: C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
         Ok(BytesVisitor)
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_string(self, _: &C, _: SizeHint) -> Result<Self::String, C::Error> {
+    fn visit_string(self, _: C, _: SizeHint) -> Result<Self::String, C::Error> {
         Ok(StringVisitor)
     }
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_variant<D>(self, _: &C, variant: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_variant<D>(self, _: C, variant: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: VariantDecoder<'de, Cx = C>,
     {
@@ -398,7 +395,7 @@ struct BytesVisitor;
 #[cfg(feature = "alloc")]
 impl<C> UnsizedVisitor<'_, C, [u8]> for BytesVisitor
 where
-    C: ?Sized + Context,
+    C: Context,
 {
     type Ok = Value;
 
@@ -409,12 +406,12 @@ where
 
     #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_owned(self, _: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, _: C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
         Ok(Value::Bytes(bytes))
     }
 
     #[inline]
-    fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
         Ok(Value::Bytes(bytes.to_vec()))
     }
 }
@@ -425,7 +422,7 @@ struct StringVisitor;
 #[cfg(feature = "alloc")]
 impl<C> UnsizedVisitor<'_, C, str> for StringVisitor
 where
-    C: ?Sized + Context,
+    C: Context,
 {
     type Ok = Value;
 
@@ -435,12 +432,12 @@ where
     }
 
     #[inline]
-    fn visit_owned(self, _: &C, string: String) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, _: C, string: String) -> Result<Self::Ok, C::Error> {
         Ok(Value::String(string))
     }
 
     #[inline]
-    fn visit_ref(self, _: &C, string: &str) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, _: C, string: &str) -> Result<Self::Ok, C::Error> {
         Ok(Value::String(string.to_owned()))
     }
 }
@@ -512,23 +509,26 @@ impl<M> Encode<M> for Value {
 }
 
 /// Value's [AsDecoder] implementation.
-pub struct AsValueDecoder<'a, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
+pub struct AsValueDecoder<const OPT: Options, C> {
+    cx: C,
     value: Value,
 }
 
-impl<'a, const OPT: Options, C: ?Sized> AsValueDecoder<'a, OPT, C> {
+impl<const OPT: Options, C> AsValueDecoder<OPT, C> {
     /// Construct a new buffered value decoder.
     #[inline]
-    pub fn new(cx: &'a C, value: Value) -> Self {
+    pub fn new(cx: C, value: Value) -> Self {
         Self { cx, value }
     }
 }
 
-impl<'a, const OPT: Options, C: ?Sized + Context> AsDecoder for AsValueDecoder<'a, OPT, C> {
+impl<const OPT: Options, C> AsDecoder for AsValueDecoder<OPT, C>
+where
+    C: Context,
+{
     type Cx = C;
     type Decoder<'this>
-        = ValueDecoder<'a, 'this, OPT, C>
+        = ValueDecoder<'this, OPT, C>
     where
         Self: 'this;
 

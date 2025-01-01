@@ -10,21 +10,20 @@ where
 {
     use crate::Context;
 
-    decoder.cx(|cx, decoder| {
-        decoder.decode_sequence(move |seq| {
-            let mut out =
-                V::with_capacity(cx, crate::internal::size_hint::cautious(seq.size_hint()))?;
-            let mut index = 0usize;
+    let cx = decoder.cx();
 
-            while let Some(value) = seq.try_decode_next()? {
-                cx.enter_sequence_index(index);
-                let value = T::decode(value)?;
-                out.push(cx, value)?;
-                cx.leave_sequence_index();
-                index = index.wrapping_add(1);
-            }
+    decoder.decode_sequence(move |seq| {
+        let mut out = V::with_capacity(cx, crate::internal::size_hint::cautious(seq.size_hint()))?;
+        let mut index = 0usize;
 
-            Ok(out)
-        })
+        while let Some(value) = seq.try_decode_next()? {
+            cx.enter_sequence_index(index);
+            let value = T::decode(value)?;
+            out.push(cx, value)?;
+            cx.leave_sequence_index();
+            index = index.wrapping_add(1);
+        }
+
+        Ok(out)
     })
 }

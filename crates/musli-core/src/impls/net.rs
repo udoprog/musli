@@ -88,9 +88,8 @@ impl<'de> Decode<'de, Text> for Ipv4Addr {
     where
         D: Decoder<'de>,
     {
-        decoder.cx(|cx, decoder| {
-            decoder.decode_unsized(|string: &str| Ipv4Addr::from_str(string).map_err(cx.map()))
-        })
+        let cx = decoder.cx();
+        decoder.decode_unsized(|string: &str| Ipv4Addr::from_str(string).map_err(cx.map()))
     }
 }
 
@@ -160,9 +159,8 @@ impl<'de> Decode<'de, Text> for Ipv6Addr {
     where
         D: Decoder<'de>,
     {
-        decoder.cx(|cx, decoder| {
-            decoder.decode_unsized(|string: &str| Ipv6Addr::from_str(string).map_err(cx.map()))
-        })
+        let cx = decoder.cx();
+        decoder.decode_unsized(|string: &str| Ipv6Addr::from_str(string).map_err(cx.map()))
     }
 }
 
@@ -289,9 +287,8 @@ impl<'de> Decode<'de, Text> for SocketAddrV4 {
     where
         D: Decoder<'de>,
     {
-        decoder.cx(|cx, decoder| {
-            decoder.decode_unsized(|string: &str| SocketAddrV4::from_str(string).map_err(cx.map()))
-        })
+        let cx = decoder.cx();
+        decoder.decode_unsized(|string: &str| SocketAddrV4::from_str(string).map_err(cx.map()))
     }
 }
 
@@ -367,9 +364,8 @@ impl<'de> Decode<'de, Text> for SocketAddrV6 {
     where
         D: Decoder<'de>,
     {
-        decoder.cx(|cx, decoder| {
-            decoder.decode_unsized(|string: &str| SocketAddrV6::from_str(string).map_err(cx.map()))
-        })
+        let cx = decoder.cx();
+        decoder.decode_unsized(|string: &str| SocketAddrV6::from_str(string).map_err(cx.map()))
     }
 }
 

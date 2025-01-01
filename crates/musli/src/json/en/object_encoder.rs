@@ -4,25 +4,25 @@ use crate::{Context, Writer};
 use super::{JsonEncoder, JsonObjectKeyEncoder, JsonObjectPairEncoder};
 
 /// An object encoder for JSON.
-pub(crate) struct JsonObjectEncoder<'a, W, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonObjectEncoder<W, C> {
+    cx: C,
     len: usize,
     end: &'static [u8],
     writer: W,
 }
 
-impl<'a, W, C> JsonObjectEncoder<'a, W, C>
+impl<W, C> JsonObjectEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     #[inline]
-    pub(super) fn new(cx: &'a C, writer: W) -> Result<Self, C::Error> {
+    pub(super) fn new(cx: C, writer: W) -> Result<Self, C::Error> {
         Self::with_end(cx, writer, b"}")
     }
 
     #[inline]
-    pub(super) fn with_end(cx: &'a C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
+    pub(super) fn with_end(cx: C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'{')?;
 
         Ok(Self {
@@ -34,15 +34,15 @@ where
     }
 }
 
-impl<'a, W, C> MapEncoder for JsonObjectEncoder<'a, W, C>
+impl<W, C> MapEncoder for JsonObjectEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeEntry<'this>
-        = JsonObjectPairEncoder<'a, W::Mut<'this>, C>
+        = JsonObjectPairEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -63,19 +63,19 @@ where
     }
 }
 
-impl<'a, W, C> EntriesEncoder for JsonObjectEncoder<'a, W, C>
+impl<W, C> EntriesEncoder for JsonObjectEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeEntryKey<'this>
-        = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
+        = JsonObjectKeyEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = JsonEncoder<'a, W::Mut<'this>, C>
+        = JsonEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
 

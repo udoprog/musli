@@ -217,15 +217,6 @@ impl Types {
 
                     let mut params = Punctuated::default();
 
-                    let this_lifetime = syn::Lifetime::new("'this", Span::call_site());
-
-                    params.push(syn::GenericParam::Lifetime(syn::LifetimeParam {
-                        attrs: Vec::new(),
-                        lifetime: this_lifetime.clone(),
-                        colon_token: None,
-                        bounds: Punctuated::default(),
-                    }));
-
                     params.push(syn::GenericParam::Type(syn::TypeParam {
                         attrs: Vec::new(),
                         ident: u_param.clone(),
@@ -247,7 +238,7 @@ impl Types {
 
                     where_clause
                         .predicates
-                        .push(syn::parse_quote!(#u_param: #this_lifetime + #crate_path::Context));
+                        .push(syn::parse_quote!(#u_param: #crate_path::Context));
 
                     generics = syn::Generics {
                         lt_token: Some(<Token![<]>::default()),

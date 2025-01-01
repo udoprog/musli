@@ -7,21 +7,21 @@ use crate::Context;
 use super::JsonDecoder;
 
 #[must_use = "Must call skip_sequence_remaining"]
-pub(crate) struct JsonSequenceDecoder<'a, P, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonSequenceDecoder<P, C> {
+    cx: C,
     len: Option<usize>,
     first: bool,
     parser: P,
     finalized: bool,
 }
 
-impl<'a, 'de, P, C> JsonSequenceDecoder<'a, P, C>
+impl<'de, P, C> JsonSequenceDecoder<P, C>
 where
     P: Parser<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     #[inline]
-    pub(super) fn new(cx: &'a C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
+    pub(super) fn new(cx: C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
         let actual = parser.lex(cx);
 
         if !matches!(actual, Token::OpenBracket) {
@@ -89,14 +89,14 @@ where
     }
 }
 
-impl<'a, 'de, P, C> SequenceDecoder<'de> for JsonSequenceDecoder<'a, P, C>
+impl<'de, P, C> SequenceDecoder<'de> for JsonSequenceDecoder<P, C>
 where
     P: Parser<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type DecodeNext<'this>
-        = JsonDecoder<'a, P::Mut<'this>, C>
+        = JsonDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
 

@@ -21,34 +21,34 @@ macro_rules! is_bitwise_slice {
 }
 
 /// A very simple encoder suitable for storage encoding.
-pub struct StorageEncoder<'a, W, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
+pub struct StorageEncoder<W, const OPT: Options, C> {
+    cx: C,
     writer: W,
 }
 
-impl<'a, W, const OPT: Options, C: ?Sized> StorageEncoder<'a, W, OPT, C> {
+impl<W, const OPT: Options, C> StorageEncoder<W, OPT, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub fn new(cx: &'a C, writer: W) -> Self {
+    pub fn new(cx: C, writer: W) -> Self {
         Self { cx, writer }
     }
 }
 
 #[crate::encoder(crate)]
-impl<'a, W, const OPT: Options, C> Encoder for StorageEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> Encoder for StorageEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = StorageEncoder<'this, W, OPT, U>
+    type WithContext<U>
+        = StorageEncoder<W, OPT, U>
     where
-        U: 'this + Context;
-    type EncodePack = StorageEncoder<'a, W, OPT, C>;
+        U: Context;
+    type EncodePack = StorageEncoder<W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -58,15 +58,12 @@ where
     type EncodeMapVariant = Self;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -331,24 +328,21 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> SequenceEncoder for StorageEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> SequenceEncoder for StorageEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+        = StorageEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn cx_mut<F, O>(&mut self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, &mut Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
@@ -398,15 +392,15 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> MapEncoder for StorageEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> MapEncoder for StorageEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeEntry<'this>
-        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+        = StorageEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -421,19 +415,19 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> EntryEncoder for StorageEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> EntryEncoder for StorageEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeKey<'this>
-        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+        = StorageEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+        = StorageEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -453,19 +447,19 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> EntriesEncoder for StorageEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> EntriesEncoder for StorageEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeEntryKey<'this>
-        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+        = StorageEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+        = StorageEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -485,19 +479,19 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> VariantEncoder for StorageEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> VariantEncoder for StorageEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeTag<'this>
-        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+        = StorageEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type EncodeData<'this>
-        = StorageEncoder<'a, W::Mut<'this>, OPT, C>
+        = StorageEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -526,12 +520,12 @@ where
 #[inline]
 unsafe fn encode_packed_len_slice<W, C, T, M>(
     mut writer: W,
-    cx: &C,
+    cx: C,
     slice: impl AsRef<[T]>,
 ) -> Result<(), C::Error>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
     T: Encode<M>,
 {
     let slice = slice.as_ref();
@@ -560,13 +554,13 @@ where
 #[inline]
 unsafe fn encode_packed_len_slices<W, C, I, T, M>(
     mut writer: W,
-    cx: &C,
+    cx: C,
     len: usize,
     slices: I,
 ) -> Result<(), C::Error>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
     I: IntoIterator<Item: AsRef<[T]>>,
     T: Encode<M>,
 {
@@ -599,12 +593,12 @@ where
 #[inline]
 unsafe fn encode_packed_slice<W, C, T, M>(
     mut writer: W,
-    cx: &C,
+    cx: C,
     slice: impl AsRef<[T]>,
 ) -> Result<(), C::Error>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
     T: Encode<M>,
 {
     if size_of::<T>() > 0 {
@@ -631,12 +625,12 @@ where
 #[inline]
 unsafe fn encode_packed_slices<W, C, I, T, M>(
     mut writer: W,
-    cx: &C,
+    cx: C,
     slices: I,
 ) -> Result<(), C::Error>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
     I: IntoIterator<Item: AsRef<[T]>>,
     T: Encode<M>,
 {

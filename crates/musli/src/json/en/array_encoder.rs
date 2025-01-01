@@ -6,25 +6,25 @@ use crate::{Context, Writer};
 use super::JsonEncoder;
 
 /// Encoder for a JSON array.
-pub(crate) struct JsonArrayEncoder<'a, W, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonArrayEncoder<W, C> {
+    cx: C,
     first: bool,
     end: &'static [u8],
     writer: W,
 }
 
-impl<'a, W, C> JsonArrayEncoder<'a, W, C>
+impl<W, C> JsonArrayEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     #[inline]
-    pub(super) fn new(cx: &'a C, writer: W) -> Result<Self, C::Error> {
+    pub(super) fn new(cx: C, writer: W) -> Result<Self, C::Error> {
         Self::with_end(cx, writer, b"]")
     }
 
     #[inline]
-    pub(super) fn with_end(cx: &'a C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
+    pub(super) fn with_end(cx: C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'[')?;
 
         Ok(Self {
@@ -36,24 +36,21 @@ where
     }
 }
 
-impl<'a, W, C> SequenceEncoder for JsonArrayEncoder<'a, W, C>
+impl<W, C> SequenceEncoder for JsonArrayEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = JsonEncoder<'a, W::Mut<'this>, C>
+        = JsonEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
 
     #[inline]
-    fn cx_mut<F, O>(&mut self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, &mut Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]

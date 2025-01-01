@@ -23,15 +23,15 @@ macro_rules! is_bitwise_slice {
 }
 
 /// A very simple decoder suitable for storage decoding.
-pub struct StorageDecoder<'a, R, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
+pub struct StorageDecoder<R, const OPT: Options, C> {
+    cx: C,
     reader: R,
 }
 
-impl<'a, R, const OPT: Options, C: ?Sized> StorageDecoder<'a, R, OPT, C> {
+impl<R, const OPT: Options, C> StorageDecoder<R, OPT, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub fn new(cx: &'a C, reader: R) -> Self {
+    pub fn new(cx: C, reader: R) -> Self {
         Self { cx, reader }
     }
 }
@@ -41,42 +41,39 @@ impl<'a, R, const OPT: Options, C: ?Sized> StorageDecoder<'a, R, OPT, C> {
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct LimitedStorageDecoder<'a, R, const OPT: Options, C: ?Sized> {
+pub struct LimitedStorageDecoder<R, const OPT: Options, C> {
     remaining: usize,
-    cx: &'a C,
+    cx: C,
     reader: R,
 }
 
 #[crate::decoder(crate)]
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> Decoder<'de>
-    for StorageDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> Decoder<'de> for StorageDecoder<R, OPT, C>
 where
     R: Reader<'de>,
+    C: Context,
 {
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = StorageDecoder<'this, R, OPT, U>
+    type WithContext<U>
+        = StorageDecoder<R, OPT, U>
     where
-        U: 'this + Context;
+        U: Context;
     type DecodePack = Self;
     type DecodeSome = Self;
-    type DecodeSequence = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeMap = LimitedStorageDecoder<'a, R, OPT, C>;
-    type DecodeMapEntries = LimitedStorageDecoder<'a, R, OPT, C>;
+    type DecodeSequence = LimitedStorageDecoder<R, OPT, C>;
+    type DecodeMap = LimitedStorageDecoder<R, OPT, C>;
+    type DecodeMapEntries = LimitedStorageDecoder<R, OPT, C>;
     type DecodeVariant = Self;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -154,7 +151,7 @@ where
 
         impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
-            C: ?Sized + Context,
+            C: Context,
             V: UnsizedVisitor<'de, C, str>,
         {
             type Ok = V::Ok;
@@ -166,19 +163,19 @@ where
 
             #[cfg(feature = "alloc")]
             #[inline]
-            fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
+            fn visit_owned(self, cx: C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline]
-            fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_ref(cx, string)
             }
@@ -415,14 +412,14 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> SequenceDecoder<'de>
-    for StorageDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> SequenceDecoder<'de> for StorageDecoder<R, OPT, C>
 where
     R: Reader<'de>,
+    C: Context,
 {
     type Cx = C;
     type DecodeNext<'this>
-        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+        = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -439,13 +436,13 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> LimitedStorageDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> LimitedStorageDecoder<R, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     #[inline]
-    fn new(cx: &'a C, mut reader: R) -> Result<Self, C::Error> {
+    fn new(cx: C, mut reader: R) -> Result<Self, C::Error> {
         let remaining = crate::int::decode_usize::<_, _, OPT>(cx, reader.borrow_mut())?;
 
         Ok(Self {
@@ -456,7 +453,7 @@ where
     }
 
     #[inline]
-    fn with_remaining(cx: &'a C, reader: R, remaining: usize) -> Self {
+    fn with_remaining(cx: C, reader: R, remaining: usize) -> Self {
         Self {
             cx,
             reader,
@@ -465,14 +462,14 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> SequenceDecoder<'de>
-    for LimitedStorageDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> SequenceDecoder<'de> for LimitedStorageDecoder<R, OPT, C>
 where
     R: Reader<'de>,
+    C: Context,
 {
     type Cx = C;
     type DecodeNext<'this>
-        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+        = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -503,18 +500,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> MapDecoder<'de>
-    for LimitedStorageDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> MapDecoder<'de> for LimitedStorageDecoder<R, OPT, C>
 where
     R: Reader<'de>,
+    C: Context,
 {
     type Cx = C;
     type DecodeEntry<'this>
-        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+        = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeRemainingEntries<'this>
-        = LimitedStorageDecoder<'a, R::Mut<'this>, OPT, C>
+        = LimitedStorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -545,14 +542,14 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> EntryDecoder<'de>
-    for StorageDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> EntryDecoder<'de> for StorageDecoder<R, OPT, C>
 where
     R: Reader<'de>,
+    C: Context,
 {
     type Cx = C;
     type DecodeKey<'this>
-        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+        = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeValue = Self;
@@ -568,18 +565,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> EntriesDecoder<'de>
-    for LimitedStorageDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> EntriesDecoder<'de> for LimitedStorageDecoder<R, OPT, C>
 where
     R: Reader<'de>,
+    C: Context,
 {
     type Cx = C;
     type DecodeEntryKey<'this>
-        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+        = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeEntryValue<'this>
-        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+        = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -610,18 +607,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C: ?Sized + Context> VariantDecoder<'de>
-    for StorageDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> VariantDecoder<'de> for StorageDecoder<R, OPT, C>
 where
     R: Reader<'de>,
+    C: Context,
 {
     type Cx = C;
     type DecodeTag<'this>
-        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+        = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeValue<'this>
-        = StorageDecoder<'a, R::Mut<'this>, OPT, C>
+        = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 

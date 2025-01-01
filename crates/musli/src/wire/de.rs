@@ -17,26 +17,26 @@ use crate::{Context, Options, Reader};
 use super::tag::{Kind, Tag};
 
 /// A very simple decoder.
-pub struct WireDecoder<'a, R, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
+pub struct WireDecoder<R, const OPT: Options, C> {
+    cx: C,
     reader: R,
 }
 
-impl<'a, 'de, R, const OPT: Options, C> WireDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> WireDecoder<R, OPT, C>
 where
+    C: Context,
     R: Reader<'de>,
-    C: ?Sized + Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, reader: R) -> Self {
+    pub(crate) fn new(cx: C, reader: R) -> Self {
         Self { cx, reader }
     }
 }
 
-impl<'de, R, const OPT: Options, C> WireDecoder<'_, Limit<R>, OPT, C>
+impl<'de, R, const OPT: Options, C> WireDecoder<Limit<R>, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     #[inline]
@@ -49,10 +49,10 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> WireDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> WireDecoder<R, OPT, C>
 where
+    C: Context,
     R: Reader<'de>,
-    C: ?Sized + Context,
 {
     /// Skip over any sequences of values.
     pub(crate) fn skip_any(mut self) -> Result<(), C::Error> {
@@ -117,16 +117,14 @@ where
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_pair_sequence(
-        mut self,
-    ) -> Result<RemainingWireDecoder<'a, R, OPT, C>, C::Error> {
+    fn shared_decode_pair_sequence(mut self) -> Result<RemainingWireDecoder<R, OPT, C>, C::Error> {
         let len = self.decode_sequence_len()?;
         Ok(RemainingWireDecoder::new(self.cx, self.reader, len / 2))
     }
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_sequence(mut self) -> Result<RemainingWireDecoder<'a, R, OPT, C>, C::Error> {
+    fn shared_decode_sequence(mut self) -> Result<RemainingWireDecoder<R, OPT, C>, C::Error> {
         let len = self.decode_sequence_len()?;
         Ok(RemainingWireDecoder::new(self.cx, self.reader, len))
     }
@@ -154,19 +152,19 @@ where
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct RemainingWireDecoder<'a, R, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
+pub struct RemainingWireDecoder<R, const OPT: Options, C> {
+    cx: C,
     reader: R,
     remaining: usize,
 }
 
-impl<'a, 'de, R, const OPT: Options, C> RemainingWireDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> RemainingWireDecoder<R, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     #[inline]
-    fn new(cx: &'a C, reader: R, remaining: usize) -> Self {
+    fn new(cx: C, reader: R, remaining: usize) -> Self {
         Self {
             cx,
             reader,
@@ -203,35 +201,32 @@ where
 }
 
 #[crate::decoder(crate)]
-impl<'a, 'de, R, const OPT: Options, C> Decoder<'de> for WireDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> Decoder<'de> for WireDecoder<R, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = WireDecoder<'this, R, OPT, U>
+    type WithContext<U>
+        = WireDecoder<R, OPT, U>
     where
-        U: 'this + Context;
-    type DecodePack = WireDecoder<'a, Limit<R>, OPT, C>;
+        U: Context;
+    type DecodePack = WireDecoder<Limit<R>, OPT, C>;
     type DecodeSome = Self;
-    type DecodeSequence = RemainingWireDecoder<'a, R, OPT, C>;
-    type DecodeMap = RemainingWireDecoder<'a, R, OPT, C>;
-    type DecodeMapEntries = RemainingWireDecoder<'a, R, OPT, C>;
+    type DecodeSequence = RemainingWireDecoder<R, OPT, C>;
+    type DecodeMap = RemainingWireDecoder<R, OPT, C>;
+    type DecodeMapEntries = RemainingWireDecoder<R, OPT, C>;
     type DecodeVariant = Self;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -309,7 +304,7 @@ where
 
         impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
-            C: ?Sized + Context,
+            C: Context,
             V: UnsizedVisitor<'de, C, str>,
         {
             type Ok = V::Ok;
@@ -321,19 +316,19 @@ where
 
             #[cfg(feature = "alloc")]
             #[inline]
-            fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
+            fn visit_owned(self, cx: C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline]
-            fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_ref(cx, string)
             }
@@ -522,14 +517,14 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> SequenceDecoder<'de> for WireDecoder<'a, Limit<R>, OPT, C>
+impl<'de, R, const OPT: Options, C> SequenceDecoder<'de> for WireDecoder<Limit<R>, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     type Cx = C;
     type DecodeNext<'this>
-        = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, OPT, C>
+        = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -544,14 +539,14 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> SequenceDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> SequenceDecoder<'de> for RemainingWireDecoder<R, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     type Cx = C;
     type DecodeNext<'this>
-        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+        = WireDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -583,18 +578,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> VariantDecoder<'de> for WireDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> VariantDecoder<'de> for WireDecoder<R, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     type Cx = C;
     type DecodeTag<'this>
-        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+        = WireDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeValue<'this>
-        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+        = WireDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -609,18 +604,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> MapDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> MapDecoder<'de> for RemainingWireDecoder<R, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     type Cx = C;
     type DecodeEntry<'this>
-        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+        = WireDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeRemainingEntries<'this>
-        = RemainingWireDecoder<'a, R::Mut<'this>, OPT, C>
+        = RemainingWireDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -649,14 +644,14 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> EntryDecoder<'de> for WireDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> EntryDecoder<'de> for WireDecoder<R, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     type Cx = C;
     type DecodeKey<'this>
-        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+        = WireDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeValue = Self;
@@ -672,18 +667,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> EntriesDecoder<'de> for RemainingWireDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> EntriesDecoder<'de> for RemainingWireDecoder<R, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     type Cx = C;
     type DecodeEntryKey<'this>
-        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+        = WireDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeEntryValue<'this>
-        = WireDecoder<'a, R::Mut<'this>, OPT, C>
+        = WireDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 

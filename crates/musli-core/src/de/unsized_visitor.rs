@@ -26,8 +26,9 @@ use crate::Context;
 /// [`Decoder::decode_bytes`]: crate::de::Decoder::decode_bytes
 /// [`Decoder::decode_string`]: crate::de::Decoder::decode_string
 /// [`Decoder::decode_unsized`]: crate::de::Decoder::decode_unsized
-pub trait UnsizedVisitor<'de, C: ?Sized + Context, T>: Sized
+pub trait UnsizedVisitor<'de, C, T>: Sized
 where
+    C: Context,
     T: ?Sized + ToOwned,
 {
     /// The value produced.
@@ -40,20 +41,20 @@ where
 
     /// Visit an owned value.
     #[inline(always)]
-    fn visit_owned(self, cx: &C, value: T::Owned) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, cx: C, value: T::Owned) -> Result<Self::Ok, C::Error> {
         self.visit_ref(cx, value.borrow())
     }
 
     /// Visit a string that is borrowed directly from the source data.
     #[inline(always)]
-    fn visit_borrowed(self, cx: &C, value: &'de T) -> Result<Self::Ok, C::Error> {
+    fn visit_borrowed(self, cx: C, value: &'de T) -> Result<Self::Ok, C::Error> {
         self.visit_ref(cx, value)
     }
 
     /// Visit a value reference that is provided from the decoder in any manner
     /// possible. Which might require additional decoding work.
     #[inline(always)]
-    fn visit_ref(self, cx: &C, _: &T) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: C, _: &T) -> Result<Self::Ok, C::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::AnyValue,
             ExpectingWrapper::new(&self),
@@ -62,12 +63,18 @@ where
 }
 
 #[repr(transparent)]
-struct ExpectingWrapper<'a, T, C: ?Sized, I: ?Sized> {
+struct ExpectingWrapper<'a, T, C, I>
+where
+    I: ?Sized,
+{
     inner: T,
-    _marker: PhantomData<(&'a C, &'a I)>,
+    _marker: PhantomData<(C, &'a I)>,
 }
 
-impl<T, C: ?Sized, U: ?Sized> ExpectingWrapper<'_, T, C, U> {
+impl<T, C, U> ExpectingWrapper<'_, T, C, U>
+where
+    U: ?Sized,
+{
     #[inline(always)]
     fn new(value: &T) -> &Self {
         // SAFETY: `ExpectingWrapper` is repr(transparent) over `T`.
@@ -78,7 +85,7 @@ impl<T, C: ?Sized, U: ?Sized> ExpectingWrapper<'_, T, C, U> {
 impl<'de, T, C, U> Expecting for ExpectingWrapper<'_, T, C, U>
 where
     T: UnsizedVisitor<'de, C, U>,
-    C: ?Sized + Context,
+    C: Context,
     U: ?Sized + ToOwned,
 {
     #[inline(always)]

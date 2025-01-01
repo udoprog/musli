@@ -17,35 +17,35 @@ use super::tag::{
 const VARIANT: Tag = Tag::from_mark(Mark::Variant);
 
 /// A very simple encoder.
-pub struct SelfEncoder<'a, W, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
+pub struct SelfEncoder<W, const OPT: Options, C> {
+    cx: C,
     writer: W,
 }
 
-impl<'a, W, const OPT: Options, C: ?Sized> SelfEncoder<'a, W, OPT, C> {
+impl<W, const OPT: Options, C> SelfEncoder<W, OPT, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W) -> Self {
+    pub(crate) fn new(cx: C, writer: W) -> Self {
         Self { cx, writer }
     }
 }
 
-pub struct SelfPackEncoder<'a, W, const OPT: Options, C>
+pub struct SelfPackEncoder<W, const OPT: Options, C>
 where
-    C: ?Sized + Context,
+    C: Context,
 {
-    cx: &'a C,
+    cx: C,
     writer: W,
     buffer: BufWriter<C::Allocator>,
 }
 
-impl<'a, W, const OPT: Options, C> SelfPackEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> SelfPackEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W) -> Self {
+    pub(crate) fn new(cx: C, writer: W) -> Self {
         Self {
             cx,
             writer,
@@ -55,20 +55,20 @@ where
 }
 
 #[crate::encoder(crate)]
-impl<'a, W, const OPT: Options, C> Encoder for SelfEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> Encoder for SelfEncoder<W, OPT, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = SelfEncoder<'this, W, OPT, U>
+    type WithContext<U>
+        = SelfEncoder<W, OPT, U>
     where
-        U: 'this + Context;
-    type EncodePack = SelfPackEncoder<'a, W, OPT, C>;
+        U: Context;
+    type EncodePack = SelfPackEncoder<W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -78,15 +78,12 @@ where
     type EncodeMapVariant = Self;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -330,24 +327,21 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> SequenceEncoder for SelfPackEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> SequenceEncoder for SelfPackEncoder<W, OPT, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = StorageEncoder<'a, &'this mut BufWriter<C::Allocator>, OPT, C>
+        = StorageEncoder<&'this mut BufWriter<C::Allocator>, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn cx_mut<F, O>(&mut self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, &mut Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
@@ -364,24 +358,21 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> SequenceEncoder for SelfEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> SequenceEncoder for SelfEncoder<W, OPT, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+        = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn cx_mut<F, O>(&mut self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, &mut Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
@@ -395,15 +386,15 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> MapEncoder for SelfEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> MapEncoder for SelfEncoder<W, OPT, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeEntry<'this>
-        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+        = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -418,19 +409,19 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> EntryEncoder for SelfEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> EntryEncoder for SelfEncoder<W, OPT, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeKey<'this>
-        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+        = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+        = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -450,19 +441,19 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> EntriesEncoder for SelfEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> EntriesEncoder for SelfEncoder<W, OPT, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeEntryKey<'this>
-        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+        = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+        = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -482,19 +473,19 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> VariantEncoder for SelfEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> VariantEncoder for SelfEncoder<W, OPT, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeTag<'this>
-        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+        = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type EncodeData<'this>
-        = SelfEncoder<'a, W::Mut<'this>, OPT, C>
+        = SelfEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -517,13 +508,13 @@ where
 /// Encode a length prefix.
 #[inline]
 fn encode_prefix<C, W, const OPT: Options>(
-    cx: &C,
+    cx: C,
     mut writer: W,
     kind: Kind,
     len: usize,
 ) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     let (tag, embedded) = Tag::with_len(kind, len);

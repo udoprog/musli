@@ -66,7 +66,7 @@ impl<'de, M> Decode<'de, M> for String {
 
         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
         where
-            C: ?Sized + Context,
+            C: Context,
         {
             type Ok = String;
 
@@ -76,17 +76,17 @@ impl<'de, M> Decode<'de, M> for String {
             }
 
             #[inline]
-            fn visit_owned(self, _: &C, value: String) -> Result<Self::Ok, C::Error> {
+            fn visit_owned(self, _: C, value: String) -> Result<Self::Ok, C::Error> {
                 Ok(value)
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: &C, string: &'de str) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, string: &'de str) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, string)
             }
 
             #[inline]
-            fn visit_ref(self, _: &C, string: &str) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: C, string: &str) -> Result<Self::Ok, C::Error> {
                 Ok(string.to_owned())
             }
         }
@@ -166,7 +166,7 @@ macro_rules! cow {
 
                 impl<'de, C> UnsizedVisitor<'de, C, $source> for Visitor
                 where
-                    C: ?Sized + Context,
+                    C: Context,
                 {
                     type Ok = Cow<'de, $ty>;
 
@@ -178,7 +178,7 @@ macro_rules! cow {
                     #[inline]
                     fn visit_owned(
                         self,
-                        $cx: &C,
+                        $cx: C,
                         $owned: <$source as ToOwned>::Owned,
                     ) -> Result<Self::Ok, C::Error> {
                         Ok($owned_expr)
@@ -187,18 +187,14 @@ macro_rules! cow {
                     #[inline]
                     fn visit_borrowed(
                         self,
-                        $cx: &C,
+                        $cx: C,
                         $borrowed: &'de $source,
                     ) -> Result<Self::Ok, C::Error> {
                         Ok($borrowed_expr)
                     }
 
                     #[inline]
-                    fn visit_ref(
-                        self,
-                        $cx: &C,
-                        $reference: &$source,
-                    ) -> Result<Self::Ok, C::Error> {
+                    fn visit_ref(self, $cx: C, $reference: &$source) -> Result<Self::Ok, C::Error> {
                         Ok($reference_expr)
                     }
                 }
@@ -298,34 +294,34 @@ macro_rules! slice_sequence {
                     $($extra: $extra_bound0 $(+ $extra_bound)*),*
                 {
                     #[inline]
-                    fn new<C>(_: &C) -> Result<Self, C::Error>
+                    fn new<C>(_: C) -> Result<Self, C::Error>
                     where
-                        C: ?Sized + Context,
+                        C: Context,
                     {
                         Ok(Builder($ty::new(), PhantomData))
                     }
 
                     #[inline]
-                    fn with_capacity<C>(_: &C, size: usize) -> Result<Self, C::Error>
+                    fn with_capacity<C>(_: C, size: usize) -> Result<Self, C::Error>
                     where
-                        C: ?Sized + Context,
+                        C: Context,
                     {
                         Ok(Builder($ty::with_capacity(size), PhantomData))
                     }
 
                     #[inline]
-                    fn push<C>(&mut self, _: &C, value: T) -> Result<(), C::Error>
+                    fn push<C>(&mut self, _: C, value: T) -> Result<(), C::Error>
                     where
-                        C: ?Sized + Context,
+                        C: Context,
                     {
                         self.0.$insert(value);
                         Ok(())
                     }
 
                     #[inline]
-                    fn reserve<C>(&mut self, _: &C, capacity: usize) -> Result<(), C::Error>
+                    fn reserve<C>(&mut self, _: C, capacity: usize) -> Result<(), C::Error>
                     where
-                        C: ?Sized + Context,
+                        C: Context,
                     {
                         self.0.reserve(capacity);
                         Ok(())
@@ -392,19 +388,19 @@ macro_rules! sequence {
             {
                 let hint = SequenceHint::with_size(self.len());
 
-                encoder.cx(|$cx, encoder| {
-                    encoder.encode_sequence_fn(&hint, |seq| {
-                        let mut index = 0;
+                let $cx = encoder.cx();
 
-                        for value in self {
-                            $cx.enter_sequence_index(index);
-                            seq.push(value)?;
-                            $cx.leave_sequence_index();
-                            index = index.wrapping_add(1);
-                        }
+                encoder.encode_sequence_fn(&hint, |seq| {
+                    let mut index = 0;
 
-                        Ok(())
-                    })
+                    for value in self {
+                        $cx.enter_sequence_index(index);
+                        seq.push(value)?;
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
+
+                    Ok(())
                 })
             }
 
@@ -427,21 +423,21 @@ macro_rules! sequence {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.cx(|$cx, decoder| {
-                    decoder.decode_sequence(|$access| {
-                        let mut out = $factory;
+                let $cx = decoder.cx();
 
-                        let mut index = 0;
+                decoder.decode_sequence(|$access| {
+                    let mut out = $factory;
 
-                        while let Some(value) = $access.try_decode_next()? {
-                            $cx.enter_sequence_index(index);
-                            out.$insert(value.decode()?);
-                            $cx.leave_sequence_index();
-                            index = index.wrapping_add(1);
-                        }
+                    let mut index = 0;
 
-                        Ok(out)
-                    })
+                    while let Some(value) = $access.try_decode_next()? {
+                        $cx.enter_sequence_index(index);
+                        out.$insert(value.decode()?);
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
+
+                    Ok(out)
                 })
             }
         }
@@ -457,19 +453,19 @@ macro_rules! sequence {
             where
                 E: Encoder<Mode = M>,
             {
-                encoder.cx(|$cx, encoder| {
-                    encoder.encode_pack_fn(|pack| {
-                        let mut index = 0;
+                let $cx = encoder.cx();
 
-                        for value in self {
-                            $cx.enter_sequence_index(index);
-                            pack.push(value)?;
-                            $cx.leave_sequence_index();
-                            index = index.wrapping_add(1);
-                        }
+                encoder.encode_pack_fn(|pack| {
+                    let mut index = 0;
 
-                        Ok(())
-                    })
+                    for value in self {
+                        $cx.enter_sequence_index(index);
+                        pack.push(value)?;
+                        $cx.leave_sequence_index();
+                        index = index.wrapping_add(1);
+                    }
+
+                    Ok(())
                 })
             }
         }
@@ -605,20 +601,20 @@ macro_rules! map {
             {
                 let hint = MapHint::with_size(self.len());
 
-                encoder.cx(|$cx, encoder| {
-                    encoder.encode_map_fn(&hint, |map| {
-                        for (k, v) in self {
-                            $cx.enter_map_key(k);
-                            map.encode_entry_fn(|entry| {
-                                entry.encode_key()?.encode(k)?;
-                                entry.encode_value()?.encode(v)?;
-                                Ok(())
-                            })?;
-                            $cx.leave_map_key();
-                        }
+                let $cx = encoder.cx();
 
-                        Ok(())
-                    })
+                encoder.encode_map_fn(&hint, |map| {
+                    for (k, v) in self {
+                        $cx.enter_map_key(k);
+                        map.encode_entry_fn(|entry| {
+                            entry.encode_key()?.encode(k)?;
+                            entry.encode_value()?.encode(v)?;
+                            Ok(())
+                        })?;
+                        $cx.leave_map_key();
+                    }
+
+                    Ok(())
                 })
             }
         }
@@ -661,20 +657,20 @@ macro_rules! map {
             where
                 D: Decoder<'de, Mode = M>,
             {
-                decoder.cx(|$cx, decoder| {
-                    decoder.decode_map(|$access| {
-                        let mut out = $with_capacity;
+                let $cx = decoder.cx();
 
-                        while let Some(mut entry) = $access.decode_entry()? {
-                            let key = entry.decode_key()?.decode()?;
-                            $cx.enter_map_key(&key);
-                            let value = entry.decode_value()?.decode()?;
-                            out.insert(key, value);
-                            $cx.leave_map_key();
-                        }
+                decoder.decode_map(|$access| {
+                    let mut out = $with_capacity;
 
-                        Ok(out)
-                    })
+                    while let Some(mut entry) = $access.decode_entry()? {
+                        let key = entry.decode_key()?.decode()?;
+                        $cx.enter_map_key(&key);
+                        let value = entry.decode_value()?.decode()?;
+                        out.insert(key, value);
+                        $cx.leave_map_key();
+                    }
+
+                    Ok(out)
                 })
             }
         }
@@ -723,7 +719,7 @@ impl<'de, M> Decode<'de, M> for CString {
 
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
-            C: ?Sized + Context,
+            C: Context,
         {
             type Ok = CString;
 
@@ -733,17 +729,17 @@ impl<'de, M> Decode<'de, M> for CString {
             }
 
             #[inline]
-            fn visit_owned(self, cx: &C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
+            fn visit_owned(self, cx: C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 CString::from_vec_with_nul(value).map_err(cx.map())
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, bytes)
             }
 
             #[inline]
-            fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(CStr::from_bytes_with_nul(bytes)
                     .map_err(cx.map())?
                     .to_owned())
@@ -889,35 +885,35 @@ where
         use crate::alloc::{Allocator, RawVec};
         use crate::en::VariantEncoder;
 
-        encoder.cx(|cx, encoder| {
-            encoder.encode_variant_fn(|variant| {
-                let mut buf = cx.alloc().new_raw_vec::<u8>();
-                let mut len = 0;
+        let cx = encoder.cx();
 
-                for w in self.encode_wide() {
-                    let bytes = w.to_le_bytes();
+        encoder.encode_variant_fn(|variant| {
+            let mut buf = cx.alloc().new_raw_vec::<u8>();
+            let mut len = 0;
 
-                    if !buf.resize(len, bytes.len()) {
-                        return Err(cx.message("Allocation failed"));
-                    }
+            for w in self.encode_wide() {
+                let bytes = w.to_le_bytes();
 
-                    // SAFETY: We've just resized the above buffer.
-                    unsafe {
-                        buf.as_mut_ptr()
-                            .add(len)
-                            .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
-                    }
-
-                    len += bytes.len();
+                if !buf.resize(len, bytes.len()) {
+                    return Err(cx.message("Allocation failed"));
                 }
 
-                // SAFETY: Slice does not outlive the buffer it references.
-                let bytes = unsafe { core::slice::from_raw_parts(buf.as_ptr(), len) };
+                // SAFETY: We've just resized the above buffer.
+                unsafe {
+                    buf.as_mut_ptr()
+                        .add(len)
+                        .copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
+                }
 
-                variant.encode_tag()?.encode(&PlatformTag::Windows)?;
-                variant.encode_data()?.encode_bytes(bytes)?;
-                Ok(())
-            })
+                len += bytes.len();
+            }
+
+            // SAFETY: Slice does not outlive the buffer it references.
+            let bytes = unsafe { core::slice::from_raw_parts(buf.as_ptr(), len) };
+
+            variant.encode_tag()?.encode(&PlatformTag::Windows)?;
+            variant.encode_data()?.encode_bytes(bytes)?;
+            Ok(())
         })
     }
 
@@ -966,59 +962,57 @@ where
     {
         use crate::de::VariantDecoder;
 
-        decoder.cx(|cx, decoder| {
-            decoder.decode_variant(|variant| {
-                let tag = variant.decode_tag()?.decode::<PlatformTag>()?;
+        let cx = decoder.cx();
 
-                match tag {
-                    #[cfg(not(unix))]
-                    PlatformTag::Unix => Err(cx.message("Unsupported OsString::Unix variant")),
-                    #[cfg(unix)]
-                    PlatformTag::Unix => {
-                        use std::os::unix::ffi::OsStringExt;
-                        Ok(OsString::from_vec(variant.decode_value()?.decode()?))
-                    }
-                    #[cfg(not(windows))]
-                    PlatformTag::Windows => {
-                        Err(cx.message("Unsupported OsString::Windows variant"))
-                    }
-                    #[cfg(windows)]
-                    PlatformTag::Windows => {
-                        use std::os::windows::ffi::OsStringExt;
+        decoder.decode_variant(|variant| {
+            let tag = variant.decode_tag()?.decode::<PlatformTag>()?;
 
-                        struct Visitor;
+            match tag {
+                #[cfg(not(unix))]
+                PlatformTag::Unix => Err(cx.message("Unsupported OsString::Unix variant")),
+                #[cfg(unix)]
+                PlatformTag::Unix => {
+                    use std::os::unix::ffi::OsStringExt;
+                    Ok(OsString::from_vec(variant.decode_value()?.decode()?))
+                }
+                #[cfg(not(windows))]
+                PlatformTag::Windows => Err(cx.message("Unsupported OsString::Windows variant")),
+                #[cfg(windows)]
+                PlatformTag::Windows => {
+                    use std::os::windows::ffi::OsStringExt;
 
-                        impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
-                        where
-                            C: ?Sized + Context,
-                        {
-                            type Ok = OsString;
+                    struct Visitor;
 
-                            #[inline]
-                            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                                write!(f, "a literal byte reference")
-                            }
+                    impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
+                    where
+                        C: Context,
+                    {
+                        type Ok = OsString;
 
-                            #[inline]
-                            fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-                                let mut buf = Vec::with_capacity(bytes.len() / 2);
-
-                                for pair in bytes.chunks_exact(2) {
-                                    let &[a, b] = pair else {
-                                        continue;
-                                    };
-
-                                    buf.push(u16::from_le_bytes([a, b]));
-                                }
-
-                                Ok(OsString::from_wide(&buf))
-                            }
+                        #[inline]
+                        fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                            write!(f, "a literal byte reference")
                         }
 
-                        variant.decode_value()?.decode_bytes(Visitor)
+                        #[inline]
+                        fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+                            let mut buf = Vec::with_capacity(bytes.len() / 2);
+
+                            for pair in bytes.chunks_exact(2) {
+                                let &[a, b] = pair else {
+                                    continue;
+                                };
+
+                                buf.push(u16::from_le_bytes([a, b]));
+                            }
+
+                            Ok(OsString::from_wide(&buf))
+                        }
                     }
+
+                    variant.decode_value()?.decode_bytes(Visitor)
                 }
-            })
+            }
         })
     }
 }
@@ -1138,7 +1132,7 @@ impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
 
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
-            C: ?Sized + Context,
+            C: Context,
         {
             type Ok = Vec<u8>;
 
@@ -1148,12 +1142,12 @@ impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
             }
 
             #[inline]
-            fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
 
             #[inline]
-            fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes.to_vec())
             }
         }

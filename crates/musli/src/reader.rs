@@ -52,24 +52,24 @@ pub trait Reader<'de>: self::sealed::Sealed {
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Skip over the given number of bytes.
-    fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     /// Peek the next value.
     fn peek(&mut self) -> Option<u8>;
 
     /// Read a slice into the given buffer.
     #[inline]
-    fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         struct Visitor<'a>(&'a mut [u8]);
 
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor<'_>
         where
-            C: ?Sized + Context,
+            C: Context,
         {
             type Ok = ();
 
@@ -79,12 +79,12 @@ pub trait Reader<'de>: self::sealed::Sealed {
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, bytes)
             }
 
             #[inline]
-            fn visit_ref(self, _: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 self.0.copy_from_slice(bytes);
                 Ok(())
             }
@@ -94,9 +94,9 @@ pub trait Reader<'de>: self::sealed::Sealed {
     }
 
     /// Read a slice out of the current reader.
-    fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
         V: UnsizedVisitor<'de, C, [u8]>;
 
     /// Read into the given buffer which might not have been initialized.
@@ -107,18 +107,18 @@ pub trait Reader<'de>: self::sealed::Sealed {
     /// `len`.
     unsafe fn read_bytes_uninit<C>(
         &mut self,
-        cx: &C,
+        cx: C,
         ptr: *mut u8,
         len: usize,
     ) -> Result<(), C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     /// Read a single byte.
     #[inline]
-    fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let [byte] = self.read_array::<C, 1>(cx)?;
         Ok(byte)
@@ -126,15 +126,15 @@ pub trait Reader<'de>: self::sealed::Sealed {
 
     /// Read an array out of the current reader.
     #[inline]
-    fn read_array<C, const N: usize>(&mut self, cx: &C) -> Result<[u8; N], C::Error>
+    fn read_array<C, const N: usize>(&mut self, cx: C) -> Result<[u8; N], C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         struct Visitor<const N: usize>([u8; N]);
 
         impl<'de, const N: usize, C> UnsizedVisitor<'de, C, [u8]> for Visitor<N>
         where
-            C: ?Sized + Context,
+            C: Context,
         {
             type Ok = [u8; N];
 
@@ -144,12 +144,12 @@ pub trait Reader<'de>: self::sealed::Sealed {
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, bytes)
             }
 
             #[inline]
-            fn visit_ref(mut self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(mut self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 self.0.copy_from_slice(bytes);
                 cx.advance(bytes.len());
                 Ok(self.0)
@@ -193,9 +193,9 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if self.len() < n {
             return Err(cx.message(SliceUnderflow {
@@ -211,9 +211,9 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if self.len() < buf.len() {
             return Err(cx.custom(SliceUnderflow::new(buf.len(), self.len())));
@@ -227,9 +227,9 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
         V: UnsizedVisitor<'de, C, [u8]>,
     {
         if self.len() < n {
@@ -244,14 +244,9 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    unsafe fn read_bytes_uninit<C>(
-        &mut self,
-        cx: &C,
-        ptr: *mut u8,
-        n: usize,
-    ) -> Result<(), C::Error>
+    unsafe fn read_bytes_uninit<C>(&mut self, cx: C, ptr: *mut u8, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if self.len() < n {
             return Err(cx.custom(SliceUnderflow::new(n, self.len())));
@@ -264,9 +259,9 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let &[first, ref tail @ ..] = *self else {
             return Err(cx.custom(SliceUnderflow::new(1, self.len())));
@@ -278,9 +273,9 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn read_array<C, const N: usize>(&mut self, cx: &C) -> Result<[u8; N], C::Error>
+    fn read_array<C, const N: usize>(&mut self, cx: C) -> Result<[u8; N], C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if self.len() < N {
             return Err(cx.custom(SliceUnderflow::new(N, self.len())));
@@ -338,9 +333,9 @@ impl<'de> SliceReader<'de> {
     /// use musli::Context;
     /// use musli::reader::{Reader, SliceReader};
     ///
-    /// fn process<C>(cx: &C) -> Result<(), C::Error>
+    /// fn process<C>(cx: C) -> Result<(), C::Error>
     /// where
-    ///     C: ?Sized + Context
+    ///     C: Context
     /// {
     ///     let mut reader = SliceReader::new(&[1, 2, 3, 4]);
     ///     assert_eq!(reader.as_slice(), &[1, 2, 3, 4]);
@@ -362,9 +357,9 @@ impl<'de> SliceReader<'de> {
     /// use musli::Context;
     /// use musli::reader::{Reader, SliceReader};
     ///
-    /// fn process<C>(cx: &C) -> Result<(), C::Error>
+    /// fn process<C>(cx: C) -> Result<(), C::Error>
     /// where
-    ///     C: ?Sized + Context
+    ///     C: Context
     /// {
     ///     let mut reader = SliceReader::new(&[1, 2, 3, 4]);
     ///     assert_eq!(reader.remaining(), 4);
@@ -390,9 +385,9 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
-    fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.range.start = bounds_check_add(cx, &self.range, n)?;
         cx.advance(n);
@@ -400,9 +395,9 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
-    fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
         V: UnsizedVisitor<'de, C, [u8]>,
     {
         let outcome = bounds_check_add(cx, &self.range, n)?;
@@ -418,14 +413,9 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
-    unsafe fn read_bytes_uninit<C>(
-        &mut self,
-        cx: &C,
-        ptr: *mut u8,
-        n: usize,
-    ) -> Result<(), C::Error>
+    unsafe fn read_bytes_uninit<C>(&mut self, cx: C, ptr: *mut u8, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let outcome = bounds_check_add(cx, &self.range, n)?;
         ptr.copy_from_nonoverlapping(self.range.start, n);
@@ -445,9 +435,9 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
-    fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let outcome = bounds_check_add(cx, &self.range, buf.len())?;
 
@@ -465,9 +455,9 @@ impl<'de> Reader<'de> for SliceReader<'de> {
 }
 
 #[inline]
-fn bounds_check_add<C>(cx: &C, range: &Range<*const u8>, len: usize) -> Result<*const u8, C::Error>
+fn bounds_check_add<C>(cx: C, range: &Range<*const u8>, len: usize) -> Result<*const u8, C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
 {
     let outcome = range.start.wrapping_add(len);
 
@@ -502,9 +492,9 @@ where
     R: Reader<'de>,
 {
     #[inline]
-    fn bounds_check<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
+    fn bounds_check<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         match self.remaining.checked_sub(n) {
             Some(remaining) => {
@@ -531,18 +521,18 @@ where
     }
 
     #[inline]
-    fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.bounds_check(cx, n)?;
         self.reader.skip(cx, n)
     }
 
     #[inline]
-    fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
         V: UnsizedVisitor<'de, C, [u8]>,
     {
         self.bounds_check(cx, n)?;
@@ -550,14 +540,9 @@ where
     }
 
     #[inline]
-    unsafe fn read_bytes_uninit<C>(
-        &mut self,
-        cx: &C,
-        ptr: *mut u8,
-        n: usize,
-    ) -> Result<(), C::Error>
+    unsafe fn read_bytes_uninit<C>(&mut self, cx: C, ptr: *mut u8, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.bounds_check(cx, n)?;
         self.reader.read_bytes_uninit(cx, ptr, n)
@@ -573,27 +558,27 @@ where
     }
 
     #[inline]
-    fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.bounds_check(cx, buf.len())?;
         self.reader.read(cx, buf)
     }
 
     #[inline]
-    fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.bounds_check(cx, 1)?;
         self.reader.read_byte(cx)
     }
 
     #[inline]
-    fn read_array<C, const N: usize>(&mut self, cx: &C) -> Result<[u8; N], C::Error>
+    fn read_array<C, const N: usize>(&mut self, cx: C) -> Result<[u8; N], C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.bounds_check(cx, N)?;
         self.reader.read_array(cx)
@@ -627,31 +612,26 @@ where
     }
 
     #[inline]
-    fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).skip(cx, n)
     }
 
     #[inline]
-    fn read_bytes<C, V>(&mut self, cx: &C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
         V: UnsizedVisitor<'de, C, [u8]>,
     {
         (**self).read_bytes(cx, n, visitor)
     }
 
     #[inline]
-    unsafe fn read_bytes_uninit<C>(
-        &mut self,
-        cx: &C,
-        ptr: *mut u8,
-        n: usize,
-    ) -> Result<(), C::Error>
+    unsafe fn read_bytes_uninit<C>(&mut self, cx: C, ptr: *mut u8, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).read_bytes_uninit(cx, ptr, n)
     }
@@ -662,25 +642,25 @@ where
     }
 
     #[inline]
-    fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).read(cx, buf)
     }
 
     #[inline]
-    fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).read_byte(cx)
     }
 
     #[inline]
-    fn read_array<C, const N: usize>(&mut self, cx: &C) -> Result<[u8; N], C::Error>
+    fn read_array<C, const N: usize>(&mut self, cx: C) -> Result<[u8; N], C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).read_array(cx)
     }

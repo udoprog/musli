@@ -60,25 +60,22 @@ mod never;
 /// use musli_core::Context;
 /// use musli_core::en::{Encoder, Encode};
 ///
-/// struct MyEncoder<'a, C: ?Sized> {
+/// struct MyEncoder<'a, C> {
 ///     value: &'a mut Option<u32>,
-///     cx: &'a C,
+///     cx: C,
 /// }
 ///
 /// #[musli_core::encoder(crate = musli_core)]
 /// impl<C> Encoder for MyEncoder<'_, C>
 /// where
-///     C: ?Sized + Context,
+///     C: Context,
 /// {
 ///     type Cx = C;
 ///     type Ok = ();
 ///
 ///     #[inline]
-///     fn cx<F, O>(self, f: F) -> O
-///     where
-///         F: FnOnce(&Self::Cx, Self) -> O,
-///     {
-///         f(self.cx, self)
+///     fn cx(&self) -> Self::Cx {
+///         self.cx
 ///     }
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -122,20 +119,20 @@ pub use musli_macros::encoder;
 /// use musli_core::Context;
 /// use musli_core::de::{Decoder, Decode};
 ///
-/// struct MyDecoder<'a, C: ?Sized> {
-///     cx: &'a C,
+/// struct MyDecoder<C> {
+///     cx: C,
 /// }
 ///
 /// #[musli_core::decoder(crate = musli_core)]
-/// impl<'de, C: ?Sized + Context> Decoder<'de> for MyDecoder<'_, C> {
+/// impl<'de, C> Decoder<'de> for MyDecoder<C>
+/// where
+///     C: Context,
+/// {
 ///     type Cx = C;
 ///
 ///     #[inline]
-///     fn cx<F, O>(self, f: F) -> O
-///     where
-///         F: FnOnce(&Self::Cx, Self) -> O,
-///     {
-///         f(self.cx, self)
+///     fn cx(&self) -> Self::Cx {
+///         self.cx
 ///     }
 ///
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -175,7 +172,10 @@ pub use musli_macros::decoder;
 /// struct AnyVisitor;
 ///
 /// #[musli_core::visitor(crate = musli_core)]
-/// impl<'de, C: ?Sized + Context> Visitor<'de, C> for AnyVisitor {
+/// impl<'de, C> Visitor<'de, C> for AnyVisitor
+/// where
+///     C: ?Sized + Context,
+/// {
 ///     type Ok = ();
 ///
 ///     #[inline]

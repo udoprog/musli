@@ -146,9 +146,9 @@ impl<const N: usize> FixedBytes<N> {
 
     /// Try and extend from the given slice.
     #[inline]
-    pub fn write_bytes<C>(&mut self, cx: &C, source: &[u8]) -> Result<(), C::Error>
+    pub fn write_bytes<C>(&mut self, cx: C, source: &[u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if !self.extend_from_slice(source) {
             return Err(cx.message(FixedBytesOverflow {
@@ -193,9 +193,9 @@ impl<const N: usize> Writer for FixedBytes<N> {
         Self: 'this;
 
     #[inline]
-    fn finish<C>(&mut self, _: &C) -> Result<Self::Ok, C::Error>
+    fn finish<C>(&mut self, _: C) -> Result<Self::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         Ok(())
     }
@@ -206,18 +206,18 @@ impl<const N: usize> Writer for FixedBytes<N> {
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         FixedBytes::write_bytes(self, cx, bytes)?;
         cx.advance(bytes.len());
