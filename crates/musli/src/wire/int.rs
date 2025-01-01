@@ -8,12 +8,12 @@ use super::tag::{Kind, Tag, DATA_MASK};
 /// Governs how usize lengths are encoded into a [`Writer`].
 #[inline]
 pub(crate) fn encode_length<C, W, const OPT: Options>(
-    cx: &C,
+    cx: C,
     mut writer: W,
     value: usize,
 ) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     match crate::options::length::<OPT>() {
@@ -48,11 +48,11 @@ where
 /// Governs how usize lengths are decoded from a [`Reader`].
 #[inline]
 pub(crate) fn decode_length<'de, C, R, const OPT: Options>(
-    cx: &C,
+    cx: C,
     mut reader: R,
 ) -> Result<usize, C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
 {
     match crate::options::length::<OPT>() {
@@ -101,12 +101,12 @@ where
 /// Governs how unsigned integers are encoded into a [`Writer`].
 #[inline]
 pub(crate) fn encode_unsigned<C, W, T, const OPT: Options>(
-    cx: &C,
+    cx: C,
     mut writer: W,
     value: T,
 ) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
     T: UnsignedOps,
 {
@@ -130,11 +130,11 @@ where
 /// Governs how unsigned integers are decoded from a [`Reader`].
 #[inline]
 pub(crate) fn decode_unsigned<'de, C, R, T, const OPT: Options>(
-    cx: &C,
+    cx: C,
     mut reader: R,
 ) -> Result<T, C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
     T: UnsignedOps,
 {
@@ -167,12 +167,12 @@ where
 /// Governs how signed integers are encoded into a [`Writer`].
 #[inline]
 pub(crate) fn encode_signed<C, W, T, const OPT: Options>(
-    cx: &C,
+    cx: C,
     writer: W,
     value: T,
 ) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
     T: Signed,
     T::Unsigned: UnsignedOps,
@@ -184,11 +184,11 @@ where
 /// Governs how signed integers are decoded from a [`Reader`].
 #[inline]
 pub(crate) fn decode_signed<'de, C, R, T, const OPT: Options>(
-    cx: &C,
+    cx: C,
     reader: R,
 ) -> Result<T, C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
     T: Signed,
     T::Unsigned: UnsignedOps,

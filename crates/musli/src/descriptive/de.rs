@@ -23,23 +23,23 @@ use super::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, 
 const BUFFER_OPTIONS: Options = options::new().build();
 
 /// A very simple decoder.
-pub struct SelfDecoder<'a, R, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
+pub struct SelfDecoder<R, const OPT: Options, C> {
+    cx: C,
     reader: R,
 }
 
-impl<'a, R, const OPT: Options, C: ?Sized> SelfDecoder<'a, R, OPT, C> {
+impl<R, const OPT: Options, C> SelfDecoder<R, OPT, C> {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, reader: R) -> Self {
+    pub(crate) fn new(cx: C, reader: R) -> Self {
         Self { cx, reader }
     }
 }
 
-impl<'de, R, const OPT: Options, C> SelfDecoder<'_, Limit<R>, OPT, C>
+impl<'de, R, const OPT: Options, C> SelfDecoder<Limit<R>, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     #[inline]
     fn end(mut self) -> Result<(), C::Error> {
@@ -51,10 +51,10 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> SelfDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> SelfDecoder<R, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     /// Skip over any sequences of values.
     pub(crate) fn skip_any(mut self) -> Result<(), C::Error> {
@@ -111,7 +111,7 @@ where
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_map(mut self) -> Result<RemainingSelfDecoder<'a, R, OPT, C>, C::Error> {
+    fn shared_decode_map(mut self) -> Result<RemainingSelfDecoder<R, OPT, C>, C::Error> {
         let pos = self.cx.mark();
         let len = self.decode_prefix(Kind::Map, &pos)?;
         Ok(RemainingSelfDecoder::new(self.cx, self.reader, len))
@@ -119,7 +119,7 @@ where
 
     // Standard function for decoding a pair sequence.
     #[inline]
-    fn shared_decode_sequence(mut self) -> Result<RemainingSelfDecoder<'a, R, OPT, C>, C::Error> {
+    fn shared_decode_sequence(mut self) -> Result<RemainingSelfDecoder<R, OPT, C>, C::Error> {
         let pos = self.cx.mark();
         let len = self.decode_prefix(Kind::Sequence, &pos)?;
         Ok(RemainingSelfDecoder::new(self.cx, self.reader, len))
@@ -169,19 +169,19 @@ where
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct RemainingSelfDecoder<'a, R, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
+pub struct RemainingSelfDecoder<R, const OPT: Options, C> {
+    cx: C,
     reader: R,
     remaining: usize,
 }
 
-impl<'a, 'de, R, const OPT: Options, C> RemainingSelfDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> RemainingSelfDecoder<R, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     #[inline]
-    fn new(cx: &'a C, reader: R, remaining: usize) -> Self {
+    fn new(cx: C, reader: R, remaining: usize) -> Self {
         Self {
             cx,
             reader,
@@ -214,37 +214,34 @@ where
 }
 
 #[crate::decoder(crate)]
-impl<'a, 'de, R, const OPT: Options, C> Decoder<'de> for SelfDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> Decoder<'de> for SelfDecoder<R, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = SelfDecoder<'this, R, OPT, U>
+    type WithContext<U>
+        = SelfDecoder<R, OPT, U>
     where
-        U: 'this + Context;
+        U: Context;
     #[cfg(feature = "value")]
-    type DecodeBuffer = crate::value::AsValueDecoder<'a, BUFFER_OPTIONS, C>;
-    type DecodePack = SelfDecoder<'a, Limit<R>, OPT, C>;
+    type DecodeBuffer = crate::value::AsValueDecoder<BUFFER_OPTIONS, C>;
+    type DecodePack = SelfDecoder<Limit<R>, OPT, C>;
     type DecodeSome = Self;
-    type DecodeSequence = RemainingSelfDecoder<'a, R, OPT, C>;
-    type DecodeMap = RemainingSelfDecoder<'a, R, OPT, C>;
-    type DecodeMapEntries = RemainingSelfDecoder<'a, R, OPT, C>;
+    type DecodeSequence = RemainingSelfDecoder<R, OPT, C>;
+    type DecodeMap = RemainingSelfDecoder<R, OPT, C>;
+    type DecodeMapEntries = RemainingSelfDecoder<R, OPT, C>;
     type DecodeVariant = Self;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -329,7 +326,7 @@ where
 
         impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
-            C: ?Sized + Context,
+            C: Context,
             V: UnsizedVisitor<'de, C, str>,
         {
             type Ok = V::Ok;
@@ -341,19 +338,19 @@ where
 
             #[cfg(feature = "alloc")]
             #[inline]
-            fn visit_owned(self, cx: &C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
+            fn visit_owned(self, cx: C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline]
-            fn visit_ref(self, cx: &C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_ref(cx, string)
             }
@@ -740,14 +737,14 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> SequenceDecoder<'de> for SelfDecoder<'a, Limit<R>, OPT, C>
+impl<'de, R, const OPT: Options, C> SequenceDecoder<'de> for SelfDecoder<Limit<R>, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type DecodeNext<'this>
-        = StorageDecoder<'a, <Limit<R> as Reader<'de>>::Mut<'this>, OPT, C>
+        = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -762,14 +759,14 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> SequenceDecoder<'de> for RemainingSelfDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> SequenceDecoder<'de> for RemainingSelfDecoder<R, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type DecodeNext<'this>
-        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+        = SelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -800,18 +797,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> MapDecoder<'de> for RemainingSelfDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> MapDecoder<'de> for RemainingSelfDecoder<R, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type DecodeEntry<'this>
-        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+        = SelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeRemainingEntries<'this>
-        = RemainingSelfDecoder<'a, R::Mut<'this>, OPT, C>
+        = RemainingSelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -840,18 +837,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> EntriesDecoder<'de> for RemainingSelfDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> EntriesDecoder<'de> for RemainingSelfDecoder<R, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type DecodeEntryKey<'this>
-        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+        = SelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeEntryValue<'this>
-        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+        = SelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -877,14 +874,14 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> EntryDecoder<'de> for SelfDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> EntryDecoder<'de> for SelfDecoder<R, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type DecodeKey<'this>
-        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+        = SelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeValue = Self;
@@ -900,18 +897,18 @@ where
     }
 }
 
-impl<'a, 'de, R, const OPT: Options, C> VariantDecoder<'de> for SelfDecoder<'a, R, OPT, C>
+impl<'de, R, const OPT: Options, C> VariantDecoder<'de> for SelfDecoder<R, OPT, C>
 where
     R: Reader<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type DecodeTag<'this>
-        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+        = SelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type DecodeValue<'this>
-        = SelfDecoder<'a, R::Mut<'this>, OPT, C>
+        = SelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
 

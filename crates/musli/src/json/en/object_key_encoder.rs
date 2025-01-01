@@ -3,14 +3,14 @@ use core::fmt;
 use crate::en::{Encode, Encoder};
 use crate::{Context, Writer};
 
-pub(crate) struct JsonObjectKeyEncoder<'a, W, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonObjectKeyEncoder<W, C> {
+    cx: C,
     writer: W,
 }
 
-impl<'a, W, C: ?Sized> JsonObjectKeyEncoder<'a, W, C> {
+impl<W, C> JsonObjectKeyEncoder<W, C> {
     #[inline]
-    pub(super) fn new(cx: &'a C, writer: W) -> Self {
+    pub(super) fn new(cx: C, writer: W) -> Self {
         Self { cx, writer }
     }
 }
@@ -27,30 +27,27 @@ macro_rules! format_integer {
 }
 
 #[crate::encoder(crate)]
-impl<W, C> Encoder for JsonObjectKeyEncoder<'_, W, C>
+impl<W, C> Encoder for JsonObjectKeyEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = JsonObjectKeyEncoder<'this, W, U>
+    type WithContext<U>
+        = JsonObjectKeyEncoder<W, U>
     where
-        U: 'this + Context;
+        U: Context;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {

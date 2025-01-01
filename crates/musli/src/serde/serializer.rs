@@ -229,15 +229,15 @@ where
 
     #[inline]
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        self.encoder.cx(|cx, encoder| {
-            let Some(len) = len else {
-                return Err(cx.message("Can only serialize maps with known lengths"));
-            };
+        let cx = self.encoder.cx();
 
-            let hint = MapHint::with_size(len);
-            let encoder = encoder.encode_map_entries(&hint)?;
-            Ok(SerializeMap::new(encoder))
-        })
+        let Some(len) = len else {
+            return Err(cx.message("Can only serialize maps with known lengths"));
+        };
+
+        let hint = MapHint::with_size(len);
+        let encoder = self.encoder.encode_map_entries(&hint)?;
+        Ok(SerializeMap::new(encoder))
     }
 
     #[inline]

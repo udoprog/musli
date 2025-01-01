@@ -17,9 +17,9 @@ pub enum SerdeError {
 }
 
 impl SerdeError {
-    pub(super) fn report<C>(self, cx: &C) -> Option<C::Error>
+    pub(super) fn report<C>(self, cx: C) -> Option<C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         match self {
             SerdeError::Captured => None,

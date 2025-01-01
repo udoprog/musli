@@ -44,21 +44,18 @@ pub enum StringReference<'de, 'scratch> {
 }
 
 /// Accessor for a slice.
-pub(crate) struct SliceAccess<'a, 'de, C>
-where
-    C: ?Sized,
-{
-    cx: &'a C,
+pub(crate) struct SliceAccess<'de, C> {
+    cx: C,
     slice: &'de [u8],
     pub(crate) index: usize,
 }
 
-impl<'a, 'de, C> SliceAccess<'a, 'de, C>
+impl<'de, C> SliceAccess<'de, C>
 where
-    C: ?Sized + Context,
+    C: Context,
 {
     #[inline]
-    pub(crate) fn new(cx: &'a C, slice: &'de [u8], index: usize) -> Self {
+    pub(crate) fn new(cx: C, slice: &'de [u8], index: usize) -> Self {
         Self { cx, slice, index }
     }
 

@@ -70,7 +70,7 @@ where
     }
 }
 
-impl<M, E, A> Context for Same<M, E, A>
+impl<M, E, A> Context for &Same<M, E, A>
 where
     M: 'static,
     E: ContextError<A>,
@@ -83,21 +83,21 @@ where
     type String = String<A>;
 
     #[inline]
-    fn clear(&self) {}
+    fn clear(self) {}
 
     #[inline]
-    fn mark(&self) -> Self::Mark {}
+    fn mark(self) -> Self::Mark {}
 
     #[inline]
-    fn advance(&self, _: usize) {}
+    fn advance(self, _: usize) {}
 
     #[inline]
-    fn alloc(&self) -> Self::Allocator {
+    fn alloc(self) -> Self::Allocator {
         self.alloc.clone()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
+    fn collect_string<T>(self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
@@ -108,7 +108,7 @@ where
     }
 
     #[inline]
-    fn custom<T>(&self, message: T) -> Self::Error
+    fn custom<T>(self, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + Error,
     {
@@ -116,7 +116,7 @@ where
     }
 
     #[inline]
-    fn message<T>(&self, message: T) -> Self::Error
+    fn message<T>(self, message: T) -> Self::Error
     where
         T: fmt::Display,
     {

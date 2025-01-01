@@ -60,9 +60,9 @@ where
 
 /// Decode a [Value] into a type which implements [Decode] using a custom
 /// context.
-pub fn decode_with<'de, C, T>(cx: &C, value: &'de Value) -> Result<T, C::Error>
+pub fn decode_with<'de, C, T>(cx: C, value: &'de Value) -> Result<T, C::Error>
 where
-    C: ?Sized + crate::Context,
+    C: crate::Context,
     T: Decode<'de, C::Mode>,
 {
     use crate::de::Decoder;

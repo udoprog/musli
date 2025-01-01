@@ -106,17 +106,17 @@ use self::serializer::Serializer;
 use crate::alloc::{self, String};
 use crate::{Context, Decoder, Encoder};
 
-struct SerdeContext<'a, C>
+struct SerdeContext<C>
 where
-    C: ?Sized + Context,
+    C: Context,
 {
     error: RefCell<Option<C::Error>>,
-    inner: &'a C,
+    inner: C,
 }
 
-impl<C> Context for SerdeContext<'_, C>
+impl<C> Context for &SerdeContext<C>
 where
-    C: ?Sized + Context,
+    C: Context,
 {
     type Mode = C::Mode;
     type Error = error::SerdeError;
@@ -125,28 +125,28 @@ where
     type String = String<C::Allocator>;
 
     #[inline]
-    fn clear(&self) {
+    fn clear(self) {
         self.inner.clear();
         *self.error.borrow_mut() = None;
     }
 
     #[inline]
-    fn mark(&self) -> Self::Mark {
+    fn mark(self) -> Self::Mark {
         self.inner.mark()
     }
 
     #[inline]
-    fn advance(&self, n: usize) {
+    fn advance(self, n: usize) {
         self.inner.advance(n)
     }
 
     #[inline]
-    fn alloc(&self) -> Self::Allocator {
+    fn alloc(self) -> Self::Allocator {
         self.inner.alloc()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
+    fn collect_string<T>(self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
@@ -157,7 +157,7 @@ where
     }
 
     #[inline]
-    fn custom<T>(&self, error: T) -> Self::Error
+    fn custom<T>(self, error: T) -> Self::Error
     where
         T: 'static + Send + Sync + Error,
     {
@@ -166,7 +166,7 @@ where
     }
 
     #[inline]
-    fn message<T>(&self, message: T) -> Self::Error
+    fn message<T>(self, message: T) -> Self::Error
     where
         T: fmt::Display,
     {
@@ -182,31 +182,31 @@ where
     E: Encoder,
     T: Serialize,
 {
-    encoder.cx(|cx, encoder| {
-        let cx = SerdeContext {
-            error: RefCell::new(None),
-            inner: cx,
-        };
+    let cx = encoder.cx();
 
-        let encoder = encoder.with_context(&cx)?;
+    let cx = SerdeContext {
+        error: RefCell::new(None),
+        inner: cx,
+    };
 
-        let serializer = Serializer::new(encoder);
+    let encoder = encoder.with_context(&cx)?;
 
-        let error = match value.serialize(serializer) {
-            Ok(value) => return Ok(value),
-            Err(error) => error,
-        };
+    let serializer = Serializer::new(encoder);
 
-        if let Some(error) = error.report(cx.inner) {
-            return Err(error);
-        }
+    let error = match value.serialize(serializer) {
+        Ok(value) => return Ok(value),
+        Err(error) => error,
+    };
 
-        let Some(error) = cx.error.borrow_mut().take() else {
-            return Err(cx.inner.message("error during encoding (no information)"));
-        };
+    if let Some(error) = error.report(cx.inner) {
+        return Err(error);
+    }
 
-        Err(error)
-    })
+    let Some(error) = cx.error.borrow_mut().take() else {
+        return Err(cx.inner.message("error during encoding (no information)"));
+    };
+
+    Err(error)
 }
 
 /// Decode the given serde value `T` from the given [Decoder] using the serde
@@ -216,29 +216,29 @@ where
     D: Decoder<'de>,
     T: Deserialize<'de>,
 {
-    decoder.cx(|cx, decoder| {
-        let cx = SerdeContext {
-            error: RefCell::new(None),
-            inner: cx,
-        };
+    let cx = decoder.cx();
 
-        let decoder = decoder.with_context(&cx)?;
+    let cx = SerdeContext {
+        error: RefCell::new(None),
+        inner: cx,
+    };
 
-        let deserializer = Deserializer::new(&cx, decoder);
+    let decoder = decoder.with_context(&cx)?;
 
-        let error = match T::deserialize(deserializer) {
-            Ok(value) => return Ok(value),
-            Err(error) => error,
-        };
+    let deserializer = Deserializer::new(decoder);
 
-        if let Some(error) = error.report(cx.inner) {
-            return Err(error);
-        }
+    let error = match T::deserialize(deserializer) {
+        Ok(value) => return Ok(value),
+        Err(error) => error,
+    };
 
-        let Some(error) = cx.error.borrow_mut().take() else {
-            return Err(cx.inner.message("error during encoding (no information)"));
-        };
+    if let Some(error) = error.report(cx.inner) {
+        return Err(error);
+    }
 
-        Err(error)
-    })
+    let Some(error) = cx.error.borrow_mut().take() else {
+        return Err(cx.inner.message("error during encoding (no information)"));
+    };
+
+    Err(error)
 }

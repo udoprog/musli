@@ -18,7 +18,7 @@ impl<'de, M> Decode<'de, M> for BytesReference<'de> {
 
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
-            C: ?Sized + Context,
+            C: Context,
         {
             type Ok = &'de [u8];
 
@@ -28,7 +28,7 @@ impl<'de, M> Decode<'de, M> for BytesReference<'de> {
             }
 
             #[inline]
-            fn visit_borrowed(self, _: &C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
                 Ok(bytes)
             }
         }
@@ -75,7 +75,7 @@ impl<'de, M> Decode<'de, M> for StringReference<'de> {
 
         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
         where
-            C: ?Sized + Context,
+            C: Context,
         {
             type Ok = &'de str;
 
@@ -85,7 +85,7 @@ impl<'de, M> Decode<'de, M> for StringReference<'de> {
             }
 
             #[inline]
-            fn visit_borrowed(self, _: &C, bytes: &'de str) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, bytes: &'de str) -> Result<Self::Ok, C::Error> {
                 Ok(bytes)
             }
         }
@@ -126,14 +126,12 @@ impl<'de, M> Decode<'de, M> for OwnedFn {
     where
         D: Decoder<'de>,
     {
-        decoder.cx(|cx, decoder| {
-            decoder.decode_unsized(|variant: &str| match variant {
-                "A" => Ok(OwnedFn::A),
-                "B" => Ok(OwnedFn::A),
-                other => {
-                    Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}")))
-                }
-            })
+        let cx = decoder.cx();
+
+        decoder.decode_unsized(|variant: &str| match variant {
+            "A" => Ok(OwnedFn::A),
+            "B" => Ok(OwnedFn::A),
+            other => Err(cx.message(format_args!("Expected either 'A' or 'B' but got {other}"))),
         })
     }
 }

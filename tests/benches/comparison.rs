@@ -98,7 +98,9 @@ fn criterion_benchmark(c: &mut Criterion) {
                         );
 
                         #[cfg(feature = "no-binary-equality")]
-                        drop((actual, index));
+                        {
+                            _ = (actual, index);
+                        }
                     }
                 }};
             }

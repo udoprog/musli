@@ -45,19 +45,19 @@ use super::parser::{integer, Parser, StringReference, Token};
 const BUFFER_OPTIONS: Options = options::new().map_keys_as_numbers().build();
 
 /// A JSON decoder for Müsli.
-pub(crate) struct JsonDecoder<'a, P, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonDecoder<P, C> {
+    cx: C,
     parser: P,
 }
 
-impl<'a, 'de, P, C> JsonDecoder<'a, P, C>
+impl<'de, P, C> JsonDecoder<P, C>
 where
     P: Parser<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, parser: P) -> Self {
+    pub(crate) fn new(cx: C, parser: P) -> Self {
         Self { cx, parser }
     }
 
@@ -101,37 +101,34 @@ where
 }
 
 #[crate::decoder(crate)]
-impl<'a, 'de, P, C> Decoder<'de> for JsonDecoder<'a, P, C>
+impl<'de, P, C> Decoder<'de> for JsonDecoder<P, C>
 where
     P: Parser<'de>,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = JsonDecoder<'this, P, U>
+    type WithContext<U>
+        = JsonDecoder<P, U>
     where
-        U: 'this + Context;
+        U: Context;
     #[cfg(feature = "value")]
-    type DecodeBuffer = crate::value::AsValueDecoder<'a, BUFFER_OPTIONS, C>;
-    type DecodePack = JsonSequenceDecoder<'a, P, C>;
-    type DecodeSequence = JsonSequenceDecoder<'a, P, C>;
-    type DecodeMap = JsonObjectDecoder<'a, P, C>;
-    type DecodeMapEntries = JsonObjectDecoder<'a, P, C>;
-    type DecodeSome = JsonDecoder<'a, P, C>;
-    type DecodeVariant = JsonVariantDecoder<'a, P, C>;
+    type DecodeBuffer = crate::value::AsValueDecoder<BUFFER_OPTIONS, C>;
+    type DecodePack = JsonSequenceDecoder<P, C>;
+    type DecodeSequence = JsonSequenceDecoder<P, C>;
+    type DecodeMap = JsonObjectDecoder<P, C>;
+    type DecodeMapEntries = JsonObjectDecoder<P, C>;
+    type DecodeSome = JsonDecoder<P, C>;
+    type DecodeVariant = JsonVariantDecoder<P, C>;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {

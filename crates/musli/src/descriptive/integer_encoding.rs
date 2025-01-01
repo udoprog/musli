@@ -7,13 +7,13 @@ use super::tag::{Kind, NumberKind, Tag};
 
 #[inline]
 pub(crate) fn encode_typed_unsigned<C, W, T>(
-    cx: &C,
+    cx: C,
     writer: W,
     bits: u8,
     value: T,
 ) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
     T: Unsigned,
 {
@@ -21,9 +21,9 @@ where
 }
 
 #[inline]
-pub(crate) fn decode_typed_unsigned<'de, C, R, T>(cx: &C, reader: R) -> Result<T, C::Error>
+pub(crate) fn decode_typed_unsigned<'de, C, R, T>(cx: C, reader: R) -> Result<T, C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
     T: Unsigned + TryFrom<T::Signed>,
 {
@@ -48,9 +48,9 @@ where
 }
 
 #[inline]
-fn encode_typed<C, W, T>(cx: &C, mut writer: W, bits: u8, value: T) -> Result<(), C::Error>
+fn encode_typed<C, W, T>(cx: C, mut writer: W, bits: u8, value: T) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
     T: Unsigned,
 {
@@ -59,9 +59,9 @@ where
 }
 
 #[inline]
-fn decode_typed<'de, C, R, T>(cx: &C, mut reader: R) -> Result<(T, NumberKind), C::Error>
+fn decode_typed<'de, C, R, T>(cx: C, mut reader: R) -> Result<(T, NumberKind), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
     T: Unsigned,
 {
@@ -77,13 +77,13 @@ where
 
 #[inline]
 pub(crate) fn encode_typed_signed<C, W, T>(
-    cx: &C,
+    cx: C,
     writer: W,
     bits: u8,
     value: T,
 ) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
     T: Signed,
 {
@@ -91,9 +91,9 @@ where
 }
 
 #[inline]
-pub(crate) fn decode_typed_signed<'de, C, R, T>(cx: &C, reader: R) -> Result<T, C::Error>
+pub(crate) fn decode_typed_signed<'de, C, R, T>(cx: C, reader: R) -> Result<T, C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     R: Reader<'de>,
     T: Signed + TryFrom<<T as Signed>::Unsigned>,
 {

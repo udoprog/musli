@@ -62,7 +62,7 @@ impl<M, A> Ignore<M, A> {
     }
 }
 
-impl<M, A> Context for Ignore<M, A>
+impl<M, A> Context for &Ignore<M, A>
 where
     M: 'static,
     A: Clone + Allocator,
@@ -74,21 +74,21 @@ where
     type String = String<A>;
 
     #[inline]
-    fn clear(&self) {}
+    fn clear(self) {}
 
     #[inline]
-    fn mark(&self) -> Self::Mark {}
+    fn mark(self) -> Self::Mark {}
 
     #[inline]
-    fn advance(&self, _: usize) {}
+    fn advance(self, _: usize) {}
 
     #[inline]
-    fn alloc(&self) -> Self::Allocator {
+    fn alloc(self) -> Self::Allocator {
         self.alloc.clone()
     }
 
     #[inline]
-    fn collect_string<T>(&self, value: &T) -> Result<Self::String, Self::Error>
+    fn collect_string<T>(self, value: &T) -> Result<Self::String, Self::Error>
     where
         T: ?Sized + fmt::Display,
     {
@@ -99,7 +99,7 @@ where
     }
 
     #[inline]
-    fn custom<T>(&self, _: T) -> ErrorMarker
+    fn custom<T>(self, _: T) -> ErrorMarker
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -108,7 +108,7 @@ where
     }
 
     #[inline]
-    fn message<T>(&self, _: T) -> ErrorMarker
+    fn message<T>(self, _: T) -> ErrorMarker
     where
         T: fmt::Display,
     {

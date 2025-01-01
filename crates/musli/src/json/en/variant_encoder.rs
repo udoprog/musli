@@ -4,36 +4,36 @@ use crate::{Context, Writer};
 use super::{JsonEncoder, JsonObjectKeyEncoder};
 
 /// A JSON variant encoder.
-pub(crate) struct JsonVariantEncoder<'a, W, C: ?Sized> {
-    cx: &'a C,
+pub(crate) struct JsonVariantEncoder<W, C> {
+    cx: C,
     writer: W,
 }
 
-impl<'a, W, C> JsonVariantEncoder<'a, W, C>
+impl<W, C> JsonVariantEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     #[inline]
-    pub(super) fn new(cx: &'a C, mut writer: W) -> Result<Self, C::Error> {
+    pub(super) fn new(cx: C, mut writer: W) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'{')?;
         Ok(Self { cx, writer })
     }
 }
 
-impl<'a, W, C> VariantEncoder for JsonVariantEncoder<'a, W, C>
+impl<W, C> VariantEncoder for JsonVariantEncoder<W, C>
 where
     W: Writer,
-    C: ?Sized + Context,
+    C: Context,
 {
     type Cx = C;
     type Ok = ();
     type EncodeTag<'this>
-        = JsonObjectKeyEncoder<'a, W::Mut<'this>, C>
+        = JsonObjectKeyEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
     type EncodeData<'this>
-        = JsonEncoder<'a, W::Mut<'this>, C>
+        = JsonEncoder<W::Mut<'this>, C>
     where
         Self: 'this;
 

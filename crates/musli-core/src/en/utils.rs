@@ -10,19 +10,18 @@ where
     E: Encoder,
     T: Encode<E::Mode>,
 {
-    encoder.cx(|cx, encoder| {
-        let slice = slice.as_ref();
-        let hint = SequenceHint::with_size(slice.len());
-        let mut seq = encoder.encode_sequence(&hint)?;
+    let cx = encoder.cx();
+    let slice = slice.as_ref();
+    let hint = SequenceHint::with_size(slice.len());
+    let mut seq = encoder.encode_sequence(&hint)?;
 
-        for (index, item) in slice.iter().enumerate() {
-            cx.enter_sequence_index(index);
-            seq.push(item)?;
-            cx.leave_sequence_index();
-        }
+    for (index, item) in slice.iter().enumerate() {
+        cx.enter_sequence_index(index);
+        seq.push(item)?;
+        cx.leave_sequence_index();
+    }
 
-        seq.finish_sequence()
-    })
+    seq.finish_sequence()
 }
 
 /// The default implementation of [`Encoder::encode_slices`].
@@ -36,23 +35,23 @@ where
     E: Encoder,
     T: Encode<E::Mode>,
 {
-    encoder.cx(|cx, encoder| {
-        let hint = SequenceHint::with_size(len);
-        let mut seq = encoder.encode_sequence(&hint)?;
+    let cx = encoder.cx();
 
-        let mut index = 0;
+    let hint = SequenceHint::with_size(len);
+    let mut seq = encoder.encode_sequence(&hint)?;
 
-        for slice in slices {
-            for item in slice.as_ref() {
-                cx.enter_sequence_index(index);
-                seq.push(item)?;
-                cx.leave_sequence_index();
-                index = index.wrapping_add(1);
-            }
+    let mut index = 0;
+
+    for slice in slices {
+        for item in slice.as_ref() {
+            cx.enter_sequence_index(index);
+            seq.push(item)?;
+            cx.leave_sequence_index();
+            index = index.wrapping_add(1);
         }
+    }
 
-        seq.finish_sequence()
-    })
+    seq.finish_sequence()
 }
 
 /// The default implementation of [`SequenceEncoder::encode_slice`].
@@ -65,18 +64,18 @@ where
     E: ?Sized + SequenceEncoder,
     T: Encode<<E::Cx as Context>::Mode>,
 {
-    seq.cx_mut(|cx, this| {
-        let mut index = 0usize;
+    let cx = seq.cx();
 
-        for value in slice.as_ref() {
-            cx.enter_sequence_index(index);
-            this.push(value)?;
-            cx.leave_sequence_index();
-            index = index.wrapping_add(1);
-        }
+    let mut index = 0usize;
 
-        Ok(())
-    })
+    for value in slice.as_ref() {
+        cx.enter_sequence_index(index);
+        seq.push(value)?;
+        cx.leave_sequence_index();
+        index = index.wrapping_add(1);
+    }
+
+    Ok(())
 }
 
 /// The default implementation of [`SequenceEncoder::encode_slices`].
@@ -89,18 +88,18 @@ where
     E: ?Sized + SequenceEncoder,
     T: Encode<<E::Cx as Context>::Mode>,
 {
-    seq.cx_mut(|cx, seq| {
-        let mut index = 0usize;
+    let cx = seq.cx();
 
-        for slice in slices {
-            for value in slice.as_ref() {
-                cx.enter_sequence_index(index);
-                seq.push(value)?;
-                cx.leave_sequence_index();
-                index = index.wrapping_add(1);
-            }
+    let mut index = 0usize;
+
+    for slice in slices {
+        for value in slice.as_ref() {
+            cx.enter_sequence_index(index);
+            seq.push(value)?;
+            cx.leave_sequence_index();
+            index = index.wrapping_add(1);
         }
+    }
 
-        Ok(())
-    })
+    Ok(())
 }

@@ -52,15 +52,15 @@ pub(crate) trait Unsigned:
 pub(crate) trait UnsignedOps: Unsigned {
     /// Write the current byte array to the given writer in little-endian
     /// encoding.
-    fn write_bytes<C, W>(self, cx: &C, writer: W, byte_order: ByteOrder) -> Result<(), C::Error>
+    fn write_bytes<C, W>(self, cx: C, writer: W, byte_order: ByteOrder) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
         W: Writer;
 
     /// Read the current value from the reader in little-endian encoding.
-    fn read_bytes<'de, C, R>(cx: &C, reader: R, byte_order: ByteOrder) -> Result<Self, C::Error>
+    fn read_bytes<'de, C, R>(cx: C, reader: R, byte_order: ByteOrder) -> Result<Self, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
         R: Reader<'de>;
 }
 
@@ -149,12 +149,12 @@ macro_rules! implement_ops {
             #[inline]
             fn write_bytes<C, W>(
                 self,
-                cx: &C,
+                cx: C,
                 mut writer: W,
                 byte_order: ByteOrder,
             ) -> Result<(), C::Error>
             where
-                C: ?Sized + Context,
+                C: Context,
                 W: Writer,
             {
                 let bytes = match byte_order {
@@ -168,12 +168,12 @@ macro_rules! implement_ops {
 
             #[inline]
             fn read_bytes<'de, C, R>(
-                cx: &C,
+                cx: C,
                 mut reader: R,
                 byte_order: ByteOrder,
             ) -> Result<Self, C::Error>
             where
-                C: ?Sized + Context,
+                C: Context,
                 R: Reader<'de>,
             {
                 let bytes = reader.read_array(cx)?;

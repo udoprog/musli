@@ -43,9 +43,9 @@ impl<'a> Writer for SliceMutWriter<'a> {
         Self: 'this;
 
     #[inline]
-    fn finish<C>(&mut self, _: &C) -> Result<Self::Ok, C::Error>
+    fn finish<C>(&mut self, _: C) -> Result<Self::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         Ok(self.remaining())
     }
@@ -56,18 +56,18 @@ impl<'a> Writer for SliceMutWriter<'a> {
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let end = self.start.as_ptr().wrapping_add(bytes.len());
 
@@ -90,9 +90,9 @@ impl<'a> Writer for SliceMutWriter<'a> {
     }
 
     #[inline]
-    fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
+    fn write_byte<C>(&mut self, cx: C, b: u8) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if self.start == self.end {
             return Err(cx.message(format_args!(

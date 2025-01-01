@@ -34,23 +34,23 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn parse_string<'scratch, C>(
         &mut self,
-        cx: &C,
+        cx: C,
         validate: bool,
         scratch: &'scratch mut Vec<u8, C::Allocator>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     /// Skip a string.
     #[doc(hidden)]
-    fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    fn skip_string<C>(&mut self, cx: C) -> Result<(), C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     #[doc(hidden)]
-    fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let mut byte = [0];
         self.read(cx, &mut byte[..])?;
@@ -58,25 +58,25 @@ pub trait Parser<'de>: private::Sealed {
     }
 
     #[doc(hidden)]
-    fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     #[doc(hidden)]
-    fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     /// Skip over whitespace.
     #[doc(hidden)]
-    fn skip_whitespace<C>(&mut self, cx: &C)
+    fn skip_whitespace<C>(&mut self, cx: C)
     where
-        C: ?Sized + Context;
+        C: Context;
 
     #[doc(hidden)]
-    fn consume_while<C>(&mut self, cx: &C, m: fn(u8) -> bool) -> Result<usize, C::Error>
+    fn consume_while<C>(&mut self, cx: C, m: fn(u8) -> bool) -> Result<usize, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         let mut c = 0;
 
@@ -97,9 +97,9 @@ pub trait Parser<'de>: private::Sealed {
     fn peek(&mut self) -> Option<u8>;
 
     #[doc(hidden)]
-    fn lex<C>(&mut self, cx: &C) -> Token
+    fn lex<C>(&mut self, cx: C) -> Token
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.skip_whitespace(cx);
 
@@ -111,19 +111,19 @@ pub trait Parser<'de>: private::Sealed {
     }
 
     /// Parse a 32-bit floating point number.
-    fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>
+    fn parse_f32<C>(&mut self, cx: C) -> Result<f32, C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     /// Parse a 64-bit floating point number.
-    fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
+    fn parse_f64<C>(&mut self, cx: C) -> Result<f64, C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     #[doc(hidden)]
-    fn parse_exact<C>(&mut self, cx: &C, exact: &str) -> Result<(), C::Error>
+    fn parse_exact<C>(&mut self, cx: C, exact: &str) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         debug_assert!(exact.len() <= 5);
 
@@ -144,9 +144,9 @@ pub trait Parser<'de>: private::Sealed {
     /// Parse an unknown number and try to coerce it into the best fit type
     /// through [Visitor].
     #[doc(hidden)]
-    fn parse_number<C, V>(&mut self, cx: &C, visitor: V) -> Result<V::Ok, C::Error>
+    fn parse_number<C, V>(&mut self, cx: C, visitor: V) -> Result<V::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
         V: Visitor<'de, C>,
     {
         let signed = decode_signed_full::<i128, _, _>(cx, self)?;
@@ -232,28 +232,28 @@ where
     #[inline]
     fn parse_string<'scratch, C>(
         &mut self,
-        cx: &C,
+        cx: C,
         validate: bool,
         scratch: &'scratch mut Vec<u8, C::Allocator>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).parse_string(cx, validate, scratch)
     }
 
     #[inline]
-    fn skip_string<C>(&mut self, cx: &C) -> Result<(), C::Error>
+    fn skip_string<C>(&mut self, cx: C) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).skip_string(cx)
     }
 
     #[inline]
-    fn read_byte<C>(&mut self, cx: &C) -> Result<u8, C::Error>
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).read_byte(cx)
     }
@@ -264,49 +264,49 @@ where
     }
 
     #[inline]
-    fn lex<C>(&mut self, cx: &C) -> Token
+    fn lex<C>(&mut self, cx: C) -> Token
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).lex(cx)
     }
 
     #[inline]
-    fn skip_whitespace<C>(&mut self, cx: &C)
+    fn skip_whitespace<C>(&mut self, cx: C)
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).skip_whitespace(cx);
     }
 
     #[inline]
-    fn skip<C>(&mut self, cx: &C, n: usize) -> Result<(), C::Error>
+    fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).skip(cx, n)
     }
 
     #[inline]
-    fn read<C>(&mut self, cx: &C, buf: &mut [u8]) -> Result<(), C::Error>
+    fn read<C>(&mut self, cx: C, buf: &mut [u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).read(cx, buf)
     }
 
     #[inline]
-    fn parse_f32<C>(&mut self, cx: &C) -> Result<f32, C::Error>
+    fn parse_f32<C>(&mut self, cx: C) -> Result<f32, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).parse_f32(cx)
     }
 
     #[inline]
-    fn parse_f64<C>(&mut self, cx: &C) -> Result<f64, C::Error>
+    fn parse_f64<C>(&mut self, cx: C) -> Result<f64, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (**self).parse_f64(cx)
     }

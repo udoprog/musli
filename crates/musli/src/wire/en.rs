@@ -11,19 +11,19 @@ use crate::{Context, Options, Writer};
 use super::tag::{Kind, Tag};
 
 /// A very simple encoder.
-pub struct WireEncoder<'a, W, const OPT: Options, C: ?Sized> {
-    cx: &'a C,
+pub struct WireEncoder<W, const OPT: Options, C> {
+    cx: C,
     writer: W,
 }
 
-impl<'a, W, const OPT: Options, C> WireEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> WireEncoder<W, OPT, C>
 where
+    C: Context,
     W: Writer,
-    C: ?Sized + Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W) -> Self {
+    pub(crate) fn new(cx: C, writer: W) -> Self {
         Self { cx, writer }
     }
 
@@ -56,22 +56,22 @@ where
     }
 }
 
-pub struct WireSequenceEncoder<'a, W, const OPT: Options, C>
+pub struct WireSequenceEncoder<W, const OPT: Options, C>
 where
-    C: ?Sized + Context,
+    C: Context,
 {
-    cx: &'a C,
+    cx: C,
     writer: W,
     buffer: BufWriter<C::Allocator>,
 }
 
-impl<'a, W, const OPT: Options, C> WireSequenceEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> WireSequenceEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
-    pub(crate) fn new(cx: &'a C, writer: W) -> Self {
+    pub(crate) fn new(cx: C, writer: W) -> Self {
         Self {
             cx,
             writer,
@@ -81,20 +81,20 @@ where
 }
 
 #[crate::encoder(crate)]
-impl<'a, W, const OPT: Options, C> Encoder for WireEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> Encoder for WireEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Error = C::Error;
     type Ok = ();
     type Mode = C::Mode;
-    type WithContext<'this, U>
-        = WireEncoder<'this, W, OPT, U>
+    type WithContext<U>
+        = WireEncoder<W, OPT, U>
     where
-        U: 'this + Context;
-    type EncodePack = WireSequenceEncoder<'a, W, OPT, C>;
+        U: Context;
+    type EncodePack = WireSequenceEncoder<W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -104,15 +104,12 @@ where
     type EncodeMapVariant = Self;
 
     #[inline]
-    fn cx<F, O>(self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
-    fn with_context<U>(self, cx: &U) -> Result<Self::WithContext<'_, U>, C::Error>
+    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
         U: Context,
     {
@@ -340,24 +337,21 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = StorageEncoder<'a, &'this mut BufWriter<C::Allocator>, OPT, C>
+        = StorageEncoder<&'this mut BufWriter<C::Allocator>, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn cx_mut<F, O>(&mut self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, &mut Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
@@ -374,24 +368,21 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> SequenceEncoder for WireEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> SequenceEncoder for WireEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = WireEncoder<'a, W::Mut<'this>, OPT, C>
+        = WireEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
     #[inline]
-    fn cx_mut<F, O>(&mut self, f: F) -> O
-    where
-        F: FnOnce(&Self::Cx, &mut Self) -> O,
-    {
-        f(self.cx, self)
+    fn cx(&self) -> Self::Cx {
+        self.cx
     }
 
     #[inline]
@@ -405,15 +396,15 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> MapEncoder for WireEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> MapEncoder for WireEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeEntry<'this>
-        = WireEncoder<'a, W::Mut<'this>, OPT, C>
+        = WireEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -428,19 +419,19 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> EntriesEncoder for WireEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> EntriesEncoder for WireEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeEntryKey<'this>
-        = WireEncoder<'a, W::Mut<'this>, OPT, C>
+        = WireEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = WireEncoder<'a, W::Mut<'this>, OPT, C>
+        = WireEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -460,19 +451,19 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> EntryEncoder for WireEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> EntryEncoder for WireEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeKey<'this>
-        = WireEncoder<'a, W::Mut<'this>, OPT, C>
+        = WireEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = WireEncoder<'a, W::Mut<'this>, OPT, C>
+        = WireEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -492,19 +483,19 @@ where
     }
 }
 
-impl<'a, W, const OPT: Options, C> VariantEncoder for WireEncoder<'a, W, OPT, C>
+impl<W, const OPT: Options, C> VariantEncoder for WireEncoder<W, OPT, C>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     type Cx = C;
     type Ok = ();
     type EncodeTag<'this>
-        = WireEncoder<'a, W::Mut<'this>, OPT, C>
+        = WireEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
     type EncodeData<'this>
-        = WireEncoder<'a, W::Mut<'this>, OPT, C>
+        = WireEncoder<W::Mut<'this>, OPT, C>
     where
         Self: 'this;
 
@@ -526,13 +517,9 @@ where
 
 /// Encode a length prefix.
 #[inline]
-fn encode_prefix<C, W, const OPT: Options>(
-    cx: &C,
-    mut writer: W,
-    len: usize,
-) -> Result<(), C::Error>
+fn encode_prefix<C, W, const OPT: Options>(cx: C, mut writer: W, len: usize) -> Result<(), C::Error>
 where
-    C: ?Sized + Context,
+    C: Context,
     W: Writer,
 {
     let (tag, embedded) = Tag::with_len(Kind::Prefix, len);

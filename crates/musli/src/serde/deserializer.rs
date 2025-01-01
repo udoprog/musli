@@ -15,25 +15,18 @@ use rust_alloc::string::String;
 #[cfg(feature = "alloc")]
 use rust_alloc::vec::Vec;
 
-pub struct Deserializer<'de, 'a, D>
-where
-    D: Decoder<'de>,
-{
-    cx: &'a D::Cx,
+pub struct Deserializer<D> {
     decoder: D,
 }
 
-impl<'de, 'a, D> Deserializer<'de, 'a, D>
-where
-    D: Decoder<'de>,
-{
+impl<D> Deserializer<D> {
     /// Construct a new deserializer out of a decoder.
-    pub fn new(cx: &'a D::Cx, decoder: D) -> Self {
-        Self { cx, decoder }
+    pub fn new(decoder: D) -> Self {
+        Self { decoder }
     }
 }
 
-impl<'de, D> de::Deserializer<'de> for Deserializer<'de, '_, D>
+impl<'de, D> de::Deserializer<'de> for Deserializer<D>
 where
     D: Decoder<'de, Cx: Context<Error: de::Error>>,
 {
@@ -209,7 +202,7 @@ where
         V: de::Visitor<'de>,
     {
         match self.decoder.decode_option()? {
-            Some(decoder) => visitor.visit_some(Deserializer::new(self.cx, decoder)),
+            Some(decoder) => visitor.visit_some(Deserializer::new(decoder)),
             None => visitor.visit_none(),
         }
     }
@@ -245,7 +238,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_newtype_struct(Deserializer::new(self.cx, self.decoder))
+        visitor.visit_newtype_struct(Deserializer::new(self.decoder))
     }
 
     #[inline]
@@ -254,7 +247,7 @@ where
         V: de::Visitor<'de>,
     {
         self.decoder
-            .decode_sequence(|d| visitor.visit_seq(SeqAccess::new(self.cx, d)))
+            .decode_sequence(|d| visitor.visit_seq(SeqAccess::new(d)))
     }
 
     #[inline]
@@ -264,9 +257,8 @@ where
     {
         let hint = SequenceHint::with_size(len);
 
-        self.decoder.decode_sequence_hint(&hint, |d| {
-            visitor.visit_seq(SequenceAccess::new(self.cx, d))
-        })
+        self.decoder
+            .decode_sequence_hint(&hint, |d| visitor.visit_seq(SequenceAccess::new(d)))
     }
 
     #[inline]
@@ -288,7 +280,7 @@ where
         V: de::Visitor<'de>,
     {
         self.decoder
-            .decode_map_entries(|decoder| visitor.visit_map(MapAccess::new(self.cx, decoder)))
+            .decode_map_entries(|decoder| visitor.visit_map(MapAccess::new(decoder)))
     }
 
     #[inline]
@@ -302,7 +294,7 @@ where
         V: de::Visitor<'de>,
     {
         self.decoder
-            .decode_map_entries(|decoder| visitor.visit_map(StructAccess::new(self.cx, decoder)))
+            .decode_map_entries(|decoder| visitor.visit_map(StructAccess::new(decoder)))
     }
 
     #[inline]
@@ -316,7 +308,7 @@ where
         V: de::Visitor<'de>,
     {
         self.decoder
-            .decode_variant(|decoder| visitor.visit_enum(EnumAccess::new(self.cx, decoder)))
+            .decode_variant(|decoder| visitor.visit_enum(EnumAccess::new(decoder)))
     }
 
     #[inline]
@@ -342,24 +334,23 @@ where
     }
 }
 
-struct SequenceAccess<'de, 'a, D>
+struct SequenceAccess<'a, D>
 where
-    D: SequenceDecoder<'de>,
+    D: ?Sized,
 {
-    cx: &'a D::Cx,
     decoder: &'a mut D,
 }
 
-impl<'de, 'a, D> SequenceAccess<'de, 'a, D>
+impl<'a, D> SequenceAccess<'a, D>
 where
-    D: SequenceDecoder<'de>,
+    D: ?Sized,
 {
-    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
-        SequenceAccess { cx, decoder }
+    fn new(decoder: &'a mut D) -> Self {
+        SequenceAccess { decoder }
     }
 }
 
-impl<'de, D> de::SeqAccess<'de> for SequenceAccess<'de, '_, D>
+impl<'de, D> de::SeqAccess<'de> for SequenceAccess<'_, D>
 where
     D: SequenceDecoder<'de, Cx: Context<Error: de::Error>>,
 {
@@ -374,7 +365,7 @@ where
             return Ok(None);
         };
 
-        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::new(decoder))?;
         Ok(Some(output))
     }
 
@@ -383,27 +374,26 @@ where
         self.decoder.size_hint().into_option()
     }
 }
-struct StructAccess<'de, 'a, D>
+struct StructAccess<'a, D>
 where
-    D: EntriesDecoder<'de>,
+    D: ?Sized,
 {
-    cx: &'a D::Cx,
     decoder: &'a mut D,
 }
 
-impl<'de, 'a, D> StructAccess<'de, 'a, D>
+impl<'a, D> StructAccess<'a, D>
 where
-    D: EntriesDecoder<'de>,
+    D: ?Sized,
 {
     #[inline]
-    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
-        StructAccess { cx, decoder }
+    fn new(decoder: &'a mut D) -> Self {
+        StructAccess { decoder }
     }
 }
 
-impl<'de, D> de::MapAccess<'de> for StructAccess<'de, '_, D>
+impl<'de, D> de::MapAccess<'de> for StructAccess<'_, D>
 where
-    D: EntriesDecoder<'de, Cx: Context<Error: de::Error>>,
+    D: ?Sized + EntriesDecoder<'de, Cx: Context<Error: de::Error>>,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -416,7 +406,7 @@ where
             return Ok(None);
         };
 
-        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::new(decoder))?;
         Ok(Some(output))
     }
 
@@ -426,7 +416,7 @@ where
         V: de::DeserializeSeed<'de>,
     {
         let decoder = self.decoder.decode_entry_value()?;
-        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::new(decoder))?;
         Ok(output)
     }
 
@@ -449,7 +439,7 @@ impl<V> BytesVisitor<V> {
 
 impl<'de, C, V> crate::de::UnsizedVisitor<'de, C, [u8]> for BytesVisitor<V>
 where
-    C: ?Sized + Context<Error: de::Error>,
+    C: Context<Error: de::Error>,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
@@ -461,39 +451,38 @@ where
 
     #[inline]
     #[cfg(feature = "alloc")]
-    fn visit_owned(self, _: &C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, _: C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
         de::Visitor::visit_byte_buf(self.visitor, value)
     }
 
     #[inline]
-    fn visit_borrowed(self, _: &C, value: &'de [u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_borrowed(self, _: C, value: &'de [u8]) -> Result<Self::Ok, C::Error> {
         de::Visitor::visit_borrowed_bytes(self.visitor, value)
     }
 
     #[inline]
-    fn visit_ref(self, _: &C, value: &[u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, _: C, value: &[u8]) -> Result<Self::Ok, C::Error> {
         de::Visitor::visit_bytes(self.visitor, value)
     }
 }
 
-struct SeqAccess<'de, 'a, D>
+struct SeqAccess<'a, D>
 where
-    D: ?Sized + SequenceDecoder<'de>,
+    D: ?Sized,
 {
-    cx: &'a D::Cx,
     decoder: &'a mut D,
 }
 
-impl<'de, 'a, D> SeqAccess<'de, 'a, D>
+impl<'a, D> SeqAccess<'a, D>
 where
-    D: ?Sized + SequenceDecoder<'de>,
+    D: ?Sized,
 {
-    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
-        Self { cx, decoder }
+    fn new(decoder: &'a mut D) -> Self {
+        Self { decoder }
     }
 }
 
-impl<'de, D> de::SeqAccess<'de> for SeqAccess<'de, '_, D>
+impl<'de, D> de::SeqAccess<'de> for SeqAccess<'_, D>
 where
     D: ?Sized + SequenceDecoder<'de, Cx: Context<Error: de::Error>>,
 {
@@ -508,7 +497,7 @@ where
             return Ok(None);
         };
 
-        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::new(decoder))?;
         Ok(Some(output))
     }
 
@@ -518,24 +507,23 @@ where
     }
 }
 
-struct MapAccess<'de, 'a, D>
+struct MapAccess<'a, D>
 where
-    D: ?Sized + EntriesDecoder<'de>,
+    D: ?Sized,
 {
-    cx: &'a D::Cx,
     decoder: &'a mut D,
 }
 
-impl<'de, 'a, D> MapAccess<'de, 'a, D>
+impl<'a, D> MapAccess<'a, D>
 where
-    D: ?Sized + EntriesDecoder<'de>,
+    D: ?Sized,
 {
-    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
-        Self { cx, decoder }
+    fn new(decoder: &'a mut D) -> Self {
+        Self { decoder }
     }
 }
 
-impl<'de, D> de::MapAccess<'de> for MapAccess<'de, '_, D>
+impl<'de, D> de::MapAccess<'de> for MapAccess<'_, D>
 where
     D: ?Sized + EntriesDecoder<'de, Cx: Context<Error: de::Error>>,
 {
@@ -550,7 +538,7 @@ where
             return Ok(None);
         };
 
-        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::new(decoder))?;
         Ok(Some(output))
     }
 
@@ -560,7 +548,7 @@ where
         V: de::DeserializeSeed<'de>,
     {
         let decoder = self.decoder.decode_entry_value()?;
-        let output = seed.deserialize(Deserializer::new(self.cx, decoder))?;
+        let output = seed.deserialize(Deserializer::new(decoder))?;
         Ok(output)
     }
 }
@@ -577,7 +565,7 @@ impl<V> StringVisitor<V> {
 
 impl<'de, C, V> crate::de::UnsizedVisitor<'de, C, str> for StringVisitor<V>
 where
-    C: ?Sized + Context<Error: de::Error>,
+    C: Context<Error: de::Error>,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
@@ -589,41 +577,40 @@ where
 
     #[inline]
     #[cfg(feature = "alloc")]
-    fn visit_owned(self, _: &C, value: String) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, _: C, value: String) -> Result<Self::Ok, C::Error> {
         de::Visitor::visit_string(self.visitor, value)
     }
 
     #[inline]
-    fn visit_borrowed(self, _: &C, value: &'de str) -> Result<Self::Ok, C::Error> {
+    fn visit_borrowed(self, _: C, value: &'de str) -> Result<Self::Ok, C::Error> {
         de::Visitor::visit_borrowed_str(self.visitor, value)
     }
 
     #[inline]
-    fn visit_ref(self, _: &C, value: &str) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, _: C, value: &str) -> Result<Self::Ok, C::Error> {
         de::Visitor::visit_str(self.visitor, value)
     }
 }
 
-struct EnumAccess<'de, 'a, D>
+struct EnumAccess<'a, D>
 where
-    D: VariantDecoder<'de>,
+    D: ?Sized,
 {
-    cx: &'a D::Cx,
     decoder: &'a mut D,
 }
 
-impl<'de, 'a, D> EnumAccess<'de, 'a, D>
+impl<'a, D> EnumAccess<'a, D>
 where
-    D: VariantDecoder<'de>,
+    D: ?Sized,
 {
-    fn new(cx: &'a D::Cx, decoder: &'a mut D) -> Self {
-        Self { cx, decoder }
+    fn new(decoder: &'a mut D) -> Self {
+        Self { decoder }
     }
 }
 
-impl<'de, D> de::VariantAccess<'de> for EnumAccess<'de, '_, D>
+impl<'de, D> de::VariantAccess<'de> for EnumAccess<'_, D>
 where
-    D: VariantDecoder<'de, Cx: Context<Error: de::Error>>,
+    D: ?Sized + VariantDecoder<'de, Cx: Context<Error: de::Error>>,
 {
     type Error = <D::Cx as Context>::Error;
 
@@ -637,7 +624,7 @@ where
     where
         T: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(Deserializer::new(self.cx, self.decoder.decode_value()?))
+        seed.deserialize(Deserializer::new(self.decoder.decode_value()?))
     }
 
     #[inline]
@@ -649,9 +636,7 @@ where
 
         self.decoder
             .decode_value()?
-            .decode_sequence_hint(&hint, |tuple| {
-                visitor.visit_seq(SequenceAccess::new(self.cx, tuple))
-            })
+            .decode_sequence_hint(&hint, |tuple| visitor.visit_seq(SequenceAccess::new(tuple)))
     }
 
     #[inline]
@@ -665,11 +650,11 @@ where
     {
         self.decoder
             .decode_value()?
-            .decode_map_entries(|decoder| visitor.visit_map(StructAccess::new(self.cx, decoder)))
+            .decode_map_entries(|decoder| visitor.visit_map(StructAccess::new(decoder)))
     }
 }
 
-impl<'de, D> de::EnumAccess<'de> for EnumAccess<'de, '_, D>
+impl<'de, D> de::EnumAccess<'de> for EnumAccess<'_, D>
 where
     D: VariantDecoder<'de, Cx: Context<Error: de::Error>>,
 {
@@ -682,7 +667,7 @@ where
         V: de::DeserializeSeed<'de>,
     {
         let tag = self.decoder.decode_tag()?;
-        let value = seed.deserialize(Deserializer::new(self.cx, tag))?;
+        let value = seed.deserialize(Deserializer::new(tag))?;
         Ok((value, self))
     }
 }
@@ -700,7 +685,7 @@ impl<V> AnyVisitor<V> {
 #[crate::visitor(crate)]
 impl<'de, C, V> Visitor<'de, C> for AnyVisitor<V>
 where
-    C: ?Sized + Context<Error: de::Error>,
+    C: Context<Error: de::Error>,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
@@ -714,42 +699,42 @@ where
     }
 
     #[inline]
-    fn visit_empty(self, _: &C) -> Result<Self::Ok, C::Error> {
+    fn visit_empty(self, _: C) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_unit()
     }
 
     #[inline]
-    fn visit_bool(self, _: &C, v: bool) -> Result<Self::Ok, C::Error> {
+    fn visit_bool(self, _: C, v: bool) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_bool(v)
     }
 
     #[inline]
-    fn visit_char(self, _: &C, v: char) -> Result<Self::Ok, C::Error> {
+    fn visit_char(self, _: C, v: char) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_char(v)
     }
 
     #[inline]
-    fn visit_u8(self, _: &C, v: u8) -> Result<Self::Ok, C::Error> {
+    fn visit_u8(self, _: C, v: u8) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u8(v)
     }
 
     #[inline]
-    fn visit_u16(self, _: &C, v: u16) -> Result<Self::Ok, C::Error> {
+    fn visit_u16(self, _: C, v: u16) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u16(v)
     }
 
     #[inline]
-    fn visit_u32(self, _: &C, v: u32) -> Result<Self::Ok, C::Error> {
+    fn visit_u32(self, _: C, v: u32) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u32(v)
     }
 
     #[inline]
-    fn visit_u64(self, _: &C, v: u64) -> Result<Self::Ok, C::Error> {
+    fn visit_u64(self, _: C, v: u64) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u64(v)
     }
 
     #[inline]
-    fn visit_u128(self, _: &C, v: u128) -> Result<Self::Ok, C::Error> {
+    fn visit_u128(self, _: C, v: u128) -> Result<Self::Ok, C::Error> {
         // Serde's 128-bit support is very broken, so just try to avoid it if we can.
         // See: https://github.com/serde-rs/serde/issues/2576
         if let Ok(v) = u64::try_from(v) {
@@ -760,27 +745,27 @@ where
     }
 
     #[inline]
-    fn visit_i8(self, _: &C, v: i8) -> Result<Self::Ok, C::Error> {
+    fn visit_i8(self, _: C, v: i8) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i8(v)
     }
 
     #[inline]
-    fn visit_i16(self, _: &C, v: i16) -> Result<Self::Ok, C::Error> {
+    fn visit_i16(self, _: C, v: i16) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i16(v)
     }
 
     #[inline]
-    fn visit_i32(self, _: &C, v: i32) -> Result<Self::Ok, C::Error> {
+    fn visit_i32(self, _: C, v: i32) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i32(v)
     }
 
     #[inline]
-    fn visit_i64(self, _: &C, v: i64) -> Result<Self::Ok, C::Error> {
+    fn visit_i64(self, _: C, v: i64) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i64(v)
     }
 
     #[inline]
-    fn visit_i128(self, _: &C, v: i128) -> Result<Self::Ok, C::Error> {
+    fn visit_i128(self, _: C, v: i128) -> Result<Self::Ok, C::Error> {
         // Serde's 128-bit support is very broken, so just try to avoid it if we can.
         // See: https://github.com/serde-rs/serde/issues/2576
         if let Ok(v) = i64::try_from(v) {
@@ -791,7 +776,7 @@ where
     }
 
     #[inline]
-    fn visit_usize(self, cx: &C, v: usize) -> Result<Self::Ok, C::Error> {
+    fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
         if let Some(value) = unsigned_value(self.visitor, v)? {
             return Ok(value);
         }
@@ -800,7 +785,7 @@ where
     }
 
     #[inline]
-    fn visit_isize(self, cx: &C, v: isize) -> Result<Self::Ok, C::Error> {
+    fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
         if let Some(value) = signed_value(self.visitor, v)? {
             return Ok(value);
         }
@@ -809,54 +794,52 @@ where
     }
 
     #[inline]
-    fn visit_f32(self, _: &C, v: f32) -> Result<Self::Ok, C::Error> {
+    fn visit_f32(self, _: C, v: f32) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_f32(v)
     }
 
     #[inline]
-    fn visit_f64(self, _: &C, v: f64) -> Result<Self::Ok, C::Error> {
+    fn visit_f64(self, _: C, v: f64) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_f64(v)
     }
 
     #[inline]
-    fn visit_option<D>(self, cx: &C, v: Option<D>) -> Result<Self::Ok, C::Error>
+    fn visit_option<D>(self, _: C, v: Option<D>) -> Result<Self::Ok, C::Error>
     where
         D: Decoder<'de, Cx = C>,
     {
         match v {
-            Some(v) => self.visitor.visit_some(Deserializer::new(cx, v)),
+            Some(v) => self.visitor.visit_some(Deserializer::new(v)),
             None => self.visitor.visit_none(),
         }
     }
 
     #[inline]
-    fn visit_sequence<D>(self, cx: &C, decoder: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, _: C, decoder: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + SequenceDecoder<'de, Cx = C>,
     {
-        self.visitor.visit_seq(SeqAccess::new(cx, decoder))
+        self.visitor.visit_seq(SeqAccess::new(decoder))
     }
 
     #[inline]
-    fn visit_map<D>(self, cx: &C, decoder: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, _: C, decoder: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + MapDecoder<'de, Cx = C>,
     {
         let mut map_decoder = decoder.decode_remaining_entries()?;
-        let value = self
-            .visitor
-            .visit_map(MapAccess::new(cx, &mut map_decoder))?;
+        let value = self.visitor.visit_map(MapAccess::new(&mut map_decoder))?;
         map_decoder.end_entries()?;
         Ok(value)
     }
 
     #[inline]
-    fn visit_string(self, _: &C, _: SizeHint) -> Result<Self::String, C::Error> {
+    fn visit_string(self, _: C, _: SizeHint) -> Result<Self::String, C::Error> {
         Ok(StringVisitor::new(self.visitor))
     }
 
     #[inline]
-    fn visit_bytes(self, _: &C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
+    fn visit_bytes(self, _: C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
         Ok(BytesVisitor::new(self.visitor))
     }
 }

@@ -54,28 +54,28 @@ pub trait Writer {
         Self: 'this;
 
     /// Finalize the writer and return the output.
-    fn finish<C>(&mut self, cx: &C) -> Result<Self::Ok, C::Error>
+    fn finish<C>(&mut self, cx: C) -> Result<Self::Ok, C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     /// Reborrow the current type.
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write a buffer to the current writer.
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     /// Write bytes to the current writer.
-    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context;
+        C: Context;
 
     /// Write a single byte.
     #[inline]
-    fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
+    fn write_byte<C>(&mut self, cx: C, b: u8) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.write_bytes(cx, &[b])
     }
@@ -105,9 +105,9 @@ where
         Self: 'this;
 
     #[inline]
-    fn finish<C>(&mut self, cx: &C) -> Result<Self::Ok, C::Error>
+    fn finish<C>(&mut self, cx: C) -> Result<Self::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (*self).finish(cx)
     }
@@ -118,25 +118,25 @@ where
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (*self).extend(cx, buffer)
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (*self).write_bytes(cx, bytes)
     }
 
     #[inline]
-    fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
+    fn write_byte<C>(&mut self, cx: C, b: u8) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         (*self).write_byte(cx, b)
     }
@@ -151,9 +151,9 @@ impl Writer for rust_alloc::vec::Vec<u8> {
         Self: 'this;
 
     #[inline]
-    fn finish<C>(&mut self, _: &C) -> Result<Self::Ok, C::Error>
+    fn finish<C>(&mut self, _: C) -> Result<Self::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         Ok(())
     }
@@ -164,18 +164,18 @@ impl Writer for rust_alloc::vec::Vec<u8> {
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         // SAFETY: the buffer never outlives this function call.
         self.write_bytes(cx, buffer.as_slice())
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.extend_from_slice(bytes);
         cx.advance(bytes.len());
@@ -183,9 +183,9 @@ impl Writer for rust_alloc::vec::Vec<u8> {
     }
 
     #[inline]
-    fn write_byte<C>(&mut self, cx: &C, b: u8) -> Result<(), C::Error>
+    fn write_byte<C>(&mut self, cx: C, b: u8) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         self.push(b);
         cx.advance(1);
@@ -239,9 +239,9 @@ where
         Self: 'this;
 
     #[inline]
-    fn finish<C>(&mut self, _: &C) -> Result<Self::Ok, C::Error>
+    fn finish<C>(&mut self, _: C) -> Result<Self::Ok, C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         Ok(())
     }
@@ -252,9 +252,9 @@ where
     }
 
     #[inline]
-    fn extend<C>(&mut self, cx: &C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
+    fn extend<C>(&mut self, cx: C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if !self.buf.write(buffer.as_slice()) {
             return Err(cx.message("Buffer overflow"));
@@ -264,9 +264,9 @@ where
     }
 
     #[inline]
-    fn write_bytes<C>(&mut self, cx: &C, bytes: &[u8]) -> Result<(), C::Error>
+    fn write_bytes<C>(&mut self, cx: C, bytes: &[u8]) -> Result<(), C::Error>
     where
-        C: ?Sized + Context,
+        C: Context,
     {
         if !self.buf.write(bytes) {
             return Err(cx.message("Buffer overflow"));
