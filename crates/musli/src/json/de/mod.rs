@@ -436,10 +436,8 @@ where
         let cx = self.cx;
 
         match self.parser.lex(cx) {
-            Token::OpenBrace => self.decode_map(|decoder| visitor.visit_map(cx, decoder)),
-            Token::OpenBracket => {
-                self.decode_sequence(|decoder| visitor.visit_sequence(cx, decoder))
-            }
+            Token::OpenBrace => self.decode_map(|decoder| visitor.visit_map(decoder)),
+            Token::OpenBracket => self.decode_sequence(|decoder| visitor.visit_sequence(decoder)),
             Token::String => {
                 let visitor = visitor.visit_string(cx, SizeHint::any())?;
                 self.decode_string(visitor)

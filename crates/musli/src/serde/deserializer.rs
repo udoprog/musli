@@ -815,7 +815,7 @@ where
     }
 
     #[inline]
-    fn visit_sequence<D>(self, _: C, decoder: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_sequence<D>(self, decoder: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + SequenceDecoder<'de, Cx = C>,
     {
@@ -823,7 +823,7 @@ where
     }
 
     #[inline]
-    fn visit_map<D>(self, _: C, decoder: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, decoder: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + MapDecoder<'de, Cx = C>,
     {

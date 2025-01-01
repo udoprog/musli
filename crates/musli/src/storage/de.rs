@@ -424,6 +424,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn try_decode_next(
         &mut self,
     ) -> Result<Option<Self::DecodeNext<'_>>, <Self::Cx as Context>::Error> {
@@ -474,6 +479,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::exact(self.remaining)
     }
@@ -516,6 +526,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::exact(self.remaining)
     }
@@ -555,6 +570,11 @@ where
     type DecodeValue = Self;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
@@ -579,6 +599,11 @@ where
         = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
@@ -621,6 +646,11 @@ where
         = StorageDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {

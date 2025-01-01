@@ -29,6 +29,11 @@ where
     type DecodeValue = JsonDecoder<P, C>;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(JsonKeyDecoder::new(self.cx, self.parser.borrow_mut()))
     }

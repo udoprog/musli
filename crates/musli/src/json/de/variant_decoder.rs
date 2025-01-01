@@ -57,6 +57,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
         Ok(JsonKeyDecoder::new(self.cx, self.parser.borrow_mut()))
     }

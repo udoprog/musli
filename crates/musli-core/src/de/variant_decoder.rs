@@ -5,7 +5,7 @@ use super::Decoder;
 /// Trait governing how to decode a variant.
 pub trait VariantDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: ?Sized + Context;
+    type Cx: Context;
     /// The decoder to use for the variant tag.
     type DecodeTag<'this>: Decoder<
         'de,
@@ -24,6 +24,9 @@ pub trait VariantDecoder<'de> {
     >
     where
         Self: 'this;
+
+    /// Access the context associated with the decoder.
+    fn cx(&self) -> Self::Cx;
 
     /// Return the decoder for the first value in the pair.
     ///

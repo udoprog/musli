@@ -5,7 +5,7 @@ use super::{Encode, Encoder};
 /// Trait governing how to encode a map entry.
 pub trait EntryEncoder {
     /// Context associated with the encoder.
-    type Cx: ?Sized + Context;
+    type Cx: Context;
     /// Result type of the encoder.
     type Ok;
     /// The encoder returned when advancing the map encoder to encode the key.
@@ -26,6 +26,9 @@ pub trait EntryEncoder {
     >
     where
         Self: 'this;
+
+    /// Access the context associated with the encoder.
+    fn cx(&self) -> Self::Cx;
 
     /// Return the encoder for the key in the entry.
     #[must_use = "Encoders must be consumed"]

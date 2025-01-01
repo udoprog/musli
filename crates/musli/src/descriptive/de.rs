@@ -686,13 +686,13 @@ where
             }
             Kind::Sequence => {
                 let mut sequence = self.shared_decode_sequence()?;
-                let output = visitor.visit_sequence(cx, &mut sequence)?;
+                let output = visitor.visit_sequence(&mut sequence)?;
                 sequence.skip_sequence_remaining()?;
                 Ok(output)
             }
             Kind::Map => {
                 let mut map = self.shared_decode_map()?;
-                let output = visitor.visit_map(cx, &mut map)?;
+                let output = visitor.visit_map(&mut map)?;
                 map.skip_map_remaining()?;
                 Ok(output)
             }
@@ -717,7 +717,7 @@ where
                     let value = self.decode_bool()?;
                     visitor.visit_bool(cx, value)
                 }
-                Mark::Variant => self.decode_variant(|decoder| visitor.visit_variant(cx, decoder)),
+                Mark::Variant => self.decode_variant(|decoder| visitor.visit_variant(decoder)),
                 Mark::Some | Mark::None => {
                     let value = self.decode_option()?;
                     visitor.visit_option(cx, value)
@@ -749,6 +749,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
         Ok(Some(StorageDecoder::new(self.cx, self.reader.borrow_mut())))
     }
@@ -769,6 +774,11 @@ where
         = SelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn size_hint(&self) -> SizeHint {
@@ -813,6 +823,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::exact(self.remaining)
     }
@@ -853,6 +868,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
         if self.remaining == 0 {
             return Ok(None);
@@ -887,6 +907,11 @@ where
     type DecodeValue = Self;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
         Ok(SelfDecoder::new(self.cx, self.reader.borrow_mut()))
     }
@@ -911,6 +936,11 @@ where
         = SelfDecoder<R::Mut<'this>, OPT, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {

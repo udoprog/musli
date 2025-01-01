@@ -126,6 +126,11 @@ where
         Self: 'this;
 
     #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
+
+    #[inline]
     fn size_hint(&self) -> SizeHint {
         SizeHint::from(self.len)
     }
@@ -170,6 +175,11 @@ where
         = JsonDecoder<P::Mut<'this>, C>
     where
         Self: 'this;
+
+    #[inline]
+    fn cx(&self) -> Self::Cx {
+        self.cx
+    }
 
     #[inline]
     fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {

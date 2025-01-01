@@ -5,13 +5,16 @@ use super::{Encode, EntryEncoder};
 /// Encoder for a map.
 pub trait MapEncoder {
     /// Context associated with the encoder.
-    type Cx: ?Sized + Context;
+    type Cx: Context;
     /// Result type of the encoder.
     type Ok;
     /// Encode the next pair.
     type EncodeEntry<'this>: EntryEncoder<Cx = Self::Cx, Ok = Self::Ok>
     where
         Self: 'this;
+
+    /// Access the context associated with the encoder.
+    fn cx(&self) -> Self::Cx;
 
     /// Encode the next pair.
     #[must_use = "Encoders must be consumed"]
