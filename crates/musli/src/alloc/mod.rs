@@ -15,30 +15,32 @@
 //! ## Examples
 //!
 //! ```
-//! use musli::alloc::Vec;
+//! use musli::alloc::{AllocError, Vec};
 //!
 //! musli::alloc::default(|alloc| {
 //!     let mut a = Vec::new_in(alloc);
 //!     let mut b = Vec::new_in(alloc);
 //!
-//!     b.write(b"He11o");
-//!     a.write(b.as_slice());
+//!     b.extend_from_slice(b"He11o")?;
+//!     a.extend_from_slice(b.as_slice())?;
 //!
 //!     assert_eq!(a.as_slice(), b"He11o");
 //!     assert_eq!(a.len(), 5);
 //!
-//!     a.write(b" W0rld");
+//!     a.extend_from_slice(b" W0rld")?;
 //!
 //!     assert_eq!(a.as_slice(), b"He11o W0rld");
 //!     assert_eq!(a.len(), 11);
 //!
 //!     let mut c = Vec::new_in(alloc);
-//!     c.write(b"!");
-//!     a.write(c.as_slice());
+//!     c.extend_from_slice(b"!")?;
+//!     a.extend_from_slice(c.as_slice())?;
 //!
 //!     assert_eq!(a.as_slice(), b"He11o W0rld!");
 //!     assert_eq!(a.len(), 12);
+//!     Ok::<_, AllocError>(())
 //! });
+//! # Ok::<_, musli::alloc::AllocError>(())
 //! ```
 //!
 //! Explicitly using a buffer on the stack with the [`Slice`] allocator:
@@ -52,23 +54,24 @@
 //! let mut a = Vec::new_in(&alloc);
 //! let mut b = Vec::new_in(&alloc);
 //!
-//! b.write(b"He11o");
-//! a.write(b.as_slice());
+//! b.extend_from_slice(b"He11o")?;
+//! a.extend_from_slice(b.as_slice())?;
 //!
 //! assert_eq!(a.as_slice(), b"He11o");
 //! assert_eq!(a.len(), 5);
 //!
-//! a.write(b" W0rld");
+//! a.extend_from_slice(b" W0rld")?;
 //!
 //! assert_eq!(a.as_slice(), b"He11o W0rld");
 //! assert_eq!(a.len(), 11);
 //!
 //! let mut c = Vec::new_in(&alloc);
-//! c.write(b"!");
-//! a.write(c.as_slice());
+//! c.extend_from_slice(b"!")?;
+//! a.extend_from_slice(c.as_slice())?;
 //!
 //! assert_eq!(a.as_slice(), b"He11o W0rld!");
 //! assert_eq!(a.len(), 12);
+//! # Ok::<_, musli::alloc::AllocError>(())
 //! ```
 //!
 //! [Müsli]: <https://docs.rs/musli>
@@ -82,7 +85,7 @@ mod default;
 pub use self::default::{DefaultAllocator, DEFAULT_ARRAY_BUFFER};
 
 #[doc(inline)]
-pub use musli_core::alloc::{Allocator, RawVec};
+pub use musli_core::alloc::{Alloc, AllocError, AllocSlice, Allocator};
 
 #[cfg(feature = "alloc")]
 mod system;
@@ -91,7 +94,7 @@ mod system;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub use self::system::System;
 #[cfg(feature = "alloc")]
-use self::system::SystemBuf;
+use self::system::{SystemAlloc, SystemBuf};
 
 mod disabled;
 #[doc(inline)]
@@ -115,19 +118,9 @@ mod vec;
 #[doc(inline)]
 pub use self::vec::Vec;
 
-use core::fmt;
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub(crate) struct AllocError;
-
-impl fmt::Display for AllocError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Failed to allocate memory")
-    }
-}
-
-impl core::error::Error for AllocError {}
+mod boxed;
+#[doc(inline)]
+pub use self::boxed::Box;
 
 /// Call the given block `body` with an instance of the [`DefaultAllocator`].
 ///
@@ -145,30 +138,32 @@ impl core::error::Error for AllocError {}
 /// # Examples
 ///
 /// ```
-/// use musli::alloc::Vec;
+/// use musli::alloc::{AllocError, Vec};
 ///
 /// musli::alloc::default(|alloc| {
 ///     let mut a = Vec::new_in(alloc);
 ///     let mut b = Vec::new_in(alloc);
 ///
-///     b.write(b"He11o");
-///     a.write(b.as_slice());
+///     b.extend_from_slice(b"He11o")?;
+///     a.extend_from_slice(b.as_slice())?;
 ///
 ///     assert_eq!(a.as_slice(), b"He11o");
 ///     assert_eq!(a.len(), 5);
 ///
-///     a.write(b" W0rld");
+///     a.extend_from_slice(b" W0rld")?;
 ///
 ///     assert_eq!(a.as_slice(), b"He11o W0rld");
 ///     assert_eq!(a.len(), 11);
 ///
 ///     let mut c = Vec::new_in(alloc);
-///     c.write(b"!");
-///     a.write(c.as_slice());
+///     c.extend_from_slice(b"!")?;
+///     a.extend_from_slice(c.as_slice())?;
 ///
 ///     assert_eq!(a.as_slice(), b"He11o W0rld!");
 ///     assert_eq!(a.len(), 12);
+///     Ok::<_, AllocError>(())
 /// });
+/// # Ok::<_, musli::alloc::AllocError>(())
 /// ```
 #[inline]
 pub fn default<O>(body: impl FnOnce(&DefaultAllocator<'_, DEFAULT_ARRAY_BUFFER>) -> O) -> O {
@@ -183,30 +178,32 @@ pub fn default<O>(body: impl FnOnce(&DefaultAllocator<'_, DEFAULT_ARRAY_BUFFER>)
 /// # Examples
 ///
 /// ```
-/// use musli::alloc::Vec;
+/// use musli::alloc::{AllocError, Vec};
 ///
 /// musli::alloc::with_buffer::<128, _>(|alloc| {
 ///     let mut a = Vec::new_in(alloc);
 ///     let mut b = Vec::new_in(alloc);
 ///
-///     b.write(b"He11o");
-///     a.write(b.as_slice());
+///     b.extend_from_slice(b"He11o")?;
+///     a.extend_from_slice(b.as_slice())?;
 ///
 ///     assert_eq!(a.as_slice(), b"He11o");
 ///     assert_eq!(a.len(), 5);
 ///
-///     a.write(b" W0rld");
+///     a.extend_from_slice(b" W0rld")?;
 ///
 ///     assert_eq!(a.as_slice(), b"He11o W0rld");
 ///     assert_eq!(a.len(), 11);
 ///
 ///     let mut c = Vec::new_in(alloc);
-///     c.write(b"!");
-///     a.write(c.as_slice());
+///     c.extend_from_slice(b"!")?;
+///     a.extend_from_slice(c.as_slice())?;
 ///
 ///     assert_eq!(a.as_slice(), b"He11o W0rld!");
 ///     assert_eq!(a.len(), 12);
+///     Ok::<_, AllocError>(())
 /// });
+/// # Ok::<_, musli::alloc::AllocError>(())
 /// ```
 #[inline]
 pub fn with_buffer<const BUF: usize, O>(body: impl FnOnce(&DefaultAllocator<'_, BUF>) -> O) -> O {

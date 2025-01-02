@@ -105,21 +105,23 @@ where
         let b = self.next()?;
 
         let extend = match b {
-            b'"' => scratch.push(b'"'),
-            b'\\' => scratch.push(b'\\'),
-            b'/' => scratch.push(b'/'),
-            b'b' => scratch.push(b'\x08'),
-            b'f' => scratch.push(b'\x0c'),
-            b'n' => scratch.push(b'\n'),
-            b'r' => scratch.push(b'\r'),
-            b't' => scratch.push(b'\t'),
+            b'"' => scratch.push(b'"').is_ok(),
+            b'\\' => scratch.push(b'\\').is_ok(),
+            b'/' => scratch.push(b'/').is_ok(),
+            b'b' => scratch.push(b'\x08').is_ok(),
+            b'f' => scratch.push(b'\x0c').is_ok(),
+            b'n' => scratch.push(b'\n').is_ok(),
+            b'r' => scratch.push(b'\r').is_ok(),
+            b't' => scratch.push(b'\t').is_ok(),
             b'u' => {
                 fn encode_surrogate(scratch: &mut Vec<u8, impl Allocator>, n: u16) -> bool {
-                    scratch.write(&[
-                        (n >> 12 & 0b0000_1111) as u8 | 0b1110_0000,
-                        (n >> 6 & 0b0011_1111) as u8 | 0b1000_0000,
-                        (n & 0b0011_1111) as u8 | 0b1000_0000,
-                    ])
+                    scratch
+                        .extend_from_slice(&[
+                            (n >> 12 & 0b0000_1111) as u8 | 0b1110_0000,
+                            (n >> 6 & 0b0011_1111) as u8 | 0b1000_0000,
+                            (n & 0b0011_1111) as u8 | 0b1000_0000,
+                        ])
+                        .is_ok()
                 }
 
                 let c = match self.parse_hex_escape()? {
@@ -188,7 +190,9 @@ where
                     n => char::from_u32(n as u32).unwrap(),
                 };
 
-                scratch.write(c.encode_utf8(&mut [0u8; 4]).as_bytes())
+                scratch
+                    .extend_from_slice(c.encode_utf8(&mut [0u8; 4]).as_bytes())
+                    .is_ok()
             }
             _ => {
                 return Err(self.cx.marked_message(&start, "Invalid string escape"));
@@ -314,7 +318,7 @@ where
                         let slice = &self.slice[open..self.index];
                         self.check_utf8(slice, start)?;
 
-                        if !scratch.write(slice) {
+                        if scratch.extend_from_slice(slice).is_err() {
                             return Err(self.cx.message("Scratch buffer overflow"));
                         }
 
@@ -330,7 +334,7 @@ where
                     let slice = &self.slice[open..self.index];
                     self.check_utf8(slice, start)?;
 
-                    if !scratch.write(slice) {
+                    if scratch.extend_from_slice(slice).is_err() {
                         return Err(self.cx.message("Scratch buffer overflow"));
                     }
 

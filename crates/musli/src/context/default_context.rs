@@ -132,7 +132,7 @@ where
         // SAFETY: We've checked that we have exclusive access just above.
         let path = unsafe { &mut (*self.path.get()) };
 
-        if !path.push(step) {
+        if path.push(step).is_err() {
             self.cap.set(self.cap.get() + 1);
         }
     }

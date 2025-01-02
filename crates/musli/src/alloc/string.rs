@@ -2,7 +2,6 @@ use core::fmt;
 use core::ops::Deref;
 use core::str;
 
-use crate::fixed::CapacityError;
 use crate::Allocator;
 
 use super::{AllocError, Vec};
@@ -22,6 +21,7 @@ const _: () = {
 };
 
 /// Collect a string into a string buffer.
+#[inline]
 pub(crate) fn collect_string<A, T>(alloc: A, value: T) -> Result<String<A>, AllocError>
 where
     A: Allocator,
@@ -43,31 +43,28 @@ where
     A: Allocator,
 {
     /// Construct a new string buffer in the provided allocator.
+    #[inline]
     pub(crate) fn new_in(alloc: A) -> Self {
         Self {
             buf: Vec::new_in(alloc),
         }
     }
 
+    #[inline]
     fn as_str(&self) -> &str {
         // SAFETY: Interactions ensure that data is valid utf-8.
         unsafe { str::from_utf8_unchecked(self.buf.as_slice()) }
     }
 
-    fn try_push(&mut self, c: char) -> Result<(), CapacityError> {
-        if !self.buf.write(c.encode_utf8(&mut [0; 4]).as_bytes()) {
-            return Err(CapacityError);
-        }
-
-        Ok(())
+    #[inline]
+    fn push(&mut self, c: char) -> Result<(), AllocError> {
+        self.buf
+            .extend_from_slice(c.encode_utf8(&mut [0; 4]).as_bytes())
     }
 
-    fn try_push_str(&mut self, s: &str) -> Result<(), CapacityError> {
-        if !self.buf.write(s.as_bytes()) {
-            return Err(CapacityError);
-        }
-
-        Ok(())
+    #[inline]
+    fn push_str(&mut self, s: &str) -> Result<(), AllocError> {
+        self.buf.extend_from_slice(s.as_bytes())
     }
 }
 
@@ -77,12 +74,12 @@ where
 {
     #[inline]
     fn write_char(&mut self, c: char) -> fmt::Result {
-        self.try_push(c).map_err(|_| fmt::Error)
+        self.push(c).map_err(|_| fmt::Error)
     }
 
     #[inline]
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.try_push_str(s).map_err(|_| fmt::Error)
+        self.push_str(s).map_err(|_| fmt::Error)
     }
 }
 

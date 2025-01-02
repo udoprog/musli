@@ -1,13 +1,11 @@
 use core::alloc::Layout;
 use core::cmp;
-use core::mem::{align_of, size_of};
+use core::mem::{align_of, needs_drop, size_of};
 use core::ptr::NonNull;
 
 use rust_alloc::alloc;
 
-use crate::Allocator;
-
-use super::RawVec;
+use super::{Alloc, AllocError, AllocSlice, Allocator};
 
 /// System buffer that can be used in combination with an [`Allocator`].
 ///
@@ -25,14 +23,15 @@ use super::RawVec;
 /// let mut buf1 = Vec::new_in(alloc);
 /// let mut buf2 = Vec::new_in(alloc);
 //
-/// assert!(buf1.write(b"Hello, "));
-/// assert!(buf2.write(b"world!"));
+/// buf1.extend_from_slice(b"Hello, ")?;
+/// buf2.extend_from_slice(b"world!")?;
 ///
 /// assert_eq!(buf1.as_slice(), b"Hello, ");
 /// assert_eq!(buf2.as_slice(), b"world!");
 ///
 /// buf1.extend(buf2);
 /// assert_eq!(buf1.as_slice(), b"Hello, world!");
+/// # Ok::<_, musli::alloc::AllocError>(())
 /// ```
 #[derive(Clone, Copy)]
 #[non_exhaustive]
@@ -54,11 +53,91 @@ impl Default for System {
 }
 
 impl Allocator for System {
-    type RawVec<T> = SystemBuf<T>;
+    type Alloc<T> = SystemAlloc<T>;
+    type AllocSlice<T> = SystemBuf<T>;
 
     #[inline]
-    fn new_raw_vec<T>(self) -> Self::RawVec<T> {
+    fn alloc<T>(self, value: T) -> Result<Self::Alloc<T>, AllocError> {
+        let mut raw = SystemAlloc::<T>::alloc()?;
+
+        if size_of::<T>() != 0 {
+            // SAFETY: The above ensures the data has been allocated.
+            unsafe {
+                raw.as_mut_ptr().write(value);
+            }
+        }
+
+        Ok(raw)
+    }
+
+    #[inline]
+    fn alloc_slice<T>(self) -> Self::AllocSlice<T> {
         SystemBuf::DANGLING
+    }
+}
+
+/// A vector-backed allocation.
+pub struct SystemAlloc<T> {
+    /// Pointer to the allocated region.
+    data: NonNull<T>,
+}
+
+unsafe impl<T> Send for SystemAlloc<T> where T: Send {}
+unsafe impl<T> Sync for SystemAlloc<T> where T: Sync {}
+
+impl<T> SystemAlloc<T> {
+    /// Reallocate the region to the given capacity.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the new capacity is valid per [`Layout`].
+    #[must_use = "allocating is fallible and must be checked"]
+    fn alloc() -> Result<Self, AllocError> {
+        if size_of::<T>() == 0 {
+            return Ok(Self {
+                data: NonNull::dangling(),
+            });
+        }
+
+        unsafe {
+            let data = alloc::alloc(Layout::new::<T>());
+
+            if data.is_null() {
+                return Err(AllocError);
+            }
+
+            Ok(Self {
+                data: NonNull::new_unchecked(data).cast(),
+            })
+        }
+    }
+}
+
+impl<T> Alloc<T> for SystemAlloc<T> {
+    #[inline]
+    fn as_ptr(&self) -> *const T {
+        self.data.as_ptr().cast_const().cast()
+    }
+
+    #[inline]
+    fn as_mut_ptr(&mut self) -> *mut T {
+        self.data.as_ptr().cast()
+    }
+}
+
+impl<T> Drop for SystemAlloc<T> {
+    fn drop(&mut self) {
+        // SAFETY: Layout assumptions are correctly encoded in the type as it
+        // was being allocated or grown.
+        unsafe {
+            if needs_drop::<T>() {
+                self.data.as_ptr().drop_in_place();
+            }
+
+            if size_of::<T>() != 0 {
+                alloc::dealloc(self.data.as_ptr().cast(), Layout::new::<T>());
+            }
+        }
     }
 }
 
@@ -73,16 +152,7 @@ pub struct SystemBuf<T> {
 unsafe impl<T> Send for SystemBuf<T> where T: Send {}
 unsafe impl<T> Sync for SystemBuf<T> where T: Sync {}
 
-impl<T> RawVec<T> for SystemBuf<T> {
-    #[inline]
-    fn resize(&mut self, len: usize, additional: usize) -> bool {
-        if additional == 0 || size_of::<T>() == 0 {
-            return true;
-        }
-
-        self.reserve(len, additional)
-    }
-
+impl<T> AllocSlice<T> for SystemBuf<T> {
     #[inline]
     fn as_ptr(&self) -> *const T {
         self.data.as_ptr().cast_const().cast()
@@ -94,9 +164,22 @@ impl<T> RawVec<T> for SystemBuf<T> {
     }
 
     #[inline]
+    fn resize(&mut self, len: usize, additional: usize) -> Result<(), AllocError> {
+        if additional == 0 || size_of::<T>() == 0 {
+            return Ok(());
+        }
+
+        if !self.reserve(len, additional) {
+            return Err(AllocError);
+        }
+
+        Ok(())
+    }
+
+    #[inline]
     fn try_merge<B>(&mut self, _: usize, other: B, _: usize) -> Result<(), B>
     where
-        B: RawVec<T>,
+        B: AllocSlice<T>,
     {
         Err(other)
     }

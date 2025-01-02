@@ -6,10 +6,9 @@ use core::marker::PhantomData;
 use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
 use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
-use core::ptr;
+use core::ptr::{self, NonNull};
 
-use super::RawVec;
-use crate::Allocator;
+use super::{Alloc, AllocError, AllocSlice, Allocator};
 
 // We keep max bytes to 2^31, since that ensures that addition between two
 // magnitutes never overflow.
@@ -43,23 +42,24 @@ const MAX_BYTES: usize = i32::MAX as usize;
 /// let mut a = Vec::new_in(&alloc);
 /// let mut b = Vec::new_in(&alloc);
 ///
-/// b.write(b"He11o");
-/// a.write(b.as_slice());
+/// b.extend_from_slice(b"He11o")?;
+/// a.extend_from_slice(b.as_slice())?;
 ///
 /// assert_eq!(a.as_slice(), b"He11o");
 /// assert_eq!(a.len(), 5);
 ///
-/// a.write(b" W0rld");
+/// a.extend_from_slice(b" W0rld")?;
 ///
 /// assert_eq!(a.as_slice(), b"He11o W0rld");
 /// assert_eq!(a.len(), 11);
 ///
 /// let mut c = Vec::new_in(&alloc);
-/// c.write(b"!");
-/// a.write(c.as_slice());
+/// c.extend_from_slice(b"!")?;
+/// a.extend_from_slice(c.as_slice())?;
 ///
 /// assert_eq!(a.as_slice(), b"He11o W0rld!");
 /// assert_eq!(a.len(), 12);
+/// # Ok::<_, musli::alloc::AllocError>(())
 /// ```
 ///
 /// ## Design
@@ -113,7 +113,7 @@ pub struct Slice<'a> {
     // This must be an unsafe cell, since it's mutably accessed through an
     // immutable pointers. We simply make sure that those accesses do not
     // clobber each other, which we can do since the API is restricted through
-    // the `RawVec` trait.
+    // the `AllocSlice` trait.
     internal: UnsafeCell<Internal>,
     // The underlying vector being borrowed.
     _marker: PhantomData<&'a mut [MaybeUninit<u8>]>,
@@ -170,10 +170,41 @@ impl<'a> Slice<'a> {
 }
 
 impl<'a> Allocator for &'a Slice<'_> {
-    type RawVec<T> = SliceBuf<'a, T>;
+    type Alloc<T> = SliceBuf<'a, T>;
+    type AllocSlice<T> = SliceBuf<'a, T>;
 
     #[inline]
-    fn new_raw_vec<T>(self) -> Self::RawVec<T> {
+    fn alloc<T>(self, value: T) -> Result<Self::Alloc<T>, AllocError> {
+        // SAFETY: We have exclusive access to the internal state, and it's only
+        // held for the duration of this call.
+        let region = 'out: {
+            if size_of::<T>() == 0 {
+                break 'out None;
+            }
+
+            unsafe {
+                let i = &mut *self.internal.get();
+                let region = i.alloc(size_of::<T>(), align_of::<T>());
+
+                let Some(region) = region else {
+                    return Err(AllocError);
+                };
+
+                // Write the value into the region.
+                region.range.start.cast::<T>().write(value);
+                Some(region.id)
+            }
+        };
+
+        Ok(SliceBuf {
+            region,
+            internal: &self.internal,
+            _marker: PhantomData,
+        })
+    }
+
+    #[inline]
+    fn alloc_slice<T>(self) -> Self::AllocSlice<T> {
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
         let region = if size_of::<T>() == 0 {
@@ -203,54 +234,35 @@ pub struct SliceBuf<'a, T> {
     _marker: PhantomData<T>,
 }
 
-impl<T> RawVec<T> for SliceBuf<'_, T> {
+impl<T> Alloc<T> for SliceBuf<'_, T> {
     #[inline]
-    fn resize(&mut self, len: usize, additional: usize) -> bool {
-        if additional == 0 || size_of::<T>() == 0 {
-            return true;
-        }
-
-        let Some(region_id) = self.region else {
-            return false;
+    fn as_ptr(&self) -> *const T {
+        let Some(region) = self.region else {
+            return NonNull::<T>::dangling().as_ptr().cast_const();
         };
 
-        let Some(len) = len.checked_mul(size_of::<T>()) else {
-            return false;
-        };
-
-        let Some(additional) = additional.checked_mul(size_of::<T>()) else {
-            return false;
-        };
-
-        let Some(requested) = len.checked_add(additional) else {
-            return false;
-        };
-
-        if requested > MAX_BYTES {
-            return false;
-        }
-
-        // SAFETY: Due to invariants in the Buffer trait we know that these
-        // cannot be used incorrectly.
         unsafe {
-            let i = &mut *self.internal.get();
-
-            let region = i.region(region_id);
-
-            // Region can already fit in the requested bytes.
-            if region.capacity() >= requested {
-                return true;
-            };
-
-            let Some(region) = i.realloc(region_id, len, requested, align_of::<T>()) else {
-                return false;
-            };
-
-            self.region = Some(region.id);
-            true
+            let i = &*self.internal.get();
+            let this = i.header(region);
+            this.range.start.cast_const().cast()
         }
     }
 
+    #[inline]
+    fn as_mut_ptr(&mut self) -> *mut T {
+        let Some(region) = self.region else {
+            return NonNull::<T>::dangling().as_ptr();
+        };
+
+        unsafe {
+            let i = &*self.internal.get();
+            let this = i.header(region);
+            this.range.start.cast()
+        }
+    }
+}
+
+impl<T> AllocSlice<T> for SliceBuf<'_, T> {
     #[inline]
     fn as_ptr(&self) -> *const T {
         let Some(region) = self.region else {
@@ -278,9 +290,56 @@ impl<T> RawVec<T> for SliceBuf<'_, T> {
     }
 
     #[inline]
+    fn resize(&mut self, len: usize, additional: usize) -> Result<(), AllocError> {
+        if additional == 0 || size_of::<T>() == 0 {
+            return Ok(());
+        }
+
+        let Some(region_id) = self.region else {
+            return Err(AllocError);
+        };
+
+        let Some(len) = len.checked_mul(size_of::<T>()) else {
+            return Err(AllocError);
+        };
+
+        let Some(additional) = additional.checked_mul(size_of::<T>()) else {
+            return Err(AllocError);
+        };
+
+        let Some(requested) = len.checked_add(additional) else {
+            return Err(AllocError);
+        };
+
+        if requested > MAX_BYTES {
+            return Err(AllocError);
+        }
+
+        // SAFETY: Due to invariants in the Buffer trait we know that these
+        // cannot be used incorrectly.
+        unsafe {
+            let i = &mut *self.internal.get();
+
+            let region = i.region(region_id);
+
+            // Region can already fit in the requested bytes.
+            if region.capacity() >= requested {
+                return Ok(());
+            };
+
+            let Some(region) = i.realloc(region_id, len, requested, align_of::<T>()) else {
+                return Err(AllocError);
+            };
+
+            self.region = Some(region.id);
+            Ok(())
+        }
+    }
+
+    #[inline]
     fn try_merge<B>(&mut self, this_len: usize, buf: B, other_len: usize) -> Result<(), B>
     where
-        B: RawVec<T>,
+        B: AllocSlice<T>,
     {
         let Some(region) = self.region else {
             return Err(buf);

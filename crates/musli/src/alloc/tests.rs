@@ -7,26 +7,26 @@ where
     let mut a = Vec::new_in(alloc);
     let mut b = Vec::new_in(alloc);
 
-    b.write(b"He11o");
+    _ = b.extend_from_slice(b"He11o");
 
     assert_eq!(b.as_slice(), b"He11o");
     assert_eq!(b.len(), 5);
 
-    a.write(b.as_slice());
+    _ = a.extend_from_slice(b.as_slice());
 
     assert_eq!(a.as_slice(), b"He11o");
     assert_eq!(a.len(), 5);
 
-    a.write(b" W0rld");
+    _ = a.extend_from_slice(b" W0rld");
 
     assert_eq!(a.as_slice(), b"He11o W0rld");
     assert_eq!(a.len(), 11);
 
     let mut c = Vec::new_in(alloc);
-    c.write(b"!");
+    _ = c.extend_from_slice(b"!");
     assert_eq!(c.len(), 1);
 
-    a.write(c.as_slice());
+    _ = a.extend_from_slice(c.as_slice());
     assert_eq!(a.as_slice(), b"He11o W0rld!");
     assert_eq!(a.len(), 12);
 }
@@ -41,8 +41,8 @@ where
     let mut b = Vec::new_in(alloc);
 
     for _ in 0..1024 {
-        assert!(a.write(BYTES));
-        assert!(b.write(BYTES));
+        assert!(a.extend_from_slice(BYTES).is_ok());
+        assert!(b.extend_from_slice(BYTES).is_ok());
     }
 
     assert_eq!(a.len(), 1024 * 4);
@@ -59,7 +59,7 @@ where
     let mut c = Vec::new_in(alloc);
 
     for _ in 0..1024 {
-        assert!(c.write(BYTES));
+        assert!(c.extend_from_slice(BYTES).is_ok());
     }
 
     assert_eq!(c.as_slice(), b.as_slice());
@@ -96,8 +96,8 @@ where
     let mut a = Vec::new_in(alloc);
     let mut b = Vec::new_in(alloc);
 
-    assert!(a.write(&[(); 100]));
-    assert!(b.write(&[(); 100]));
+    assert!(a.extend_from_slice(&[(); 100]).is_ok());
+    assert!(b.extend_from_slice(&[(); 100]).is_ok());
 
     assert_eq!(a.len(), 100);
     assert_eq!(b.len(), 100);

@@ -30,7 +30,7 @@ macro_rules! bare_encoding {
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -72,7 +72,7 @@ macro_rules! bare_encoding {
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..w])?;")]
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -110,7 +110,7 @@ macro_rules! bare_encoding {
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -144,7 +144,7 @@ macro_rules! bare_encoding {
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -184,7 +184,7 @@ macro_rules! bare_encoding {
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(all(feature = "std", feature = "alloc"))]
         #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
@@ -230,7 +230,7 @@ macro_rules! bare_encoding {
         /// assert_eq!(slice, &[0xde, 0xad, 0xbe, 0xef]);
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -267,7 +267,7 @@ macro_rules! bare_encoding {
         #[doc = concat!("let person: Person = ", stringify!($what), "::from_slice(&data[..])?;")]
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -323,7 +323,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -370,7 +370,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice(&data[..w])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -410,7 +410,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -450,7 +450,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -496,7 +496,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(all(feature = "std", feature = "alloc"))]
         #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
@@ -545,7 +545,7 @@ macro_rules! encoding_impls {
         /// assert_eq!(slice, &[0xde, 0xad, 0xbe, 0xef]);
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -585,7 +585,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice(&data[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -651,7 +651,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[inline]
         pub fn encode_with<C, W, T>(self, cx: C, writer: W, value: &T) -> Result<W::Ok, C::Error>
@@ -707,7 +707,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice_with(&cx, &data[..w])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[inline]
         pub fn to_slice_with<C, T>(
@@ -760,7 +760,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -809,7 +809,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[inline]
         pub fn to_fixed_bytes_with<C, const N: usize, T>(
@@ -860,7 +860,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[cfg(feature = "std")]
         #[inline]
@@ -911,7 +911,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.decode_with(&cx, &mut slice)?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[inline]
         pub fn decode_with<'de, C, R, T>(self, cx: C, reader: R) -> Result<T, C::Error>
@@ -960,7 +960,7 @@ macro_rules! encoding_impls {
         /// let person: Person = ENCODING.from_slice_with(&cx, &buf[..])?;
         /// assert_eq!(person.name, "Aristotle");
         /// assert_eq!(person.age, 61);
-        /// # Ok::<(), Error>(())
+        /// # Ok::<_, Error>(())
         /// ```
         #[inline]
         pub fn from_slice_with<'de, C, T>(self, cx: C, bytes: &'de [u8]) -> Result<T, C::Error>

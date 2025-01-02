@@ -11,10 +11,10 @@ fn work(alloc: System) {
     let mut buf1 = Vec::new_in(alloc);
     let mut buf2 = Vec::new_in(alloc);
 
-    assert!(buf1.write(BIG1));
-    assert!(buf2.write(BIG2));
+    assert!(buf1.extend_from_slice(BIG1).is_ok());
+    assert!(buf2.extend_from_slice(BIG2).is_ok());
 
-    buf1.extend(buf2);
+    _ = buf1.extend(buf2);
     assert!(buf1.as_slice().iter().eq(BIG1.iter().chain(BIG2)));
 }
 

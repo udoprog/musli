@@ -916,21 +916,19 @@ where
     {
         use std::os::windows::ffi::OsStrExt;
 
-        use crate::alloc::RawVec;
+        use crate::alloc::AllocSlice;
         use crate::en::VariantEncoder;
 
         let cx = encoder.cx();
 
         encoder.encode_variant_fn(|variant| {
-            let mut buf = cx.alloc().new_raw_vec::<u8>();
+            let mut buf = cx.alloc().alloc_slice::<u8>();
             let mut len = 0;
 
             for w in self.encode_wide() {
                 let bytes = w.to_le_bytes();
 
-                if !buf.resize(len, bytes.len()) {
-                    return Err(cx.message("Allocation failed"));
-                }
+                buf.resize(len, bytes.len()).map_err(cx.map())?;
 
                 // SAFETY: We've just resized the above buffer.
                 unsafe {

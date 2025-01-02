@@ -256,10 +256,9 @@ where
     where
         C: Context,
     {
-        if !self.buf.write(buffer.as_slice()) {
-            return Err(cx.message("Buffer overflow"));
-        }
-
+        self.buf
+            .extend_from_slice(buffer.as_slice())
+            .map_err(cx.map())?;
         Ok(())
     }
 
@@ -268,10 +267,7 @@ where
     where
         C: Context,
     {
-        if !self.buf.write(bytes) {
-            return Err(cx.message("Buffer overflow"));
-        }
-
+        self.buf.extend_from_slice(bytes).map_err(cx.map())?;
         Ok(())
     }
 }
