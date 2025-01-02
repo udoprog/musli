@@ -1,6 +1,6 @@
 use core::alloc::Layout;
 use core::cmp;
-use core::mem::{align_of, needs_drop, size_of};
+use core::mem::{align_of, size_of};
 use core::ptr::NonNull;
 
 use rust_alloc::alloc;
@@ -126,14 +126,11 @@ impl<T> Alloc<T> for SystemAlloc<T> {
 }
 
 impl<T> Drop for SystemAlloc<T> {
+    #[inline]
     fn drop(&mut self) {
         // SAFETY: Layout assumptions are correctly encoded in the type as it
         // was being allocated or grown.
         unsafe {
-            if needs_drop::<T>() {
-                self.data.as_ptr().drop_in_place();
-            }
-
             if size_of::<T>() != 0 {
                 alloc::dealloc(self.data.as_ptr().cast(), Layout::new::<T>());
             }
