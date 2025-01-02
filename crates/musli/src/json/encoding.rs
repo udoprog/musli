@@ -47,7 +47,7 @@ crate::macros::bare_encoding!(Text, DEFAULT, json, IntoParser, IntoWriter);
 /// let person: Person = json::from_str(&data[..])?;
 /// assert_eq!(person.name, "Aristotle");
 /// assert_eq!(person.age, 61);
-/// # Ok::<(), Error>(())
+/// # Ok::<_, Error>(())
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -83,7 +83,7 @@ where
 /// let person: Person = json::from_str(&data[..])?;
 /// assert_eq!(person.name, "Aristotle");
 /// assert_eq!(person.age, 61);
-/// # Ok::<(), Error>(())
+/// # Ok::<_, Error>(())
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -142,7 +142,7 @@ impl Encoding<Text> {
     /// let out = json::to_string(&expected)?;
     /// let actual = json::from_str(&out)?;
     /// assert_eq!(expected, actual);
-    /// # Ok::<(), Error>(())
+    /// # Ok::<_, Error>(())
     /// ```
     #[inline]
     pub const fn new() -> Self {
@@ -211,7 +211,7 @@ where
     /// let person: Person = ENCODING.from_str(&data[..])?;
     /// assert_eq!(person.name, "Aristotle");
     /// assert_eq!(person.age, 61);
-    /// # Ok::<(), Error>(())
+    /// # Ok::<_, Error>(())
     /// ```
     #[cfg(feature = "alloc")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
@@ -257,7 +257,7 @@ where
     /// let person: Person = ENCODING.from_str_with(&cx, &data[..])?;
     /// assert_eq!(person.name, "Aristotle");
     /// assert_eq!(person.age, 61);
-    /// # Ok::<(), Error>(())
+    /// # Ok::<_, Error>(())
     /// ```
     #[cfg(feature = "alloc")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]

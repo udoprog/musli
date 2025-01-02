@@ -50,7 +50,7 @@ use crate::Allocator;
 ///     assert_eq!(string, "42");
 ///     Ok(())
 /// })?;
-/// # Ok::<(), musli::context::ErrorMarker>(())
+/// # Ok::<_, musli::context::ErrorMarker>(())
 /// ```
 ///
 /// We can also very conveniently set up an allocator which uses an existing
@@ -66,7 +66,7 @@ use crate::Allocator;
 /// let encoding = musli::json::Encoding::new();
 /// let string = encoding.to_string_with(&cx, &42)?;
 /// assert_eq!(string, "42");
-/// # Ok::<(), musli::context::ErrorMarker>(())
+/// # Ok::<_, musli::context::ErrorMarker>(())
 /// ```
 ///
 pub fn with_alloc<A, M>(alloc: A) -> DefaultContext<A, M>
@@ -92,7 +92,7 @@ where
 ///     assert_eq!(string, "42");
 ///     Ok(())
 /// })?;
-/// # Ok::<(), musli::context::ErrorMarker>(())
+/// # Ok::<_, musli::context::ErrorMarker>(())
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]

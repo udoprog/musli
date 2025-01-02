@@ -5,16 +5,14 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use crate::Allocator;
-
-use super::RawVec;
+use super::{AllocError, AllocSlice, Allocator};
 
 /// A vector backed by an [`Allocator`].
 pub struct Vec<T, A>
 where
     A: Allocator,
 {
-    buf: A::RawVec<T>,
+    buf: A::AllocSlice<T>,
     len: usize,
 }
 
@@ -29,8 +27,14 @@ where
     A: Allocator,
 {
     /// Construct a buffer vector from raw parts.
-    const unsafe fn from_raw_parts(buf: A::RawVec<T>, len: usize) -> Self {
+    const unsafe fn from_raw_parts(buf: A::AllocSlice<T>, len: usize) -> Self {
         Self { buf, len }
+    }
+
+    /// Access the raw allocation.
+    #[cfg(test)]
+    pub(crate) const fn raw(&self) -> &A::AllocSlice<T> {
+        &self.buf
     }
 
     /// Construct a new buffer vector.
@@ -51,14 +55,14 @@ where
     /// ```
     pub fn new_in(alloc: A) -> Self {
         Self {
-            buf: alloc.new_raw_vec::<T>(),
+            buf: alloc.alloc_slice::<T>(),
             len: 0,
         }
     }
 
     /// Construct a new buffer vector.
     #[inline]
-    pub const fn new(buf: A::RawVec<T>) -> Self {
+    pub const fn new(buf: A::AllocSlice<T>) -> Self {
         Self { buf, len: 0 }
     }
 
@@ -67,16 +71,19 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::alloc::Vec;
+    /// use musli::alloc::{AllocError, Vec};
     ///
     /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///
     ///     assert_eq!(a.len(), 0);
-    ///     a.write(b"Hello");
+    ///     a.extend_from_slice(b"Hello")?;
     ///     assert_eq!(a.len(), 5);
-    /// });
+    ///     Ok::<_, AllocError>(())
+    /// })?;
+    /// # Ok::<_, musli::alloc::AllocError>(())
     /// ```
+    #[inline]
     pub fn len(&self) -> usize {
         self.len
     }
@@ -86,15 +93,17 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::alloc::Vec;
+    /// use musli::alloc::{AllocError, Vec};
     ///
     /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///
     ///     assert!(a.is_empty());
-    ///     a.write(b"Hello");
+    ///     a.extend_from_slice(b"Hello")?;
     ///     assert!(!a.is_empty());
+    ///     Ok::<_, AllocError>(())
     /// });
+    /// # Ok::<_, AllocError>(())
     /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -124,10 +133,8 @@ where
     /// });
     /// ```
     #[inline]
-    pub fn push(&mut self, item: T) -> bool {
-        if !self.buf.resize(self.len, 1) {
-            return false;
-        }
+    pub fn push(&mut self, item: T) -> Result<(), AllocError> {
+        self.buf.resize(self.len, 1)?;
 
         // SAFETY: The call to reserve ensures that we have enough capacity.
         unsafe {
@@ -135,7 +142,7 @@ where
             self.len += 1;
         }
 
-        true
+        Ok(())
     }
 
     /// Pop a single item from the buffer.
@@ -160,6 +167,7 @@ where
     ///     assert_eq!(a.pop(), None);
     /// });
     /// ```
+    #[inline]
     pub fn pop(&mut self) -> Option<T> {
         if self.len == 0 {
             return None;
@@ -192,6 +200,7 @@ where
     ///     assert_eq!(a.as_slice(), b"");
     /// });
     /// ```
+    #[inline]
     pub fn clear(&mut self) {
         // SAFETY: We know that the buffer is initialized up to `len`.
         unsafe { ptr::drop_in_place(slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len)) }
@@ -203,22 +212,49 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::alloc::Vec;
+    /// use musli::alloc::{AllocError, Vec};
     ///
     /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///     assert_eq!(a.as_slice(), b"");
-    ///     a.write(b"Hello");
+    ///     a.extend_from_slice(b"Hello")?;
     ///     assert_eq!(a.as_slice(), b"Hello");
+    ///     Ok::<_, AllocError>(())
     /// });
+    /// # Ok::<_, musli::alloc::AllocError>(())
     /// ```
+    #[inline]
     pub fn as_slice(&self) -> &[T] {
         // SAFETY: We know that the buffer is initialized up to `self.len`.
         unsafe { slice::from_raw_parts(self.buf.as_ptr(), self.len) }
     }
 
+    /// Get the initialized part of the buffer as a slice.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::alloc::{AllocError, Vec};
+    ///
+    /// musli::alloc::default(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
+    ///     assert_eq!(a.as_slice(), b"");
+    ///     a.extend_from_slice(b"Hello")?;
+    ///     assert_eq!(a.as_slice(), b"Hello");
+    ///     a.as_slice_mut().make_ascii_uppercase();
+    ///     assert_eq!(a.as_slice(), b"HELLO");
+    ///     Ok::<_, AllocError>(())
+    /// });
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
     #[inline]
-    fn into_raw_parts(self) -> (A::RawVec<T>, usize) {
+    pub fn as_slice_mut(&mut self) -> &mut [T] {
+        // SAFETY: We know that the buffer is initialized up to `self.len`.
+        unsafe { slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len) }
+    }
+
+    #[inline]
+    fn into_raw_parts(self) -> (A::AllocSlice<T>, usize) {
         let this = ManuallyDrop::new(self);
 
         // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
@@ -247,14 +283,13 @@ where
     /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///     assert_eq!(a.len(), 0);
-    ///     a.write(b"Hello");
+    ///     a.extend_from_slice(b"Hello");
     ///     assert_eq!(a.len(), 5);
     /// });
     /// ```
-    pub fn write(&mut self, items: &[T]) -> bool {
-        if !self.buf.resize(self.len, items.len()) {
-            return false;
-        }
+    #[inline]
+    pub fn extend_from_slice(&mut self, items: &[T]) -> Result<(), AllocError> {
+        self.buf.resize(self.len, items.len())?;
 
         // SAFETY: The call to reserve ensures that we have enough capacity.
         unsafe {
@@ -265,7 +300,7 @@ where
             self.len += items.len();
         }
 
-        true
+        Ok(())
     }
 
     /// Write a buffer of the same type onto the current buffer.
@@ -276,31 +311,33 @@ where
     /// ## Examples
     ///
     /// ```
-    /// use musli::alloc::Vec;
+    /// use musli::alloc::{AllocError, Vec};
     ///
     /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///     let mut b = Vec::new_in(alloc);
     ///
-    ///     a.write(b"Hello");
-    ///     b.write(b" World");
+    ///     a.extend_from_slice(b"Hello")?;
+    ///     b.extend_from_slice(b" World")?;
     ///
-    ///     a.extend(b);
+    ///     a.extend(b)?;
     ///     assert_eq!(a.as_slice(), b"Hello World");
+    ///     Ok::<_, AllocError>(())
     /// });
+    /// # Ok::<_, AllocError>(())
     /// ```
     #[inline]
-    pub fn extend(&mut self, other: Vec<T, A>) -> bool {
+    pub fn extend(&mut self, other: Vec<T, A>) -> Result<(), AllocError> {
         let (other, other_len) = other.into_raw_parts();
 
         // Try to merge one buffer with another.
         if let Err(buf) = self.buf.try_merge(self.len, other, other_len) {
             let other = unsafe { Vec::<T, A>::from_raw_parts(buf, other_len) };
-            return self.write(other.as_slice());
+            return self.extend_from_slice(other.as_slice());
         }
 
         self.len += other_len;
-        true
+        Ok(())
     }
 }
 
@@ -322,7 +359,7 @@ where
 ///     assert_eq!(a.as_slice(), b"Hello World");
 ///     Ok(())
 /// })?;
-/// # Ok::<(), core::fmt::Error>(())
+/// # Ok::<_, core::fmt::Error>(())
 /// ```
 impl<A> fmt::Write for Vec<u8, A>
 where
@@ -330,11 +367,7 @@ where
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        if !self.write(s.as_bytes()) {
-            return Err(fmt::Error);
-        }
-
-        Ok(())
+        self.extend_from_slice(s.as_bytes()).map_err(|_| fmt::Error)
     }
 }
 
@@ -343,11 +376,11 @@ impl<T, A> Deref for Vec<T, A>
 where
     A: Allocator,
 {
-    type Target = A::RawVec<T>;
+    type Target = [T];
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.buf
+        self.as_slice()
     }
 }
 
@@ -358,7 +391,7 @@ where
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.buf
+        self.as_slice_mut()
     }
 }
 

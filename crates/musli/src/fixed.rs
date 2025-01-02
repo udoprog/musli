@@ -12,10 +12,6 @@ use crate::alloc::Vec;
 use crate::writer::Writer;
 use crate::Context;
 
-/// An error raised when we are at capacity.
-#[non_exhaustive]
-pub(crate) struct CapacityError;
-
 /// A fixed-size bytes storage which keeps track of how much has been
 /// initialized.
 pub struct FixedBytes<const N: usize> {

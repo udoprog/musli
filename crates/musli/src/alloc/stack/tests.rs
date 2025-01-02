@@ -198,8 +198,8 @@ fn grow_last() {
     let a = Vec::<u8, _>::new_in(&alloc);
 
     let mut b = Vec::<u8, _>::new_in(&alloc);
-    b.write(&[1, 2, 3, 4, 5, 6]);
-    b.write(&[7, 8]);
+    _ = b.extend_from_slice(&[1, 2, 3, 4, 5, 6]);
+    _ = b.extend_from_slice(&[7, 8]);
 
     assert_structure! {
         alloc, occupied[], free[], list[A, B],
@@ -207,7 +207,7 @@ fn grow_last() {
         B => { 0, 8, 8 },
     };
 
-    b.write(&[9, 10]);
+    _ = b.extend_from_slice(&[9, 10]);
 
     assert_structure! {
         alloc, occupied[], free[], list[A, B],
@@ -229,20 +229,20 @@ fn realloc() {
     let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
-    a.write(&[1, 2, 3, 4]);
-    assert_eq!(a.region, Some(A));
+    _ = a.extend_from_slice(&[1, 2, 3, 4]);
+    assert_eq!(a.raw().region, Some(A));
 
     let mut b = Vec::<u8, _>::new_in(&alloc);
-    b.write(&[1, 2, 3, 4]);
-    assert_eq!(b.region, Some(B));
+    _ = b.extend_from_slice(&[1, 2, 3, 4]);
+    assert_eq!(b.raw().region, Some(B));
 
     let mut c = Vec::<u8, _>::new_in(&alloc);
-    c.write(&[1, 2, 3, 4]);
-    assert_eq!(c.region, Some(C));
+    _ = c.extend_from_slice(&[1, 2, 3, 4]);
+    assert_eq!(c.raw().region, Some(C));
 
-    assert_eq!(a.region, Some(A));
-    assert_eq!(b.region, Some(B));
-    assert_eq!(c.region, Some(C));
+    assert_eq!(a.raw().region, Some(A));
+    assert_eq!(b.raw().region, Some(B));
+    assert_eq!(c.raw().region, Some(C));
 
     assert_structure! {
         alloc, occupied[], free[], list[A, B, C],
@@ -269,7 +269,7 @@ fn realloc() {
     };
 
     let mut d = Vec::<u8, _>::new_in(&alloc);
-    assert_eq!(d.region, Some(A));
+    assert_eq!(d.raw().region, Some(A));
 
     assert_structure! {
         alloc, occupied[], free[B], list[A, C],
@@ -277,8 +277,8 @@ fn realloc() {
         C => { 8, 4, 4 },
     };
 
-    d.write(&[1, 2]);
-    assert_eq!(d.region, Some(A));
+    _ = d.extend_from_slice(&[1, 2]);
+    assert_eq!(d.raw().region, Some(A));
 
     assert_structure! {
         alloc, occupied[], free[B], list[A, C],
@@ -286,8 +286,8 @@ fn realloc() {
         C => { 8, 4, 4 },
     };
 
-    d.write(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-    assert_eq!(d.region, Some(B));
+    _ = d.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+    assert_eq!(d.raw().region, Some(B));
 
     assert_structure! {
         alloc, occupied[A], free[], list[A, C, B],
@@ -308,8 +308,8 @@ fn grow_empty_moved() {
     let b = Vec::<u8, _>::new_in(&alloc);
     let mut c = Vec::<u8, _>::new_in(&alloc);
 
-    c.write(&[0]);
-    a.write(&[1, 2, 3, 4]);
+    _ = c.extend_from_slice(&[0]);
+    _ = a.extend_from_slice(&[1, 2, 3, 4]);
 
     assert_structure! {
         alloc, occupied[], free[], list[B, C, A],
@@ -356,8 +356,8 @@ fn extend() {
     let mut a = Vec::<u8, _>::new_in(&alloc);
     let mut b = Vec::<u8, _>::new_in(&alloc);
 
-    a.write(&[1, 2]);
-    b.write(&[1, 2, 3, 4]);
+    _ = a.extend_from_slice(&[1, 2]);
+    _ = b.extend_from_slice(&[1, 2, 3, 4]);
 
     assert_structure! {
         alloc, occupied[], free[], list[A, B],
@@ -365,7 +365,7 @@ fn extend() {
         B => { 2, 4, 4 },
     };
 
-    a.extend(b);
+    _ = a.extend(b);
 
     assert_structure! {
         alloc, occupied[], free[B], list[A],
@@ -385,9 +385,9 @@ fn extend_middle() {
     let mut b = Vec::<u8, _>::new_in(&alloc);
     let mut c = Vec::<u8, _>::new_in(&alloc);
 
-    a.write(&[1, 2]);
-    b.write(&[1, 2, 3, 4]);
-    c.write(&[1, 2, 3, 4]);
+    _ = a.extend_from_slice(&[1, 2]);
+    _ = b.extend_from_slice(&[1, 2, 3, 4]);
+    _ = c.extend_from_slice(&[1, 2, 3, 4]);
 
     assert_structure! {
         alloc, occupied[], free[], list[A, B, C],
@@ -396,7 +396,7 @@ fn extend_middle() {
         C => { 6, 4, 4 },
     };
 
-    a.extend(b);
+    _ = a.extend(b);
 
     assert_structure! {
         alloc, occupied[], free[B], list[A, C],
@@ -417,9 +417,9 @@ fn extend_gap() {
     let mut b = Vec::<u8, _>::new_in(&alloc);
     let mut c = Vec::<u8, _>::new_in(&alloc);
 
-    a.write(&[1, 2]);
-    b.write(&[7, 8, 9, 10]);
-    c.write(&[3, 4, 5, 6]);
+    _ = a.extend_from_slice(&[1, 2]);
+    _ = b.extend_from_slice(&[7, 8, 9, 10]);
+    _ = c.extend_from_slice(&[3, 4, 5, 6]);
 
     assert_structure! {
         alloc, occupied[], free[], list[A, B, C],
@@ -429,7 +429,7 @@ fn extend_gap() {
     };
 
     drop(b);
-    a.extend(c);
+    _ = a.extend(c);
 
     assert_structure! {
         alloc, occupied[], free[C, B], list[A],
@@ -449,11 +449,11 @@ fn test_overlapping_slice_miri() {
     let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
-    a.write(&[1, 2, 3, 4]);
+    _ = a.extend_from_slice(&[1, 2, 3, 4]);
     let a_slice = a.as_slice();
 
     let mut b = Vec::<u8, _>::new_in(&alloc);
-    b.write(&[5, 6, 7, 8]);
+    _ = b.extend_from_slice(&[5, 6, 7, 8]);
     let b_slice = b.as_slice();
 
     assert_eq!(a_slice, &[1, 2, 3, 4]);
@@ -467,16 +467,16 @@ fn grow_into_preceeding() {
     let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
-    a.write(&[0]);
+    _ = a.extend_from_slice(&[0]);
 
     let mut b = Vec::<u8, _>::new_in(&alloc);
-    b.write(&[1]);
+    _ = b.extend_from_slice(&[1]);
 
     let mut c = Vec::<u8, _>::new_in(&alloc);
-    c.write(&[2]);
+    _ = c.extend_from_slice(&[2]);
 
     let mut d = Vec::<u8, _>::new_in(&alloc);
-    d.write(&[3]);
+    _ = d.extend_from_slice(&[3]);
 
     drop(a);
 
@@ -488,7 +488,7 @@ fn grow_into_preceeding() {
         D => { 3, 1, 1 },
     };
 
-    b.write(&[2]);
+    _ = b.extend_from_slice(&[2]);
 
     assert_structure! {
         alloc, occupied[], free[B], list[A, C, D],
@@ -507,8 +507,8 @@ fn flip_flop() {
     let mut a = Vec::<u8, _>::new_in(&alloc);
     let mut b = Vec::<u8, _>::new_in(&alloc);
 
-    a.write(&[0]);
-    b.write(&[0]);
+    _ = a.extend_from_slice(&[0]);
+    _ = b.extend_from_slice(&[0]);
 
     assert_structure! {
         alloc, occupied[], free[], list[A, B],
@@ -516,8 +516,8 @@ fn flip_flop() {
         B => { 1, 1, 1 },
     };
 
-    a.write(&[1]);
-    assert_eq!(a.region, Some(C));
+    _ = a.extend_from_slice(&[1]);
+    assert_eq!(a.raw().region, Some(C));
 
     assert_structure! {
         alloc, occupied[A], free[], list[A, B, C],
@@ -526,8 +526,8 @@ fn flip_flop() {
         C => { 2, 2, 2 },
     };
 
-    b.write(&[1]);
-    assert_eq!(b.region, Some(A));
+    _ = b.extend_from_slice(&[1]);
+    assert_eq!(b.raw().region, Some(A));
 
     assert_structure! {
         alloc, occupied[], free[B], list[A, C],
@@ -535,8 +535,8 @@ fn flip_flop() {
         C => { 2, 2, 2 },
     };
 
-    a.write(&[2]);
-    assert_eq!(a.region, Some(C));
+    _ = a.extend_from_slice(&[2]);
+    assert_eq!(a.raw().region, Some(C));
 
     assert_structure! {
         alloc, occupied[], free[B], list[A, C],
@@ -544,8 +544,8 @@ fn flip_flop() {
         C => { 2, 3, 3 },
     };
 
-    b.write(&[2]);
-    assert_eq!(b.region, Some(B));
+    _ = b.extend_from_slice(&[2]);
+    assert_eq!(b.raw().region, Some(B));
 
     assert_structure! {
         alloc, occupied[A], free[], list[A, C, B],
@@ -554,8 +554,8 @@ fn flip_flop() {
         B => { 5, 3, 3 },
     };
 
-    a.write(&[3]);
-    assert_eq!(a.region, Some(A));
+    _ = a.extend_from_slice(&[3]);
+    assert_eq!(a.raw().region, Some(A));
 
     assert_structure! {
         alloc, occupied[], free[C], list[A, B],
@@ -563,8 +563,8 @@ fn flip_flop() {
         B => { 5, 3, 3 },
     };
 
-    b.write(&[3]);
-    assert_eq!(b.region, Some(B));
+    _ = b.extend_from_slice(&[3]);
+    assert_eq!(b.raw().region, Some(B));
 
     assert_structure! {
         alloc, occupied[], free[C], list[A, B],
@@ -581,18 +581,18 @@ fn flip_flop() {
 fn limits() {
     let mut buf = ArrayBuffer::<8>::with_size();
     let alloc = Slice::new(&mut buf);
-    assert!(alloc.new_raw_vec::<u8>().region.is_none());
+    assert!(alloc.alloc_slice::<u8>().region.is_none());
 
     let mut buf = ArrayBuffer::<32>::with_size();
     let alloc = Slice::new(&mut buf);
 
     let mut a = Vec::<u8, _>::new_in(&alloc);
-    assert!(a.write(&[0, 1, 2, 3, 4, 5, 6, 7]));
+    assert!(a.extend_from_slice(&[0, 1, 2, 3, 4, 5, 6, 7]).is_ok());
 
     assert_structure! {
         alloc, occupied[], free[], list[A],
         A => { 0, 8, 8 },
     };
 
-    assert!(!a.write(&[0]));
+    assert!(a.extend_from_slice(&[0]).is_err());
 }
