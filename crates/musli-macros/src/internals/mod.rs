@@ -11,7 +11,7 @@ mod tokens;
 pub(crate) const ATTR: &str = "musli";
 
 pub(crate) use self::attr::Only;
-pub(crate) use self::build::Build;
+pub(crate) use self::build::{Build, Parameters};
 pub(crate) use self::ctxt::Ctxt;
 pub(crate) use self::expansion::Expansion;
 pub(crate) use self::mode::{ImportedMethod, Mode};

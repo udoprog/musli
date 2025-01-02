@@ -12,6 +12,7 @@ pub trait EntryDecoder<'de> {
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
         Mode = <Self::Cx as Context>::Mode,
+        Allocator = <Self::Cx as Context>::Allocator,
     >
     where
         Self: 'this;
@@ -21,6 +22,7 @@ pub trait EntryDecoder<'de> {
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
         Mode = <Self::Cx as Context>::Mode,
+        Allocator = <Self::Cx as Context>::Allocator,
     >;
 
     /// Access the context associated with the decoder.

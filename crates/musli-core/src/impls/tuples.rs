@@ -3,6 +3,7 @@
 use crate::de::{Decode, DecodePacked, Decoder, SequenceDecoder};
 use crate::en::{Encode, EncodePacked, Encoder, SequenceEncoder};
 use crate::hint::SequenceHint;
+use crate::Allocator;
 
 macro_rules! count {
     (_) => { 1 };
@@ -72,10 +73,11 @@ macro_rules! declare {
             }
         }
 
-        impl<'de, M, $ty0, $($ty,)*> Decode<'de, M> for ($ty0, $($ty),*)
+        impl<'de, M, A, $ty0, $($ty,)*> Decode<'de, M, A> for ($ty0, $($ty),*)
         where
-            $ty0: Decode<'de, M>,
-            $($ty: Decode<'de, M>),*
+            A: Allocator,
+            $ty0: Decode<'de, M, A>,
+            $($ty: Decode<'de, M, A>),*
         {
             // It is harder to check that a tuple is packed, because we have to
             // ensure it doesn't contain any padding.
@@ -84,7 +86,7 @@ macro_rules! declare {
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
-                D: Decoder<'de, Mode = M>,
+                D: Decoder<'de, Mode = M, Allocator = A>,
             {
                 static HINT: SequenceHint = SequenceHint::with_size(count!($ident0 $($ident)*));
 
@@ -115,15 +117,16 @@ macro_rules! declare {
             }
         }
 
-        impl<'de, M, $ty0, $($ty,)*> DecodePacked<'de, M> for ($ty0, $($ty),*)
+        impl<'de, M, A, $ty0, $($ty,)*> DecodePacked<'de, M, A> for ($ty0, $($ty),*)
         where
-            $ty0: Decode<'de, M>,
-            $($ty: Decode<'de, M>),*
+            A: Allocator,
+            $ty0: Decode<'de, M, A>,
+            $($ty: Decode<'de, M, A>),*
         {
             #[inline]
             fn decode_packed<D>(decoder: D) -> Result<Self, D::Error>
             where
-                D: Decoder<'de, Mode = M>,
+                D: Decoder<'de, Mode = M, Allocator = A>,
             {
                 decoder.decode_pack(|pack| {
                     let $ident0 = pack.next()?;

@@ -475,7 +475,7 @@ through heuristics. Such a type must also implement [`Decode`] (for `"sized"`),
 
 <br>
 
-#### `#[musli(bound = {..})]` and `#[musli(decode_bound = {..})]`
+#### `#[musli(bound = {..})]` and `#[musli(decode_bound<'de, A> = {..})]`
 
 These attributes can be used to apply bounds to an [`Encode`] or [`Decode`]
 implementation.
@@ -484,9 +484,14 @@ These are necessary to use when a generic container is used to ensure that
 the given parameter implements the necessary bounds.
 
 `#[musli(bound = {..})]` applies to all implementations while
-`#[musli(decode_bound = {..})]` only applies to the [`Decode`]
-implementation. The latter allows for using the decode lifetime parameter
-(which defaults to `'de`).
+`#[musli(decode_bound<'de, A> = {..})]` only applies to the [`Decode`]
+implementation. The latter allows for using the decode lifetime and allocator
+parameter. If these parameters are not part of the type signature, they can be
+specified in the `decode_bound` parameter directly like
+`#[musli(decode_bound<'de, A> = {..})]`.
+
+An HRTB can also be used like `#[musli(decode_bound<A> = {T: for<'de>
+Decode<'de, Binary, A>})]`.
 
 <br>
 
@@ -497,8 +502,8 @@ use musli::{Decode, Encode};
 use musli::mode::{Binary, Text};
 
 #[derive(Clone, Debug, PartialEq, Encode, Decode)]
-#[musli(mode = Binary, bound = {T: Encode<Binary>}, decode_bound = {T: Decode<'de, Binary>})]
-#[musli(mode = Text, bound = {T: Encode<Text>}, decode_bound = {T: Decode<'de, Text>})]
+#[musli(mode = Binary, bound = {T: Encode<Binary>}, decode_bound<A> = {T: for<'de> Decode<'de, Binary, A>})]
+#[musli(mode = Text, bound = {T: Encode<Text>}, decode_bound<A> = {T: for<'de> Decode<'de, Text, A>})]
 pub struct GenericWithBound<T> {
     value: T,
 }
@@ -1228,7 +1233,7 @@ mod example {
         pub fn decode<'de, D, T>(decoder: D) -> Result<HashSet<T>, D::Error>
         where
             D: Decoder<'de>,
-            T: Decode<'de, D::Mode> + Eq + Hash,
+            T: Decode<'de, D::Mode, D::Allocator> + Eq + Hash,
         {
             decoder.decode()
         }

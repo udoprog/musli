@@ -56,6 +56,7 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
+    type Allocator = C::Allocator;
     type WithContext<U>
         = StorageDecoder<R, OPT, U>
     where
@@ -88,7 +89,7 @@ where
     #[inline]
     fn try_fast_decode<T>(mut self) -> Result<TryFastDecode<T, Self>, Self::Error>
     where
-        T: Decode<'de, Self::Mode>,
+        T: Decode<'de, Self::Mode, Self::Allocator>,
     {
         if !const { is_native_fixed::<OPT>() && T::IS_BITWISE_DECODE } {
             return Ok(TryFastDecode::Unsupported(self));
@@ -294,7 +295,7 @@ where
     fn decode_slice<V, T>(mut self) -> Result<V, <Self::Cx as Context>::Error>
     where
         V: DecodeSliceBuilder<T>,
-        T: Decode<'de, Self::Mode>,
+        T: Decode<'de, Self::Mode, Self::Allocator>,
     {
         // Check that the type is packed inside of the slice.
         if !is_bitwise_slice!(OPT, T) {

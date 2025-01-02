@@ -1,6 +1,6 @@
 /// A raw buffer allocated through an [`Allocator`].
 ///
-/// [`Allocator`]: super::Allocator
+/// [`Allocator`]: crate::Allocator
 ///
 /// ## Examples
 ///

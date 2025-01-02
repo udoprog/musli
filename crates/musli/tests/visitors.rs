@@ -1,14 +1,17 @@
 use std::fmt;
 
 use musli::de::UnsizedVisitor;
-use musli::{Context, Decode, Decoder};
+use musli::{Allocator, Context, Decode, Decoder};
 
 #[derive(Debug, PartialEq)]
 pub struct BytesReference<'de> {
     data: &'de [u8],
 }
 
-impl<'de, M> Decode<'de, M> for BytesReference<'de> {
+impl<'de, M, A> Decode<'de, M, A> for BytesReference<'de>
+where
+    A: Allocator,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
@@ -65,7 +68,10 @@ pub struct StringReference<'de> {
     data: &'de str,
 }
 
-impl<'de, M> Decode<'de, M> for StringReference<'de> {
+impl<'de, M, A> Decode<'de, M, A> for StringReference<'de>
+where
+    A: Allocator,
+{
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
@@ -121,7 +127,10 @@ pub enum OwnedFn {
     B,
 }
 
-impl<'de, M> Decode<'de, M> for OwnedFn {
+impl<'de, M, A> Decode<'de, M, A> for OwnedFn
+where
+    A: Allocator,
+{
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de>,

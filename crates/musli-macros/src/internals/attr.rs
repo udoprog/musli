@@ -109,7 +109,7 @@ macro_rules! layer {
         }
 
         impl $attr {
-            fn by_mode<A, O>(&self, mode: Mode<'_>, access: A) -> Option<&O>
+            fn by_mode<A, O>(&self, mode: &Mode<'_>, access: A) -> Option<&O>
             where
                 A: Copy + Fn(&$layer) -> Option<&O>,
                 O: ?Sized,
@@ -123,7 +123,7 @@ macro_rules! layer {
 
             $(
                 #[allow(unused)]
-                pub(crate) fn $single(&self, mode: Mode<'_>) -> Option<&(Span, $single_ty)> {
+                pub(crate) fn $single(&self, mode: &Mode<'_>) -> Option<&(Span, $single_ty)> {
                     self.by_mode(mode, |m| {
                         match mode.only {
                             Only::Encode if m.$single.encode.is_some() => m.$single.encode.as_ref(),
@@ -136,7 +136,7 @@ macro_rules! layer {
 
             $($(
                 #[allow(unused)]
-                pub(crate) fn $multiple(&self, mode: Mode<'_>) -> &[(Span, $multiple_ty)] {
+                pub(crate) fn $multiple(&self, mode: &Mode<'_>) -> &[(Span, $multiple_ty)] {
                     self.by_mode(mode, |m| {
                         match mode.only {
                             Only::Encode if !m.$multiple.encode.is_empty() => Some(&m.$multiple.encode[..]),
@@ -260,24 +260,28 @@ layer! {
         bounds: syn::WherePredicate,
         /// Bounds to require for a `Decode` implementation.
         decode_bounds: syn::WherePredicate,
+        /// Lifetimes specified.
+        decode_bounds_lifetimes: syn::Lifetime,
+        /// Types specified.
+        decode_bounds_types: syn::Ident,
     }
 }
 
 impl TypeAttr {
-    pub(crate) fn is_name_type_ambiguous(&self, mode: Mode<'_>) -> bool {
+    pub(crate) fn is_name_type_ambiguous(&self, mode: &Mode<'_>) -> bool {
         self.name_type(mode).is_none()
             && self.name_all(mode).is_none()
             && self.name_method(mode).is_none()
     }
 
-    pub(crate) fn enum_tagging_span(&self, mode: Mode<'_>) -> Option<Span> {
+    pub(crate) fn enum_tagging_span(&self, mode: &Mode<'_>) -> Option<Span> {
         let tag = self.tag_value(mode);
         let content = self.content_value(mode);
         Some(tag.or(content)?.0)
     }
 
     /// Indicates the state of enum tagging.
-    pub(crate) fn enum_tagging(&self, mode: Mode<'_>) -> Option<EnumTagging<'_>> {
+    pub(crate) fn enum_tagging(&self, mode: &Mode<'_>) -> Option<EnumTagging<'_>> {
         let (_, tag_value) = self.tag_value(mode)?;
 
         let default_tag_type = build::determine_type(tag_value);
@@ -414,6 +418,14 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             // #[musli(decode_bound = {..})]
             if meta.path.is_ident("decode_bound") {
+                if meta.input.parse::<Option<Token![<]>>()?.is_some() {
+                    parse_bound_types(
+                        &meta,
+                        &mut new.decode_bounds_lifetimes,
+                        &mut new.decode_bounds_types,
+                    )?;
+                }
+
                 meta.input.parse::<Token![=]>()?;
                 parse_bounds(&meta, &mut new.decode_bounds)?;
                 return Ok(());
@@ -487,6 +499,40 @@ fn parse_name_all(meta: &syn::meta::ParseNestedMeta<'_>) -> Result<NameAll, syn:
     Ok(name_all)
 }
 
+fn parse_bound_types(
+    meta: &syn::meta::ParseNestedMeta,
+    lifetimes: &mut Vec<(Span, syn::Lifetime)>,
+    types: &mut Vec<(Span, syn::Ident)>,
+) -> syn::Result<()> {
+    let mut first = true;
+    let mut last = false;
+
+    while !meta.input.is_empty() && !meta.input.peek(Token![>]) {
+        if !first {
+            last |= meta.input.parse::<Option<Token![,]>>()?.is_none();
+        }
+
+        'out: {
+            if let Some(lt) = meta.input.parse::<Option<syn::Lifetime>>()? {
+                lifetimes.push((lt.span(), lt));
+                break 'out;
+            }
+
+            let ident = meta.input.parse::<syn::Ident>()?;
+            types.push((ident.span(), ident));
+        }
+
+        first = false;
+
+        if last {
+            break;
+        }
+    }
+
+    meta.input.parse::<Token![>]>()?;
+    Ok(())
+}
+
 fn parse_bounds(
     meta: &syn::meta::ParseNestedMeta,
     out: &mut Vec<(Span, syn::WherePredicate)>,
@@ -528,7 +574,7 @@ layer! {
 }
 
 impl VariantAttr {
-    pub(crate) fn is_name_type_ambiguous(&self, mode: Mode<'_>) -> bool {
+    pub(crate) fn is_name_type_ambiguous(&self, mode: &Mode<'_>) -> bool {
         self.name_type(mode).is_none()
             && self.name_all(mode).is_none()
             && self.name_method(mode).is_none()
@@ -675,7 +721,7 @@ impl Field {
     /// Expand encode of the given field.
     pub(crate) fn encode_path_expanded<'a>(
         &self,
-        mode: Mode<'a>,
+        mode: &Mode<'a>,
         span: Span,
     ) -> (Span, DefaultOrCustom<'a>) {
         if let Some((span, encode_path)) = self.encode_path(mode) {
@@ -690,14 +736,15 @@ impl Field {
     /// Expand decode of the given field.
     pub(crate) fn decode_path_expanded<'a>(
         &self,
-        mode: Mode<'a>,
+        mode: &Mode<'a>,
         span: Span,
+        allocator_ident: &syn::Ident,
     ) -> (Span, DefaultOrCustom<'a>) {
         if let Some((span, decode_path)) = self.decode_path(mode) {
             (*span, DefaultOrCustom::Custom(decode_path.clone()))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
-            let decode_path = mode.decode_t_decode(field_encoding);
+            let decode_path = mode.decode_t_decode(field_encoding, allocator_ident);
             (span, DefaultOrCustom::Default(decode_path))
         }
     }

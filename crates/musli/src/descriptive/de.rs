@@ -222,6 +222,7 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
+    type Allocator = C::Allocator;
     type WithContext<U>
         = SelfDecoder<R, OPT, U>
     where

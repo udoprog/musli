@@ -19,6 +19,7 @@ pub trait EntriesDecoder<'de> {
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
         Mode = <Self::Cx as Context>::Mode,
+        Allocator = <Self::Cx as Context>::Allocator,
     >
     where
         Self: 'this;
@@ -28,6 +29,7 @@ pub trait EntriesDecoder<'de> {
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
         Mode = <Self::Cx as Context>::Mode,
+        Allocator = <Self::Cx as Context>::Allocator,
     >
     where
         Self: 'this;

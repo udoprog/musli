@@ -3,8 +3,9 @@ use core::ops::Deref;
 use core::str;
 
 use crate::fixed::CapacityError;
+use crate::Allocator;
 
-use super::{AllocError, Allocator, Vec};
+use super::{AllocError, Vec};
 
 /// Wrapper around a buffer that is guaranteed to be a valid utf-8 string.
 pub struct String<A>

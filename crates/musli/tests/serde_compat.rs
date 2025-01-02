@@ -27,6 +27,8 @@ where
     T: DeserializeOwned;
 
 mod value {
+    use musli::alloc::System;
+
     use super::*;
 
     #[track_caller]
@@ -36,7 +38,7 @@ mod value {
             + fmt::Debug
             + Generate
             + Encode<Binary>
-            + DecodeOwned<Binary>
+            + DecodeOwned<Binary, System>
             + Serialize
             + DeserializeOwned,
     {
@@ -46,7 +48,12 @@ mod value {
     #[track_caller]
     pub(super) fn guided<T>(module: &str, value: fn(&mut Rng) -> T)
     where
-        T: Eq + fmt::Debug + Encode<Binary> + DecodeOwned<Binary> + Serialize + DeserializeOwned,
+        T: Eq
+            + fmt::Debug
+            + Encode<Binary>
+            + DecodeOwned<Binary, System>
+            + Serialize
+            + DeserializeOwned,
     {
         macro_rules! do_try {
             ($expr:expr, $msg:expr) => {
@@ -100,12 +107,14 @@ mod value {
 macro_rules! tester {
     ($module:ident, $mode:ty $(,)?) => {
         mod $module {
+            use musli::alloc::System;
+
             use super::*;
 
             #[track_caller]
             pub(super) fn random<T>(module: &str)
             where
-                T: Encode<$mode> + DecodeOwned<$mode>,
+                T: Encode<$mode> + DecodeOwned<$mode, System>,
                 T: Eq + fmt::Debug + Generate + Serialize + DeserializeOwned,
             {
                 guided(module, <T as Generate>::generate);
@@ -114,7 +123,7 @@ macro_rules! tester {
             #[track_caller]
             pub(super) fn guided<T>(module: &str, value: fn(&mut Rng) -> T)
             where
-                T: Encode<$mode> + DecodeOwned<$mode>,
+                T: Encode<$mode> + DecodeOwned<$mode, System>,
                 T: Eq + fmt::Debug + Serialize + DeserializeOwned,
             {
                 macro_rules! do_try {
@@ -210,8 +219,8 @@ struct Struct {
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
 #[generate(crate)]
-#[musli(mode = Binary, bound = {T: Encode<Binary>}, decode_bound = {T: Decode<'de, Binary>})]
-#[musli(mode = Text, bound = {T: Encode<Text>}, decode_bound = {T: Decode<'de, Text>})]
+#[musli(mode = Binary, bound = {T: Encode<Binary>}, decode_bound<A> = {T: for<'de> Decode<'de, Binary, A>})]
+#[musli(mode = Text, bound = {T: Encode<Text>}, decode_bound<A> = {T: for<'de> Decode<'de, Text, A>})]
 struct StructWith<T> {
     a: u32,
     b: T,

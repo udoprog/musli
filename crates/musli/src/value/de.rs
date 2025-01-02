@@ -87,6 +87,7 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
+    type Allocator = C::Allocator;
     type WithContext<U>
         = ValueDecoder<'de, OPT, U>
     where

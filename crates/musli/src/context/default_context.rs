@@ -9,8 +9,8 @@ use core::slice;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
-use crate::alloc::{self, Allocator, String, Vec};
-use crate::Context;
+use crate::alloc::{self, String, Vec};
+use crate::{Allocator, Context};
 
 use super::{Access, ErrorMarker, Shared};
 

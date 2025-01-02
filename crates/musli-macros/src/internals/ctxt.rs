@@ -152,11 +152,22 @@ impl Ctxt {
     }
 
     /// Build a type identifier with a span.
-    pub(crate) fn type_with_span<N>(
-        &self,
-        #[cfg_attr(not(feature = "verbose"), allow(unused))] name: N,
-        span: Span,
-    ) -> syn::Ident
+    pub(crate) fn type_with_span<N>(&self, name: N, span: Span) -> syn::Ident
+    where
+        N: fmt::Display,
+    {
+        self.type_with_span_inner(name, span, false)
+    }
+
+    /// Build a type identifier with a span.
+    pub(crate) fn type_with_span_permanent<N>(&self, name: N, span: Span) -> syn::Ident
+    where
+        N: fmt::Display,
+    {
+        self.type_with_span_inner(name, span, true)
+    }
+
+    fn type_with_span_inner<N>(&self, name: N, span: Span, permanent: bool) -> syn::Ident
     where
         N: fmt::Display,
     {
@@ -164,13 +175,22 @@ impl Ctxt {
 
         #[cfg(not(feature = "verbose"))]
         {
-            let index = inner.types;
-            inner.types += 1;
-            _ = write!(inner.b1, "T{index}");
+            _ = name;
+
+            let index;
+
+            if permanent {
+                _ = write!(inner.b1, "{name}");
+            } else {
+                index = inner.types;
+                inner.types += 1;
+                _ = write!(inner.b1, "T{index}");
+            }
         }
 
         #[cfg(feature = "verbose")]
         {
+            _ = permanent;
             _ = write!(inner.b1, "{name}");
         }
 

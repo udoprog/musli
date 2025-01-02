@@ -190,7 +190,7 @@ where
     #[inline]
     fn visit_option<D>(self, cx: C, _: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode>,
+        D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode, Allocator = C::Allocator>,
     {
         Err(cx.message(expecting::unsupported_type(
             &expecting::Option,
@@ -256,7 +256,7 @@ where
     #[inline]
     fn visit_unknown<D>(self, decoder: D) -> Result<Self::Ok, D::Error>
     where
-        D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode>,
+        D: Decoder<'de, Cx = C, Error = C::Error, Mode = C::Mode, Allocator = C::Allocator>,
     {
         Err(decoder.cx().message(expecting::unsupported_type(
             &expecting::Any,

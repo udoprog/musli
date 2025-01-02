@@ -1,6 +1,8 @@
 use core::marker::PhantomData;
 
-use super::{Allocator, RawVec};
+use crate::Allocator;
+
+use super::RawVec;
 #[cfg(not(feature = "alloc"))]
 use super::{Slice, SliceBuf};
 #[cfg(feature = "alloc")]

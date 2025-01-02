@@ -359,6 +359,7 @@
 //! We achieve this through the following methods:
 //!
 //! ```
+//! use musli::alloc::{Allocator, System};
 //! use musli::context::{ErrorMarker as Error, Ignore};
 //! use musli::options::{self, Float, Integer, Width, Options};
 //! use musli::storage::Encoding;
@@ -371,9 +372,10 @@
 //! const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 //!
 //! #[inline]
-//! pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T, alloc: &Slice<'_>) -> Result<&'buf [u8], Error>
+//! pub fn encode<'buf, T, A>(buf: &'buf mut [u8], value: &T, alloc: A) -> Result<&'buf [u8], Error>
 //! where
 //!     T: Encode<Packed>,
+//!     A: Clone + Allocator,
 //! {
 //!     let cx = Ignore::with_alloc(alloc);
 //!     let w = ENCODING.to_slice_with(&cx, &mut buf[..], value)?;
@@ -381,9 +383,10 @@
 //! }
 //!
 //! #[inline]
-//! pub fn decode<'buf, T>(buf: &'buf [u8], alloc: &Slice<'_>) -> Result<T, Error>
+//! pub fn decode<'buf, T, A>(buf: &'buf [u8], alloc: A) -> Result<T, Error>
 //! where
-//!     T: Decode<'buf, Packed>,
+//!     T: Decode<'buf, Packed, A>,
+//!     A: Clone + Allocator,
 //! {
 //!     let cx = Ignore::with_alloc(alloc);
 //!     ENCODING.from_slice_with(&cx, buf)
@@ -680,6 +683,8 @@ pub use musli_core::{Context, Decode, Decoder, Encode, Encoder};
 pub use musli_core::__priv;
 
 pub mod alloc;
+#[doc(inline)]
+pub use self::alloc::Allocator;
 
 pub mod descriptive;
 pub mod json;
@@ -716,6 +721,7 @@ pub mod no_std;
 mod int;
 mod str;
 
+use crate::alloc::Disabled;
 use crate::mode::Binary;
 
 /// Test if the given type `T` is marked with the `#[musli(packed)]` attribute,
@@ -733,7 +739,8 @@ where
 }
 
 /// Test if the given type `T` is marked with the `#[musli(packed)]` attribute,
-/// and is bitwise encodeable in the [`Binary`] mode.
+/// and is bitwise encodeable in the [`Binary`] mode using the [`Disabled`]
+/// allocator.
 ///
 /// See the [help section for `#[musli(packed)]`][help] for more information.
 ///
@@ -741,7 +748,7 @@ where
 #[inline]
 pub const fn is_bitwise_decode<T>() -> bool
 where
-    T: for<'de> Decode<'de, Binary>,
+    T: for<'de> Decode<'de, Binary, Disabled>,
 {
     T::IS_BITWISE_DECODE
 }

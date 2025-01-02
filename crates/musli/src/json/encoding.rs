@@ -90,7 +90,7 @@ where
 #[inline]
 pub fn from_str<'de, T>(string: &'de str) -> Result<T, Error>
 where
-    T: Decode<'de, Text>,
+    T: Decode<'de, Text, System>,
 {
     DEFAULT.from_str(string)
 }

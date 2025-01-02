@@ -15,7 +15,7 @@ use crate::de::{
 use crate::en::{Encode, Encoder};
 #[cfg(feature = "alloc")]
 use crate::en::{MapEncoder, SequenceEncoder, VariantEncoder};
-use crate::{Context, Options};
+use crate::{Allocator, Context, Options};
 
 use super::de::ValueDecoder;
 use super::type_hint::{NumberHint, TypeHint};
@@ -377,7 +377,10 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for Value {
+impl<'de, M, A> Decode<'de, M, A> for Value
+where
+    A: Allocator,
+{
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]

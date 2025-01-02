@@ -104,6 +104,7 @@ where
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
+    type Allocator = C::Allocator;
     type WithContext<U>
         = Never<(), U>
     where
@@ -138,7 +139,7 @@ where
     #[inline]
     fn decode<T>(self) -> Result<T, Self::Error>
     where
-        T: Decode<'de, Self::Mode>,
+        T: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
     {
         match self._never {}
     }

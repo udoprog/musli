@@ -2,7 +2,7 @@ use core::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInc
 
 use crate::en::SequenceEncoder;
 use crate::hint::SequenceHint;
-use crate::{Decode, Decoder, Encode, Encoder};
+use crate::{Allocator, Decode, Decoder, Encode, Encoder};
 
 macro_rules! implement {
     ($ty:ident $(<$type:ident>)? { $($field:ident),* }, $count:expr) => {
@@ -34,16 +34,17 @@ macro_rules! implement {
             }
         }
 
-        impl<'de, M, $($type)*> Decode<'de, M> for $ty $(<$type>)*
+        impl<'de, M, A, $($type)*> Decode<'de, M, A> for $ty $(<$type>)*
         where
-            $($type: Decode<'de, M>,)*
+            A: Allocator,
+            $($type: Decode<'de, M, A>,)*
         {
             const IS_BITWISE_DECODE: bool = false;
 
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
-                D: Decoder<'de, Mode = M>,
+                D: Decoder<'de, Mode = M, Allocator = A>,
             {
                 let ($($field,)*) = decoder.decode()?;
                 Ok($ty { $($field,)* })
@@ -81,16 +82,17 @@ macro_rules! implement_new {
             }
         }
 
-        impl<'de, M, T> Decode<'de, M> for $ty<T>
+        impl<'de, M, A, T> Decode<'de, M, A> for $ty<T>
         where
-            T: Decode<'de, M>,
+            A: Allocator,
+            T: Decode<'de, M, A>,
         {
             const IS_BITWISE_DECODE: bool = false;
 
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
-                D: Decoder<'de, Mode = M>,
+                D: Decoder<'de, Mode = M, Allocator = A>,
             {
                 let ($($field,)*) = Decode::decode(decoder)?;
                 Ok($ty::new($($field,)*))

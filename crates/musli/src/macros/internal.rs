@@ -238,7 +238,7 @@ macro_rules! bare_encoding {
         pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
         where
             R: $reader_trait<'de>,
-            T: Decode<'de, $mode>,
+            T: Decode<'de, $mode, System>,
         {
             $default.decode(reader)
         }
@@ -274,7 +274,7 @@ macro_rules! bare_encoding {
         #[inline]
         pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
         where
-            T: Decode<'de, $mode>,
+            T: Decode<'de, $mode, System>,
         {
             $default.from_slice(bytes)
         }
@@ -553,7 +553,7 @@ macro_rules! encoding_impls {
         pub fn decode<'de, R, T>(self, reader: R) -> Result<T, Error>
         where
             R: $reader_trait<'de>,
-            T: Decode<'de, $mode>,
+            T: Decode<'de, $mode, System>,
         {
             let cx = $crate::context::Same::with_alloc(System::new());
             self.decode_with(&cx, reader)
@@ -592,7 +592,7 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
         where
-            T: Decode<'de, $mode>,
+            T: Decode<'de, $mode, System>,
         {
             let cx = $crate::context::Same::with_alloc(System::new());
             self.from_slice_with(&cx, bytes)
@@ -608,7 +608,7 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, Error>
         where
-            T: Decode<'de, M>,
+            T: Decode<'de, M, System>,
         {
             self.from_slice(string.as_bytes())
         }
@@ -918,7 +918,7 @@ macro_rules! encoding_impls {
         where
             C: Context<Mode = $mode>,
             R: $reader_trait<'de>,
-            T: Decode<'de, C::Mode>,
+            T: Decode<'de, C::Mode, C::Allocator>,
         {
             cx.clear();
             let reader = $reader_trait::$into_reader(reader);
@@ -966,7 +966,7 @@ macro_rules! encoding_impls {
         pub fn from_slice_with<'de, C, T>(self, cx: C, bytes: &'de [u8]) -> Result<T, C::Error>
         where
             C: Context<Mode = $mode>,
-            T: Decode<'de, $mode>,
+            T: Decode<'de, $mode, C::Allocator>,
         {
             self.decode_with(cx, bytes)
         }
@@ -985,7 +985,7 @@ macro_rules! encoding_impls {
         pub fn from_str_with<'de, C, T>(self, cx: C, string: &'de str) -> Result<T, C::Error>
         where
             C: Context<Mode = M>,
-            T: Decode<'de, M>,
+            T: Decode<'de, M, C::Allocator>,
         {
             self.from_slice_with(cx, string.as_bytes())
         }
@@ -1001,7 +1001,7 @@ macro_rules! implement_error {
         #[cfg(feature = "alloc")]
         pub struct $id<A = $crate::alloc::System>
         where
-            A: $crate::alloc::Allocator,
+            A: $crate::Allocator,
         {
             err: Impl<A>,
         }
@@ -1010,14 +1010,14 @@ macro_rules! implement_error {
         #[cfg(not(feature = "alloc"))]
         pub struct $id<A>
         where
-            A: $crate::alloc::Allocator,
+            A: $crate::Allocator,
         {
             err: Impl<A>,
         }
 
         impl<A> core::fmt::Display for $id<A>
         where
-            A: $crate::alloc::Allocator,
+            A: $crate::Allocator,
         {
             #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -1027,7 +1027,7 @@ macro_rules! implement_error {
 
         impl<A> core::fmt::Debug for $id<A>
         where
-            A: $crate::alloc::Allocator,
+            A: $crate::Allocator,
         {
             #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -1037,7 +1037,7 @@ macro_rules! implement_error {
 
         enum Impl<A>
         where
-            A: $crate::alloc::Allocator,
+            A: $crate::Allocator,
         {
             Message(crate::alloc::String<A>),
             Alloc(crate::alloc::AllocError),
@@ -1045,7 +1045,7 @@ macro_rules! implement_error {
 
         impl<A> core::fmt::Display for Impl<A>
         where
-            A: $crate::alloc::Allocator,
+            A: $crate::Allocator,
         {
             #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -1058,7 +1058,7 @@ macro_rules! implement_error {
 
         impl<A> core::fmt::Debug for Impl<A>
         where
-            A: $crate::alloc::Allocator,
+            A: $crate::Allocator,
         {
             #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -1075,13 +1075,13 @@ macro_rules! implement_error {
 
         impl<A> core::error::Error for $id<A>
         where
-            A: $crate::alloc::Allocator
+            A: $crate::Allocator
         {
         }
 
         impl<A> $crate::context::ContextError<A> for $id<A>
         where
-            A: $crate::alloc::Allocator,
+            A: $crate::Allocator,
         {
             #[inline]
             fn custom<T>(alloc: A, error: T) -> Self

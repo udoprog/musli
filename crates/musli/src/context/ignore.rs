@@ -4,10 +4,10 @@ use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
-use crate::alloc::{self, Allocator, String};
+use crate::alloc::{self, String};
 #[cfg(test)]
 use crate::mode::Binary;
-use crate::Context;
+use crate::{Allocator, Context};
 
 use super::ErrorMarker;
 

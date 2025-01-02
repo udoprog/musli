@@ -29,9 +29,9 @@ mod ignore;
 #[doc(inline)]
 pub use self::ignore::Ignore;
 
-use crate::alloc::Allocator;
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
+use crate::Allocator;
 
 /// Construct a new default context using the provided allocator.
 ///

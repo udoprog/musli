@@ -188,6 +188,7 @@ pub mod generic {
 
 #[cfg(feature = "musli")]
 pub mod musli {
+    use musli::alloc::System;
     use musli::context::{ErrorMarker as Error, Ignore};
     use musli::options::{self, Options};
     use musli::storage::Encoding;
@@ -220,7 +221,7 @@ pub mod musli {
     #[inline(always)]
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, Packed>,
+        T: Decode<'buf, Packed, System>,
     {
         let cx = Ignore::new();
         ENCODING.from_slice_with(&cx, buf)

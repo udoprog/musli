@@ -5,7 +5,7 @@
 use core::fmt;
 use core::mem;
 
-use crate::{Decode, Decoder};
+use crate::{Allocator, Decode, Decoder};
 
 /// Variant corresponding to marks.
 #[derive(Debug)]
@@ -266,14 +266,17 @@ impl fmt::Debug for Tag {
     }
 }
 
-impl<'de, M> Decode<'de, M> for Tag {
+impl<'de, M, A> Decode<'de, M, A> for Tag
+where
+    A: Allocator,
+{
     // Every bit pattern is valid for a tag.
     const IS_BITWISE_DECODE: bool = true;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         Ok(Self::from_byte(decoder.decode_u8()?))
     }

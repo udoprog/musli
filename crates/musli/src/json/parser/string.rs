@@ -1,7 +1,7 @@
 #![allow(clippy::zero_prefixed_literal)]
 
-use crate::alloc::{Allocator, Vec};
-use crate::Context;
+use crate::alloc::Vec;
+use crate::{Allocator, Context};
 
 // Copied and adapter form the serde-json project under the MIT and Apache 2.0
 // license.

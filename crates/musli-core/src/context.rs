@@ -4,7 +4,7 @@ use core::error::Error;
 use core::fmt;
 use core::str;
 
-use crate::alloc::Allocator;
+use crate::Allocator;
 
 /// Provides ergonomic access to the serialization context.
 ///

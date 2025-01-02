@@ -5,8 +5,8 @@ use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use rust_alloc::string::ToString;
 
-use crate::alloc::Allocator;
 use crate::context::ContextError;
+use crate::Allocator;
 
 use super::type_hint::{NumberHint, TypeHint};
 
