@@ -5,8 +5,8 @@ use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
-use crate::alloc::{self, Allocator, String};
-use crate::Context;
+use crate::alloc::{self, String};
+use crate::{Allocator, Context};
 
 use super::{ContextError, ErrorMarker};
 

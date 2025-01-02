@@ -1,3 +1,5 @@
+use crate::Allocator;
+
 use super::Decoder;
 
 /// Trait governing how a type is decoded as a packed value.
@@ -25,14 +27,17 @@ use super::Decoder;
 /// Implementing manually:
 ///
 /// ```
-/// use musli::{Decode, Decoder};
+/// use musli::{Allocator, Decode, Decoder};
 /// use musli::de::SequenceDecoder;
 ///
 /// struct Packed {
 ///     data: (u32, u32),
 /// }
 ///
-/// impl<'de, M> Decode<'de, M> for Packed {
+/// impl<'de, M, A> Decode<'de, M, A> for Packed
+/// where
+///     A: Allocator,
+/// {
 ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de>,
@@ -45,9 +50,13 @@ use super::Decoder;
 ///     }
 /// }
 /// ```
-pub trait DecodePacked<'de, M>: Sized {
+pub trait DecodePacked<'de, M, A>
+where
+    Self: Sized,
+    A: Allocator,
+{
     /// Decode the given input as bytes.
     fn decode_packed<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>;
+        D: Decoder<'de, Mode = M, Allocator = A>;
 }

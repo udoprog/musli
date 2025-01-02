@@ -5,7 +5,9 @@ use core::ptr::NonNull;
 
 use rust_alloc::alloc;
 
-use super::{Allocator, RawVec};
+use crate::Allocator;
+
+use super::RawVec;
 
 /// System buffer that can be used in combination with an [`Allocator`].
 ///

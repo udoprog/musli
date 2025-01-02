@@ -78,12 +78,24 @@ pub use self::variant_decoder::VariantDecoder;
 mod visitor;
 pub use self::visitor::Visitor;
 
+use crate::Allocator;
+
 /// Decode to an owned value.
 ///
-/// This is a simpler bound to use than `for<'de> Decode<'de, M>`.
-pub trait DecodeOwned<M>: for<'de> Decode<'de, M> {}
+/// This is a simpler bound to use than `for<'de> Decode<'de, M, A>`.
+pub trait DecodeOwned<M, A>
+where
+    Self: for<'de> Decode<'de, M, A>,
+    A: Allocator,
+{
+}
 
-impl<M, D> DecodeOwned<M> for D where D: for<'de> Decode<'de, M> {}
+impl<M, D, A> DecodeOwned<M, A> for D
+where
+    D: for<'de> Decode<'de, M, A>,
+    A: Allocator,
+{
+}
 
 #[doc(hidden)]
 pub mod utils;

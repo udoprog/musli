@@ -8,7 +8,8 @@ use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
-use super::{Allocator, RawVec};
+use super::RawVec;
+use crate::Allocator;
 
 // We keep max bytes to 2^31, since that ensures that addition between two
 // magnitutes never overflow.

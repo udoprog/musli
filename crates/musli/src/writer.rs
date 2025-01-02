@@ -9,8 +9,8 @@ pub use self::slice_mut_writer::SliceMutWriter;
 
 use core::fmt;
 
-use crate::alloc::{Allocator, Vec};
-use crate::Context;
+use crate::alloc::Vec;
+use crate::{Allocator, Context};
 
 mod sealed {
     use super::Writer;

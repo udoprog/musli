@@ -1,14 +1,13 @@
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
 use syn::Token;
 
 use crate::expander::{NameMethod, StructKind};
 use crate::internals::apply;
 use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
-use crate::internals::{Import, Only, Result, Tokens};
+use crate::internals::{Import, Result, Tokens};
 
 struct Ctxt<'a> {
     ctx_var: &'a Ident,
@@ -18,7 +17,7 @@ struct Ctxt<'a> {
     trace_body: bool,
 }
 
-pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
+pub(crate) fn expand_decode_entry(e: Build<'_, '_>) -> Result<TokenStream> {
     e.validate_decode()?;
     e.cx.reset();
 
@@ -39,13 +38,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let body = match &e.data {
         BuildData::Struct(st) => {
-            packed = crate::internals::packed(
-                &e,
-                st,
-                e.tokens.decode_t,
-                "IS_BITWISE_DECODE",
-                Only::Decode,
-            );
+            packed = crate::internals::packed(&e, st);
             decode_struct(&cx, &e, st)?
         }
         BuildData::Enum(en) => {
@@ -64,18 +57,8 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     let mut generics = e.input.generics.clone();
     let type_ident = &e.input.ident;
 
-    let (lt, exists) = if let Some(existing) = generics.lifetimes().next() {
-        (existing.clone(), true)
-    } else {
-        let lt = syn::LifetimeParam::new(syn::Lifetime::new("'de", e.input.span()));
-        (lt, false)
-    };
-
-    if !exists {
-        generics.params.push(lt.clone().into());
-    }
-
     let Tokens {
+        allocator_t,
         context_t,
         result,
         decode_t,
@@ -83,6 +66,32 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         try_fast_decode,
         ..
     } = e.tokens;
+
+    let lt = &e.p.lt;
+
+    if !e.p.lt_exists {
+        generics
+            .params
+            .push(syn::GenericParam::Lifetime(syn::LifetimeParam {
+                attrs: Vec::new(),
+                lifetime: lt.clone(),
+                colon_token: None,
+                bounds: Punctuated::new(),
+            }));
+    }
+
+    let allocator_ident = &e.p.allocator_ident;
+
+    if !e.p.allocator_exists {
+        generics
+            .params
+            .push(syn::GenericParam::Type(allocator_ident.clone().into()));
+
+        generics
+            .make_where_clause()
+            .predicates
+            .push(syn::parse_quote!(#allocator_ident: #allocator_t));
+    }
 
     if !e.bounds.is_empty() && !e.decode_bounds.is_empty() {
         generics.make_where_clause().predicates.extend(
@@ -102,13 +111,13 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
         attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
     }
 
-    let mode_ident = e.expansion.mode_path(&e.tokens);
+    let mode_ident = e.expansion.mode_path(e.tokens);
 
     Ok(quote! {
         const _: () = {
             #[automatically_derived]
             #(#attributes)*
-            impl #impl_generics #decode_t<#lt, #mode_ident> for #type_ident #type_generics
+            impl #impl_generics #decode_t<#lt, #mode_ident, #allocator_ident> for #type_ident #type_generics
             #where_clause
             {
                 const IS_BITWISE_DECODE: bool = #packed;
@@ -116,7 +125,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
                 #[inline]
                 fn decode<#d_param>(#decoder_var: #d_param) -> #result<Self, <#d_param as #decoder_t<#lt>>::Error>
                 where
-                    #d_param: #decoder_t<#lt, Mode = #mode_ident>,
+                    #d_param: #decoder_t<#lt, Mode = #mode_ident, Allocator = #allocator_ident>,
                 {
                     let #ctx_var = #decoder_t::cx(&#decoder_var);
 
@@ -133,7 +142,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_>) -> Result<TokenStream> {
     })
 }
 
-fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
     let Tokens { result, .. } = b.tokens;
 
     let body = match (st.kind, st.packing) {
@@ -146,7 +155,7 @@ fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
     Ok(quote!(#result::Ok({ #body })))
 }
 
-fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
+fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStream> {
     let Ctxt {
         ctx_var,
         name_var,
@@ -761,7 +770,7 @@ fn decode_variant(
 }
 
 /// Decode something empty.
-fn decode_empty(cx: &Ctxt, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+fn decode_empty(cx: &Ctxt, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         ctx_var,
         decoder_var,
@@ -808,7 +817,7 @@ fn decode_empty(cx: &Ctxt, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> 
 /// decoded.
 fn decode_tagged(
     cx: &Ctxt,
-    b: &Build<'_>,
+    b: &Build<'_, '_>,
     st: &Body<'_>,
     variant_tag: Option<&Ident>,
 ) -> Result<TokenStream> {
@@ -1094,7 +1103,7 @@ fn decode_tagged(
 }
 
 /// Decode a transparent value.
-fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         decoder_var,
         ctx_var,
@@ -1137,7 +1146,7 @@ fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<Tok
 }
 
 /// Decode something packed.
-fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_>, st_: &Body<'_>) -> Result<TokenStream> {
+fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st_: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         decoder_var,
         ctx_var,
@@ -1219,7 +1228,7 @@ pub(crate) struct NameVariant<'a> {
 
 impl NameVariant<'_> {
     /// Generate the pattern for this output.
-    pub(crate) fn as_arm(&self, binding_var: &syn::Ident, option: Import<'_>) -> syn::Arm {
+    pub(crate) fn as_arm(&self, binding_var: &syn::Ident, option: &Import<'_>) -> syn::Arm {
         let path = &self.path;
         let arm = output_arm(self.pattern, self.name, binding_var);
 
@@ -1242,7 +1251,7 @@ impl NameVariant<'_> {
 }
 
 fn unsized_arm<'a>(
-    b: &Build<'_>,
+    b: &Build<'_, '_>,
     span: Span,
     index: usize,
     name: &'a syn::Expr,

@@ -3,15 +3,9 @@ use quote::quote;
 
 use super::attr::Packing;
 use super::build::{Body, Build};
-use super::{Import, Only, Tokens};
+use super::{Only, Tokens};
 
-pub(crate) fn packed(
-    e: &Build<'_>,
-    st: &Body<'_>,
-    trait_t: Import<'_>,
-    packed_field: &str,
-    only: Only,
-) -> syn::Expr {
+pub(crate) fn packed(e: &Build<'_, '_>, st: &Body<'_>) -> syn::Expr {
     let Tokens {
         offset_of,
         size_of,
@@ -19,15 +13,21 @@ pub(crate) fn packed(
         ..
     } = e.tokens;
 
-    let base = match only {
-        Only::Encode => st.all_fields.iter().all(|f| f.encode_path.1.is_default()),
-        Only::Decode => st.all_fields.iter().all(|f| f.decode_path.1.is_default()),
+    let (base, packed_field) = match e.mode.only {
+        Only::Encode => (
+            st.all_fields.iter().all(|f| f.encode_path.1.is_default()),
+            "IS_BITWISE_ENCODE",
+        ),
+        Only::Decode => (
+            st.all_fields.iter().all(|f| f.decode_path.1.is_default()),
+            "IS_BITWISE_DECODE",
+        ),
     };
 
     match st.packing {
         Packing::Packed if base && st.all_fields.len() == st.unskipped_fields.len() => {
             let packed_field = syn::Ident::new(packed_field, Span::call_site());
-            let mode_ident = e.expansion.mode_path(&e.tokens);
+            let trait_t = e.mode.as_trait_t(&e.p.allocator_ident);
 
             let mut offsets = Vec::with_capacity(st.all_fields.len().saturating_sub(1));
             let mut sizes = Vec::with_capacity(st.all_fields.len());
@@ -53,7 +53,7 @@ pub(crate) fn packed(
             for f in &st.all_fields {
                 let ty = &f.ty;
                 sizes.push(quote!(#size_of::<#ty>()));
-                packed.push(quote!(<#ty as #trait_t<#mode_ident>>::#packed_field));
+                packed.push(quote!(<#ty as #trait_t>::#packed_field));
             }
 
             syn::parse_quote! {

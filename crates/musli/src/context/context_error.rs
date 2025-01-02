@@ -9,7 +9,7 @@ use core::error::Error;
 use core::fmt;
 
 #[cfg(any(feature = "alloc", feature = "std"))]
-use crate::alloc::Allocator;
+use crate::Allocator;
 
 #[cfg(feature = "alloc")]
 use rust_alloc::string::{String, ToString};

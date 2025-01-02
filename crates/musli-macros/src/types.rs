@@ -24,6 +24,8 @@ pub(super) enum Extra {
     Error,
     /// `type Mode = <Self::Cx as Context>::Mode;`
     Mode,
+    /// `type Allocator = <Self::Cx as Context>::Allocator;`
+    Allocator,
     Context,
     Visitor(Ty),
 }
@@ -45,6 +47,7 @@ pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
 pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
+    ("Allocator", Extra::Allocator),
     ("WithContext", Extra::Context),
     ("DecodeBuffer", Extra::None),
     ("DecodeSome", Extra::None),
@@ -206,6 +209,10 @@ impl Types {
             match extra {
                 Extra::Mode => {
                     ty = syn::parse_quote!(<Self::Cx as #crate_path::Context>::Mode);
+                    generics = syn::Generics::default();
+                }
+                Extra::Allocator => {
+                    ty = syn::parse_quote!(<Self::Cx as #crate_path::Context>::Allocator);
                     generics = syn::Generics::default();
                 }
                 Extra::Error => {

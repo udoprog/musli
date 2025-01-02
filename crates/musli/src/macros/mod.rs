@@ -25,7 +25,9 @@ pub(crate) use self::internal::{bare_encoding, encoding_impls, implement_error};
     )
 ))]
 mod test;
+#[cfg(all(feature = "test", feature = "alloc"))]
+pub use self::test::support;
 #[cfg(feature = "test")]
-pub use self::test::{__test_extra, __test_matrix, assert_decode_eq, assert_roundtrip_eq, support};
+pub use self::test::{__test_extra, __test_matrix, assert_decode_eq, assert_roundtrip_eq};
 #[cfg(feature = "test")]
 pub(crate) use self::test::{test_fns, test_include_if};

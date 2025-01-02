@@ -13,9 +13,10 @@ macro_rules! test_fns {
         /// Roundtrip encode the given value.
         #[doc(hidden)]
         #[track_caller]
+        #[cfg(feature = "alloc")]
         pub fn rt<T, M>(value: T) -> T
         where
-            T: $crate::en::Encode<M> + $crate::de::DecodeOwned<M>,
+            T: $crate::en::Encode<M> + $crate::de::DecodeOwned<M, $crate::alloc::System>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
             M: 'static,
         {
@@ -44,64 +45,63 @@ macro_rules! test_fns {
                 }
             }
 
-            $crate::alloc::default(|alloc| {
-                let mut cx = $crate::context::with_alloc(alloc);
-                cx.include_type();
+            let mut cx = $crate::context::with_alloc($crate::alloc::System::new());
+            cx.include_type();
 
-                let out = match encoding.to_vec_with(&cx, &value) {
-                    Ok(out) => out,
-                    Err(..) => {
-                        let error = cx.report();
-                        panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
-                    }
-                };
+            let out = match encoding.to_vec_with(&cx, &value) {
+                Ok(out) => out,
+                Err(..) => {
+                    let error = cx.report();
+                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                }
+            };
 
-                let decoded: T = match encoding.from_slice_with(&cx, out.as_slice()) {
+            let decoded: T = match encoding.from_slice_with(&cx, out.as_slice()) {
+                Ok(decoded) => decoded,
+                Err(..) => {
+                    let out = FormatBytes(&out);
+                    let error = cx.report();
+                    panic!("{WHAT}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<T>())
+                }
+            };
+
+            assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match\nValue: {value:?}", type_name::<T>());
+
+            $crate::macros::test_include_if! {
+                $($(#[$option])*)* =>
+                let value_decode: $crate::value::Value = match encoding.from_slice_with(&cx, out.as_slice()) {
                     Ok(decoded) => decoded,
                     Err(..) => {
                         let out = FormatBytes(&out);
                         let error = cx.report();
-                        panic!("{WHAT}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<T>())
+                        panic!("{WHAT}: {}: failed to decode to value type:\nValue: {value:?}\nBytes:{out}\n{error}", type_name::<T>())
                     }
                 };
 
-                assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match\nValue: {value:?}", type_name::<T>());
+                let value_decoded: T = match $crate::value::decode_with(&cx, &value_decode) {
+                    Ok(decoded) => decoded,
+                    Err(..) => {
+                        let out = FormatBytes(&out);
+                        let error = cx.report();
+                        panic!("{WHAT}: {}: failed to decode from value type:\nValue: {value:?}\nBytes: {out}\nBuffered value: {value_decode:?}\n{error}", type_name::<T>())
+                    }
+                };
 
-                $crate::macros::test_include_if! {
-                    $($(#[$option])*)* =>
-                    let value_decode: $crate::value::Value = match encoding.from_slice_with(&cx, out.as_slice()) {
-                        Ok(decoded) => decoded,
-                        Err(..) => {
-                            let out = FormatBytes(&out);
-                            let error = cx.report();
-                            panic!("{WHAT}: {}: failed to decode to value type:\nValue: {value:?}\nBytes:{out}\n{error}", type_name::<T>())
-                        }
-                    };
+                assert_eq!(value_decoded, value, "{WHAT}: {}: musli-value roundtrip does not match\nValue: {value:?}", type_name::<T>());
+            }
 
-                    let value_decoded: T = match $crate::value::decode_with(&cx, &value_decode) {
-                        Ok(decoded) => decoded,
-                        Err(..) => {
-                            let out = FormatBytes(&out);
-                            let error = cx.report();
-                            panic!("{WHAT}: {}: failed to decode from value type:\nValue: {value:?}\nBytes: {out}\nBuffered value: {value_decode:?}\n{error}", type_name::<T>())
-                        }
-                    };
-
-                    assert_eq!(value_decoded, value, "{WHAT}: {}: musli-value roundtrip does not match\nValue: {value:?}", type_name::<T>());
-                }
-
-                decoded
-            })
+            decoded
         }
 
         /// Encode and then decode the given value once.
         #[doc(hidden)]
         #[track_caller]
+        #[cfg(feature = "alloc")]
         pub fn decode<'de, T, U, M>(value: T, out: &'de mut rust_alloc::vec::Vec<u8>, expected: &U) -> U
         where
             T: $crate::en::Encode<M>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
-            U: $crate::de::Decode<'de, M>,
+            U: $crate::de::Decode<'de, M, $crate::alloc::System>,
             U: ::core::fmt::Debug + ::core::cmp::PartialEq,
             M: 'static,
         {
@@ -130,43 +130,42 @@ macro_rules! test_fns {
                 }
             }
 
-            $crate::alloc::default(|alloc| {
-                let mut cx = $crate::context::with_alloc(alloc);
-                cx.include_type();
+            let mut cx = $crate::context::with_alloc($crate::alloc::System::new());
+            cx.include_type();
 
-                out.clear();
+            out.clear();
 
-                match encoding.to_writer_with(&cx, &mut *out, &value) {
-                    Ok(()) => (),
-                    Err(..) => {
-                        let error = cx.report();
-                        panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
-                    }
-                };
+            match encoding.to_writer_with(&cx, &mut *out, &value) {
+                Ok(()) => (),
+                Err(..) => {
+                    let error = cx.report();
+                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                }
+            };
 
-                let actual = match encoding.from_slice_with(&cx, &*out) {
-                    Ok(decoded) => decoded,
-                    Err(..) => {
-                        let out = FormatBytes(&*out);
-                        let error = cx.report();
-                        panic!("{WHAT}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<U>())
-                    }
-                };
+            let actual = match encoding.from_slice_with(&cx, &*out) {
+                Ok(decoded) => decoded,
+                Err(..) => {
+                    let out = FormatBytes(&*out);
+                    let error = cx.report();
+                    panic!("{WHAT}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<U>())
+                }
+            };
 
-                assert_eq!(
-                    actual,
-                    *expected,
-                    "{WHAT}: decoded value does not match expected\nBytes: {}",
-                    FormatBytes(&*out),
-                );
+            assert_eq!(
+                actual,
+                *expected,
+                "{WHAT}: decoded value does not match expected\nBytes: {}",
+                FormatBytes(&*out),
+            );
 
-                actual
-            })
+            actual
         }
 
         /// Encode a value to bytes.
         #[doc(hidden)]
         #[track_caller]
+        #[cfg(feature = "alloc")]
         pub fn to_vec<T, M>(value: T) -> rust_alloc::vec::Vec<u8>
         where
             T: $crate::en::Encode<M>,
@@ -435,9 +434,11 @@ macro_rules! __test_matrix {
 pub use __test_matrix;
 
 #[doc(hidden)]
+#[cfg(feature = "alloc")]
 pub mod support {
     pub use rust_alloc::vec::Vec;
 
+    use crate::alloc::System;
     use crate::mode::Binary;
     use crate::value::{self, Value};
     use crate::{Decode, Encode};
@@ -445,7 +446,7 @@ pub mod support {
     #[track_caller]
     pub fn musli_value_rt<T>(expected: T)
     where
-        T: Encode<Binary> + for<'de> Decode<'de, Binary>,
+        T: Encode<Binary> + for<'de> Decode<'de, Binary, System>,
         T: PartialEq + core::fmt::Debug,
     {
         let value: Value = value::encode(&expected).expect("value: Encoding should succeed");

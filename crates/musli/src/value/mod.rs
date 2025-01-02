@@ -23,6 +23,8 @@ pub use self::value::{AsValueDecoder, Value};
 pub use error::Error;
 
 use crate::alloc;
+#[cfg(feature = "alloc")]
+use crate::alloc::System;
 use crate::mode::Binary;
 use crate::value::en::ValueEncoder;
 use crate::{Decode, Encode, Options};
@@ -46,16 +48,15 @@ where
 }
 
 /// Decode a [Value] into a type which implements [Decode].
+#[cfg(feature = "alloc")]
 pub fn decode<'de, T>(value: &'de Value) -> Result<T, Error>
 where
-    T: Decode<'de, Binary>,
+    T: Decode<'de, Binary, System>,
 {
     use crate::de::Decoder;
 
-    alloc::default(|alloc| {
-        let cx = crate::context::Same::<Binary, Error, _>::with_alloc(alloc);
-        value.decoder::<OPTIONS, _>(&cx).decode()
-    })
+    let cx = crate::context::Same::<Binary, Error, _>::with_alloc(System::new());
+    value.decoder::<OPTIONS, _>(&cx).decode()
 }
 
 /// Decode a [Value] into a type which implements [Decode] using a custom
@@ -63,7 +64,7 @@ where
 pub fn decode_with<'de, C, T>(cx: C, value: &'de Value) -> Result<T, C::Error>
 where
     C: crate::Context,
-    T: Decode<'de, C::Mode>,
+    T: Decode<'de, C::Mode, C::Allocator>,
 {
     use crate::de::Decoder;
 

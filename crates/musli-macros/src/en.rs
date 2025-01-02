@@ -5,7 +5,7 @@ use syn::Token;
 
 use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{Body, Build, BuildData, Enum, Variant};
-use crate::internals::{Only, Result, Tokens};
+use crate::internals::{Result, Tokens};
 
 struct Ctxt<'a> {
     ctx_var: &'a syn::Ident,
@@ -13,7 +13,7 @@ struct Ctxt<'a> {
     trace: bool,
 }
 
-pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
+pub(crate) fn expand_insert_entry(e: Build<'_, '_>) -> Result<TokenStream> {
     e.validate_encode()?;
     e.cx.reset();
 
@@ -42,13 +42,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 
     let body = match &e.data {
         BuildData::Struct(st) => {
-            packed = crate::internals::packed(
-                &e,
-                st,
-                e.tokens.encode_t,
-                "IS_BITWISE_ENCODE",
-                Only::Encode,
-            );
+            packed = crate::internals::packed(&e, st);
             encode_map(&cx, &e, st)?
         }
         BuildData::Enum(en) => {
@@ -80,7 +74,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
         attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
     }
 
-    let mode_ident = e.expansion.mode_path(&e.tokens);
+    let mode_ident = e.expansion.mode_path(e.tokens);
 
     Ok(quote! {
         const _: () = {
@@ -119,7 +113,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_>) -> Result<TokenStream> {
 }
 
 /// Encode a struct.
-fn encode_map(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
+fn encode_map(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         ctx_var,
         encoder_var,
@@ -206,7 +200,7 @@ struct FieldTest<'st> {
 
 fn insert_fields<'st>(
     cx: &Ctxt<'_>,
-    b: &Build<'_>,
+    b: &Build<'_, '_>,
     st: &'st Body<'_>,
     pack_var: &syn::Ident,
 ) -> Result<(Vec<TokenStream>, Vec<FieldTest<'st>>)> {
@@ -330,7 +324,7 @@ fn insert_fields<'st>(
 }
 
 /// Encode an internally tagged enum.
-fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum<'_>) -> Result<TokenStream> {
+fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum<'_>) -> Result<TokenStream> {
     let Ctxt { ctx_var, .. } = *cx;
 
     let Tokens {
@@ -365,7 +359,7 @@ fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum<'_>) -> Result<TokenStrea
 /// Setup encoding for a single variant. that is externally tagged.
 fn encode_variant(
     cx: &Ctxt<'_>,
-    b: &Build<'_>,
+    b: &Build<'_, '_>,
     en: &Enum<'_>,
     v: &Variant<'_>,
 ) -> Result<(syn::PatStruct, TokenStream)> {
@@ -590,7 +584,7 @@ struct LengthTest {
 }
 
 impl LengthTest {
-    fn build(&self, b: &Build<'_>) -> (syn::Stmt, syn::Ident) {
+    fn build(&self, b: &Build<'_, '_>) -> (syn::Stmt, syn::Ident) {
         let Tokens { map_hint, .. } = b.tokens;
 
         match self.kind {

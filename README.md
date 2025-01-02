@@ -348,6 +348,7 @@ The tradeoffs we will be showcasing to achieve speed here are:
 We achieve this through the following methods:
 
 ```rust
+use musli::alloc::System;
 use musli::context::{ErrorMarker as Error, Ignore};
 use musli::options::{self, Float, Integer, Width, Options};
 use musli::storage::Encoding;
@@ -372,7 +373,7 @@ where
 #[inline]
 pub fn decode<'buf, T>(buf: &'buf [u8], alloc: &Slice<'_>) -> Result<T, Error>
 where
-    T: Decode<'buf, Packed>,
+    T: Decode<'buf, Packed, System>,
 {
     let cx = Ignore::with_alloc(alloc);
     ENCODING.from_slice_with(&cx, buf)

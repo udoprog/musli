@@ -6,7 +6,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 
 use crate::internals::attr::{self, ModeIdent, ModeKind, TypeAttr};
-use crate::internals::{Build, Ctxt, Expansion, Mode, NameAll, Only, Result, Tokens};
+use crate::internals::{Build, Ctxt, Expansion, Mode, NameAll, Only, Parameters, Result, Tokens};
 
 #[derive(Clone, Copy)]
 pub(crate) enum UnsizedMethod {
@@ -234,7 +234,12 @@ impl<'a> Expander<'a> {
         self.cx.into_errors()
     }
 
-    fn setup_builds<'b>(&'b self, modes: &'b [ModeIdent], only: Only) -> Result<Vec<Build<'b>>> {
+    fn setup_builds<'tok, 'b>(
+        &'b self,
+        modes: &'b [ModeIdent],
+        tokens: &'tok Tokens<'b>,
+        only: Only,
+    ) -> Result<Vec<Build<'tok, 'b>>> {
         let mut builds = Vec::new();
 
         let mut missing = BTreeMap::new();
@@ -243,31 +248,109 @@ impl<'a> Expander<'a> {
             missing.insert(&default.kind, default);
         }
 
+        let (lt, lt_exists) = 'out: {
+            if let Some(lt) = self.input.generics.lifetimes().next() {
+                break 'out (lt.lifetime.clone(), true);
+            }
+
+            (syn::Lifetime::new("'__de", Span::call_site()), false)
+        };
+
+        let (allocator_ident, allocator_exists) = 'out: {
+            for p in self.input.generics.type_params() {
+                if p.ident == "A" {
+                    break 'out (p.ident.clone(), true);
+                }
+            }
+
+            (
+                self.cx.type_with_span_permanent("__A", Span::call_site()),
+                false,
+            )
+        };
+
+        let p = Parameters {
+            lt,
+            lt_exists,
+            allocator_ident,
+            allocator_exists,
+        };
+
         for mode_ident in modes {
             missing.remove(&mode_ident.kind);
 
+            let expansion = Expansion { mode_ident };
+
+            let mode = expansion.as_mode(tokens, only);
+            let p = self.decorate(&p, &mode);
+
             builds.push(crate::internals::build::setup(
-                self,
-                Expansion { mode_ident },
-                only,
+                self, expansion, mode, tokens, p,
             )?);
         }
 
         for (_, mode_ident) in missing {
+            let expansion = Expansion { mode_ident };
+
+            let mode = expansion.as_mode(tokens, only);
+            let p = self.decorate(&p, &mode);
+
             builds.push(crate::internals::build::setup(
-                self,
-                Expansion { mode_ident },
-                only,
+                self, expansion, mode, tokens, p,
             )?);
         }
 
         Ok(builds)
     }
 
+    fn decorate(&self, p: &Parameters, mode: &Mode<'_>) -> Parameters {
+        let (lt, lt_exists) = 'out: {
+            let list = self.type_attr.decode_bounds_lifetimes(mode);
+
+            if let [_, rest @ ..] = list {
+                for (span, _) in rest {
+                    self.cx
+                        .error_span(*span, "More than one decoder lifetime bound is specified");
+                }
+            }
+
+            if let Some((_, ty)) = list.first() {
+                break 'out (ty, false);
+            }
+
+            (&p.lt, p.lt_exists)
+        };
+
+        let (allocator_ident, allocator_exists) = 'out: {
+            let list = self.type_attr.decode_bounds_types(mode);
+
+            if let [_, rest @ ..] = list {
+                for (span, _) in rest {
+                    self.cx
+                        .error_span(*span, "More than one decoder allocator bound is specified");
+                }
+            }
+
+            if let Some((_, ty)) = list.first() {
+                break 'out (ty, false);
+            }
+
+            (&p.allocator_ident, p.allocator_exists)
+        };
+
+        Parameters {
+            lt: lt.clone(),
+            lt_exists,
+            allocator_ident: allocator_ident.clone(),
+            allocator_exists,
+        }
+    }
+
     /// Expand Encode implementation.
     pub(crate) fn expand_encode(&self) -> Result<TokenStream> {
         let modes = self.cx.modes();
-        let builds = self.setup_builds(&modes, Only::Encode)?;
+        let tokens = self.tokens();
+        let builds = self.setup_builds(&modes, &tokens, Only::Encode)?;
 
         let mut out = TokenStream::new();
 
@@ -281,7 +364,8 @@ impl<'a> Expander<'a> {
     /// Expand Decode implementation.
     pub(crate) fn expand_decode(&self) -> Result<TokenStream> {
         let modes = self.cx.modes();
-        let builds = self.setup_builds(&modes, Only::Decode)?;
+        let tokens = self.tokens();
+        let builds = self.setup_builds(&modes, &tokens, Only::Decode)?;
 
         let mut out = TokenStream::new();
 
@@ -298,7 +382,7 @@ pub(crate) trait Taggable {
     /// The span of the taggable item.
     fn span(&self) -> Span;
     /// The rename configuration the taggable item currently has.
-    fn name(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)>;
+    fn name(&self, mode: &Mode<'_>) -> Option<&(Span, syn::Expr)>;
     /// The index of the taggable item.
     fn index(&self) -> usize;
 }
@@ -306,7 +390,7 @@ pub(crate) trait Taggable {
 /// Expand the given configuration to the appropriate tag expression.
 pub(crate) fn expand_name(
     taggable: &dyn Taggable,
-    mode: Mode<'_>,
+    mode: &Mode<'_>,
     name_all: NameAll,
     ident: Option<&syn::Ident>,
 ) -> syn::Expr {
@@ -341,7 +425,7 @@ impl Taggable for FieldData<'_> {
         self.span
     }
 
-    fn name(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+    fn name(&self, mode: &Mode<'_>) -> Option<&(Span, syn::Expr)> {
         self.attr.name(mode)
     }
 
@@ -355,7 +439,7 @@ impl Taggable for VariantData<'_> {
         self.span
     }
 
-    fn name(&self, mode: Mode<'_>) -> Option<&(Span, syn::Expr)> {
+    fn name(&self, mode: &Mode<'_>) -> Option<&(Span, syn::Expr)> {
         self.attr.name_expr(mode)
     }
 

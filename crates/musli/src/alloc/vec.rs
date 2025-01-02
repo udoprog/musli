@@ -5,7 +5,9 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
-use super::{Allocator, RawVec};
+use crate::Allocator;
+
+use super::RawVec;
 
 /// A vector backed by an [`Allocator`].
 pub struct Vec<T, A>

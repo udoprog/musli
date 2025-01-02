@@ -32,24 +32,43 @@ impl ToTokens for ModePath<'_> {
     }
 }
 
-pub(crate) struct ImportedMethod<'a>(Import<'a>, ModePath<'a>, &'static str);
+pub(crate) struct Trait<'a> {
+    import: Import<'a>,
+    mode: ModePath<'a>,
+    allocator_ident: Option<syn::Ident>,
+}
+
+impl ToTokens for Trait<'_> {
+    #[inline]
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        self.import.to_tokens(tokens);
+        <Token![::]>::default().to_tokens(tokens);
+        <Token![<]>::default().to_tokens(tokens);
+        self.mode.to_tokens(tokens);
+
+        if let Some(ident) = &self.allocator_ident {
+            <Token![,]>::default().to_tokens(tokens);
+            ident.to_tokens(tokens);
+        }
+
+        <Token![>]>::default().to_tokens(tokens);
+    }
+}
+
+pub(crate) struct ImportedMethod<'a> {
+    trait_t: Trait<'a>,
+    method: &'static str,
+}
 
 impl ToTokens for ImportedMethod<'_> {
     #[inline]
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let ImportedMethod(import, mode_path, name) = *self;
-
-        import.to_tokens(tokens);
+        self.trait_t.to_tokens(tokens);
         <Token![::]>::default().to_tokens(tokens);
-        <Token![<]>::default().to_tokens(tokens);
-        mode_path.to_tokens(tokens);
-        <Token![>]>::default().to_tokens(tokens);
-        <Token![::]>::default().to_tokens(tokens);
-        tokens.extend([TokenTree::Ident(Ident::new(name, Span::call_site()))]);
+        tokens.extend([TokenTree::Ident(Ident::new(self.method, Span::call_site()))]);
     }
 }
 
-#[derive(Clone, Copy)]
 pub(crate) struct Mode<'a> {
     pub(crate) kind: Option<&'a ModeKind>,
     pub(crate) mode_path: ModePath<'a>,
@@ -74,11 +93,38 @@ impl<'a> Mode<'a> {
             FieldEncoding::Default => (self.encode_t, "encode"),
         };
 
-        ImportedMethod(encode_t, self.mode_path, name)
+        ImportedMethod {
+            trait_t: Trait {
+                import: encode_t,
+                mode: self.mode_path,
+                allocator_ident: None,
+            },
+            method: name,
+        }
+    }
+
+    /// Get the fully expanded trait.
+    pub(crate) fn as_trait_t(&self, allocator_ident: &syn::Ident) -> Trait<'a> {
+        match self.only {
+            Only::Encode => Trait {
+                import: self.encode_t,
+                mode: self.mode_path,
+                allocator_ident: None,
+            },
+            Only::Decode => Trait {
+                import: self.decode_t,
+                mode: self.mode_path,
+                allocator_ident: Some(allocator_ident.clone()),
+            },
+        }
     }
 
     /// Construct a typed decode call.
-    pub(crate) fn decode_t_decode(&self, encoding: FieldEncoding) -> ImportedMethod<'a> {
+    pub(crate) fn decode_t_decode(
+        &self,
+        encoding: FieldEncoding,
+        allocator_ident: &syn::Ident,
+    ) -> ImportedMethod<'a> {
         let (decode_t, name) = match encoding {
             FieldEncoding::Packed => (self.decode_packed_t, "decode_packed"),
             FieldEncoding::Bytes => (self.decode_bytes_t, "decode_bytes"),
@@ -86,6 +132,13 @@ impl<'a> Mode<'a> {
             FieldEncoding::Default => (self.decode_t, "decode"),
         };
 
-        ImportedMethod(decode_t, self.mode_path, name)
+        ImportedMethod {
+            trait_t: Trait {
+                import: decode_t,
+                mode: self.mode_path,
+                allocator_ident: Some(allocator_ident.clone()),
+            },
+            method: name,
+        }
     }
 }

@@ -18,7 +18,9 @@ impl ToTokens for Import<'_> {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Tokens<'a> {
+    pub(crate) allocator_t: Import<'a>,
     pub(crate) as_decoder_t: Import<'a>,
     pub(crate) context_t: Import<'a>,
     pub(crate) decode_bytes_t: Import<'a>,
@@ -57,6 +59,7 @@ pub(crate) struct Tokens<'a> {
 impl<'a> Tokens<'a> {
     pub(crate) fn new(prefix: &'a syn::Path) -> Self {
         Self {
+            allocator_t: Import(prefix, "Allocator"),
             as_decoder_t: Import(prefix, "AsDecoder"),
             context_t: Import(prefix, "Context"),
             decode_bytes_t: Import(prefix, "DecodeBytes"),

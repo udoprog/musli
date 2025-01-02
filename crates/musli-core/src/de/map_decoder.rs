@@ -39,8 +39,8 @@ pub trait MapDecoder<'de> {
     /// Decode the next map entry as a tuple.
     fn entry<K, V>(&mut self) -> Result<Option<(K, V)>, <Self::Cx as Context>::Error>
     where
-        K: Decode<'de, <Self::Cx as Context>::Mode>,
-        V: Decode<'de, <Self::Cx as Context>::Mode>,
+        K: Decode<'de, <Self::Cx as Context>::Mode, <Self::Cx as Context>::Allocator>,
+        V: Decode<'de, <Self::Cx as Context>::Mode, <Self::Cx as Context>::Allocator>,
     {
         let Some(mut entry) = self.decode_entry()? else {
             return Ok(None);

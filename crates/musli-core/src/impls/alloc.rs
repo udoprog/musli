@@ -30,7 +30,7 @@ use crate::en::{
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::internal::size_hint;
-use crate::Context;
+use crate::{Allocator, Context};
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 use super::PlatformTag;
@@ -54,7 +54,10 @@ impl<M> Encode<M> for String {
     }
 }
 
-impl<'de, M> Decode<'de, M> for String {
+impl<'de, M, A> Decode<'de, M, A> for String
+where
+    A: Allocator,
+{
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
@@ -95,7 +98,10 @@ impl<'de, M> Decode<'de, M> for String {
     }
 }
 
-impl<'de, M> Decode<'de, M> for Box<str> {
+impl<'de, M, A> Decode<'de, M, A> for Box<str>
+where
+    A: Allocator,
+{
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
@@ -107,16 +113,17 @@ impl<'de, M> Decode<'de, M> for Box<str> {
     }
 }
 
-impl<'de, M, T> Decode<'de, M> for Box<[T]>
+impl<'de, M, A, T> Decode<'de, M, A> for Box<[T]>
 where
-    T: Decode<'de, M>,
+    A: Allocator,
+    T: Decode<'de, M, A>,
 {
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         Ok(decoder.decode::<Vec<T>>()?.into())
     }
@@ -154,13 +161,16 @@ macro_rules! cow {
             }
         }
 
-        impl<'de, M> $decode<'de, M> for Cow<'de, $ty> {
+        impl<'de, M, A> $decode<'de, M, A> for Cow<'de, $ty>
+        where
+            A: Allocator,
+        {
             const $decode_packed: bool = false;
 
             #[inline]
             fn $decode_fn<D>(decoder: D) -> Result<Self, D::Error>
             where
-                D: Decoder<'de, Mode = M>,
+                D: Decoder<'de, Mode = M, Allocator = A>,
             {
                 struct Visitor;
 
@@ -274,9 +284,10 @@ macro_rules! slice_sequence {
         }
 
         $(#[$($meta)*])*
-        impl<'de, M, T $(, $extra)*> Decode<'de, M> for $ty<T $(, $extra)*>
+        impl<'de, M, A, T $(, $extra)*> Decode<'de, M, A> for $ty<T $(, $extra)*>
         where
-            T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
+            A: Allocator,
+            T: Decode<'de, M, A> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             const IS_BITWISE_DECODE: bool = false;
@@ -284,13 +295,14 @@ macro_rules! slice_sequence {
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
-                D: Decoder<'de, Mode = M>,
+                D: Decoder<'de, Mode = M, Allocator = A>,
             {
-                struct Builder<'de, M, T $(, $extra)*>($ty<T $(, $extra)*>, PhantomData<(M, &'de ())>);
+                struct Builder<'de, M, A, T $(, $extra)*>($ty<T $(, $extra)*>, PhantomData<(M, A, &'de ())>);
 
-                impl<'de, M, T $(, $extra)*> DecodeSliceBuilder<T> for Builder<'de, M, T $(, $extra)*>
+                impl<'de, M, A, T $(, $extra)*> DecodeSliceBuilder<T> for Builder<'de, M, A, T $(, $extra)*>
                 where
-                    T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
+                    A: Allocator,
+                    T: Decode<'de, M, A> $(+ $trait0 $(+ $trait)*)*,
                     $($extra: $extra_bound0 $(+ $extra_bound)*),*
                 {
                     #[inline]
@@ -411,9 +423,10 @@ macro_rules! sequence {
         }
 
         $(#[$($meta)*])*
-        impl<'de, M, T $(, $extra)*> Decode<'de, M> for $ty<T $(, $extra)*>
+        impl<'de, M, A, T $(, $extra)*> Decode<'de, M, A> for $ty<T $(, $extra)*>
         where
-            T: Decode<'de, M> $(+ $trait0 $(+ $trait)*)*,
+            A: Allocator,
+            T: Decode<'de, M, A> $(+ $trait0 $(+ $trait)*)*,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             const IS_BITWISE_DECODE: bool = false;
@@ -421,7 +434,7 @@ macro_rules! sequence {
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
-                D: Decoder<'de, Mode = M>,
+                D: Decoder<'de, Mode = M, Allocator = A>,
             {
                 let $cx = decoder.cx();
 
@@ -497,16 +510,17 @@ where
     }
 }
 
-impl<'de, M, T> Decode<'de, M> for VecDeque<T>
+impl<'de, M, A, T> Decode<'de, M, A> for VecDeque<T>
 where
-    T: Decode<'de, M>,
+    A: Allocator,
+    T: Decode<'de, M, A>,
 {
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         Ok(VecDeque::from(Vec::decode(decoder)?))
     }
@@ -620,10 +634,11 @@ macro_rules! map {
         }
 
         $(#[$($meta)*])*
-        impl<'de, K, V, M $(, $extra)*> Decode<'de, M> for $ty<K, V $(, $extra)*>
+        impl<'de, K, V, A, M $(, $extra)*> Decode<'de, M, A> for $ty<K, V $(, $extra)*>
         where
-            K: Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
-            V: Decode<'de, M>,
+            A: Allocator,
+            K: Decode<'de, M, A> $(+ $key_bound0 $(+ $key_bound)*)*,
+            V: Decode<'de, M, A>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             const IS_BITWISE_DECODE: bool = false;
@@ -631,7 +646,7 @@ macro_rules! map {
             #[inline]
             fn decode<D>(decoder: D) -> Result<Self, D::Error>
             where
-                D: Decoder<'de, Mode = M>,
+                D: Decoder<'de, Mode = M, Allocator = A>,
             {
                 decoder.decode_map(|$access| {
                     let mut out = $with_capacity;
@@ -646,16 +661,17 @@ macro_rules! map {
         }
 
         $(#[$($meta)*])*
-        impl<'de, K, V, M $(, $extra)*> DecodeTrace<'de, M> for $ty<K, V $(, $extra)*>
+        impl<'de, K, V, A, M $(, $extra)*> DecodeTrace<'de, M, A> for $ty<K, V $(, $extra)*>
         where
-            K: fmt::Display + Decode<'de, M> $(+ $key_bound0 $(+ $key_bound)*)*,
-            V: Decode<'de, M>,
+            A: Allocator,
+            K: fmt::Display + Decode<'de, M, A> $(+ $key_bound0 $(+ $key_bound)*)*,
+            V: Decode<'de, M, A>,
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
             fn trace_decode<D>(decoder: D) -> Result<Self, D::Error>
             where
-                D: Decoder<'de, Mode = M>,
+                D: Decoder<'de, Mode = M, Allocator = A>,
             {
                 let $cx = decoder.cx();
 
@@ -707,13 +723,16 @@ impl<M> Encode<M> for CString {
     }
 }
 
-impl<'de, M> Decode<'de, M> for CString {
+impl<'de, M, A> Decode<'de, M, A> for CString
+where
+    A: Allocator,
+{
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de>,
+        D: Decoder<'de, Allocator = A>,
     {
         struct Visitor;
 
@@ -775,40 +794,47 @@ macro_rules! smart_pointer {
                 }
             }
 
-            impl<'de, M, T> Decode<'de, M> for $ty<T>
+            impl<'de, M, A, T> Decode<'de, M, A> for $ty<T>
             where
-                T: Decode<'de, M>,
+                A: Allocator,
+                T: Decode<'de, M, A>,
             {
                 const IS_BITWISE_DECODE: bool = false;
 
                 #[inline]
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
                 where
-                    D: Decoder<'de, Mode = M>,
+                    D: Decoder<'de, Mode = M, Allocator = A>,
                 {
                     Ok($ty::new(decoder.decode()?))
                 }
             }
 
-            impl<'de, M> DecodeBytes<'de, M> for $ty<[u8]> {
+            impl<'de, M, A> DecodeBytes<'de, M, A> for $ty<[u8]>
+            where
+                A: Allocator
+            {
                 const DECODE_BYTES_PACKED: bool = false;
 
                 #[inline]
                 fn decode_bytes<D>(decoder: D) -> Result<Self, D::Error>
                 where
-                    D: Decoder<'de, Mode = M>,
+                    D: Decoder<'de, Mode = M, Allocator = A>,
                 {
                     Ok($ty::from(<Vec<u8>>::decode_bytes(decoder)?))
                 }
             }
 
-            impl<'de, M> Decode<'de, M> for $ty<CStr> {
+            impl<'de, M, A> Decode<'de, M, A> for $ty<CStr>
+            where
+                A: Allocator,
+            {
                 const IS_BITWISE_DECODE: bool = false;
 
                 #[inline]
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
                 where
-                    D: Decoder<'de, Mode = M>,
+                    D: Decoder<'de, Mode = M, Allocator = A>,
                 {
                     Ok($ty::from(CString::decode(decoder)?))
                 }
@@ -816,13 +842,17 @@ macro_rules! smart_pointer {
 
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-            impl<'de, M> Decode<'de, M> for $ty<Path> where PlatformTag: Decode<'de, M> {
+            impl<'de, M, A> Decode<'de, M, A> for $ty<Path>
+            where
+                A: Allocator,
+                PlatformTag: Decode<'de, M, A>,
+            {
                 const IS_BITWISE_DECODE: bool = false;
 
                 #[inline]
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
                 where
-                    D: Decoder<'de, Mode = M>,
+                    D: Decoder<'de, Mode = M, Allocator = A>,
                 {
                     Ok($ty::from(PathBuf::decode(decoder)?))
                 }
@@ -830,13 +860,17 @@ macro_rules! smart_pointer {
 
             #[cfg(all(feature = "std", any(unix, windows)))]
             #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-            impl<'de, M> Decode<'de, M> for $ty<OsStr> where PlatformTag: Decode<'de, M> {
+            impl<'de, M, A> Decode<'de, M, A> for $ty<OsStr>
+            where
+                A: Allocator,
+                PlatformTag: Decode<'de, M, A>,
+            {
                 const IS_BITWISE_DECODE: bool = false;
 
                 #[inline]
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
                 where
-                    D: Decoder<'de, Mode = M>,
+                    D: Decoder<'de, Mode = M, Allocator = A>,
                 {
                     Ok($ty::from(OsString::decode(decoder)?))
                 }
@@ -882,7 +916,7 @@ where
     {
         use std::os::windows::ffi::OsStrExt;
 
-        use crate::alloc::{Allocator, RawVec};
+        use crate::alloc::RawVec;
         use crate::en::VariantEncoder;
 
         let cx = encoder.cx();
@@ -949,16 +983,17 @@ where
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-impl<'de, M> Decode<'de, M> for OsString
+impl<'de, M, A> Decode<'de, M, A> for OsString
 where
-    PlatformTag: Decode<'de, M>,
+    A: Allocator,
+    PlatformTag: Decode<'de, M, A>,
 {
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         use crate::de::VariantDecoder;
 
@@ -1067,16 +1102,17 @@ where
 
 #[cfg(all(feature = "std", any(unix, windows)))]
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", any(unix, windows)))))]
-impl<'de, M> Decode<'de, M> for PathBuf
+impl<'de, M, A> Decode<'de, M, A> for PathBuf
 where
-    PlatformTag: Decode<'de, M>,
+    A: Allocator,
+    PlatformTag: Decode<'de, M, A>,
 {
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         Ok(PathBuf::from(decoder.decode::<OsString>()?))
     }
@@ -1120,13 +1156,16 @@ impl<M> EncodeBytes<M> for Box<[u8]> {
     }
 }
 
-impl<'de, M> DecodeBytes<'de, M> for Vec<u8> {
+impl<'de, M, A> DecodeBytes<'de, M, A> for Vec<u8>
+where
+    A: Allocator,
+{
     const DECODE_BYTES_PACKED: bool = false;
 
     #[inline]
     fn decode_bytes<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         struct Visitor;
 
@@ -1176,13 +1215,16 @@ impl<M> EncodeBytes<M> for VecDeque<u8> {
     }
 }
 
-impl<'de, M> DecodeBytes<'de, M> for VecDeque<u8> {
+impl<'de, M, A> DecodeBytes<'de, M, A> for VecDeque<u8>
+where
+    A: Allocator,
+{
     const DECODE_BYTES_PACKED: bool = false;
 
     #[inline]
     fn decode_bytes<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         Ok(VecDeque::from(<Vec<u8>>::decode_bytes(decoder)?))
     }

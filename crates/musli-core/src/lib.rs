@@ -17,6 +17,8 @@ extern crate alloc as rust_alloc;
 extern crate std;
 
 pub mod alloc;
+#[doc(inline)]
+pub use self::alloc::Allocator;
 
 mod context;
 #[doc(inline)]
@@ -195,6 +197,7 @@ pub use musli_macros::visitor;
 /// Using these directly is not supported.
 #[doc(hidden)]
 pub mod __priv {
+    pub use crate::alloc::Allocator;
     pub use crate::context::Context;
     pub use crate::de::{
         AsDecoder, Decode, DecodeBytes, DecodePacked, DecodeTrace, Decoder, EntryDecoder,

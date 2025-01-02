@@ -14,12 +14,19 @@ use super::attr::{DefaultOrCustom, EnumTagging, FieldEncoding, ModeKind, Packing
 use super::mode::ImportedMethod;
 use super::name::NameAll;
 use super::ATTR;
-use super::{Ctxt, Expansion, Mode, Only, Result, Tokens};
+use super::{Ctxt, Expansion, Mode, Result, Tokens};
 
-pub(crate) struct Build<'a> {
+pub(crate) struct Parameters {
+    pub(crate) lt: syn::Lifetime,
+    pub(crate) lt_exists: bool,
+    pub(crate) allocator_ident: syn::Ident,
+    pub(crate) allocator_exists: bool,
+}
+
+pub(crate) struct Build<'tok, 'a> {
+    pub(crate) mode: Mode<'a>,
     pub(crate) input: &'a syn::DeriveInput,
     pub(crate) cx: &'a Ctxt,
-    pub(crate) tokens: Tokens<'a>,
     pub(crate) bounds: &'a [(Span, syn::WherePredicate)],
     pub(crate) decode_bounds: &'a [(Span, syn::WherePredicate)],
     pub(crate) expansion: Expansion<'a>,
@@ -27,9 +34,11 @@ pub(crate) struct Build<'a> {
     pub(crate) decode_t_decode: ImportedMethod<'a>,
     pub(crate) encode_t_encode: ImportedMethod<'a>,
     pub(crate) enum_tagging_span: Option<Span>,
+    pub(crate) tokens: &'tok Tokens<'a>,
+    pub(crate) p: Parameters,
 }
 
-impl Build<'_> {
+impl Build<'_, '_> {
     /// Emit diagnostics for when we try to implement `Decode` for an enum which
     /// is marked as `#[musli(transparent)]`.
     pub(crate) fn encode_transparent_enum_diagnostics(&self, span: Span) {
@@ -156,17 +165,16 @@ pub(crate) struct Field<'a> {
 /// Setup a build.
 ///
 /// Handles mode decoding, and construction of parameters which might give rise to errors.
-pub(crate) fn setup<'a>(
+pub(crate) fn setup<'tok, 'a>(
     e: &'a Expander,
     expansion: Expansion<'a>,
-    only: Only,
-) -> Result<Build<'a>> {
-    let tokens = e.tokens();
-    let mode = expansion.as_mode(&tokens, only);
-
+    mode: Mode<'a>,
+    tokens: &'tok Tokens<'a>,
+    p: Parameters,
+) -> Result<Build<'tok, 'a>> {
     let data = match &e.data {
-        Data::Struct(data) => BuildData::Struct(setup_struct(e, mode, data)),
-        Data::Enum(data) => BuildData::Enum(setup_enum(e, mode, data)),
+        Data::Struct(data) => BuildData::Struct(setup_struct(e, &mode, data, &p.allocator_ident)),
+        Data::Enum(data) => BuildData::Enum(setup_enum(e, &mode, data, &p.allocator_ident)),
         Data::Union => {
             e.cx.error_span(e.input.ident.span(), "musli: not supported for unions");
             return Err(());
@@ -177,24 +185,35 @@ pub(crate) fn setup<'a>(
         return Err(());
     }
 
-    let decode_t_decode = mode.decode_t_decode(FieldEncoding::Default);
+    let decode_t_decode = mode.decode_t_decode(FieldEncoding::Default, &p.allocator_ident);
     let encode_t_encode = mode.encode_t_encode(FieldEncoding::Default);
 
+    let bounds = e.type_attr.bounds(&mode);
+    let decode_bounds = e.type_attr.decode_bounds(&mode);
+    let enum_tagging_span = e.type_attr.enum_tagging_span(&mode);
+
     Ok(Build {
+        mode,
         input: e.input,
         cx: &e.cx,
-        tokens,
-        bounds: e.type_attr.bounds(mode),
-        decode_bounds: e.type_attr.decode_bounds(mode),
+        bounds,
+        decode_bounds,
         expansion,
         data,
         decode_t_decode,
         encode_t_encode,
-        enum_tagging_span: e.type_attr.enum_tagging_span(mode),
+        enum_tagging_span,
+        tokens,
+        p,
     })
 }
 
-fn setup_struct<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a StructData<'a>) -> Body<'a> {
+fn setup_struct<'a>(
+    e: &'a Expander,
+    mode: &Mode<'a>,
+    data: &'a StructData<'a>,
+    allocator_ident: &syn::Ident,
+) -> Body<'a> {
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
@@ -220,7 +239,15 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a StructData<'a>) -
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
 
     for f in &data.fields {
-        let field = Rc::new(setup_field(e, mode, f, name_all, packing, None));
+        let field = Rc::new(setup_field(
+            e,
+            mode,
+            f,
+            name_all,
+            packing,
+            None,
+            allocator_ident,
+        ));
 
         if field.skip.is_none() {
             unskipped_fields.push(field.clone());
@@ -248,7 +275,12 @@ fn setup_struct<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a StructData<'a>) -
     body
 }
 
-fn setup_enum<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a EnumData<'a>) -> Enum<'a> {
+fn setup_enum<'a>(
+    e: &'a Expander,
+    mode: &Mode<'a>,
+    data: &'a EnumData<'a>,
+    allocator_ident: &syn::Ident,
+) -> Enum<'a> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
 
@@ -296,7 +328,7 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a EnumData<'a>) -> En
     );
 
     for v in &data.variants {
-        variants.push(setup_variant(e, mode, v, &mut fallback));
+        variants.push(setup_variant(e, mode, v, &mut fallback, allocator_ident));
     }
 
     Enum {
@@ -317,9 +349,10 @@ fn setup_enum<'a>(e: &'a Expander, mode: Mode<'a>, data: &'a EnumData<'a>) -> En
 
 fn setup_variant<'a>(
     e: &'a Expander<'_>,
-    mode: Mode<'a>,
+    mode: &Mode<'a>,
     data: &'a VariantData<'a>,
     fallback: &mut Option<&'a syn::Ident>,
+    allocator_ident: &syn::Ident,
 ) -> Variant<'a> {
     let mut unskipped_fields = Vec::with_capacity(data.fields.len());
     let mut all_fields = Vec::with_capacity(data.fields.len());
@@ -384,6 +417,7 @@ fn setup_variant<'a>(
             name_all,
             variant_packing,
             Some(&mut patterns),
+            allocator_ident,
         ));
 
         if field.skip.is_none() {
@@ -422,14 +456,17 @@ fn setup_variant<'a>(
 
 fn setup_field<'a>(
     e: &'a Expander,
-    mode: Mode<'a>,
+    mode: &Mode<'a>,
     data: &'a FieldData<'a>,
     name_all: NameAll,
     packing: Packing,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
+    allocator_ident: &syn::Ident,
 ) -> Field<'a> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
-    let decode_path = data.attr.decode_path_expanded(mode, data.span);
+    let decode_path = data
+        .attr
+        .decode_path_expanded(mode, data.span, allocator_ident);
 
     let name = expander::expand_name(data, mode, name_all, data.ident);
     let pattern = data.attr.pattern(mode).map(|(_, p)| p);

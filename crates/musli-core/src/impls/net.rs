@@ -1,10 +1,10 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::str::FromStr;
 
-use crate::context::Context;
 use crate::de::{Decode, Decoder, SequenceDecoder, VariantDecoder};
 use crate::en::{Encode, Encoder, SequenceEncoder, VariantEncoder};
 use crate::mode::{Binary, Text};
+use crate::{Allocator, Context};
 
 #[derive(Encode, Decode)]
 #[musli(crate)]
@@ -64,7 +64,10 @@ impl Encode<Text> for Ipv4Addr {
     }
 }
 
-impl<'de> Decode<'de, Binary> for Ipv4Addr {
+impl<'de, A> Decode<'de, Binary, A> for Ipv4Addr
+where
+    A: Allocator,
+{
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_DECODE: bool = false;
@@ -78,7 +81,10 @@ impl<'de> Decode<'de, Binary> for Ipv4Addr {
     }
 }
 
-impl<'de> Decode<'de, Text> for Ipv4Addr {
+impl<'de, A> Decode<'de, Text, A> for Ipv4Addr
+where
+    A: Allocator,
+{
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_DECODE: bool = false;
@@ -135,7 +141,10 @@ impl Encode<Text> for Ipv6Addr {
     }
 }
 
-impl<'de> Decode<'de, Binary> for Ipv6Addr {
+impl<'de, A> Decode<'de, Binary, A> for Ipv6Addr
+where
+    A: Allocator,
+{
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_DECODE: bool = false;
@@ -149,7 +158,10 @@ impl<'de> Decode<'de, Binary> for Ipv6Addr {
     }
 }
 
-impl<'de> Decode<'de, Text> for Ipv6Addr {
+impl<'de, A> Decode<'de, Text, A> for Ipv6Addr
+where
+    A: Allocator,
+{
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_DECODE: bool = false;
@@ -193,18 +205,19 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for IpAddr
+impl<'de, M, A> Decode<'de, M, A> for IpAddr
 where
-    IpAddrTag: Decode<'de, M>,
-    Ipv4Addr: Decode<'de, M>,
-    Ipv6Addr: Decode<'de, M>,
+    A: Allocator,
+    IpAddrTag: Decode<'de, M, A>,
+    Ipv4Addr: Decode<'de, M, A>,
+    Ipv6Addr: Decode<'de, M, A>,
 {
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         decoder.decode_variant(|variant| {
             let tag = variant.decode_tag()?.decode()?;
@@ -263,7 +276,10 @@ impl Encode<Text> for SocketAddrV4 {
     }
 }
 
-impl<'de> Decode<'de, Binary> for SocketAddrV4 {
+impl<'de, A> Decode<'de, Binary, A> for SocketAddrV4
+where
+    A: Allocator,
+{
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_DECODE: bool = false;
@@ -277,7 +293,10 @@ impl<'de> Decode<'de, Binary> for SocketAddrV4 {
     }
 }
 
-impl<'de> Decode<'de, Text> for SocketAddrV4 {
+impl<'de, A> Decode<'de, Text, A> for SocketAddrV4
+where
+    A: Allocator,
+{
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_DECODE: bool = false;
@@ -340,7 +359,10 @@ impl Encode<Text> for SocketAddrV6 {
     }
 }
 
-impl<'de> Decode<'de, Binary> for SocketAddrV6 {
+impl<'de, A> Decode<'de, Binary, A> for SocketAddrV6
+where
+    A: Allocator,
+{
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_DECODE: bool = false;
@@ -354,7 +376,10 @@ impl<'de> Decode<'de, Binary> for SocketAddrV6 {
     }
 }
 
-impl<'de> Decode<'de, Text> for SocketAddrV6 {
+impl<'de, A> Decode<'de, Text, A> for SocketAddrV6
+where
+    A: Allocator,
+{
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_DECODE: bool = false;
@@ -398,18 +423,19 @@ where
     }
 }
 
-impl<'de, M> Decode<'de, M> for SocketAddr
+impl<'de, M, A> Decode<'de, M, A> for SocketAddr
 where
-    SocketAddrTag: Decode<'de, M>,
-    SocketAddrV4: Decode<'de, M>,
-    SocketAddrV6: Decode<'de, M>,
+    A: Allocator,
+    SocketAddrTag: Decode<'de, M, A>,
+    SocketAddrV4: Decode<'de, M, A>,
+    SocketAddrV6: Decode<'de, M, A>,
 {
     const IS_BITWISE_DECODE: bool = false;
 
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         decoder.decode_variant(|variant| {
             let tag = variant.decode_tag()?.decode()?;
