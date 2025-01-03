@@ -36,7 +36,7 @@ fn test_simple_json_encoding() {
     let actual: Vec<SimpleJsonStruct<'_>> = musli::json::from_slice(out.as_bytes()).unwrap();
     assert_eq!(expected, actual);
 
-    let value: musli::value::Value = musli::json::from_slice(b"10.00001e-121").unwrap();
+    let value: musli::value::Value<_> = musli::json::from_slice(b"10.00001e-121").unwrap();
     println!("{:?}", value);
     // assert_eq!(expected, actual);
 }

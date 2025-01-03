@@ -108,7 +108,7 @@ where
     type WithContext<U>
         = Never<(), U>
     where
-        U: Context;
+        U: Context<Allocator = Self::Allocator>;
     type DecodeBuffer = Self;
     type DecodePack = Self;
     type DecodeSequence = Self;
@@ -126,7 +126,7 @@ where
     #[inline]
     fn with_context<U>(self, _: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = Self::Allocator>,
     {
         match self._never {}
     }
@@ -346,7 +346,7 @@ where
     type WithContext<U>
         = Never<A, U>
     where
-        U: Context;
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     type EncodePack = Self;
     type EncodeSome = Self;
     type EncodeSequence = Self;
@@ -365,7 +365,7 @@ where
     #[inline]
     fn with_context<U>(self, _: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
     {
         match self._never {}
     }

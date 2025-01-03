@@ -1,19 +1,14 @@
-#[cfg(feature = "alloc")]
-use rust_alloc::borrow::ToOwned;
-#[cfg(feature = "alloc")]
-use rust_alloc::boxed::Box;
-#[cfg(feature = "alloc")]
-use rust_alloc::string::String;
-#[cfg(feature = "alloc")]
-use rust_alloc::vec::Vec;
+use core::cmp::Ordering;
+use core::fmt;
 
-use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 #[cfg(feature = "alloc")]
+use crate::alloc::{AllocError, System};
+use crate::alloc::{Box, String, Vec};
+use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 use crate::de::{
     EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
 };
 use crate::en::{Encode, Encoder};
-#[cfg(feature = "alloc")]
 use crate::en::{MapEncoder, SequenceEncoder, VariantEncoder};
 use crate::{Allocator, Context, Options};
 
@@ -24,9 +19,11 @@ use super::type_hint::{NumberHint, TypeHint};
 /// complex or simple.
 ///
 /// [Müsli]: https://github.com/udoprog/musli
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
 #[non_exhaustive]
-pub enum Value {
+pub enum Value<A>
+where
+    A: Allocator,
+{
     /// The default unit value.
     Unit,
     /// A boolean value.
@@ -36,37 +33,48 @@ pub enum Value {
     /// A number.
     Number(Number),
     /// An array.
-    #[cfg(feature = "alloc")]
-    Bytes(Vec<u8>),
+    Bytes(Vec<u8, A>),
     /// A string in a value.
-    #[cfg(feature = "alloc")]
-    String(String),
+    String(String<A>),
     /// A unit value.
-    #[cfg(feature = "alloc")]
-    Sequence(Vec<Value>),
+    Sequence(Vec<Value<A>, A>),
     /// A pair stored in the value.
-    #[cfg(feature = "alloc")]
-    Map(Vec<(Value, Value)>),
+    Map(Vec<(Value<A>, Value<A>), A>),
     /// A variant pair. The first value identifies the variant, the second value
     /// contains the value of the variant.
-    #[cfg(feature = "alloc")]
-    Variant(Box<(Value, Value)>),
+    Variant(Box<(Value<A>, Value<A>), A>),
     /// An optional value.
-    #[cfg(feature = "alloc")]
-    Option(Option<Box<Value>>),
+    Option(Option<Box<Value<A>, A>>),
 }
 
-impl Value {
-    /// Construct a [AsValueDecoder] implementation out of this value which
-    /// emits the specified error `E`.
+impl<A> Value<A>
+where
+    A: Allocator,
+{
+    /// Construct a [IntoValueDecoder] implementation out of the current value.
     #[inline]
-    pub fn into_value_decoder<const OPT: Options, C>(self, cx: C) -> AsValueDecoder<OPT, C> {
+    pub fn into_decoder<const OPT: Options, C>(self, cx: C) -> IntoValueDecoder<OPT, C, A>
+    where
+        C: Context,
+    {
+        IntoValueDecoder::new(cx, self)
+    }
+
+    /// Construct a [AsValueDecoder] implementation out of the current value.
+    #[inline]
+    pub fn as_decoder<const OPT: Options, C>(&self, cx: C) -> AsValueDecoder<'_, OPT, C, A>
+    where
+        C: Context,
+    {
         AsValueDecoder::new(cx, self)
     }
 
     /// Get a decoder associated with a value.
     #[inline]
-    pub(crate) fn decoder<const OPT: Options, C>(&self, cx: C) -> ValueDecoder<'_, OPT, C> {
+    pub(crate) fn decoder<const OPT: Options, C>(&self, cx: C) -> ValueDecoder<'_, OPT, C, A>
+    where
+        C: Context,
+    {
         ValueDecoder::new(cx, self)
     }
 
@@ -77,18 +85,76 @@ impl Value {
             Value::Bool(..) => TypeHint::Bool,
             Value::Char(..) => TypeHint::Char,
             Value::Number(number) => TypeHint::Number(number.type_hint()),
-            #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => TypeHint::Bytes(SizeHint::exact(bytes.len())),
-            #[cfg(feature = "alloc")]
             Value::String(string) => TypeHint::String(SizeHint::exact(string.len())),
-            #[cfg(feature = "alloc")]
             Value::Sequence(sequence) => TypeHint::Sequence(SizeHint::exact(sequence.len())),
-            #[cfg(feature = "alloc")]
             Value::Map(map) => TypeHint::Map(SizeHint::exact(map.len())),
-            #[cfg(feature = "alloc")]
             Value::Variant(..) => TypeHint::Variant,
-            #[cfg(feature = "alloc")]
             Value::Option(..) => TypeHint::Option,
+        }
+    }
+}
+
+impl<A> fmt::Debug for Value<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unit => write!(f, "Unit"),
+            Self::Bool(value) => f.debug_tuple("Bool").field(value).finish(),
+            Self::Char(value) => f.debug_tuple("Char").field(value).finish(),
+            Self::Number(value) => f.debug_tuple("Number").field(value).finish(),
+            Self::Bytes(value) => f.debug_tuple("Bytes").field(value).finish(),
+            Self::String(value) => f.debug_tuple("String").field(value).finish(),
+            Self::Sequence(value) => f.debug_tuple("Sequence").field(value).finish(),
+            Self::Map(value) => f.debug_tuple("Map").field(value).finish(),
+            Self::Variant(value) => f.debug_tuple("Variant").field(value).finish(),
+            Self::Option(value) => f.debug_tuple("Option").field(value).finish(),
+        }
+    }
+}
+
+impl<A> PartialEq for Value<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Bool(lhs), Self::Bool(rhs)) => lhs == rhs,
+            (Self::Char(lhs), Self::Char(rhs)) => lhs == rhs,
+            (Self::Number(lhs), Self::Number(rhs)) => lhs == rhs,
+            (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs == rhs,
+            (Self::String(lhs), Self::String(rhs)) => lhs == rhs,
+            (Self::Sequence(lhs), Self::Sequence(rhs)) => lhs == rhs,
+            (Self::Map(lhs), Self::Map(rhs)) => lhs == rhs,
+            (Self::Variant(lhs), Self::Variant(rhs)) => lhs == rhs,
+            (Self::Option(lhs), Self::Option(rhs)) => lhs == rhs,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
+impl<A> PartialOrd for Value<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Self::Unit, Self::Unit) => Some(Ordering::Equal),
+            (Self::Bool(lhs), Self::Bool(rhs)) => lhs.partial_cmp(rhs),
+            (Self::Char(lhs), Self::Char(rhs)) => lhs.partial_cmp(rhs),
+            (Self::Number(lhs), Self::Number(rhs)) => lhs.partial_cmp(rhs),
+            (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs.partial_cmp(rhs),
+            (Self::String(lhs), Self::String(rhs)) => lhs.partial_cmp(rhs),
+            (Self::Sequence(lhs), Self::Sequence(rhs)) => lhs.partial_cmp(rhs),
+            (Self::Map(lhs), Self::Map(rhs)) => lhs.partial_cmp(rhs),
+            (Self::Variant(lhs), Self::Variant(rhs)) => lhs.partial_cmp(rhs),
+            (Self::Option(lhs), Self::Option(rhs)) => lhs.partial_cmp(rhs),
+            _ => None,
         }
     }
 }
@@ -213,10 +279,8 @@ impl<'de, C> Visitor<'de, C> for AnyVisitor
 where
     C: Context,
 {
-    type Ok = Value;
-    #[cfg(feature = "alloc")]
+    type Ok = Value<C::Allocator>;
     type String = StringVisitor;
-    #[cfg(feature = "alloc")]
     type Bytes = BytesVisitor;
 
     #[inline]
@@ -309,63 +373,65 @@ where
         Ok(Value::Number(Number::F64(value)))
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_option<D>(self, _: C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
+    fn visit_option<D>(self, cx: C, decoder: Option<D>) -> Result<Self::Ok, C::Error>
     where
-        D: Decoder<'de, Cx = C, Error = C::Error>,
+        D: Decoder<'de, Cx = C, Error = C::Error, Allocator = C::Allocator>,
     {
         match decoder {
-            Some(decoder) => Ok(Value::Option(Some(Box::new(decoder.decode::<Value>()?)))),
+            Some(decoder) => {
+                let value = decoder.decode::<Value<C::Allocator>>()?;
+                let value = Box::new_in(value, cx.alloc()).map_err(cx.map())?;
+                Ok(Value::Option(Some(value)))
+            }
             None => Ok(Value::Option(None)),
         }
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_sequence<D>(self, seq: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + SequenceDecoder<'de, Cx = C>,
     {
-        let mut out = Vec::with_capacity(seq.size_hint().or_default());
+        let cx = seq.cx();
+        let mut out =
+            Vec::with_capacity_in(seq.size_hint().or_default(), cx.alloc()).map_err(cx.map())?;
 
         while let Some(item) = seq.try_next()? {
-            out.push(item);
+            out.push(item).map_err(cx.map())?;
         }
 
         Ok(Value::Sequence(out))
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_map<D>(self, map: &mut D) -> Result<Self::Ok, C::Error>
     where
         D: ?Sized + MapDecoder<'de, Cx = C>,
     {
-        let mut out = Vec::with_capacity(map.size_hint().or_default());
+        let cx = map.cx();
+        let mut out =
+            Vec::with_capacity_in(map.size_hint().or_default(), cx.alloc()).map_err(cx.map())?;
 
         while let Some(mut entry) = map.decode_entry()? {
             let first = entry.decode_key()?.decode()?;
             let second = entry.decode_value()?.decode()?;
-            out.push((first, second));
+            out.push((first, second)).map_err(cx.map())?;
         }
 
         Ok(Value::Map(out))
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_bytes(self, _: C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
         Ok(BytesVisitor)
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_string(self, _: C, _: SizeHint) -> Result<Self::String, C::Error> {
         Ok(StringVisitor)
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn visit_variant<D>(self, variant: &mut D) -> Result<Self::Ok, C::Error>
     where
@@ -373,11 +439,13 @@ where
     {
         let first = variant.decode_tag()?.decode()?;
         let second = variant.decode_value()?.decode()?;
-        Ok(Value::Variant(Box::new((first, second))))
+        let value =
+            Box::new_in((first, second), variant.cx().alloc()).map_err(variant.cx().map())?;
+        Ok(Value::Variant(value))
     }
 }
 
-impl<'de, M, A> Decode<'de, M, A> for Value
+impl<'de, M, A> Decode<'de, M, A> for Value<A>
 where
     A: Allocator,
 {
@@ -386,48 +454,40 @@ where
     #[inline]
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
-        D: Decoder<'de, Mode = M>,
+        D: Decoder<'de, Mode = M, Allocator = A>,
     {
         decoder.decode_any(AnyVisitor)
     }
 }
 
-#[cfg(feature = "alloc")]
 struct BytesVisitor;
 
-#[cfg(feature = "alloc")]
 impl<C> UnsizedVisitor<'_, C, [u8]> for BytesVisitor
 where
     C: Context,
 {
-    type Ok = Value;
+    type Ok = Value<C::Allocator>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "bytes")
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
-    fn visit_owned(self, _: C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: C, b: &[u8]) -> Result<Self::Ok, C::Error> {
+        let mut bytes = Vec::with_capacity_in(b.len(), cx.alloc()).map_err(cx.map())?;
+        bytes.extend_from_slice(b).map_err(cx.map())?;
         Ok(Value::Bytes(bytes))
-    }
-
-    #[inline]
-    fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-        Ok(Value::Bytes(bytes.to_vec()))
     }
 }
 
-#[cfg(feature = "alloc")]
 struct StringVisitor;
 
-#[cfg(feature = "alloc")]
 impl<C> UnsizedVisitor<'_, C, str> for StringVisitor
 where
     C: Context,
 {
-    type Ok = Value;
+    type Ok = Value<C::Allocator>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -435,17 +495,17 @@ where
     }
 
     #[inline]
-    fn visit_owned(self, _: C, string: String) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: C, s: &str) -> Result<Self::Ok, C::Error> {
+        let mut string = String::new_in(cx.alloc());
+        string.push_str(s).map_err(cx.map())?;
         Ok(Value::String(string))
-    }
-
-    #[inline]
-    fn visit_ref(self, _: C, string: &str) -> Result<Self::Ok, C::Error> {
-        Ok(Value::String(string.to_owned()))
     }
 }
 
-impl<M> Encode<M> for Value {
+impl<M, C> Encode<M> for Value<C>
+where
+    C: Allocator,
+{
     const IS_BITWISE_ENCODE: bool = false;
 
     type Encode = Self;
@@ -459,45 +519,39 @@ impl<M> Encode<M> for Value {
             Value::Bool(b) => encoder.encode_bool(*b),
             Value::Char(c) => encoder.encode_char(*c),
             Value::Number(n) => encoder.encode(n),
-            #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => encoder.encode_bytes(bytes),
-            #[cfg(feature = "alloc")]
             Value::String(string) => encoder.encode_string(string),
-            #[cfg(feature = "alloc")]
             Value::Sequence(values) => {
                 use crate::hint::SequenceHint;
 
                 let hint = SequenceHint::with_size(values.len());
 
                 encoder.encode_sequence_fn(&hint, |sequence| {
-                    for value in values {
+                    for value in values.iter() {
                         sequence.encode_next()?.encode(value)?;
                     }
 
                     Ok(())
                 })
             }
-            #[cfg(feature = "alloc")]
             Value::Map(values) => {
                 use crate::hint::MapHint;
 
                 let hint = MapHint::with_size(values.len());
 
                 encoder.encode_map_fn(&hint, |map| {
-                    for (first, second) in values {
+                    for (first, second) in values.iter() {
                         map.insert_entry(first, second)?;
                     }
 
                     Ok(())
                 })
             }
-            #[cfg(feature = "alloc")]
             Value::Variant(variant) => {
                 let (tag, variant) = &**variant;
                 let encoder = encoder.encode_variant()?;
                 encoder.insert_variant(tag, variant)
             }
-            #[cfg(feature = "alloc")]
             Value::Option(option) => match option {
                 Some(value) => encoder.encode_some()?.encode(&**value),
                 None => encoder.encode_none(),
@@ -512,31 +566,145 @@ impl<M> Encode<M> for Value {
 }
 
 /// Value's [AsDecoder] implementation.
-pub struct AsValueDecoder<const OPT: Options, C> {
+pub struct IntoValueDecoder<const OPT: Options, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     cx: C,
-    value: Value,
+    value: Value<A>,
 }
 
-impl<const OPT: Options, C> AsValueDecoder<OPT, C> {
+impl<const OPT: Options, C, A> IntoValueDecoder<OPT, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     /// Construct a new buffered value decoder.
     #[inline]
-    pub fn new(cx: C, value: Value) -> Self {
+    pub fn new(cx: C, value: Value<A>) -> Self {
         Self { cx, value }
     }
 }
 
-impl<const OPT: Options, C> AsDecoder for AsValueDecoder<OPT, C>
+impl<const OPT: Options, C, A> AsDecoder for IntoValueDecoder<OPT, C, A>
 where
     C: Context,
+    A: Allocator,
 {
     type Cx = C;
     type Decoder<'this>
-        = ValueDecoder<'this, OPT, C>
+        = ValueDecoder<'this, OPT, C, A>
     where
         Self: 'this;
 
     #[inline]
     fn as_decoder(&self) -> Result<Self::Decoder<'_>, C::Error> {
         Ok(self.value.decoder(self.cx))
+    }
+}
+
+/// Value's [AsDecoder] implementation.
+pub struct AsValueDecoder<'de, const OPT: Options, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
+    cx: C,
+    value: &'de Value<A>,
+}
+
+impl<'de, const OPT: Options, C, A> AsValueDecoder<'de, OPT, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
+    /// Construct a new buffered value decoder.
+    #[inline]
+    pub fn new(cx: C, value: &'de Value<A>) -> Self {
+        Self { cx, value }
+    }
+}
+
+impl<const OPT: Options, C, A> AsDecoder for AsValueDecoder<'_, OPT, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
+    type Cx = C;
+    type Decoder<'this>
+        = ValueDecoder<'this, OPT, C, A>
+    where
+        Self: 'this;
+
+    #[inline]
+    fn as_decoder(&self) -> Result<Self::Decoder<'_>, C::Error> {
+        Ok(self.value.decoder(self.cx))
+    }
+}
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl TryFrom<&str> for Value<System> {
+    type Error = AllocError;
+
+    #[inline]
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let mut string = String::new_in(System::new());
+        string.push_str(value)?;
+        Ok(Value::String(string))
+    }
+}
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl From<rust_alloc::string::String> for Value<System> {
+    #[inline]
+    fn from(value: rust_alloc::string::String) -> Self {
+        Value::String(String::from(value))
+    }
+}
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl From<rust_alloc::vec::Vec<Value<System>>> for Value<System> {
+    #[inline]
+    fn from(value: rust_alloc::vec::Vec<Value<System>>) -> Self {
+        Value::Sequence(Vec::from(value))
+    }
+}
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl TryFrom<&[u8]> for Value<System> {
+    type Error = AllocError;
+
+    #[inline]
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let mut string = Vec::new_in(System::new());
+        string.extend_from_slice(value)?;
+        Ok(Value::Bytes(string))
+    }
+}
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl<const N: usize> TryFrom<&[u8; N]> for Value<System> {
+    type Error = AllocError;
+
+    #[inline]
+    fn try_from(value: &[u8; N]) -> Result<Self, Self::Error> {
+        Self::try_from(&value[..])
+    }
+}
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl<const N: usize> TryFrom<[u8; N]> for Value<System> {
+    type Error = AllocError;
+
+    #[inline]
+    fn try_from(value: [u8; N]) -> Result<Self, Self::Error> {
+        Self::try_from(&value[..])
     }
 }

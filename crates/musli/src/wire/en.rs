@@ -93,7 +93,7 @@ where
     type WithContext<U>
         = WireEncoder<W, OPT, U>
     where
-        U: Context;
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     type EncodePack = WireSequenceEncoder<W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
@@ -111,7 +111,7 @@ where
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
     {
         Ok(WireEncoder::new(cx, self.writer))
     }

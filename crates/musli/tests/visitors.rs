@@ -1,6 +1,8 @@
 use std::fmt;
 
+use musli::alloc::System;
 use musli::de::UnsizedVisitor;
+use musli::value::Value;
 use musli::{Allocator, Context, Decode, Decoder};
 
 #[derive(Debug, PartialEq)]
@@ -44,7 +46,7 @@ where
 
 #[test]
 fn bytes_reference() {
-    let value = musli::value::Value::Bytes(vec![0, 1, 2, 3]);
+    let value = Value::try_from(&[0u8, 1, 2, 3]).unwrap();
 
     assert_eq!(
         musli::value::decode::<BytesReference>(&value).unwrap(),
@@ -53,7 +55,7 @@ fn bytes_reference() {
         }
     );
 
-    let value = musli::value::Value::Number(42u32.into());
+    let value: Value<System> = Value::Number(42u32.into());
 
     assert_eq!(
         musli::value::decode::<BytesReference>(&value)
@@ -104,14 +106,14 @@ where
 
 #[test]
 fn string_reference() {
-    let value = musli::value::Value::String(String::from("Hello!"));
+    let value = Value::try_from("Hello!").unwrap();
 
     assert_eq!(
         musli::value::decode::<StringReference>(&value).unwrap(),
         StringReference { data: "Hello!" }
     );
 
-    let value = musli::value::Value::Number(42u32.into());
+    let value: Value<System> = Value::Number(42u32.into());
 
     assert_eq!(
         musli::value::decode::<StringReference>(&value)
@@ -147,6 +149,6 @@ where
 
 #[test]
 fn owned_fn() {
-    let value = musli::value::Value::String("A".to_string());
+    let value = Value::try_from("A").unwrap();
     assert_eq!(musli::value::decode::<OwnedFn>(&value).unwrap(), OwnedFn::A);
 }

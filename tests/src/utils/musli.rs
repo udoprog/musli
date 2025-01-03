@@ -196,14 +196,14 @@ pub mod musli_value {
     use musli::value::Value;
     use musli::{Decode, Encode};
 
-    pub fn encode<T>(value: &T) -> Result<Value, musli::value::Error>
+    pub fn encode<T>(value: &T) -> Result<Value<System>, musli::value::Error>
     where
         T: Encode<Binary>,
     {
         musli::value::encode(value)
     }
 
-    pub fn decode<T>(buf: &Value) -> Result<T, musli::value::Error>
+    pub fn decode<T>(buf: &Value<System>) -> Result<T, musli::value::Error>
     where
         for<'a> T: Decode<'a, Binary, System>,
     {

@@ -1,10 +1,14 @@
+use core::cmp::Ordering;
 use core::fmt;
 use core::mem::ManuallyDrop;
-#[cfg(test)]
 use core::ops::{Deref, DerefMut};
 use core::ptr;
+#[cfg(feature = "alloc")]
+use core::ptr::NonNull;
 use core::slice;
 
+#[cfg(feature = "alloc")]
+use super::System;
 use super::{AllocError, AllocSlice, Allocator};
 
 /// A vector backed by an [`Allocator`].
@@ -27,6 +31,7 @@ where
     A: Allocator,
 {
     /// Construct a buffer vector from raw parts.
+    #[inline]
     const unsafe fn from_raw_parts(buf: A::AllocSlice<T>, len: usize) -> Self {
         Self { buf, len }
     }
@@ -53,11 +58,37 @@ where
     ///     assert_eq!(a.as_slice(), ["Hello", "World"]);
     /// });
     /// ```
+    #[inline]
     pub fn new_in(alloc: A) -> Self {
         Self {
             buf: alloc.alloc_slice::<T>(),
             len: 0,
         }
+    }
+
+    /// Construct a new buffer vector.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::alloc::{AllocError, Vec};
+    ///
+    /// musli::alloc::default(|alloc| {
+    ///     let mut a = Vec::with_capacity_in(2, alloc)?;
+    ///
+    ///     a.push(String::from("Hello"))?;
+    ///     a.push(String::from("World"))?;
+    ///
+    ///     assert_eq!(a.as_slice(), ["Hello", "World"]);
+    ///     Ok::<_, AllocError>(())
+    /// });
+    /// # Ok::<_, AllocError>(())
+    /// ```
+    #[inline]
+    pub fn with_capacity_in(capacity: usize, alloc: A) -> Result<Self, AllocError> {
+        let mut buf = alloc.alloc_slice::<T>();
+        buf.resize(0, capacity)?;
+        Ok(Self { buf, len: 0 })
     }
 
     /// Construct a new buffer vector.
@@ -134,14 +165,16 @@ where
     /// ```
     #[inline]
     pub fn push(&mut self, item: T) -> Result<(), AllocError> {
-        self.buf.resize(self.len, 1)?;
+        if size_of::<T>() != 0 {
+            self.buf.resize(self.len, 1)?;
 
-        // SAFETY: The call to reserve ensures that we have enough capacity.
-        unsafe {
-            self.buf.as_mut_ptr().add(self.len).write(item);
-            self.len += 1;
+            // SAFETY: The call to reserve ensures that we have enough capacity.
+            unsafe {
+                self.buf.as_mut_ptr().add(self.len).write(item);
+            }
         }
 
+        self.len += 1;
         Ok(())
     }
 
@@ -174,7 +207,6 @@ where
         }
 
         self.len -= 1;
-
         // SAFETY: We know that the buffer is initialized up to `len`.
         unsafe { Some(ptr::read(self.buf.as_ptr().add(self.len))) }
     }
@@ -289,17 +321,19 @@ where
     /// ```
     #[inline]
     pub fn extend_from_slice(&mut self, items: &[T]) -> Result<(), AllocError> {
-        self.buf.resize(self.len, items.len())?;
+        if size_of::<T>() != 0 {
+            self.buf.resize(self.len, items.len())?;
 
-        // SAFETY: The call to reserve ensures that we have enough capacity.
-        unsafe {
-            self.buf
-                .as_mut_ptr()
-                .add(self.len)
-                .copy_from_nonoverlapping(items.as_ptr(), items.len());
-            self.len += items.len();
+            // SAFETY: The call to reserve ensures that we have enough capacity.
+            unsafe {
+                self.buf
+                    .as_mut_ptr()
+                    .add(self.len)
+                    .copy_from_nonoverlapping(items.as_ptr(), items.len());
+            }
         }
 
+        self.len += items.len();
         Ok(())
     }
 
@@ -371,7 +405,6 @@ where
     }
 }
 
-#[cfg(test)]
 impl<T, A> Deref for Vec<T, A>
 where
     A: Allocator,
@@ -384,7 +417,6 @@ where
     }
 }
 
-#[cfg(test)]
 impl<T, A> DerefMut for Vec<T, A>
 where
     A: Allocator,
@@ -395,11 +427,82 @@ where
     }
 }
 
+impl<T, A> fmt::Debug for Vec<T, A>
+where
+    T: fmt::Debug,
+    A: Allocator,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.as_slice()).finish()
+    }
+}
+
 impl<T, A> Drop for Vec<T, A>
 where
     A: Allocator,
 {
     fn drop(&mut self) {
         self.clear();
+    }
+}
+
+impl<T, A> PartialEq for Vec<T, A>
+where
+    T: PartialEq,
+    A: Allocator,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice().eq(other.as_slice())
+    }
+}
+
+impl<T, A> Eq for Vec<T, A>
+where
+    T: Eq,
+    A: Allocator,
+{
+}
+
+impl<T, A> PartialOrd for Vec<T, A>
+where
+    T: PartialOrd,
+    A: Allocator,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.as_slice().partial_cmp(other.as_slice())
+    }
+}
+
+impl<T, A> Ord for Vec<T, A>
+where
+    T: Ord,
+    A: Allocator,
+{
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_slice().cmp(other.as_slice())
+    }
+}
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, System> {
+    #[inline]
+    fn from(value: rust_alloc::vec::Vec<T>) -> Self {
+        // SAFETY: We know that the vector was allocated as expected using the
+        // system allocator.
+        unsafe {
+            let mut value = ManuallyDrop::new(value);
+            let ptr = NonNull::new_unchecked(value.as_mut_ptr());
+            let len = value.len();
+            let cap = value.capacity();
+
+            let buf = System::slice_from_raw_parts(ptr, cap);
+
+            Self { buf, len }
+        }
     }
 }

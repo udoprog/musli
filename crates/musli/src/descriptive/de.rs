@@ -9,7 +9,6 @@ use crate::de::{
     UnsizedVisitor, VariantDecoder, Visitor,
 };
 use crate::int::continuation as c;
-#[cfg(feature = "value")]
 use crate::options;
 use crate::reader::Limit;
 use crate::storage::de::StorageDecoder;
@@ -19,7 +18,6 @@ use crate::{Options, Reader};
 use super::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
 use super::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
 
-#[cfg(feature = "value")]
 const BUFFER_OPTIONS: Options = options::new().build();
 
 /// A very simple decoder.
@@ -226,9 +224,8 @@ where
     type WithContext<U>
         = SelfDecoder<R, OPT, U>
     where
-        U: Context;
-    #[cfg(feature = "value")]
-    type DecodeBuffer = crate::value::AsValueDecoder<BUFFER_OPTIONS, C>;
+        U: Context<Allocator = Self::Allocator>;
+    type DecodeBuffer = crate::value::IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator>;
     type DecodePack = SelfDecoder<Limit<R>, OPT, C>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingSelfDecoder<R, OPT, C>;
@@ -244,7 +241,7 @@ where
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = Self::Allocator>,
     {
         Ok(SelfDecoder::new(cx, self.reader))
     }
@@ -265,12 +262,11 @@ where
         Ok(Skip::Skipped)
     }
 
-    #[cfg(feature = "value")]
     #[inline]
     fn decode_buffer(self) -> Result<Self::DecodeBuffer, C::Error> {
         let cx = self.cx;
-        let value = self.decode::<crate::value::Value>()?;
-        Ok(value.into_value_decoder(cx))
+        let value = self.decode::<crate::value::Value<Self::Allocator>>()?;
+        Ok(value.into_decoder(cx))
     }
 
     #[inline]

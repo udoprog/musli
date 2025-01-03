@@ -1,6 +1,5 @@
 use core::fmt;
 
-#[cfg(feature = "alloc")]
 use crate::de::SizeHint;
 
 /// A type hint.
@@ -16,22 +15,16 @@ pub(crate) enum TypeHint {
     /// The type as a number.
     Number(NumberHint),
     /// A byte array.
-    #[cfg(feature = "alloc")]
     Bytes(SizeHint),
     /// A string with the given length.
-    #[cfg(feature = "alloc")]
     String(SizeHint),
     /// A sequence with a length hint.
-    #[cfg(feature = "alloc")]
     Sequence(SizeHint),
     /// A map with a length hint.
-    #[cfg(feature = "alloc")]
     Map(SizeHint),
     /// A variant.
-    #[cfg(feature = "alloc")]
     Variant,
     /// An optional value.
-    #[cfg(feature = "alloc")]
     Option,
 }
 
@@ -42,17 +35,11 @@ impl fmt::Display for TypeHint {
             TypeHint::Bool => write!(f, "bool"),
             TypeHint::Char => write!(f, "char"),
             TypeHint::Number(number) => number.fmt(f),
-            #[cfg(feature = "alloc")]
             TypeHint::Bytes(size) => write!(f, "bytes with {size}"),
-            #[cfg(feature = "alloc")]
             TypeHint::String(size) => write!(f, "string with {size}"),
-            #[cfg(feature = "alloc")]
             TypeHint::Sequence(size) => write!(f, "sequence with {size}"),
-            #[cfg(feature = "alloc")]
             TypeHint::Map(size) => write!(f, "map with {size}"),
-            #[cfg(feature = "alloc")]
             TypeHint::Variant => write!(f, "variant"),
-            #[cfg(feature = "alloc")]
             TypeHint::Option => write!(f, "option"),
         }
     }

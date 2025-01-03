@@ -41,7 +41,7 @@ pub trait Decoder<'de>: Sized {
         Allocator = U::Allocator,
     >
     where
-        U: Context;
+        U: Context<Allocator = Self::Allocator>;
     /// Decoder returned by [`Decoder::decode_buffer`].
     type DecodeBuffer: AsDecoder<Cx = Self::Cx>;
     /// Decoder returned by [`Decoder::decode_option`].
@@ -76,7 +76,7 @@ pub trait Decoder<'de>: Sized {
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, <Self::Cx as Context>::Error>
     where
-        U: Context,
+        U: Context<Allocator = Self::Allocator>,
     {
         Err(self.cx().message(format_args!(
             "Context switch not supported, expected {}",

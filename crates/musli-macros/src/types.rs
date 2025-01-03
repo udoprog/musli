@@ -245,7 +245,7 @@ impl Types {
 
                     where_clause
                         .predicates
-                        .push(syn::parse_quote!(#u_param: #crate_path::Context));
+                        .push(syn::parse_quote!(#u_param: #crate_path::Context<Allocator = <Self::Cx as Context>::Allocator>));
 
                     generics = syn::Generics {
                         lt_token: Some(<Token![<]>::default()),

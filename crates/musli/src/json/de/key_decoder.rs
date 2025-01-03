@@ -51,7 +51,7 @@ where
     type WithContext<U>
         = JsonKeyDecoder<P, U>
     where
-        U: Context;
+        U: Context<Allocator = Self::Allocator>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -61,7 +61,7 @@ where
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = Self::Allocator>,
     {
         Ok(JsonKeyDecoder::new(cx, self.parser))
     }
