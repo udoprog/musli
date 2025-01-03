@@ -33,44 +33,24 @@ fn store_dag(buf: &mut OwnedBuf) -> Ref<Node> {
     let d = buf.store_uninit::<Node>();
     let e = buf.store_uninit::<Node>();
 
-    {
-        let nodes = buf.store_slice::<Ref<Node>>(&[]);
-
-        buf.load_uninit_mut(e).write(&Node { id: 'e', nodes });
-    }
-
+    let nodes = buf.store_slice::<Ref<Node>>(&[]);
+    buf.load_uninit_mut(e).write(&Node { id: 'e', nodes });
     let e = e.assume_init();
 
-    {
-        let nodes = buf.store_slice(&[e]);
-
-        buf.load_uninit_mut(d).write(&Node { id: 'd', nodes });
-    }
-
+    let nodes = buf.store_slice(&[e]);
+    buf.load_uninit_mut(d).write(&Node { id: 'd', nodes });
     let d = d.assume_init();
 
-    {
-        let nodes = buf.store_slice(&[d, e]);
-
-        buf.load_uninit_mut(c).write(&Node { id: 'c', nodes });
-    }
-
+    let nodes = buf.store_slice(&[d, e]);
+    buf.load_uninit_mut(c).write(&Node { id: 'c', nodes });
     let c = c.assume_init();
 
-    {
-        let nodes = buf.store_slice(&[d]);
-
-        buf.load_uninit_mut(b).write(&Node { id: 'b', nodes });
-    }
-
+    let nodes = buf.store_slice(&[d]);
+    buf.load_uninit_mut(b).write(&Node { id: 'b', nodes });
     let b = b.assume_init();
 
-    {
-        let nodes = buf.store_slice(&[b, c, e]);
-
-        buf.load_uninit_mut(a).write(&Node { id: 'a', nodes });
-    }
-
+    let nodes = buf.store_slice(&[b, c, e]);
+    buf.load_uninit_mut(a).write(&Node { id: 'a', nodes });
     a.assume_init()
 }
 
