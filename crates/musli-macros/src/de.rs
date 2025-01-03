@@ -1157,6 +1157,8 @@ fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st_: &Body<'_>) -> Result<Tok
         context_t,
         decoder_t,
         pack_decoder_t,
+        option,
+        default_function,
         ..
     } = b.tokens;
 
@@ -1164,10 +1166,17 @@ fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st_: &Body<'_>) -> Result<Tok
     let output_var = b.cx.ident("output");
     let field_decoder = b.cx.ident("field_decoder");
 
+    let mut last = None;
+
     let mut assign = Vec::new();
 
     for f in &st_.unskipped_fields {
+        let mut is_default = false;
+
         if let Some((span, _)) = f.default_attr {
+            is_default = true;
+            last = Some(span);
+        } else if let Some(span) = last {
             b.packed_default_diagnostics(span);
         }
 
@@ -1175,14 +1184,38 @@ fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st_: &Body<'_>) -> Result<Tok
         let member = &f.member;
         let field_decoder = &field_decoder;
 
-        assign.push(move |ident: &syn::Ident, tokens: &mut TokenStream| {
-            tokens.extend(quote! {
-                #member: {
-                    let #field_decoder = #pack_decoder_t::decode_next(#ident)?;
-                    #decode_path(#field_decoder)?
-                }
-            })
-        });
+        if is_default {
+            let ty = f.ty;
+
+            let value: Box<dyn Fn(&syn::Ident, &mut TokenStream)> =
+                Box::new(move |ident: &syn::Ident, tokens: &mut TokenStream| {
+                    tokens.extend(quote! {
+                        #member: {
+                            let #field_decoder = #pack_decoder_t::decode_next(#ident)?;
+
+                            match #decoder_t::decode_option(#field_decoder)? {
+                                #option::Some(#field_decoder) => #decode_path(#field_decoder)?,
+                                #option::None => #default_function::<#ty>(),
+                            }
+                        }
+                    })
+                });
+
+            assign.push(value);
+        } else {
+            let value: Box<dyn Fn(&syn::Ident, &mut TokenStream)> = Box::new(Box::new(
+                move |ident: &syn::Ident, tokens: &mut TokenStream| {
+                    tokens.extend(quote! {
+                        #member: {
+                            let #field_decoder = #pack_decoder_t::decode_next(#ident)?;
+                            #decode_path(#field_decoder)?
+                        }
+                    })
+                },
+            ));
+
+            assign.push(value);
+        }
     }
 
     let enter = (cx.trace && cx.trace_body).then(|| {

@@ -10,6 +10,7 @@
 
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::needless_late_init)]
+#![allow(clippy::type_complexity)]
 #![allow(missing_docs)]
 
 mod de;

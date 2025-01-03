@@ -62,7 +62,9 @@ impl Build<'_, '_> {
     pub(crate) fn packed_default_diagnostics(&self, span: Span) {
         self.cx.error_span(
             span,
-            format_args!("#[{ATTR}(default)] fields cannot be used in an packed container",),
+            format_args!(
+                "#[{ATTR}(default)] fields can only be used in the end of packed containers"
+            ),
         );
     }
 

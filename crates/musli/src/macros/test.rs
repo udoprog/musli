@@ -389,6 +389,13 @@ macro_rules! __test_matrix {
         $call!(json, Text);
     };
 
+    (not_packed, $call:path) => {
+        $call!(storage, Binary);
+        $call!(wire, Binary);
+        $call!(descriptive, Binary);
+        $call!(json, Text);
+    };
+
     (text_mode, $call:path) => {
         $call!(storage, Text);
         $call!(wire, Text);

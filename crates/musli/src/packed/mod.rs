@@ -11,13 +11,52 @@
 //! In order to make full use of the packed format, the data model should use
 //! the `#[musli(packed)]` attribute on the container. This among other things
 //! prevents field identifiers from being emitted. See [`derives`] for more
-//! information.
+//! information. Since the packed format doesn't use field identifiers, it only
+//! supports optional fields *at the end* of the stream.
 //!
 //! See [`storage`] or [`wire`] or [`descriptive`] for formats which are upgrade
 //! stable.
 //!
 //! Note that this is simply a specialization of the `storage` format with
 //! different options. But it allows for much more efficient encoding.
+//!
+//! ```
+//! use musli::{Encode, Decode};
+//!
+//! #[derive(Debug, PartialEq, Encode, Decode)]
+//! #[musli(packed)]
+//! struct Version1 {
+//!     name: String,
+//! }
+//!
+//! #[derive(Debug, PartialEq, Encode, Decode)]
+//! #[musli(packed)]
+//! struct Version2 {
+//!     name: String,
+//!     #[musli(default)]
+//!     age: Option<u32>,
+//! }
+//!
+//! let version2 = musli::packed::to_vec(&Version2 {
+//!     name: String::from("Aristotle"),
+//!     age: Some(61),
+//! })?;
+//!
+//! let version1 = musli::packed::decode::<_, Version1>(version2.as_slice())?;
+//! assert_eq!(version1.name, "Aristotle");
+//!
+//! let version1 = musli::packed::to_vec(&Version1 {
+//!     name: String::from("Aristotle"),
+//! })?;
+//!
+//! let version2: Version2 = musli::packed::decode(version1.as_slice())?;
+//!
+//! assert_eq!(version2, Version2 {
+//!     name: String::from("Aristotle"),
+//!     age: None,
+//! });
+//! # Ok::<_, musli::packed::Error>(())
+//! ```
 //!
 //! [`storage`]: crate::storage
 //! [`descriptive`]: crate::descriptive
