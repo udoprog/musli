@@ -21,21 +21,21 @@ macro_rules! is_bitwise_slice {
 }
 
 /// A very simple encoder suitable for storage encoding.
-pub struct StorageEncoder<W, const OPT: Options, C> {
+pub struct StorageEncoder<const OPT: Options, const PACK: bool, W, C> {
     cx: C,
     writer: W,
 }
 
-impl<W, const OPT: Options, C> StorageEncoder<W, OPT, C> {
-    /// Construct a new fixed width message encoder.
+impl<const OPT: Options, const PACK: bool, W, C> StorageEncoder<OPT, PACK, W, C> {
+    /// Construct a new storage encoder.
     #[inline]
-    pub fn new(cx: C, writer: W) -> Self {
+    pub(crate) fn new(cx: C, writer: W) -> Self {
         Self { cx, writer }
     }
 }
 
 #[crate::encoder(crate)]
-impl<W, const OPT: Options, C> Encoder for StorageEncoder<W, OPT, C>
+impl<const OPT: Options, const PACK: bool, W, C> Encoder for StorageEncoder<OPT, PACK, W, C>
 where
     C: Context,
     W: Writer,
@@ -45,10 +45,10 @@ where
     type Ok = ();
     type Mode = C::Mode;
     type WithContext<U>
-        = StorageEncoder<W, OPT, U>
+        = StorageEncoder<OPT, PACK, W, U>
     where
         U: Context<Allocator = <Self::Cx as Context>::Allocator>;
-    type EncodePack = StorageEncoder<W, OPT, C>;
+    type EncodePack = StorageEncoder<OPT, true, W, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -105,7 +105,7 @@ where
 
     #[inline]
     fn encode_pack(self) -> Result<Self::EncodePack, C::Error> {
-        Ok(self)
+        Ok(StorageEncoder::<OPT, true, _, _>::new(self.cx, self.writer))
     }
 
     #[inline]
@@ -232,13 +232,19 @@ where
 
     #[inline]
     fn encode_some(mut self) -> Result<Self::EncodeSome, C::Error> {
-        self.writer.write_byte(self.cx, 1)?;
+        if !PACK {
+            self.writer.write_byte(self.cx, 1)?;
+        }
+
         Ok(self)
     }
 
     #[inline]
     fn encode_none(mut self) -> Result<Self::Ok, C::Error> {
-        self.writer.write_byte(self.cx, 0)?;
+        if !PACK {
+            self.writer.write_byte(self.cx, 0)?;
+        }
+
         Ok(())
     }
 
@@ -308,7 +314,7 @@ where
     where
         T: ?Sized + Encode<C::Mode>,
     {
-        StorageEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        StorageEncoder::<OPT, PACK, _, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
         crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
@@ -322,13 +328,13 @@ where
     where
         T: ?Sized + Encode<C::Mode>,
     {
-        StorageEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        StorageEncoder::<OPT, PACK, _, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
         crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
         Ok(self)
     }
 }
 
-impl<W, const OPT: Options, C> SequenceEncoder for StorageEncoder<W, OPT, C>
+impl<const OPT: Options, const PACK: bool, W, C> SequenceEncoder for StorageEncoder<OPT, PACK, W, C>
 where
     C: Context,
     W: Writer,
@@ -336,7 +342,7 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = StorageEncoder<W::Mut<'this>, OPT, C>
+        = StorageEncoder<OPT, PACK, W::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -392,7 +398,7 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> MapEncoder for StorageEncoder<W, OPT, C>
+impl<const OPT: Options, const PACK: bool, W, C> MapEncoder for StorageEncoder<OPT, PACK, W, C>
 where
     C: Context,
     W: Writer,
@@ -400,7 +406,7 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeEntry<'this>
-        = StorageEncoder<W::Mut<'this>, OPT, C>
+        = StorageEncoder<OPT, PACK, W::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -420,7 +426,7 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> EntryEncoder for StorageEncoder<W, OPT, C>
+impl<const OPT: Options, const PACK: bool, W, C> EntryEncoder for StorageEncoder<OPT, PACK, W, C>
 where
     C: Context,
     W: Writer,
@@ -428,11 +434,11 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeKey<'this>
-        = StorageEncoder<W::Mut<'this>, OPT, C>
+        = StorageEncoder<OPT, PACK, W::Mut<'this>, C>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = StorageEncoder<W::Mut<'this>, OPT, C>
+        = StorageEncoder<OPT, PACK, W::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -457,7 +463,7 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> EntriesEncoder for StorageEncoder<W, OPT, C>
+impl<const OPT: Options, const PACK: bool, W, C> EntriesEncoder for StorageEncoder<OPT, PACK, W, C>
 where
     C: Context,
     W: Writer,
@@ -465,11 +471,11 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeEntryKey<'this>
-        = StorageEncoder<W::Mut<'this>, OPT, C>
+        = StorageEncoder<OPT, PACK, W::Mut<'this>, C>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = StorageEncoder<W::Mut<'this>, OPT, C>
+        = StorageEncoder<OPT, PACK, W::Mut<'this>, C>
     where
         Self: 'this;
 
@@ -494,7 +500,7 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> VariantEncoder for StorageEncoder<W, OPT, C>
+impl<const OPT: Options, const PACK: bool, W, C> VariantEncoder for StorageEncoder<OPT, PACK, W, C>
 where
     C: Context,
     W: Writer,
@@ -502,11 +508,11 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeTag<'this>
-        = StorageEncoder<W::Mut<'this>, OPT, C>
+        = StorageEncoder<OPT, PACK, W::Mut<'this>, C>
     where
         Self: 'this;
     type EncodeData<'this>
-        = StorageEncoder<W::Mut<'this>, OPT, C>
+        = StorageEncoder<OPT, PACK, W::Mut<'this>, C>
     where
         Self: 'this;
 

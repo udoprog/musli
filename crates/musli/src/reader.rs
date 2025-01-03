@@ -51,6 +51,9 @@ pub trait Reader<'de>: self::sealed::Sealed {
     /// Borrow the current reader.
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
+    /// Test if the reader is at end of input.
+    fn is_eof(&mut self) -> bool;
+
     /// Skip over the given number of bytes.
     fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
@@ -190,6 +193,11 @@ impl<'de> Reader<'de> for &'de [u8] {
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         self
+    }
+
+    #[inline]
+    fn is_eof(&mut self) -> bool {
+        self.is_empty()
     }
 
     #[inline]
@@ -385,6 +393,11 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
+    fn is_eof(&mut self) -> bool {
+        self.range.start == self.range.end
+    }
+
+    #[inline]
     fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
         C: Context,
@@ -521,6 +534,11 @@ where
     }
 
     #[inline]
+    fn is_eof(&mut self) -> bool {
+        self.remaining == 0 || self.reader.is_eof()
+    }
+
+    #[inline]
     fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
         C: Context,
@@ -609,6 +627,11 @@ where
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         self
+    }
+
+    #[inline]
+    fn is_eof(&mut self) -> bool {
+        (**self).is_eof()
     }
 
     #[inline]

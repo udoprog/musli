@@ -335,7 +335,7 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = StorageEncoder<&'this mut BufWriter<C::Allocator>, OPT, C>
+        = StorageEncoder<OPT, true, &'this mut BufWriter<C::Allocator>, C>
     where
         Self: 'this;
 

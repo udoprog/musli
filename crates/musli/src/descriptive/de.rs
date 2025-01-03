@@ -741,7 +741,7 @@ where
 {
     type Cx = C;
     type DecodeNext<'this>
-        = StorageDecoder<<Limit<R> as Reader<'de>>::Mut<'this>, OPT, C>
+        = StorageDecoder<OPT, true, <Limit<R> as Reader<'de>>::Mut<'this>, C>
     where
         Self: 'this;
 

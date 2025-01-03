@@ -9,6 +9,7 @@ impl<F, T> Apply<T> for F
 where
     F: Fn(&T, &mut TokenStream),
 {
+    #[inline]
     fn apply(&self, value: &T, tokens: &mut TokenStream) {
         self(value, tokens)
     }
@@ -23,6 +24,7 @@ impl<A, T> ToTokens for IterItem<'_, A, T>
 where
     A: Apply<T>,
 {
+    #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream) {
         self.apply.apply(self.value, tokens);
     }

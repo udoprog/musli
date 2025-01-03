@@ -118,8 +118,8 @@ where
     crate::macros::encoding_impls!(
         M,
         packed,
-        StorageEncoder::<_, OPT, _>::new,
-        StorageDecoder::<_, OPT, _>::new,
+        StorageEncoder::<OPT, true, _, _>::new,
+        StorageDecoder::<OPT, true, _, _>::new,
         IntoReader::into_reader,
         IntoWriter::into_writer,
     );

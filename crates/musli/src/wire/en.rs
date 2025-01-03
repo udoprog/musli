@@ -56,7 +56,7 @@ where
     }
 }
 
-pub struct WireSequenceEncoder<W, const OPT: Options, C>
+pub struct WirePackEncoder<W, const OPT: Options, C>
 where
     C: Context,
 {
@@ -65,7 +65,7 @@ where
     buffer: BufWriter<C::Allocator>,
 }
 
-impl<W, const OPT: Options, C> WireSequenceEncoder<W, OPT, C>
+impl<W, const OPT: Options, C> WirePackEncoder<W, OPT, C>
 where
     C: Context,
 {
@@ -94,7 +94,7 @@ where
         = WireEncoder<W, OPT, U>
     where
         U: Context<Allocator = <Self::Cx as Context>::Allocator>;
-    type EncodePack = WireSequenceEncoder<W, OPT, C>;
+    type EncodePack = WirePackEncoder<W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -138,7 +138,7 @@ where
 
     #[inline]
     fn encode_pack(self) -> Result<Self::EncodePack, C::Error> {
-        Ok(WireSequenceEncoder::new(self.cx, self.writer))
+        Ok(WirePackEncoder::new(self.cx, self.writer))
     }
 
     #[inline]
@@ -337,7 +337,7 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> SequenceEncoder for WireSequenceEncoder<W, OPT, C>
+impl<W, const OPT: Options, C> SequenceEncoder for WirePackEncoder<W, OPT, C>
 where
     C: Context,
     W: Writer,
@@ -345,7 +345,7 @@ where
     type Cx = C;
     type Ok = ();
     type EncodeNext<'this>
-        = StorageEncoder<&'this mut BufWriter<C::Allocator>, OPT, C>
+        = StorageEncoder<OPT, true, &'this mut BufWriter<C::Allocator>, C>
     where
         Self: 'this;
 

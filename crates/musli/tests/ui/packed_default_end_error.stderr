@@ -1,0 +1,5 @@
+error: #[musli(default)] fields can only be used in the end of packed containers
+ --> tests/ui/packed_default_end_error.rs:7:13
+  |
+7 |     #[musli(default)]
+  |             ^^^^^^^

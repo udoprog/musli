@@ -100,7 +100,7 @@ where
         U: Context<Allocator = Self::Allocator>;
     type DecodeBuffer = AsValueDecoder<'de, OPT, C, A>;
     type DecodeSome = Self;
-    type DecodePack = StorageDecoder<SliceReader<'de>, OPT, C>;
+    type DecodePack = StorageDecoder<OPT, true, SliceReader<'de>, C>;
     type DecodeSequence = IterValueDecoder<'de, OPT, C, A>;
     type DecodeMap = IterValuePairsDecoder<'de, OPT, C, A>;
     type DecodeMapEntries = IterValuePairsDecoder<'de, OPT, C, A>;
