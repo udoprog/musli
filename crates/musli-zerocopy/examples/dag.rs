@@ -14,7 +14,7 @@
 //! d → e
 //! ```
 //!
-//! [DAG]: <https://en.wikipedia.org/wiki/Directed_acyclic_graph>)
+//! [DAG]: <https://en.wikipedia.org/wiki/Directed_acyclic_graph>
 
 use anyhow::{Context, Error};
 use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
