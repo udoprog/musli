@@ -1,13 +1,14 @@
+#![allow(clippy::type_complexity)]
+
 use core::fmt;
 use core::slice;
 
-#[cfg(feature = "alloc")]
+use crate::alloc::Allocator;
 use crate::de::UnsizedVisitor;
 use crate::de::{
     AsDecoder, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, Skip,
     VariantDecoder, Visitor,
 };
-#[cfg(feature = "alloc")]
 use crate::hint::SequenceHint;
 use crate::reader::SliceReader;
 use crate::storage::de::StorageDecoder;
@@ -19,30 +20,35 @@ use super::value::{Number, Value};
 use super::AsValueDecoder;
 
 /// Encoder for a single value.
-pub struct ValueDecoder<'de, const OPT: Options, C> {
+pub struct ValueDecoder<'de, const OPT: Options, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     cx: C,
-    value: &'de Value,
-    #[cfg(feature = "alloc")]
+    value: &'de Value<A>,
     map_key: bool,
 }
 
-impl<'de, const OPT: Options, C> ValueDecoder<'de, OPT, C> {
+impl<'de, const OPT: Options, C, A> ValueDecoder<'de, OPT, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     #[inline]
-    pub(crate) const fn new(cx: C, value: &'de Value) -> Self {
+    pub(crate) const fn new(cx: C, value: &'de Value<A>) -> Self {
         Self {
             cx,
             value,
-            #[cfg(feature = "alloc")]
             map_key: false,
         }
     }
 
     #[inline]
-    pub(crate) const fn with_map_key(cx: C, value: &'de Value) -> Self {
+    pub(crate) const fn with_map_key(cx: C, value: &'de Value<A>) -> Self {
         Self {
             cx,
             value,
-            #[cfg(feature = "alloc")]
             map_key: true,
         }
     }
@@ -52,7 +58,6 @@ macro_rules! ensure_number {
     ($self:expr, $opt:expr, $hint:ident, $ident:ident $tt:tt, Value::$variant:ident($block:ident) => $ty:ty) => {
         match $self.value {
             Value::$variant($block) => <$ty>::from_number($block).map_err(|e| $self.cx.message(e)),
-            #[cfg(feature = "alloc")]
             Value::String(string) if crate::options::is_map_keys_as_numbers::<$opt>() && $self.map_key => {
                 match <$ty>::parse_number(string) {
                     Some(value) => Ok(value),
@@ -80,25 +85,26 @@ macro_rules! ensure {
 }
 
 #[crate::decoder(crate)]
-impl<'de, C, const OPT: Options> Decoder<'de> for ValueDecoder<'de, OPT, C>
+impl<'de, const OPT: Options, C, A> Decoder<'de> for ValueDecoder<'de, OPT, C, A>
 where
     C: Context,
+    A: Allocator,
 {
     type Cx = C;
     type Error = C::Error;
     type Mode = C::Mode;
     type Allocator = C::Allocator;
     type WithContext<U>
-        = ValueDecoder<'de, OPT, U>
+        = ValueDecoder<'de, OPT, U, A>
     where
-        U: Context;
-    type DecodeBuffer = AsValueDecoder<OPT, C>;
+        U: Context<Allocator = Self::Allocator>;
+    type DecodeBuffer = AsValueDecoder<'de, OPT, C, A>;
     type DecodeSome = Self;
     type DecodePack = StorageDecoder<SliceReader<'de>, OPT, C>;
-    type DecodeSequence = IterValueDecoder<'de, OPT, C>;
-    type DecodeMap = IterValuePairsDecoder<'de, OPT, C>;
-    type DecodeMapEntries = IterValuePairsDecoder<'de, OPT, C>;
-    type DecodeVariant = IterValueVariantDecoder<'de, OPT, C>;
+    type DecodeSequence = IterValueDecoder<'de, OPT, C, A>;
+    type DecodeMap = IterValuePairsDecoder<'de, OPT, C, A>;
+    type DecodeMapEntries = IterValuePairsDecoder<'de, OPT, C, A>;
+    type DecodeVariant = IterValueVariantDecoder<'de, OPT, C, A>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -108,7 +114,7 @@ where
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = Self::Allocator>,
     {
         Ok(ValueDecoder::new(cx, self.value))
     }
@@ -130,7 +136,7 @@ where
 
     #[inline]
     fn decode_buffer(self) -> Result<Self::DecodeBuffer, C::Error> {
-        Ok(AsValueDecoder::new(self.cx, self.value.clone()))
+        Ok(AsValueDecoder::new(self.cx, self.value))
     }
 
     #[inline]
@@ -218,7 +224,6 @@ where
         ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => isize)
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_array<const N: usize>(self) -> Result<[u8; N], C::Error> {
         ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
@@ -226,7 +231,6 @@ where
         })
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
@@ -237,7 +241,6 @@ where
         })
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
@@ -248,7 +251,6 @@ where
         })
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_option(self) -> Result<Option<Self::DecodeSome>, C::Error> {
         ensure!(self, hint, ExpectedOption(hint), Value::Option(option) => {
@@ -256,7 +258,6 @@ where
         })
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_pack<F, O>(self, f: F) -> Result<O, C::Error>
     where
@@ -267,7 +268,6 @@ where
         })
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_sequence<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
     where
@@ -278,7 +278,6 @@ where
         })
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
     where
@@ -289,7 +288,6 @@ where
         })
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
     where
@@ -300,7 +298,6 @@ where
         })
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
     where
@@ -309,7 +306,6 @@ where
         self.decode_map(f)
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_variant<F, O>(self, f: F) -> Result<O, C::Error>
     where
@@ -345,46 +341,43 @@ where
                 Number::F32(value) => visitor.visit_f32(self.cx, *value),
                 Number::F64(value) => visitor.visit_f64(self.cx, *value),
             },
-            #[cfg(feature = "alloc")]
             Value::Bytes(bytes) => {
                 let visitor = visitor.visit_bytes(self.cx, SizeHint::exact(bytes.len()))?;
                 visitor.visit_borrowed(self.cx, bytes)
             }
-            #[cfg(feature = "alloc")]
             Value::String(string) => {
                 let visitor = visitor.visit_string(self.cx, SizeHint::exact(string.len()))?;
                 visitor.visit_borrowed(self.cx, string)
             }
-            #[cfg(feature = "alloc")]
             Value::Sequence(values) => {
-                visitor.visit_sequence(&mut IterValueDecoder::<OPT, _>::new(self.cx, values))
+                visitor.visit_sequence(&mut IterValueDecoder::<OPT, _, _>::new(self.cx, values))
             }
-            #[cfg(feature = "alloc")]
-            Value::Map(values) => {
-                visitor.visit_map(&mut IterValuePairsDecoder::<OPT, _>::new(self.cx, values))
+            Value::Map(values) => visitor.visit_map(&mut IterValuePairsDecoder::<OPT, _, _>::new(
+                self.cx, values,
+            )),
+            Value::Variant(variant) => {
+                visitor.visit_variant(&mut IterValueVariantDecoder::<OPT, _, _>::new(
+                    self.cx, variant,
+                ))
             }
-            #[cfg(feature = "alloc")]
-            Value::Variant(variant) => visitor.visit_variant(
-                &mut IterValueVariantDecoder::<OPT, _>::new(self.cx, variant),
-            ),
-            #[cfg(feature = "alloc")]
             Value::Option(option) => visitor.visit_option(
                 self.cx,
                 option
                     .as_ref()
-                    .map(|value| ValueDecoder::<OPT, _>::new(self.cx, value)),
+                    .map(|value| ValueDecoder::<OPT, _, _>::new(self.cx, value)),
             ),
         }
     }
 }
 
-impl<C, const OPT: Options> AsDecoder for ValueDecoder<'_, OPT, C>
+impl<const OPT: Options, C, A> AsDecoder for ValueDecoder<'_, OPT, C, A>
 where
     C: Context,
+    A: Allocator,
 {
     type Cx = C;
     type Decoder<'this>
-        = ValueDecoder<'this, OPT, C>
+        = ValueDecoder<'this, OPT, C, A>
     where
         Self: 'this;
 
@@ -395,15 +388,22 @@ where
 }
 
 /// A decoder over a simple value iterator.
-pub struct IterValueDecoder<'de, const OPT: Options, C> {
+pub struct IterValueDecoder<'de, const OPT: Options, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     cx: C,
-    iter: slice::Iter<'de, Value>,
+    iter: slice::Iter<'de, Value<A>>,
 }
 
-#[cfg(feature = "alloc")]
-impl<'de, const OPT: Options, C> IterValueDecoder<'de, OPT, C> {
+impl<'de, const OPT: Options, C, A> IterValueDecoder<'de, OPT, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     #[inline]
-    fn new(cx: C, values: &'de [Value]) -> Self {
+    fn new(cx: C, values: &'de [Value<A>]) -> Self {
         Self {
             cx,
             iter: values.iter(),
@@ -411,13 +411,14 @@ impl<'de, const OPT: Options, C> IterValueDecoder<'de, OPT, C> {
     }
 }
 
-impl<'de, C, const OPT: Options> SequenceDecoder<'de> for IterValueDecoder<'de, OPT, C>
+impl<'de, const OPT: Options, C, A> SequenceDecoder<'de> for IterValueDecoder<'de, OPT, C, A>
 where
     C: Context,
+    A: Allocator,
 {
     type Cx = C;
     type DecodeNext<'this>
-        = ValueDecoder<'de, OPT, C>
+        = ValueDecoder<'de, OPT, C, A>
     where
         Self: 'this;
 
@@ -449,14 +450,22 @@ where
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairsDecoder<'de, const OPT: Options, C> {
+pub struct IterValuePairsDecoder<'de, const OPT: Options, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     cx: C,
-    iter: slice::Iter<'de, (Value, Value)>,
+    iter: slice::Iter<'de, (Value<A>, Value<A>)>,
 }
 
-impl<'de, const OPT: Options, C> IterValuePairsDecoder<'de, OPT, C> {
+impl<'de, const OPT: Options, C, A> IterValuePairsDecoder<'de, OPT, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     #[inline]
-    fn new(cx: C, values: &'de [(Value, Value)]) -> Self {
+    fn new(cx: C, values: &'de [(Value<A>, Value<A>)]) -> Self {
         Self {
             cx,
             iter: values.iter(),
@@ -464,17 +473,18 @@ impl<'de, const OPT: Options, C> IterValuePairsDecoder<'de, OPT, C> {
     }
 }
 
-impl<'de, C, const OPT: Options> MapDecoder<'de> for IterValuePairsDecoder<'de, OPT, C>
+impl<'de, const OPT: Options, C, A> MapDecoder<'de> for IterValuePairsDecoder<'de, OPT, C, A>
 where
     C: Context,
+    A: Allocator,
 {
     type Cx = C;
     type DecodeEntry<'this>
-        = IterValuePairDecoder<'de, OPT, C>
+        = IterValuePairDecoder<'de, OPT, C, A>
     where
         Self: 'this;
     type DecodeRemainingEntries<'this>
-        = IterValuePairsDecoder<'de, OPT, C>
+        = IterValuePairsDecoder<'de, OPT, C, A>
     where
         Self: 'this;
 
@@ -505,17 +515,18 @@ where
     }
 }
 
-impl<'de, C, const OPT: Options> EntriesDecoder<'de> for IterValuePairsDecoder<'de, OPT, C>
+impl<'de, const OPT: Options, C, A> EntriesDecoder<'de> for IterValuePairsDecoder<'de, OPT, C, A>
 where
     C: Context,
+    A: Allocator,
 {
     type Cx = C;
     type DecodeEntryKey<'this>
-        = ValueDecoder<'de, OPT, C>
+        = ValueDecoder<'de, OPT, C, A>
     where
         Self: 'this;
     type DecodeEntryValue<'this>
-        = ValueDecoder<'de, OPT, C>
+        = ValueDecoder<'de, OPT, C, A>
     where
         Self: 'this;
 
@@ -548,16 +559,17 @@ where
     }
 }
 
-impl<'de, C, const OPT: Options> EntryDecoder<'de> for IterValuePairDecoder<'de, OPT, C>
+impl<'de, const OPT: Options, C, A> EntryDecoder<'de> for IterValuePairDecoder<'de, OPT, C, A>
 where
     C: Context,
+    A: Allocator,
 {
     type Cx = C;
     type DecodeKey<'this>
-        = ValueDecoder<'de, OPT, C>
+        = ValueDecoder<'de, OPT, C, A>
     where
         Self: 'this;
-    type DecodeValue = ValueDecoder<'de, OPT, C>;
+    type DecodeValue = ValueDecoder<'de, OPT, C, A>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -576,43 +588,59 @@ where
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairDecoder<'de, const OPT: Options, C> {
+pub struct IterValuePairDecoder<'de, const OPT: Options, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     cx: C,
-    pair: &'de (Value, Value),
+    pair: &'de (Value<A>, Value<A>),
 }
 
-impl<'de, const OPT: Options, C> IterValuePairDecoder<'de, OPT, C> {
+impl<'de, const OPT: Options, C, A> IterValuePairDecoder<'de, OPT, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     #[inline]
-    const fn new(cx: C, pair: &'de (Value, Value)) -> Self {
+    const fn new(cx: C, pair: &'de (Value<A>, Value<A>)) -> Self {
         Self { cx, pair }
     }
 }
 
 /// A decoder over a simple value pair as a variant.
-pub struct IterValueVariantDecoder<'de, const OPT: Options, C> {
+pub struct IterValueVariantDecoder<'de, const OPT: Options, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     cx: C,
-    pair: &'de (Value, Value),
+    pair: &'de (Value<A>, Value<A>),
 }
 
-#[cfg(feature = "alloc")]
-impl<'de, const OPT: Options, C> IterValueVariantDecoder<'de, OPT, C> {
+impl<'de, const OPT: Options, C, A> IterValueVariantDecoder<'de, OPT, C, A>
+where
+    C: Context,
+    A: Allocator,
+{
     #[inline]
-    const fn new(cx: C, pair: &'de (Value, Value)) -> Self {
+    const fn new(cx: C, pair: &'de (Value<A>, Value<A>)) -> Self {
         Self { cx, pair }
     }
 }
 
-impl<'de, C, const OPT: Options> VariantDecoder<'de> for IterValueVariantDecoder<'de, OPT, C>
+impl<'de, const OPT: Options, C, A> VariantDecoder<'de> for IterValueVariantDecoder<'de, OPT, C, A>
 where
     C: Context,
+    A: Allocator,
 {
     type Cx = C;
     type DecodeTag<'this>
-        = ValueDecoder<'de, OPT, C>
+        = ValueDecoder<'de, OPT, C, A>
     where
         Self: 'this;
     type DecodeValue<'this>
-        = ValueDecoder<'de, OPT, C>
+        = ValueDecoder<'de, OPT, C, A>
     where
         Self: 'this;
 
@@ -638,7 +666,6 @@ trait FromNumber: Sized {
 
     fn from_number(number: &Number) -> Result<Self, ErrorMessage>;
 
-    #[cfg(feature = "alloc")]
     fn parse_number(string: &str) -> Option<Self>;
 }
 
@@ -676,7 +703,6 @@ macro_rules! integer_from {
             }
 
             #[inline]
-            #[cfg(feature = "alloc")]
             fn parse_number(string: &str) -> Option<Self> {
                 string.parse().ok()
             }
@@ -718,7 +744,6 @@ macro_rules! float_from {
             }
 
             #[inline]
-            #[cfg(feature = "alloc")]
             fn parse_number(string: &str) -> Option<Self> {
                 string.parse().ok()
             }

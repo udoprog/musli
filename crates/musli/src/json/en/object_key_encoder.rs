@@ -39,7 +39,7 @@ where
     type WithContext<U>
         = JsonObjectKeyEncoder<W, U>
     where
-        U: Context;
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -49,7 +49,7 @@ where
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
     {
         Ok(JsonObjectKeyEncoder::new(cx, self.writer))
     }

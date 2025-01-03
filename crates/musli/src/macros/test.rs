@@ -69,7 +69,7 @@ macro_rules! test_fns {
 
             $crate::macros::test_include_if! {
                 $($(#[$option])*)* =>
-                let value_decode: $crate::value::Value = match encoding.from_slice_with(&cx, out.as_slice()) {
+                let value_decode: $crate::value::Value<_> = match encoding.from_slice_with(&cx, out.as_slice()) {
                     Ok(decoded) => decoded,
                     Err(..) => {
                         let out = FormatBytes(&out);
@@ -449,7 +449,7 @@ pub mod support {
         T: Encode<Binary> + for<'de> Decode<'de, Binary, System>,
         T: PartialEq + core::fmt::Debug,
     {
-        let value: Value = value::encode(&expected).expect("value: Encoding should succeed");
+        let value: Value<_> = value::encode(&expected).expect("value: Encoding should succeed");
         let actual: T = value::decode(&value).expect("value: Decoding should succeed");
         assert_eq!(
             actual, expected,

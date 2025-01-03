@@ -46,7 +46,7 @@ where
     type WithContext<U>
         = JsonEncoder<W, U>
     where
-        U: Context;
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     type EncodePack = JsonArrayEncoder<W, C>;
     type EncodeSome = Self;
     type EncodeSequence = JsonArrayEncoder<W, C>;
@@ -64,7 +64,7 @@ where
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
     {
         Ok(JsonEncoder::new(cx, self.writer))
     }

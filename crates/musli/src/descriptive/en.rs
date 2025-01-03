@@ -67,7 +67,7 @@ where
     type WithContext<U>
         = SelfEncoder<W, OPT, U>
     where
-        U: Context;
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     type EncodePack = SelfPackEncoder<W, OPT, C>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
@@ -85,7 +85,7 @@ where
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
     {
         Ok(SelfEncoder::new(cx, self.writer))
     }

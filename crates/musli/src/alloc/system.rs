@@ -43,6 +43,17 @@ impl System {
     pub const fn new() -> Self {
         Self
     }
+
+    /// Construct an allocation directly from raw parts.
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that the allocation comes from the same system
+    /// allocator and is correctly initialized per its parameters.
+    #[inline]
+    pub(crate) unsafe fn slice_from_raw_parts<T>(data: NonNull<T>, size: usize) -> SystemBuf<T> {
+        SystemBuf { data, size }
+    }
 }
 
 impl Default for System {
@@ -270,6 +281,7 @@ impl<T> SystemBuf<T> {
 }
 
 impl<T> Drop for SystemBuf<T> {
+    #[inline]
     fn drop(&mut self) {
         self.free();
     }

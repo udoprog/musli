@@ -28,7 +28,7 @@ error[E0277]: `ContextError` must be implemented for `MyError`, or any error typ
              musli::json::Error<A>
              musli::packed::Error<A>
              musli::storage::Error<A>
-             musli::value::Error
+             musli::value::Error<A>
              musli::wire::Error<A>
              std::io::Error
              std::string::String

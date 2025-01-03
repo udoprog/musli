@@ -1,9 +1,12 @@
+use core::cmp::Ordering;
 use core::fmt;
 use core::ops::Deref;
 use core::str;
 
 use crate::Allocator;
 
+#[cfg(feature = "alloc")]
+use super::System;
 use super::{AllocError, Vec};
 
 /// Wrapper around a buffer that is guaranteed to be a valid utf-8 string.
@@ -56,14 +59,16 @@ where
         unsafe { str::from_utf8_unchecked(self.buf.as_slice()) }
     }
 
+    /// Push a character.
     #[inline]
-    fn push(&mut self, c: char) -> Result<(), AllocError> {
+    pub fn push(&mut self, c: char) -> Result<(), AllocError> {
         self.buf
             .extend_from_slice(c.encode_utf8(&mut [0; 4]).as_bytes())
     }
 
+    /// Push a string.
     #[inline]
-    fn push_str(&mut self, s: &str) -> Result<(), AllocError> {
+    pub fn push_str(&mut self, s: &str) -> Result<(), AllocError> {
         self.buf.extend_from_slice(s.as_bytes())
     }
 }
@@ -122,5 +127,48 @@ where
     #[inline]
     fn as_ref(&self) -> &str {
         self.as_str()
+    }
+}
+
+impl<A> PartialEq for String<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str().eq(other.as_str())
+    }
+}
+
+impl<A> Eq for String<A> where A: Allocator {}
+
+impl<A> PartialOrd for String<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<A> Ord for String<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_str().cmp(other.as_str())
+    }
+}
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl From<rust_alloc::string::String> for String<System> {
+    #[inline]
+    fn from(value: rust_alloc::string::String) -> Self {
+        Self {
+            buf: Vec::from(value.into_bytes()),
+        }
     }
 }

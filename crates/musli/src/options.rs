@@ -310,7 +310,7 @@ pub(crate) const fn byteorder_value(opt: Options) -> ByteOrder {
     }
 }
 
-#[cfg(all(feature = "alloc", feature = "value"))]
+#[cfg(feature = "value")]
 #[inline]
 pub(crate) const fn is_map_keys_as_numbers<const OPT: Options>() -> bool {
     is_map_keys_as_numbers_value(OPT)

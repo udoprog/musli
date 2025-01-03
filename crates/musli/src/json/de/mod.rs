@@ -25,10 +25,8 @@ use core::str;
 use crate::alloc::Vec;
 use crate::de::{Decoder, SequenceDecoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 use crate::hint::{MapHint, SequenceHint};
-#[cfg(feature = "value")]
 use crate::options;
 use crate::Context;
-#[cfg(feature = "value")]
 use crate::Options;
 
 #[cfg(not(feature = "parse-full"))]
@@ -41,7 +39,6 @@ use super::parser::integer::{
 };
 use super::parser::{integer, Parser, StringReference, Token};
 
-#[cfg(feature = "value")]
 const BUFFER_OPTIONS: Options = options::new().map_keys_as_numbers().build();
 
 /// A JSON decoder for Müsli.
@@ -113,9 +110,8 @@ where
     type WithContext<U>
         = JsonDecoder<P, U>
     where
-        U: Context;
-    #[cfg(feature = "value")]
-    type DecodeBuffer = crate::value::AsValueDecoder<BUFFER_OPTIONS, C>;
+        U: Context<Allocator = Self::Allocator>;
+    type DecodeBuffer = crate::value::IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator>;
     type DecodePack = JsonSequenceDecoder<P, C>;
     type DecodeSequence = JsonSequenceDecoder<P, C>;
     type DecodeMap = JsonObjectDecoder<P, C>;
@@ -131,7 +127,7 @@ where
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = Self::Allocator>,
     {
         Ok(JsonDecoder::new(cx, self.parser))
     }
@@ -152,14 +148,13 @@ where
         Ok(Skip::Skipped)
     }
 
-    #[cfg(feature = "value")]
     #[inline]
     fn decode_buffer(self) -> Result<Self::DecodeBuffer, C::Error> {
         let cx = self.cx;
-        let value = self.decode::<crate::value::Value>()?;
+        let value = self.decode::<crate::value::Value<C::Allocator>>()?;
         // JSON: Encodes numbers in objects as strings, so we need to permit
         // treating them as such here as well.
-        Ok(value.into_value_decoder(cx))
+        Ok(value.into_decoder(cx))
     }
 
     #[inline]

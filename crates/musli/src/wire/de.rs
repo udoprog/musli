@@ -213,7 +213,7 @@ where
     type WithContext<U>
         = WireDecoder<R, OPT, U>
     where
-        U: Context;
+        U: Context<Allocator = Self::Allocator>;
     type DecodePack = WireDecoder<Limit<R>, OPT, C>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingWireDecoder<R, OPT, C>;
@@ -229,7 +229,7 @@ where
     #[inline]
     fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
     where
-        U: Context,
+        U: Context<Allocator = Self::Allocator>,
     {
         Ok(WireDecoder::new(cx, self.reader))
     }
