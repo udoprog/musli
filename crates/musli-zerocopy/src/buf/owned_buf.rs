@@ -6,6 +6,9 @@ use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
 use core::slice::{self, SliceIndex};
 
+#[cfg(feature = "std")]
+use std::io;
+
 use alloc::alloc;
 
 use crate::buf::{self, Buf, DefaultAlignment, Padder, StoreBuf};
@@ -1396,5 +1399,20 @@ where
     #[inline]
     fn as_mut_buf(&mut self) -> &mut Buf {
         self
+    }
+}
+
+#[cfg(feature = "std")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
+impl io::Write for OwnedBuf {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }

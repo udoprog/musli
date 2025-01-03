@@ -531,6 +531,7 @@
 #![deny(missing_docs)]
 #![cfg_attr(all(musli_nightly), feature(repr128))]
 #![cfg_attr(all(musli_nightly), allow(incomplete_features))]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

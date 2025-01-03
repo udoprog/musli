@@ -20,7 +20,7 @@ all-features = true
 rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
 
 [lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(musli_nightly)'] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(musli_nightly, doc_cfg)'] }
 
 [features]
 default = ["std", "alloc"]
