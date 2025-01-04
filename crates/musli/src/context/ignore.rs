@@ -1,26 +1,22 @@
 use core::cell::Cell;
 use core::fmt;
-use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
-#[cfg(test)]
-use crate::mode::Binary;
 use crate::{Allocator, Context};
 
 use super::ErrorMarker;
 
 /// A simple non-diagnostical capturing context which ignores the error and
 /// loses all information about it (except that it happened).
-pub struct Ignore<M, A> {
+pub struct Ignore<A> {
     alloc: A,
     error: Cell<bool>,
-    _marker: PhantomData<M>,
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M> Ignore<M, System> {
+impl Ignore<System> {
     /// Construct a new ignoring context with the [`System`] allocator.
     #[inline]
     pub fn new() -> Self {
@@ -28,20 +24,19 @@ impl<M> Ignore<M, System> {
     }
 }
 
-impl<M, A> Ignore<M, A> {
+impl<A> Ignore<A> {
     /// Construct a new ignoring context.
     #[inline]
     pub fn with_alloc(alloc: A) -> Self {
         Self {
             alloc,
             error: Cell::new(false),
-            _marker: PhantomData,
         }
     }
 }
 
 #[cfg(test)]
-impl<A> Ignore<Binary, A> {
+impl<A> Ignore<A> {
     /// Construct a new ignoring context which collects an error marker.
     #[inline]
     pub(crate) fn with_marker(alloc: A) -> Self {
@@ -49,7 +44,7 @@ impl<A> Ignore<Binary, A> {
     }
 }
 
-impl<M, A> Ignore<M, A> {
+impl<A> Ignore<A> {
     /// Construct an error or panic.
     #[inline]
     pub fn unwrap(self) -> ErrorMarker {
@@ -61,12 +56,10 @@ impl<M, A> Ignore<M, A> {
     }
 }
 
-impl<M, A> Context for &Ignore<M, A>
+impl<A> Context for &Ignore<A>
 where
-    M: 'static,
     A: Clone + Allocator,
 {
-    type Mode = M;
     type Error = ErrorMarker;
     type Mark = ();
     type Allocator = A;
@@ -106,7 +99,7 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M> Default for Ignore<M, System> {
+impl Default for Ignore<System> {
     #[inline]
     fn default() -> Self {
         Self::new()

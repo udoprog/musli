@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 use core::mem;
 
 use crate::de::{Decoder, SequenceDecoder, SizeHint};
@@ -7,18 +8,20 @@ use crate::Context;
 use super::JsonDecoder;
 
 #[must_use = "Must call skip_sequence_remaining"]
-pub(crate) struct JsonSequenceDecoder<P, C> {
+pub(crate) struct JsonSequenceDecoder<P, C, M> {
     cx: C,
     len: Option<usize>,
     first: bool,
     parser: P,
     finalized: bool,
+    _marker: PhantomData<M>,
 }
 
-impl<'de, P, C> JsonSequenceDecoder<P, C>
+impl<'de, P, C, M> JsonSequenceDecoder<P, C, M>
 where
     P: Parser<'de>,
     C: Context,
+    M: 'static,
 {
     #[inline]
     pub(super) fn new(cx: C, len: Option<usize>, mut parser: P) -> Result<Self, C::Error> {
@@ -36,6 +39,7 @@ where
             first: true,
             parser,
             finalized: false,
+            _marker: PhantomData,
         })
     }
 
@@ -89,14 +93,16 @@ where
     }
 }
 
-impl<'de, P, C> SequenceDecoder<'de> for JsonSequenceDecoder<P, C>
+impl<'de, P, C, M> SequenceDecoder<'de> for JsonSequenceDecoder<P, C, M>
 where
     P: Parser<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeNext<'this>
-        = JsonDecoder<P::Mut<'this>, C>
+        = JsonDecoder<P::Mut<'this>, C, M>
     where
         Self: 'this;
 

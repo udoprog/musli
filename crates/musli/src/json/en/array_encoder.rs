@@ -1,3 +1,4 @@
+use core::marker::PhantomData;
 use core::mem::take;
 
 use crate::en::SequenceEncoder;
@@ -6,17 +7,19 @@ use crate::{Context, Writer};
 use super::JsonEncoder;
 
 /// Encoder for a JSON array.
-pub(crate) struct JsonArrayEncoder<W, C> {
+pub(crate) struct JsonArrayEncoder<W, C, M> {
     cx: C,
     first: bool,
     end: &'static [u8],
     writer: W,
+    _marker: PhantomData<M>,
 }
 
-impl<W, C> JsonArrayEncoder<W, C>
+impl<W, C, M> JsonArrayEncoder<W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     #[inline]
     pub(super) fn new(cx: C, writer: W) -> Result<Self, C::Error> {
@@ -32,19 +35,22 @@ where
             first: true,
             end,
             writer,
+            _marker: PhantomData,
         })
     }
 }
 
-impl<W, C> SequenceEncoder for JsonArrayEncoder<W, C>
+impl<W, C, M> SequenceEncoder for JsonArrayEncoder<W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeNext<'this>
-        = JsonEncoder<W::Mut<'this>, C>
+        = JsonEncoder<W::Mut<'this>, C, M>
     where
         Self: 'this;
 

@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
@@ -17,29 +18,35 @@ use super::tag::{
 const VARIANT: Tag = Tag::from_mark(Mark::Variant);
 
 /// A very simple encoder.
-pub struct SelfEncoder<W, const OPT: Options, C> {
+pub struct SelfEncoder<const OPT: Options, W, C, M> {
     cx: C,
     writer: W,
+    _marker: PhantomData<M>,
 }
 
-impl<W, const OPT: Options, C> SelfEncoder<W, OPT, C> {
+impl<const OPT: Options, W, C, M> SelfEncoder<OPT, W, C, M> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(cx: C, writer: W) -> Self {
-        Self { cx, writer }
+        Self {
+            cx,
+            writer,
+            _marker: PhantomData,
+        }
     }
 }
 
-pub struct SelfPackEncoder<W, const OPT: Options, C>
+pub struct SelfPackEncoder<const OPT: Options, W, C, M>
 where
     C: Context,
 {
     cx: C,
     writer: W,
     buffer: BufWriter<C::Allocator>,
+    _marker: PhantomData<M>,
 }
 
-impl<W, const OPT: Options, C> SelfPackEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> SelfPackEncoder<OPT, W, C, M>
 where
     C: Context,
 {
@@ -50,25 +57,27 @@ where
             cx,
             writer,
             buffer: BufWriter::new(cx.alloc()),
+            _marker: PhantomData,
         }
     }
 }
 
 #[crate::encoder(crate)]
-impl<W, const OPT: Options, C> Encoder for SelfEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> Encoder for SelfEncoder<OPT, W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
     type Ok = ();
-    type Mode = C::Mode;
+    type Mode = M;
     type WithContext<U>
-        = SelfEncoder<W, OPT, U>
+        = SelfEncoder<OPT, W, U, M>
     where
         U: Context<Allocator = <Self::Cx as Context>::Allocator>;
-    type EncodePack = SelfPackEncoder<W, OPT, C>;
+    type EncodePack = SelfPackEncoder<OPT, W, C, M>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -122,7 +131,7 @@ where
 
     #[inline]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Bytes, bytes.len())?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Bytes, bytes.len())?;
         self.writer.write_bytes(self.cx, bytes)?;
         Ok(())
     }
@@ -132,7 +141,7 @@ where
     where
         I: IntoIterator<Item: AsRef<[u8]>>,
     {
-        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Bytes, len)?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Bytes, len)?;
 
         for bytes in vectors {
             self.writer.write_bytes(self.cx, bytes.as_ref())?;
@@ -143,7 +152,7 @@ where
 
     #[inline]
     fn encode_string(mut self, string: &str) -> Result<Self::Ok, C::Error> {
-        encode_prefix::<_, _, OPT>(
+        encode_prefix::<OPT, _, _>(
             self.cx,
             self.writer.borrow_mut(),
             Kind::String,
@@ -255,19 +264,19 @@ where
 
     #[inline]
     fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, C::Error> {
-        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Sequence, hint.size)?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Sequence, hint.size)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, C::Error> {
-        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Map, hint.size)?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Map, hint.size)?;
         Ok(self)
     }
 
     #[inline]
     fn encode_map_entries(mut self, hint: &MapHint) -> Result<Self::EncodeMapEntries, C::Error> {
-        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Map, hint.size)?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Map, hint.size)?;
         Ok(self)
     }
 
@@ -280,7 +289,7 @@ where
     #[inline]
     fn encode_unit_variant<T>(self, tag: &T) -> Result<(), C::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         let mut variant = self.encode_variant()?;
         variant.encode_tag()?.encode(tag)?;
@@ -296,10 +305,10 @@ where
         hint: &SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         self.writer.write_byte(self.cx, VARIANT.byte())?;
-        SelfEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        SelfEncoder::<OPT, _, _, M>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
         self.encode_sequence(hint)
     }
 
@@ -310,23 +319,25 @@ where
         hint: &MapHint,
     ) -> Result<Self::EncodeMapVariant, C::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         self.writer.write_byte(self.cx, VARIANT.byte())?;
-        SelfEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        SelfEncoder::<OPT, _, _, M>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
         self.encode_map(hint)
     }
 }
 
-impl<W, const OPT: Options, C> SequenceEncoder for SelfPackEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> SequenceEncoder for SelfPackEncoder<OPT, W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeNext<'this>
-        = StorageEncoder<OPT, true, &'this mut BufWriter<C::Allocator>, C>
+        = StorageEncoder<OPT, true, &'this mut BufWriter<C::Allocator>, C, M>
     where
         Self: 'this;
 
@@ -343,21 +354,23 @@ where
     #[inline]
     fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
-        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), Kind::Bytes, buffer.len())?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Bytes, buffer.len())?;
         self.writer.extend(self.cx, buffer)?;
         Ok(())
     }
 }
 
-impl<W, const OPT: Options, C> SequenceEncoder for SelfEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> SequenceEncoder for SelfEncoder<OPT, W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeNext<'this>
-        = SelfEncoder<W::Mut<'this>, OPT, C>
+        = SelfEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -377,15 +390,17 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> MapEncoder for SelfEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> MapEncoder for SelfEncoder<OPT, W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeEntry<'this>
-        = SelfEncoder<W::Mut<'this>, OPT, C>
+        = SelfEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -405,19 +420,21 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> EntryEncoder for SelfEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> EntryEncoder for SelfEncoder<OPT, W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeKey<'this>
-        = SelfEncoder<W::Mut<'this>, OPT, C>
+        = SelfEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = SelfEncoder<W::Mut<'this>, OPT, C>
+        = SelfEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -442,19 +459,21 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> EntriesEncoder for SelfEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> EntriesEncoder for SelfEncoder<OPT, W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeEntryKey<'this>
-        = SelfEncoder<W::Mut<'this>, OPT, C>
+        = SelfEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = SelfEncoder<W::Mut<'this>, OPT, C>
+        = SelfEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -479,19 +498,21 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> VariantEncoder for SelfEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> VariantEncoder for SelfEncoder<OPT, W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeTag<'this>
-        = SelfEncoder<W::Mut<'this>, OPT, C>
+        = SelfEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
     type EncodeData<'this>
-        = SelfEncoder<W::Mut<'this>, OPT, C>
+        = SelfEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -518,15 +539,15 @@ where
 
 /// Encode a length prefix.
 #[inline]
-fn encode_prefix<C, W, const OPT: Options>(
+fn encode_prefix<const OPT: Options, W, C>(
     cx: C,
     mut writer: W,
     kind: Kind,
     len: usize,
 ) -> Result<(), C::Error>
 where
-    C: Context,
     W: Writer,
+    C: Context,
 {
     let (tag, embedded) = Tag::with_len(kind, len);
     writer.write_byte(cx, tag.byte())?;

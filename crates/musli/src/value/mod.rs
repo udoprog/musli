@@ -37,7 +37,8 @@ use crate::{Decode, Options};
 
 const OPTIONS: Options = crate::options::new().build();
 
-/// Encode something that implements [Encode] into a [Value].
+/// Encode something that implements [Encode] into a [Value] in the [`Binary`]
+/// mode.
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub fn encode<T>(value: T) -> Result<Value<System>, Error>
@@ -47,12 +48,13 @@ where
     use crate::en::Encoder;
 
     let mut output = Value::Unit;
-    let cx = crate::context::Same::<Binary, Error, _>::with_alloc(System::new());
-    ValueEncoder::<OPTIONS, _, _>::new(&cx, &mut output).encode(value)?;
+    let cx = crate::context::Same::<Error, _>::with_alloc(System::new());
+    ValueEncoder::<OPTIONS, _, _, Binary>::new(&cx, &mut output).encode(value)?;
     Ok(output)
 }
 
-/// Decode a [Value] into a type which implements [Decode].
+/// Decode a [Value] into a type which implements [Decode] in the [`Binary`]
+/// mode.
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub fn decode<'de, T>(value: &'de Value<impl Allocator>) -> Result<T, Error>
@@ -60,19 +62,20 @@ where
     T: Decode<'de, Binary, System>,
 {
     use crate::de::Decoder;
-    let cx = crate::context::Same::<Binary, Error, _>::with_alloc(System::new());
-    value.decoder::<OPTIONS, _>(&cx).decode()
+    let cx = crate::context::Same::<Error, _>::with_alloc(System::new());
+    value.decoder::<OPTIONS, _, Binary>(&cx).decode()
 }
 
 /// Decode a [Value] into a type which implements [Decode] using a custom
-/// context.
-pub fn decode_with<'de, C, T>(cx: C, value: &'de Value<impl Allocator>) -> Result<T, C::Error>
+/// context in the [`Binary`] mode.
+pub fn decode_with<'de, C, T, M>(cx: C, value: &'de Value<impl Allocator>) -> Result<T, C::Error>
 where
     C: crate::Context,
-    T: Decode<'de, C::Mode, C::Allocator>,
+    T: Decode<'de, M, C::Allocator>,
+    M: 'static,
 {
     use crate::de::Decoder;
 
     cx.clear();
-    value.decoder::<OPTIONS, _>(cx).decode()
+    value.decoder::<OPTIONS, _, M>(cx).decode()
 }

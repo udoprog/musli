@@ -10,8 +10,6 @@ use crate::Allocator;
 ///
 /// This is used to among other things report diagnostics.
 pub trait Context: Copy {
-    /// Mode of the context.
-    type Mode: 'static;
     /// Error produced by context.
     type Error;
     /// A mark during processing.

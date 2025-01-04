@@ -1,7 +1,6 @@
 use core::cell::UnsafeCell;
 use core::error::Error;
 use core::fmt;
-use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
@@ -10,22 +9,19 @@ use crate::{Allocator, Context};
 use super::{ContextError, ErrorMarker};
 
 /// A simple non-diagnostical capturing context.
-pub struct Capture<M, E, A>
+pub struct Capture<E, A>
 where
-    M: 'static,
     E: ContextError<A>,
     A: Allocator,
 {
     alloc: A,
     error: UnsafeCell<Option<E>>,
-    _marker: PhantomData<M>,
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Capture<M, E, System>
+impl<E> Capture<E, System>
 where
-    M: 'static,
     E: ContextError<System>,
 {
     /// Construct a new capturing context using the [`System`] allocator.
@@ -35,9 +31,8 @@ where
     }
 }
 
-impl<M, E, A> Capture<M, E, A>
+impl<E, A> Capture<E, A>
 where
-    M: 'static,
     E: ContextError<A>,
     A: Clone + Allocator,
 {
@@ -46,7 +41,6 @@ where
         Self {
             alloc,
             error: UnsafeCell::new(None),
-            _marker: PhantomData,
         }
     }
 
@@ -62,13 +56,11 @@ where
     }
 }
 
-impl<M, E, A> Context for &Capture<M, E, A>
+impl<E, A> Context for &Capture<E, A>
 where
-    M: 'static,
     E: ContextError<A>,
     A: Clone + Allocator,
 {
-    type Mode = M;
     type Error = ErrorMarker;
     type Mark = ();
     type Allocator = A;
@@ -128,7 +120,7 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Default for Capture<M, E, System>
+impl<E> Default for Capture<E, System>
 where
     E: ContextError<System>,
 {

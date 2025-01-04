@@ -69,7 +69,7 @@ use crate::Allocator;
 /// # Ok::<_, musli::context::ErrorMarker>(())
 /// ```
 ///
-pub fn with_alloc<A, M>(alloc: A) -> DefaultContext<A, M>
+pub fn with_alloc<A>(alloc: A) -> DefaultContext<A>
 where
     A: Clone + Allocator,
 {
@@ -96,6 +96,6 @@ where
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub fn new<M>() -> DefaultContext<System, M> {
+pub fn new() -> DefaultContext<System> {
     DefaultContext::new()
 }

@@ -2,7 +2,6 @@
 
 use core::cell::{Cell, UnsafeCell};
 use core::fmt::{self, Write};
-use core::marker::PhantomData;
 use core::mem::take;
 use core::ops::Range;
 use core::slice;
@@ -23,7 +22,7 @@ use super::{Access, ErrorMarker, Shared};
 /// enabled, and will use the [`System`] allocator.
 ///
 /// [`with_alloc`]: super::with_alloc
-pub struct DefaultContext<A, M>
+pub struct DefaultContext<A>
 where
     A: Allocator,
 {
@@ -35,14 +34,13 @@ where
     cap: Cell<usize>,
     include_type: bool,
     access: Access,
-    _marker: PhantomData<M>,
 }
 
-impl<A, M> DefaultContext<A, M> where A: Allocator {}
+impl<A> DefaultContext<A> where A: Allocator {}
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M> DefaultContext<System, M> {
+impl DefaultContext<System> {
     /// Construct a new fully featured context which uses the [`System`]
     /// allocator for memory.
     ///
@@ -54,14 +52,14 @@ impl<M> DefaultContext<System, M> {
 }
 
 #[cfg(feature = "alloc")]
-impl<M> Default for DefaultContext<System, M> {
+impl Default for DefaultContext<System> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<A, M> DefaultContext<A, M>
+impl<A> DefaultContext<A>
 where
     A: Clone + Allocator,
 {
@@ -80,7 +78,6 @@ where
             cap: Cell::new(0),
             include_type: false,
             access: Access::new(),
-            _marker: PhantomData,
         }
     }
 
@@ -166,12 +163,10 @@ where
     }
 }
 
-impl<A, M> Context for &DefaultContext<A, M>
+impl<A> Context for &DefaultContext<A>
 where
     A: Clone + Allocator,
-    M: 'static,
 {
-    type Mode = M;
     type Error = ErrorMarker;
     type Mark = usize;
     type Allocator = A;

@@ -6,12 +6,14 @@ use super::{Decode, Decoder, EntriesDecoder, EntryDecoder, SizeHint};
 pub trait MapDecoder<'de> {
     /// Context associated with the decoder.
     type Cx: Context;
+    /// The mode of the decoder.
+    type Mode: 'static;
     /// The decoder to use for a key.
-    type DecodeEntry<'this>: EntryDecoder<'de, Cx = Self::Cx>
+    type DecodeEntry<'this>: EntryDecoder<'de, Cx = Self::Cx, Mode = Self::Mode>
     where
         Self: 'this;
     /// Decoder returned by [`MapDecoder::decode_remaining_entries`].
-    type DecodeRemainingEntries<'this>: EntriesDecoder<'de, Cx = Self::Cx>
+    type DecodeRemainingEntries<'this>: EntriesDecoder<'de, Cx = Self::Cx, Mode = Self::Mode>
     where
         Self: 'this;
 
@@ -39,8 +41,8 @@ pub trait MapDecoder<'de> {
     /// Decode the next map entry as a tuple.
     fn entry<K, V>(&mut self) -> Result<Option<(K, V)>, <Self::Cx as Context>::Error>
     where
-        K: Decode<'de, <Self::Cx as Context>::Mode, <Self::Cx as Context>::Allocator>,
-        V: Decode<'de, <Self::Cx as Context>::Mode, <Self::Cx as Context>::Allocator>,
+        K: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
+        V: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
     {
         let Some(mut entry) = self.decode_entry()? else {
             return Ok(None);

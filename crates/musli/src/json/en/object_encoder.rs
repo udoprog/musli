@@ -1,20 +1,24 @@
+use core::marker::PhantomData;
+
 use crate::en::{EntriesEncoder, MapEncoder};
 use crate::{Context, Writer};
 
 use super::{JsonEncoder, JsonObjectKeyEncoder, JsonObjectPairEncoder};
 
 /// An object encoder for JSON.
-pub(crate) struct JsonObjectEncoder<W, C> {
+pub(crate) struct JsonObjectEncoder<W, C, M> {
     cx: C,
     len: usize,
     end: &'static [u8],
     writer: W,
+    _marker: PhantomData<M>,
 }
 
-impl<W, C> JsonObjectEncoder<W, C>
+impl<W, C, M> JsonObjectEncoder<W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     #[inline]
     pub(super) fn new(cx: C, writer: W) -> Result<Self, C::Error> {
@@ -30,19 +34,22 @@ where
             len: 0,
             end,
             writer,
+            _marker: PhantomData,
         })
     }
 }
 
-impl<W, C> MapEncoder for JsonObjectEncoder<W, C>
+impl<W, C, M> MapEncoder for JsonObjectEncoder<W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeEntry<'this>
-        = JsonObjectPairEncoder<W::Mut<'this>, C>
+        = JsonObjectPairEncoder<W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -68,19 +75,21 @@ where
     }
 }
 
-impl<W, C> EntriesEncoder for JsonObjectEncoder<W, C>
+impl<W, C, M> EntriesEncoder for JsonObjectEncoder<W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeEntryKey<'this>
-        = JsonObjectKeyEncoder<W::Mut<'this>, C>
+        = JsonObjectKeyEncoder<W::Mut<'this>, C, M>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = JsonEncoder<W::Mut<'this>, C>
+        = JsonEncoder<W::Mut<'this>, C, M>
     where
         Self: 'this;
 

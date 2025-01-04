@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use crate::en::{
     Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder,
@@ -11,20 +12,29 @@ use crate::{Context, Options, Writer};
 use super::tag::{Kind, Tag};
 
 /// A very simple encoder.
-pub struct WireEncoder<W, const OPT: Options, C> {
+pub struct WireEncoder<const OPT: Options, W, C, M>
+where
+    M: 'static,
+{
     cx: C,
     writer: W,
+    _marker: PhantomData<M>,
 }
 
-impl<W, const OPT: Options, C> WireEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> WireEncoder<OPT, W, C, M>
 where
-    C: Context,
     W: Writer,
+    C: Context,
+    M: 'static,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(cx: C, writer: W) -> Self {
-        Self { cx, writer }
+        Self {
+            cx,
+            writer,
+            _marker: PhantomData,
+        }
     }
 
     #[inline]
@@ -56,16 +66,18 @@ where
     }
 }
 
-pub struct WirePackEncoder<W, const OPT: Options, C>
+pub struct WirePackEncoder<const OPT: Options, W, C, M>
 where
     C: Context,
+    M: 'static,
 {
     cx: C,
     writer: W,
     buffer: BufWriter<C::Allocator>,
+    _marker: PhantomData<M>,
 }
 
-impl<W, const OPT: Options, C> WirePackEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> WirePackEncoder<OPT, W, C, M>
 where
     C: Context,
 {
@@ -76,25 +88,27 @@ where
             cx,
             writer,
             buffer: BufWriter::new(cx.alloc()),
+            _marker: PhantomData,
         }
     }
 }
 
 #[crate::encoder(crate)]
-impl<W, const OPT: Options, C> Encoder for WireEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> Encoder for WireEncoder<OPT, W, C, M>
 where
-    C: Context,
     W: Writer,
+    C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
     type Ok = ();
-    type Mode = C::Mode;
+    type Mode = M;
     type WithContext<U>
-        = WireEncoder<W, OPT, U>
+        = WireEncoder<OPT, W, U, M>
     where
         U: Context<Allocator = <Self::Cx as Context>::Allocator>;
-    type EncodePack = WirePackEncoder<W, OPT, C>;
+    type EncodePack = WirePackEncoder<OPT, W, C, M>;
     type EncodeSome = Self;
     type EncodeSequence = Self;
     type EncodeMap = Self;
@@ -148,7 +162,7 @@ where
 
     #[inline]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), bytes.len())?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), bytes.len())?;
         self.writer.write_bytes(self.cx, bytes)?;
         Ok(())
     }
@@ -158,7 +172,7 @@ where
     where
         I: IntoIterator<Item: AsRef<[u8]>>,
     {
-        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), len)?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), len)?;
 
         for bytes in vectors {
             self.writer.write_bytes(self.cx, bytes.as_ref())?;
@@ -304,11 +318,11 @@ where
         hint: &SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
-        WireEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        WireEncoder::<OPT, _, _, M>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
         self.encode_sequence(hint)
     }
 
@@ -319,24 +333,26 @@ where
         hint: &MapHint,
     ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         self.writer
             .write_byte(self.cx, Tag::new(Kind::Sequence, 2).byte())?;
-        WireEncoder::<_, OPT, _>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
+        WireEncoder::<OPT, _, _, M>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
         self.encode_map(hint)
     }
 }
 
-impl<W, const OPT: Options, C> SequenceEncoder for WirePackEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> SequenceEncoder for WirePackEncoder<OPT, W, C, M>
 where
-    C: Context,
     W: Writer,
+    C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeNext<'this>
-        = StorageEncoder<OPT, true, &'this mut BufWriter<C::Allocator>, C>
+        = StorageEncoder<OPT, true, &'this mut BufWriter<C::Allocator>, C, M>
     where
         Self: 'this;
 
@@ -353,21 +369,23 @@ where
     #[inline]
     fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
         let buffer = self.buffer.into_inner();
-        encode_prefix::<_, _, OPT>(self.cx, self.writer.borrow_mut(), buffer.len())?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), buffer.len())?;
         self.writer.extend(self.cx, buffer)?;
         Ok(())
     }
 }
 
-impl<W, const OPT: Options, C> SequenceEncoder for WireEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> SequenceEncoder for WireEncoder<OPT, W, C, M>
 where
-    C: Context,
     W: Writer,
+    C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeNext<'this>
-        = WireEncoder<W::Mut<'this>, OPT, C>
+        = WireEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -387,15 +405,17 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> MapEncoder for WireEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> MapEncoder for WireEncoder<OPT, W, C, M>
 where
-    C: Context,
     W: Writer,
+    C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeEntry<'this>
-        = WireEncoder<W::Mut<'this>, OPT, C>
+        = WireEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -415,19 +435,21 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> EntriesEncoder for WireEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> EntriesEncoder for WireEncoder<OPT, W, C, M>
 where
-    C: Context,
     W: Writer,
+    C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeEntryKey<'this>
-        = WireEncoder<W::Mut<'this>, OPT, C>
+        = WireEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = WireEncoder<W::Mut<'this>, OPT, C>
+        = WireEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -452,19 +474,21 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> EntryEncoder for WireEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> EntryEncoder for WireEncoder<OPT, W, C, M>
 where
-    C: Context,
     W: Writer,
+    C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeKey<'this>
-        = WireEncoder<W::Mut<'this>, OPT, C>
+        = WireEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = WireEncoder<W::Mut<'this>, OPT, C>
+        = WireEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -489,19 +513,21 @@ where
     }
 }
 
-impl<W, const OPT: Options, C> VariantEncoder for WireEncoder<W, OPT, C>
+impl<const OPT: Options, W, C, M> VariantEncoder for WireEncoder<OPT, W, C, M>
 where
-    C: Context,
     W: Writer,
+    C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeTag<'this>
-        = WireEncoder<W::Mut<'this>, OPT, C>
+        = WireEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
     type EncodeData<'this>
-        = WireEncoder<W::Mut<'this>, OPT, C>
+        = WireEncoder<OPT, W::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -528,10 +554,10 @@ where
 
 /// Encode a length prefix.
 #[inline]
-fn encode_prefix<C, W, const OPT: Options>(cx: C, mut writer: W, len: usize) -> Result<(), C::Error>
+fn encode_prefix<const OPT: Options, C, W>(cx: C, mut writer: W, len: usize) -> Result<(), C::Error>
 where
-    C: Context,
     W: Writer,
+    C: Context,
 {
     let (tag, embedded) = Tag::with_len(Kind::Prefix, len);
     writer.write_byte(cx, tag.byte())?;

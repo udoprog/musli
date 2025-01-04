@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use crate::alloc::Vec;
 use crate::de::{Decoder, SizeHint, Skip, UnsizedVisitor, Visitor};
@@ -8,20 +9,26 @@ use super::super::parser::{Parser, Token};
 use super::{JsonDecoder, KeySignedVisitor, KeyUnsignedVisitor, StringReference};
 
 /// A JSON object key decoder for Müsli.
-pub(crate) struct JsonKeyDecoder<P, C> {
+pub(crate) struct JsonKeyDecoder<P, C, M> {
     cx: C,
     parser: P,
+    _marker: PhantomData<M>,
 }
 
-impl<'de, P, C> JsonKeyDecoder<P, C>
+impl<'de, P, C, M> JsonKeyDecoder<P, C, M>
 where
     P: Parser<'de>,
     C: Context,
+    M: 'static,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(cx: C, parser: P) -> Self {
-        Self { cx, parser }
+        Self {
+            cx,
+            parser,
+            _marker: PhantomData,
+        }
     }
 
     #[inline]
@@ -39,17 +46,18 @@ where
 }
 
 #[crate::decoder(crate)]
-impl<'de, P, C> Decoder<'de> for JsonKeyDecoder<P, C>
+impl<'de, P, C, M> Decoder<'de> for JsonKeyDecoder<P, C, M>
 where
     P: Parser<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = C::Mode;
+    type Mode = M;
     type Allocator = C::Allocator;
     type WithContext<U>
-        = JsonKeyDecoder<P, U>
+        = JsonKeyDecoder<P, U, M>
     where
         U: Context<Allocator = Self::Allocator>;
 
@@ -73,7 +81,7 @@ where
 
     #[inline]
     fn skip(self) -> Result<(), C::Error> {
-        JsonDecoder::new(self.cx, self.parser).skip()
+        JsonDecoder::<_, _, M>::new(self.cx, self.parser).skip()
     }
 
     #[inline]
@@ -147,7 +155,7 @@ where
     where
         V: UnsizedVisitor<'de, C, str>,
     {
-        JsonDecoder::new(self.cx, self.parser).decode_string(visitor)
+        JsonDecoder::<_, _, M>::new(self.cx, self.parser).decode_string(visitor)
     }
 
     #[inline]

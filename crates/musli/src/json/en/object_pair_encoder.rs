@@ -1,35 +1,45 @@
+use core::marker::PhantomData;
+
 use crate::en::EntryEncoder;
 use crate::{Context, Writer};
 
 use super::{JsonEncoder, JsonObjectKeyEncoder};
 
 /// Encoder for a JSON object pair.
-pub(crate) struct JsonObjectPairEncoder<W, C> {
+pub(crate) struct JsonObjectPairEncoder<W, C, M> {
     cx: C,
     empty: bool,
     writer: W,
+    _marker: PhantomData<M>,
 }
 
-impl<W, C> JsonObjectPairEncoder<W, C> {
+impl<W, C, M> JsonObjectPairEncoder<W, C, M> {
     #[inline]
     pub(super) const fn new(cx: C, empty: bool, writer: W) -> Self {
-        Self { cx, empty, writer }
+        Self {
+            cx,
+            empty,
+            writer,
+            _marker: PhantomData,
+        }
     }
 }
 
-impl<W, C> EntryEncoder for JsonObjectPairEncoder<W, C>
+impl<W, C, M> EntryEncoder for JsonObjectPairEncoder<W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Ok = ();
+    type Mode = M;
     type EncodeKey<'this>
-        = JsonObjectKeyEncoder<W::Mut<'this>, C>
+        = JsonObjectKeyEncoder<W::Mut<'this>, C, M>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = JsonEncoder<W::Mut<'this>, C>
+        = JsonEncoder<W::Mut<'this>, C, M>
     where
         Self: 'this;
 

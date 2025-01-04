@@ -6,12 +6,14 @@ use super::{Decode, Decoder, SizeHint};
 pub trait SequenceDecoder<'de> {
     /// Context associated with the decoder.
     type Cx: Context;
+    /// The mode of the decoder.
+    type Mode: 'static;
     /// The decoder for individual items.
     type DecodeNext<'this>: Decoder<
         'de,
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
-        Mode = <Self::Cx as Context>::Mode,
+        Mode = Self::Mode,
         Allocator = <Self::Cx as Context>::Allocator,
     >
     where
@@ -43,7 +45,7 @@ pub trait SequenceDecoder<'de> {
     #[inline]
     fn next<T>(&mut self) -> Result<T, <Self::Cx as Context>::Error>
     where
-        T: Decode<'de, <Self::Cx as Context>::Mode, <Self::Cx as Context>::Allocator>,
+        T: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
     {
         self.decode_next()?.decode()
     }
@@ -52,7 +54,7 @@ pub trait SequenceDecoder<'de> {
     #[inline]
     fn try_next<T>(&mut self) -> Result<Option<T>, <Self::Cx as Context>::Error>
     where
-        T: Decode<'de, <Self::Cx as Context>::Mode, <Self::Cx as Context>::Allocator>,
+        T: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
     {
         let Some(decoder) = self.try_decode_next()? else {
             return Ok(None);

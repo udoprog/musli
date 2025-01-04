@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use core::fmt;
+use core::marker::PhantomData;
 use core::slice;
 
 use crate::alloc::Allocator;
@@ -20,20 +21,23 @@ use super::value::{Number, Value};
 use super::AsValueDecoder;
 
 /// Encoder for a single value.
-pub struct ValueDecoder<'de, const OPT: Options, C, A>
+pub struct ValueDecoder<'de, const OPT: Options, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     cx: C,
     value: &'de Value<A>,
     map_key: bool,
+    _marker: PhantomData<M>,
 }
 
-impl<'de, const OPT: Options, C, A> ValueDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> ValueDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     #[inline]
     pub(crate) const fn new(cx: C, value: &'de Value<A>) -> Self {
@@ -41,6 +45,7 @@ where
             cx,
             value,
             map_key: false,
+            _marker: PhantomData,
         }
     }
 
@@ -50,6 +55,7 @@ where
             cx,
             value,
             map_key: true,
+            _marker: PhantomData,
         }
     }
 }
@@ -85,26 +91,27 @@ macro_rules! ensure {
 }
 
 #[crate::decoder(crate)]
-impl<'de, const OPT: Options, C, A> Decoder<'de> for ValueDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> Decoder<'de> for ValueDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = C::Mode;
+    type Mode = M;
     type Allocator = C::Allocator;
     type WithContext<U>
-        = ValueDecoder<'de, OPT, U, A>
+        = ValueDecoder<'de, OPT, U, A, M>
     where
         U: Context<Allocator = Self::Allocator>;
-    type DecodeBuffer = AsValueDecoder<'de, OPT, C, A>;
+    type DecodeBuffer = AsValueDecoder<'de, OPT, C, A, M>;
     type DecodeSome = Self;
-    type DecodePack = StorageDecoder<OPT, true, SliceReader<'de>, C>;
-    type DecodeSequence = IterValueDecoder<'de, OPT, C, A>;
-    type DecodeMap = IterValuePairsDecoder<'de, OPT, C, A>;
-    type DecodeMapEntries = IterValuePairsDecoder<'de, OPT, C, A>;
-    type DecodeVariant = IterValueVariantDecoder<'de, OPT, C, A>;
+    type DecodePack = StorageDecoder<OPT, true, SliceReader<'de>, C, M>;
+    type DecodeSequence = IterValueDecoder<'de, OPT, C, A, M>;
+    type DecodeMap = IterValuePairsDecoder<'de, OPT, C, A, M>;
+    type DecodeMapEntries = IterValuePairsDecoder<'de, OPT, C, A, M>;
+    type DecodeVariant = IterValueVariantDecoder<'de, OPT, C, A, M>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -350,13 +357,13 @@ where
                 visitor.visit_borrowed(self.cx, string)
             }
             Value::Sequence(values) => {
-                visitor.visit_sequence(&mut IterValueDecoder::<OPT, _, _>::new(self.cx, values))
+                visitor.visit_sequence(&mut IterValueDecoder::<OPT, _, _, M>::new(self.cx, values))
             }
-            Value::Map(values) => visitor.visit_map(&mut IterValuePairsDecoder::<OPT, _, _>::new(
-                self.cx, values,
-            )),
+            Value::Map(values) => visitor.visit_map(
+                &mut IterValuePairsDecoder::<OPT, _, _, M>::new(self.cx, values),
+            ),
             Value::Variant(variant) => {
-                visitor.visit_variant(&mut IterValueVariantDecoder::<OPT, _, _>::new(
+                visitor.visit_variant(&mut IterValueVariantDecoder::<OPT, _, _, M>::new(
                     self.cx, variant,
                 ))
             }
@@ -364,20 +371,22 @@ where
                 self.cx,
                 option
                     .as_ref()
-                    .map(|value| ValueDecoder::<OPT, _, _>::new(self.cx, value)),
+                    .map(|value| ValueDecoder::<OPT, _, _, M>::new(self.cx, value)),
             ),
         }
     }
 }
 
-impl<const OPT: Options, C, A> AsDecoder for ValueDecoder<'_, OPT, C, A>
+impl<const OPT: Options, C, A, M> AsDecoder for ValueDecoder<'_, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type Decoder<'this>
-        = ValueDecoder<'this, OPT, C, A>
+        = ValueDecoder<'this, OPT, C, A, M>
     where
         Self: 'this;
 
@@ -388,37 +397,43 @@ where
 }
 
 /// A decoder over a simple value iterator.
-pub struct IterValueDecoder<'de, const OPT: Options, C, A>
+pub struct IterValueDecoder<'de, const OPT: Options, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     cx: C,
     iter: slice::Iter<'de, Value<A>>,
+    _marker: PhantomData<M>,
 }
 
-impl<'de, const OPT: Options, C, A> IterValueDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> IterValueDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     #[inline]
     fn new(cx: C, values: &'de [Value<A>]) -> Self {
         Self {
             cx,
             iter: values.iter(),
+            _marker: PhantomData,
         }
     }
 }
 
-impl<'de, const OPT: Options, C, A> SequenceDecoder<'de> for IterValueDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> SequenceDecoder<'de> for IterValueDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeNext<'this>
-        = ValueDecoder<'de, OPT, C, A>
+        = ValueDecoder<'de, OPT, C, A, M>
     where
         Self: 'this;
 
@@ -450,41 +465,47 @@ where
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairsDecoder<'de, const OPT: Options, C, A>
+pub struct IterValuePairsDecoder<'de, const OPT: Options, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     cx: C,
     iter: slice::Iter<'de, (Value<A>, Value<A>)>,
+    _marker: PhantomData<M>,
 }
 
-impl<'de, const OPT: Options, C, A> IterValuePairsDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> IterValuePairsDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     #[inline]
     fn new(cx: C, values: &'de [(Value<A>, Value<A>)]) -> Self {
         Self {
             cx,
             iter: values.iter(),
+            _marker: PhantomData,
         }
     }
 }
 
-impl<'de, const OPT: Options, C, A> MapDecoder<'de> for IterValuePairsDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> MapDecoder<'de> for IterValuePairsDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeEntry<'this>
-        = IterValuePairDecoder<'de, OPT, C, A>
+        = IterValuePairDecoder<'de, OPT, C, A, M>
     where
         Self: 'this;
     type DecodeRemainingEntries<'this>
-        = IterValuePairsDecoder<'de, OPT, C, A>
+        = IterValuePairsDecoder<'de, OPT, C, A, M>
     where
         Self: 'this;
 
@@ -515,18 +536,21 @@ where
     }
 }
 
-impl<'de, const OPT: Options, C, A> EntriesDecoder<'de> for IterValuePairsDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> EntriesDecoder<'de>
+    for IterValuePairsDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeEntryKey<'this>
-        = ValueDecoder<'de, OPT, C, A>
+        = ValueDecoder<'de, OPT, C, A, M>
     where
         Self: 'this;
     type DecodeEntryValue<'this>
-        = ValueDecoder<'de, OPT, C, A>
+        = ValueDecoder<'de, OPT, C, A, M>
     where
         Self: 'this;
 
@@ -559,17 +583,19 @@ where
     }
 }
 
-impl<'de, const OPT: Options, C, A> EntryDecoder<'de> for IterValuePairDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> EntryDecoder<'de> for IterValuePairDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeKey<'this>
-        = ValueDecoder<'de, OPT, C, A>
+        = ValueDecoder<'de, OPT, C, A, M>
     where
         Self: 'this;
-    type DecodeValue = ValueDecoder<'de, OPT, C, A>;
+    type DecodeValue = ValueDecoder<'de, OPT, C, A, M>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -588,59 +614,76 @@ where
 }
 
 /// A decoder over a simple value pair iterator.
-pub struct IterValuePairDecoder<'de, const OPT: Options, C, A>
+pub struct IterValuePairDecoder<'de, const OPT: Options, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     cx: C,
     pair: &'de (Value<A>, Value<A>),
+    _marker: PhantomData<M>,
 }
 
-impl<'de, const OPT: Options, C, A> IterValuePairDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> IterValuePairDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     #[inline]
     const fn new(cx: C, pair: &'de (Value<A>, Value<A>)) -> Self {
-        Self { cx, pair }
+        Self {
+            cx,
+            pair,
+            _marker: PhantomData,
+        }
     }
 }
 
 /// A decoder over a simple value pair as a variant.
-pub struct IterValueVariantDecoder<'de, const OPT: Options, C, A>
+pub struct IterValueVariantDecoder<'de, const OPT: Options, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     cx: C,
     pair: &'de (Value<A>, Value<A>),
+    _marker: PhantomData<M>,
 }
 
-impl<'de, const OPT: Options, C, A> IterValueVariantDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> IterValueVariantDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     #[inline]
     const fn new(cx: C, pair: &'de (Value<A>, Value<A>)) -> Self {
-        Self { cx, pair }
+        Self {
+            cx,
+            pair,
+            _marker: PhantomData,
+        }
     }
 }
 
-impl<'de, const OPT: Options, C, A> VariantDecoder<'de> for IterValueVariantDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> VariantDecoder<'de>
+    for IterValueVariantDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeTag<'this>
-        = ValueDecoder<'de, OPT, C, A>
+        = ValueDecoder<'de, OPT, C, A, M>
     where
         Self: 'this;
     type DecodeValue<'this>
-        = ValueDecoder<'de, OPT, C, A>
+        = ValueDecoder<'de, OPT, C, A, M>
     where
         Self: 'this;
 

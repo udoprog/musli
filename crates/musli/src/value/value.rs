@@ -1,5 +1,6 @@
 use core::cmp::Ordering;
 use core::fmt;
+use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::{AllocError, System};
@@ -53,7 +54,7 @@ where
 {
     /// Construct a [IntoValueDecoder] implementation out of the current value.
     #[inline]
-    pub fn into_decoder<const OPT: Options, C>(self, cx: C) -> IntoValueDecoder<OPT, C, A>
+    pub fn into_decoder<const OPT: Options, C, M>(self, cx: C) -> IntoValueDecoder<OPT, C, A, M>
     where
         C: Context,
     {
@@ -62,7 +63,7 @@ where
 
     /// Construct a [AsValueDecoder] implementation out of the current value.
     #[inline]
-    pub fn as_decoder<const OPT: Options, C>(&self, cx: C) -> AsValueDecoder<'_, OPT, C, A>
+    pub fn as_decoder<const OPT: Options, C, M>(&self, cx: C) -> AsValueDecoder<'_, OPT, C, A, M>
     where
         C: Context,
     {
@@ -71,7 +72,7 @@ where
 
     /// Get a decoder associated with a value.
     #[inline]
-    pub(crate) fn decoder<const OPT: Options, C>(&self, cx: C) -> ValueDecoder<'_, OPT, C, A>
+    pub(crate) fn decoder<const OPT: Options, C, M>(&self, cx: C) -> ValueDecoder<'_, OPT, C, A, M>
     where
         C: Context,
     {
@@ -566,35 +567,44 @@ where
 }
 
 /// Value's [AsDecoder] implementation.
-pub struct IntoValueDecoder<const OPT: Options, C, A>
+pub struct IntoValueDecoder<const OPT: Options, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     cx: C,
     value: Value<A>,
+    _marker: PhantomData<M>,
 }
 
-impl<const OPT: Options, C, A> IntoValueDecoder<OPT, C, A>
+impl<const OPT: Options, C, A, M> IntoValueDecoder<OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     /// Construct a new buffered value decoder.
     #[inline]
     pub fn new(cx: C, value: Value<A>) -> Self {
-        Self { cx, value }
+        Self {
+            cx,
+            value,
+            _marker: PhantomData,
+        }
     }
 }
 
-impl<const OPT: Options, C, A> AsDecoder for IntoValueDecoder<OPT, C, A>
+impl<const OPT: Options, C, A, M> AsDecoder for IntoValueDecoder<OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type Decoder<'this>
-        = ValueDecoder<'this, OPT, C, A>
+        = ValueDecoder<'this, OPT, C, A, M>
     where
         Self: 'this;
 
@@ -605,35 +615,44 @@ where
 }
 
 /// Value's [AsDecoder] implementation.
-pub struct AsValueDecoder<'de, const OPT: Options, C, A>
+pub struct AsValueDecoder<'de, const OPT: Options, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     cx: C,
     value: &'de Value<A>,
+    _marker: PhantomData<M>,
 }
 
-impl<'de, const OPT: Options, C, A> AsValueDecoder<'de, OPT, C, A>
+impl<'de, const OPT: Options, C, A, M> AsValueDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     /// Construct a new buffered value decoder.
     #[inline]
     pub fn new(cx: C, value: &'de Value<A>) -> Self {
-        Self { cx, value }
+        Self {
+            cx,
+            value,
+            _marker: PhantomData,
+        }
     }
 }
 
-impl<const OPT: Options, C, A> AsDecoder for AsValueDecoder<'_, OPT, C, A>
+impl<const OPT: Options, C, A, M> AsDecoder for AsValueDecoder<'_, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type Decoder<'this>
-        = ValueDecoder<'this, OPT, C, A>
+        = ValueDecoder<'this, OPT, C, A, M>
     where
         Self: 'this;
 

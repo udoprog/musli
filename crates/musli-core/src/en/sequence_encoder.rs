@@ -8,12 +8,14 @@ pub trait SequenceEncoder {
     type Cx: Context;
     /// Result type of the encoder.
     type Ok;
+    /// The mode of the encoder.
+    type Mode: 'static;
     /// The encoder returned when advancing the sequence encoder.
     type EncodeNext<'this>: Encoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
         Error = <Self::Cx as Context>::Error,
-        Mode = <Self::Cx as Context>::Mode,
+        Mode = Self::Mode,
     >
     where
         Self: 'this;
@@ -29,7 +31,7 @@ pub trait SequenceEncoder {
     #[inline]
     fn push<T>(&mut self, value: T) -> Result<(), <Self::Cx as Context>::Error>
     where
-        T: Encode<<Self::Cx as Context>::Mode>,
+        T: Encode<Self::Mode>,
     {
         self.encode_next()?.encode(value)?;
         Ok(())
@@ -45,7 +47,7 @@ pub trait SequenceEncoder {
         slice: impl AsRef<[T]>,
     ) -> Result<(), <Self::Cx as Context>::Error>
     where
-        T: Encode<<Self::Cx as Context>::Mode>,
+        T: Encode<Self::Mode>,
     {
         utils::default_sequence_encode_slice(self, slice)
     }
@@ -60,7 +62,7 @@ pub trait SequenceEncoder {
         slices: impl IntoIterator<Item: AsRef<[T]>>,
     ) -> Result<(), <Self::Cx as Context>::Error>
     where
-        T: Encode<<Self::Cx as Context>::Mode>,
+        T: Encode<Self::Mode>,
     {
         utils::default_sequence_encode_slices(self, slices)
     }

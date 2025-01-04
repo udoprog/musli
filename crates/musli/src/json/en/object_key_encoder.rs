@@ -1,17 +1,23 @@
 use core::fmt;
+use core::marker::PhantomData;
 
 use crate::en::{Encode, Encoder};
 use crate::{Context, Writer};
 
-pub(crate) struct JsonObjectKeyEncoder<W, C> {
+pub(crate) struct JsonObjectKeyEncoder<W, C, M> {
     cx: C,
     writer: W,
+    _marker: PhantomData<M>,
 }
 
-impl<W, C> JsonObjectKeyEncoder<W, C> {
+impl<W, C, M> JsonObjectKeyEncoder<W, C, M> {
     #[inline]
     pub(super) fn new(cx: C, writer: W) -> Self {
-        Self { cx, writer }
+        Self {
+            cx,
+            writer,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -27,17 +33,18 @@ macro_rules! format_integer {
 }
 
 #[crate::encoder(crate)]
-impl<W, C> Encoder for JsonObjectKeyEncoder<W, C>
+impl<W, C, M> Encoder for JsonObjectKeyEncoder<W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
     type Ok = ();
-    type Mode = C::Mode;
+    type Mode = M;
     type WithContext<U>
-        = JsonObjectKeyEncoder<W, U>
+        = JsonObjectKeyEncoder<W, U, M>
     where
         U: Context<Allocator = <Self::Cx as Context>::Allocator>;
 

@@ -117,7 +117,6 @@ impl<C> Context for &SerdeContext<C>
 where
     C: Context,
 {
-    type Mode = C::Mode;
     type Error = error::SerdeError;
     type Mark = C::Mark;
     type Allocator = C::Allocator;
