@@ -34,7 +34,7 @@ struct To {
 #[test]
 fn trace_complex() {
     musli::alloc::default(|alloc| {
-        let cx = context::with_alloc(alloc);
+        let cx = context::with_alloc(alloc).with_trace();
 
         let mut field = HashMap::new();
 
@@ -58,7 +58,7 @@ fn trace_complex() {
             unreachable!()
         };
 
-        let cx = context::with_alloc(alloc);
+        let cx = context::with_alloc(alloc).with_trace();
 
         let Ok(..) = encoding.from_slice_with::<_, To>(&cx, &bytes) else {
             if let Some(error) = cx.errors().next() {

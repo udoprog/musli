@@ -141,12 +141,12 @@ pub trait Context: Copy {
     ///
     /// [`leave_field`]: Context::leave_field
     #[inline]
-    fn enter_named_field<T>(self, type_name: &'static str, tag: &T)
+    fn enter_named_field<T>(self, type_name: &'static str, field: T)
     where
-        T: ?Sized + fmt::Display,
+        T: fmt::Display,
     {
         _ = type_name;
-        _ = tag;
+        _ = field;
     }
 
     /// Trace that we've entered the given unnamed field.
@@ -169,9 +169,9 @@ pub trait Context: Copy {
     ///
     /// [`leave_field`]: Context::leave_field
     #[inline]
-    fn enter_unnamed_field<T>(self, index: u32, name: &T)
+    fn enter_unnamed_field<T>(self, index: u32, name: T)
     where
-        T: ?Sized + fmt::Display,
+        T: fmt::Display,
     {
         _ = index;
         _ = name;

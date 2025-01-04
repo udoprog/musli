@@ -5,13 +5,17 @@
 mod access;
 use self::access::{Access, Shared};
 
+mod trace;
+#[doc(inline)]
+pub use self::trace::{Error, Errors, NoTrace, Report, Trace, WithTrace};
+
 mod error_marker;
 #[doc(inline)]
 pub use self::error_marker::ErrorMarker;
 
 mod default_context;
 #[doc(inline)]
-pub use self::default_context::{DefaultContext, Error};
+pub use self::default_context::DefaultContext;
 
 mod context_error;
 #[doc(inline)]
@@ -69,7 +73,7 @@ use crate::Allocator;
 /// # Ok::<_, musli::context::ErrorMarker>(())
 /// ```
 ///
-pub fn with_alloc<A>(alloc: A) -> DefaultContext<A>
+pub fn with_alloc<A>(alloc: A) -> DefaultContext<A, NoTrace>
 where
     A: Clone + Allocator,
 {
@@ -96,6 +100,6 @@ where
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub fn new() -> DefaultContext<System> {
+pub fn new() -> DefaultContext<System, NoTrace> {
     DefaultContext::new()
 }

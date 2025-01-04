@@ -7,7 +7,7 @@ pub(crate) struct Access {
 
 impl Access {
     #[inline]
-    pub(crate) fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             state: Cell::new(0),
         }
@@ -52,15 +52,18 @@ pub(crate) struct Shared<'a> {
 }
 
 impl Drop for Shared<'_> {
+    #[inline]
     fn drop(&mut self) {
         self.access.state.set(self.access.state.get() + 1);
     }
 }
 
 impl Clone for Shared<'_> {
+    #[inline]
     fn clone(&self) -> Self {
         // Shared state is already acquired, so we simply decrement it one more.
         self.access.state.set(self.access.state.get() - 1);
+
         Shared {
             access: self.access,
         }
