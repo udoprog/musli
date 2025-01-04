@@ -9,10 +9,7 @@
     feature = "value"
 ))]
 
-#[cfg(feature = "alloc")]
-use rust_alloc::string::String;
-#[cfg(feature = "alloc")]
-use rust_alloc::vec::Vec;
+use crate::alloc::{Allocator, String, Vec};
 
 use core::fmt;
 
@@ -39,8 +36,11 @@ impl fmt::Display for Utf8Error {
 ///
 /// [`String::from_utf8`]: rust_alloc::string::String::from_utf8
 #[inline]
-#[cfg(all(feature = "alloc", not(feature = "simdutf8")))]
-pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
+#[cfg(not(feature = "simdutf8"))]
+pub fn from_utf8_owned<A>(bytes: Vec<u8, A>) -> Result<String<A>, Utf8Error>
+where
+    A: Allocator,
+{
     match String::from_utf8(bytes) {
         Ok(string) => Ok(string),
         Err(..) => Err(Utf8Error),
@@ -52,8 +52,11 @@ pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
 ///
 /// [`String::from_utf8`]: rust_alloc::string::String::from_utf8
 #[inline]
-#[cfg(all(feature = "alloc", feature = "simdutf8"))]
-pub fn from_utf8_owned(bytes: Vec<u8>) -> Result<String, Utf8Error> {
+#[cfg(feature = "simdutf8")]
+pub fn from_utf8_owned<A>(bytes: Vec<u8, A>) -> Result<String<A>, Utf8Error>
+where
+    A: Allocator,
+{
     if simdutf8::basic::from_utf8(&bytes).is_err() {
         return Err(Utf8Error);
     }

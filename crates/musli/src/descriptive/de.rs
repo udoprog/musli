@@ -1,9 +1,7 @@
 use core::fmt;
 use core::mem::take;
 
-#[cfg(feature = "alloc")]
-use rust_alloc::vec::Vec;
-
+use crate::alloc::Vec;
 use crate::de::{
     Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, Skip,
     UnsizedVisitor, VariantDecoder, Visitor,
@@ -333,9 +331,12 @@ where
                 self.0.expecting(f)
             }
 
-            #[cfg(feature = "alloc")]
             #[inline]
-            fn visit_owned(self, cx: C, bytes: Vec<u8>) -> Result<Self::Ok, C::Error> {
+            fn visit_owned(
+                self,
+                cx: C,
+                bytes: Vec<u8, C::Allocator>,
+            ) -> Result<Self::Ok, C::Error> {
                 let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }

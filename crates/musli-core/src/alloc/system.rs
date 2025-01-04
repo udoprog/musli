@@ -5,7 +5,7 @@ use core::ptr::NonNull;
 
 use rust_alloc::alloc;
 
-use super::{Alloc, AllocError, AllocSlice, Allocator};
+use super::{Alloc, AllocError, Allocator};
 
 /// System buffer that can be used in combination with an [`Allocator`].
 ///
@@ -51,8 +51,8 @@ impl System {
     /// Caller must ensure that the allocation comes from the same system
     /// allocator and is correctly initialized per its parameters.
     #[inline]
-    pub(crate) unsafe fn slice_from_raw_parts<T>(data: NonNull<T>, size: usize) -> SystemBuf<T> {
-        SystemBuf { data, size }
+    pub(crate) unsafe fn slice_from_raw_parts<T>(data: NonNull<T>, size: usize) -> SystemAlloc<T> {
+        SystemAlloc { data, size }
     }
 }
 
@@ -65,7 +65,6 @@ impl Default for System {
 
 impl Allocator for System {
     type Alloc<T> = SystemAlloc<T>;
-    type AllocSlice<T> = SystemBuf<T>;
 
     #[inline]
     fn alloc<T>(self, value: T) -> Result<Self::Alloc<T>, AllocError> {
@@ -82,8 +81,8 @@ impl Allocator for System {
     }
 
     #[inline]
-    fn alloc_slice<T>(self) -> Self::AllocSlice<T> {
-        SystemBuf::DANGLING
+    fn alloc_empty<T>(self) -> Self::Alloc<T> {
+        SystemAlloc::DANGLING
     }
 }
 
@@ -91,10 +90,9 @@ impl Allocator for System {
 pub struct SystemAlloc<T> {
     /// Pointer to the allocated region.
     data: NonNull<T>,
+    /// The size in number of `T` elements in the region.
+    size: usize,
 }
-
-unsafe impl<T> Send for SystemAlloc<T> where T: Send {}
-unsafe impl<T> Sync for SystemAlloc<T> where T: Sync {}
 
 impl<T> SystemAlloc<T> {
     /// Reallocate the region to the given capacity.
@@ -107,6 +105,7 @@ impl<T> SystemAlloc<T> {
         if size_of::<T>() == 0 {
             return Ok(Self {
                 data: NonNull::dangling(),
+                size: 1,
             });
         }
 
@@ -119,10 +118,14 @@ impl<T> SystemAlloc<T> {
 
             Ok(Self {
                 data: NonNull::new_unchecked(data).cast(),
+                size: 1,
             })
         }
     }
 }
+
+unsafe impl<T> Send for SystemAlloc<T> where T: Send {}
+unsafe impl<T> Sync for SystemAlloc<T> where T: Sync {}
 
 impl<T> Alloc<T> for SystemAlloc<T> {
     #[inline]
@@ -134,46 +137,19 @@ impl<T> Alloc<T> for SystemAlloc<T> {
     fn as_mut_ptr(&mut self) -> *mut T {
         self.data.as_ptr().cast()
     }
-}
 
-impl<T> Drop for SystemAlloc<T> {
     #[inline]
-    fn drop(&mut self) {
-        // SAFETY: Layout assumptions are correctly encoded in the type as it
-        // was being allocated or grown.
-        unsafe {
-            if size_of::<T>() != 0 {
-                alloc::dealloc(self.data.as_ptr().cast(), Layout::new::<T>());
-            }
+    fn capacity(&self) -> usize {
+        if size_of::<T>() == 0 {
+            usize::MAX
+        } else {
+            self.size
         }
-    }
-}
-
-/// A vector-backed allocation.
-pub struct SystemBuf<T> {
-    /// Pointer to the allocated region.
-    data: NonNull<T>,
-    /// The size in number of `T` elements in the region.
-    size: usize,
-}
-
-unsafe impl<T> Send for SystemBuf<T> where T: Send {}
-unsafe impl<T> Sync for SystemBuf<T> where T: Sync {}
-
-impl<T> AllocSlice<T> for SystemBuf<T> {
-    #[inline]
-    fn as_ptr(&self) -> *const T {
-        self.data.as_ptr().cast_const().cast()
-    }
-
-    #[inline]
-    fn as_mut_ptr(&mut self) -> *mut T {
-        self.data.as_ptr().cast()
     }
 
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> Result<(), AllocError> {
-        if additional == 0 || size_of::<T>() == 0 {
+        if size_of::<T>() == 0 {
             return Ok(());
         }
 
@@ -187,13 +163,17 @@ impl<T> AllocSlice<T> for SystemBuf<T> {
     #[inline]
     fn try_merge<B>(&mut self, _: usize, other: B, _: usize) -> Result<(), B>
     where
-        B: AllocSlice<T>,
+        B: Alloc<T>,
     {
+        if size_of::<T>() == 0 {
+            return Ok(());
+        }
+
         Err(other)
     }
 }
 
-impl<T> SystemBuf<T> {
+impl<T> SystemAlloc<T> {
     const MIN_NON_ZERO_CAP: usize = if size_of::<T>() == 1 {
         8
     } else if size_of::<T>() <= 1024 {
@@ -266,21 +246,23 @@ impl<T> SystemBuf<T> {
     }
 
     fn free(&mut self) {
-        if self.size > 0 {
-            // SAFETY: Layout assumptions are correctly encoded in the type as
-            // it was being allocated or grown.
-            unsafe {
-                let layout =
-                    Layout::from_size_align_unchecked(self.size * size_of::<T>(), align_of::<T>());
-                alloc::dealloc(self.data.as_ptr().cast(), layout);
-                self.data = NonNull::dangling();
-                self.size = 0;
-            }
+        if size_of::<T>() == 0 || self.size == 0 {
+            return;
+        }
+
+        // SAFETY: Layout assumptions are correctly encoded in the type as
+        // it was being allocated or grown.
+        unsafe {
+            let layout =
+                Layout::from_size_align_unchecked(self.size * size_of::<T>(), align_of::<T>());
+            alloc::dealloc(self.data.as_ptr().cast(), layout);
+            self.data = NonNull::dangling();
+            self.size = 0;
         }
     }
 }
 
-impl<T> Drop for SystemBuf<T> {
+impl<T> Drop for SystemAlloc<T> {
     #[inline]
     fn drop(&mut self) {
         self.free();

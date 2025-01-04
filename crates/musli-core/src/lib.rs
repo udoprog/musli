@@ -34,7 +34,6 @@ pub use self::en::{Encode, Encoder};
 
 pub mod hint;
 pub mod mode;
-pub mod no_std;
 
 mod expecting;
 mod impls;

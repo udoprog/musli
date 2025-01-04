@@ -1,10 +1,4 @@
-//! Trait fills for `#[no_std]` environments.
-//!
-//! * [`ToOwned`] - if the `alloc` feature is enabled, this is an alias for
-//!   `alloc::borrow::ToOwned`.
-
-#[doc(inline)]
-pub use musli_core::no_std::ToOwned;
+//! Implementation fills for `#[no_std]` environments.
 
 /// A somewhat portable, but also noisy abort implementation for no_std
 /// environments.

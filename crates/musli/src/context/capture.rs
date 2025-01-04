@@ -5,7 +5,6 @@ use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
-use crate::alloc::{self, String};
 use crate::{Allocator, Context};
 
 use super::{ContextError, ErrorMarker};
@@ -32,7 +31,7 @@ where
     /// Construct a new capturing context using the [`System`] allocator.
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(alloc::System::new())
+        Self::with_alloc(System::new())
     }
 }
 
@@ -73,7 +72,6 @@ where
     type Error = ErrorMarker;
     type Mark = ();
     type Allocator = A;
-    type String = String<A>;
 
     #[inline]
     fn clear(self) {
@@ -93,17 +91,6 @@ where
     #[inline]
     fn alloc(self) -> Self::Allocator {
         self.alloc.clone()
-    }
-
-    #[inline]
-    fn collect_string<T>(self, value: &T) -> Result<Self::String, Self::Error>
-    where
-        T: ?Sized + fmt::Display,
-    {
-        match alloc::collect_string(self.alloc(), value) {
-            Ok(string) => Ok(string),
-            Err(error) => Err(self.custom(error)),
-        }
     }
 
     #[inline]

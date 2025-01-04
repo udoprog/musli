@@ -85,42 +85,19 @@ mod default;
 pub use self::default::{DefaultAllocator, DEFAULT_ARRAY_BUFFER};
 
 #[doc(inline)]
-pub use musli_core::alloc::{Alloc, AllocError, AllocSlice, Allocator};
-
-#[cfg(feature = "alloc")]
-mod system;
+pub use musli_core::alloc::{Alloc, AllocError, Allocator, Box, Disabled, String, ToOwned, Vec};
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub use self::system::System;
-#[cfg(feature = "alloc")]
-use self::system::{SystemAlloc, SystemBuf};
-
-mod disabled;
 #[doc(inline)]
-pub use self::disabled::Disabled;
+pub use musli_core::alloc::{System, SystemAlloc};
 
 mod stack;
 #[doc(inline)]
-pub use self::stack::Slice;
-#[cfg(not(feature = "alloc"))]
-use self::stack::SliceBuf;
+pub use self::stack::{Slice, SliceAlloc};
 
 mod array_buffer;
 pub use self::array_buffer::ArrayBuffer;
-
-mod string;
-pub(crate) use self::string::collect_string;
-#[doc(inline)]
-pub use self::string::String;
-
-mod vec;
-#[doc(inline)]
-pub use self::vec::Vec;
-
-mod boxed;
-#[doc(inline)]
-pub use self::boxed::Box;
 
 /// Call the given block `body` with an instance of the [`DefaultAllocator`].
 ///

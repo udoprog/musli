@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 use core::ptr;
 
-use super::{Alloc, AllocError, AllocSlice, Allocator};
+use super::{Alloc, AllocError, Allocator};
 
 /// An empty buffer.
 pub struct EmptyBuf<T> {
@@ -18,17 +18,14 @@ impl<T> Alloc<T> for EmptyBuf<T> {
     fn as_mut_ptr(&mut self) -> *mut T {
         ptr::NonNull::dangling().as_ptr()
     }
-}
-
-impl<T> AllocSlice<T> for EmptyBuf<T> {
-    #[inline]
-    fn as_ptr(&self) -> *const T {
-        ptr::NonNull::dangling().as_ptr()
-    }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut T {
-        ptr::NonNull::dangling().as_ptr()
+    fn capacity(&self) -> usize {
+        if size_of::<T>() == 0 {
+            usize::MAX
+        } else {
+            0
+        }
     }
 
     #[inline]
@@ -39,7 +36,7 @@ impl<T> AllocSlice<T> for EmptyBuf<T> {
     #[inline]
     fn try_merge<B>(&mut self, _: usize, other: B, _: usize) -> Result<(), B>
     where
-        B: AllocSlice<T>,
+        B: Alloc<T>,
     {
         Err(other)
     }
@@ -68,15 +65,14 @@ impl Default for Disabled {
 
 impl Allocator for Disabled {
     type Alloc<T> = EmptyBuf<T>;
-    type AllocSlice<T> = EmptyBuf<T>;
 
     #[inline]
-    fn alloc<T>(self, _: T) -> Result<Self::AllocSlice<T>, AllocError> {
+    fn alloc<T>(self, _: T) -> Result<Self::Alloc<T>, AllocError> {
         Err(AllocError)
     }
 
     #[inline]
-    fn alloc_slice<T>(self) -> Self::AllocSlice<T> {
+    fn alloc_empty<T>(self) -> Self::Alloc<T> {
         EmptyBuf {
             _marker: PhantomData,
         }

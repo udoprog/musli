@@ -1,68 +1,76 @@
+use core::borrow::Borrow;
 use core::cmp::Ordering;
 use core::fmt;
 use core::mem::ManuallyDrop;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
-#[cfg(feature = "alloc")]
-use core::ptr::NonNull;
 use core::slice;
 
 #[cfg(feature = "alloc")]
 use super::System;
-use super::{AllocError, AllocSlice, Allocator};
+use super::{Alloc, AllocError, Allocator, Disabled};
 
 /// A vector backed by an [`Allocator`].
 pub struct Vec<T, A>
 where
     A: Allocator,
 {
-    buf: A::AllocSlice<T>,
+    buf: A::Alloc<T>,
     len: usize,
 }
 
-#[cfg(feature = "alloc")]
 const _: () = {
     const fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<Vec<u8, crate::alloc::System>>();
+    assert_send_sync::<Vec<u8, Disabled>>();
 };
 
 impl<T, A> Vec<T, A>
 where
     A: Allocator,
 {
-    /// Construct a buffer vector from raw parts.
-    #[inline]
-    const unsafe fn from_raw_parts(buf: A::AllocSlice<T>, len: usize) -> Self {
-        Self { buf, len }
-    }
-
-    /// Access the raw allocation.
-    #[cfg(test)]
-    pub(crate) const fn raw(&self) -> &A::AllocSlice<T> {
-        &self.buf
-    }
-
     /// Construct a new buffer vector.
     ///
     /// ## Examples
     ///
     /// ```
-    /// use musli::alloc::Vec;
+    /// use musli::alloc::{AllocError, Vec};
     ///
     /// musli::alloc::default(|alloc| {
     ///     let mut a = Vec::new_in(alloc);
     ///
-    ///     a.push(String::from("Hello"));
-    ///     a.push(String::from("World"));
+    ///     a.push(String::from("Hello"))?;
+    ///     a.push(String::from("World"))?;
     ///
     ///     assert_eq!(a.as_slice(), ["Hello", "World"]);
+    ///     Ok::<_, AllocError>(())
     /// });
+    /// # Ok::<_, AllocError>(())
     /// ```
     #[inline]
     pub fn new_in(alloc: A) -> Self {
         Self {
-            buf: alloc.alloc_slice::<T>(),
+            buf: alloc.alloc_empty::<T>(),
             len: 0,
+        }
+    }
+
+    /// Coerce into a std vector.
+    #[cfg(feature = "alloc")]
+    pub fn into_std(self) -> Result<rust_alloc::vec::Vec<T>, Self> {
+        let mut this = ManuallyDrop::new(self);
+
+        // SAFETY: The implementation of `as_non_null_std` ensures that the
+        // allocation originates from the system allocator.
+        unsafe {
+            let Some((ptr, cap)) = this.buf.as_non_null_std() else {
+                return Err(ManuallyDrop::into_inner(this));
+            };
+
+            Ok(rust_alloc::vec::Vec::from_raw_parts(
+                ptr.as_ptr().cast(),
+                this.len,
+                cap,
+            ))
         }
     }
 
@@ -86,18 +94,13 @@ where
     /// ```
     #[inline]
     pub fn with_capacity_in(capacity: usize, alloc: A) -> Result<Self, AllocError> {
-        let mut buf = alloc.alloc_slice::<T>();
+        let mut buf = alloc.alloc_empty::<T>();
         buf.resize(0, capacity)?;
         Ok(Self { buf, len: 0 })
     }
 
-    /// Construct a new buffer vector.
-    #[inline]
-    pub const fn new(buf: A::AllocSlice<T>) -> Self {
-        Self { buf, len: 0 }
-    }
-
-    /// Get the number of initialized elements in the buffer.
+    /// Returns the number of elements in the vector, also referred to as its
+    /// 'length'.
     ///
     /// ## Examples
     ///
@@ -117,6 +120,33 @@ where
     #[inline]
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    /// Returns the total number of elements the vector can hold without
+    /// reallocating.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::alloc::{AllocError, Vec};
+    ///
+    /// musli::alloc::default(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
+    ///
+    ///     assert_eq!(a.len(), 0);
+    ///     assert_eq!(a.capacity(), 0);
+    ///
+    ///     a.extend_from_slice(b"Hello")?;
+    ///     assert_eq!(a.len(), 5);
+    ///     assert!(a.capacity() >= 5);
+    ///
+    ///     Ok::<_, AllocError>(())
+    /// })?;
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.buf.capacity()
     }
 
     /// Check if the buffer is empty.
@@ -285,8 +315,31 @@ where
         unsafe { slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len) }
     }
 
+    /// Deconstruct a vector into its raw parts.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::alloc::{Allocator, AllocError, Vec};
+    ///
+    /// fn operate<A>(alloc: A) -> Result<(), AllocError>
+    /// where
+    ///     A: Allocator
+    /// {
+    ///     let mut a = Vec::new_in(alloc);
+    ///     a.extend_from_slice(b"abc")?;
+    ///     let (buf, len) = a.into_raw_parts();
+    ///
+    ///     let b = Vec::<_, A>::from_raw_parts(buf, len);
+    ///     assert_eq!(b.as_slice(), b"abc");
+    ///     Ok::<_, AllocError>(())
+    /// }
+    ///
+    /// musli::alloc::default(|alloc| operate(alloc))?;
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
     #[inline]
-    fn into_raw_parts(self) -> (A::AllocSlice<T>, usize) {
+    pub fn into_raw_parts(self) -> (A::Alloc<T>, usize) {
         let this = ManuallyDrop::new(self);
 
         // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
@@ -294,6 +347,39 @@ where
             let buf = ptr::addr_of!(this.buf).read();
             (buf, this.len)
         }
+    }
+
+    /// Construct a vector from raw parts.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::alloc::{Allocator, AllocError, Vec};
+    ///
+    /// fn operate<A>(alloc: A) -> Result<(), AllocError>
+    /// where
+    ///     A: Allocator
+    /// {
+    ///     let mut a = Vec::new_in(alloc);
+    ///     a.extend_from_slice(b"abc")?;
+    ///     let (buf, len) = a.into_raw_parts();
+    ///
+    ///     let b = Vec::<_, A>::from_raw_parts(buf, len);
+    ///     assert_eq!(b.as_slice(), b"abc");
+    ///     Ok::<_, AllocError>(())
+    /// }
+    ///
+    /// musli::alloc::default(|alloc| operate(alloc))?;
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    #[inline]
+    pub fn from_raw_parts(buf: A::Alloc<T>, len: usize) -> Self {
+        Self { buf, len }
+    }
+
+    /// Access a reference to the raw underlying allocation.
+    pub const fn raw(&self) -> &A::Alloc<T> {
+        &self.buf
     }
 }
 
@@ -366,7 +452,7 @@ where
 
         // Try to merge one buffer with another.
         if let Err(buf) = self.buf.try_merge(self.len, other, other_len) {
-            let other = unsafe { Vec::<T, A>::from_raw_parts(buf, other_len) };
+            let other = Vec::<T, A>::from_raw_parts(buf, other_len);
             return self.extend_from_slice(other.as_slice());
         }
 
@@ -447,13 +533,99 @@ where
     }
 }
 
-impl<T, A> PartialEq for Vec<T, A>
+macro_rules! impl_eq {
+    ($lhs:ty, $rhs: ty) => {
+        #[allow(unused_lifetimes)]
+        impl<'a, 'b, T, A> PartialEq<$rhs> for $lhs
+        where
+            T: PartialEq,
+            A: Allocator,
+        {
+            #[inline]
+            fn eq(&self, other: &$rhs) -> bool {
+                PartialEq::eq(&self[..], &other[..])
+            }
+
+            #[inline]
+            #[allow(clippy::partialeq_ne_impl)]
+            fn ne(&self, other: &$rhs) -> bool {
+                PartialEq::ne(&self[..], &other[..])
+            }
+        }
+
+        #[allow(unused_lifetimes)]
+        impl<'a, 'b, T, A> PartialEq<$lhs> for $rhs
+        where
+            T: PartialEq,
+            A: Allocator,
+        {
+            #[inline]
+            fn eq(&self, other: &$lhs) -> bool {
+                PartialEq::eq(&self[..], &other[..])
+            }
+
+            #[inline]
+            #[allow(clippy::partialeq_ne_impl)]
+            fn ne(&self, other: &$lhs) -> bool {
+                PartialEq::ne(&self[..], &other[..])
+            }
+        }
+    };
+}
+
+macro_rules! impl_eq_array {
+    ($lhs:ty, $rhs: ty) => {
+        #[allow(unused_lifetimes)]
+        impl<'a, 'b, T, A, const N: usize> PartialEq<$rhs> for $lhs
+        where
+            T: PartialEq,
+            A: Allocator,
+        {
+            #[inline]
+            fn eq(&self, other: &$rhs) -> bool {
+                PartialEq::eq(&self[..], &other[..])
+            }
+
+            #[inline]
+            #[allow(clippy::partialeq_ne_impl)]
+            fn ne(&self, other: &$rhs) -> bool {
+                PartialEq::ne(&self[..], &other[..])
+            }
+        }
+
+        #[allow(unused_lifetimes)]
+        impl<'a, 'b, T, A, const N: usize> PartialEq<$lhs> for $rhs
+        where
+            T: PartialEq,
+            A: Allocator,
+        {
+            #[inline]
+            fn eq(&self, other: &$lhs) -> bool {
+                PartialEq::eq(&self[..], &other[..])
+            }
+
+            #[inline]
+            #[allow(clippy::partialeq_ne_impl)]
+            fn ne(&self, other: &$lhs) -> bool {
+                PartialEq::ne(&self[..], &other[..])
+            }
+        }
+    };
+}
+
+impl_eq! { Vec<T, A>, [T] }
+impl_eq! { Vec<T, A>, &'a [T] }
+impl_eq_array! { Vec<T, A>, [T; N] }
+impl_eq_array! { Vec<T, A>, &'a [T; N] }
+
+impl<T, A, B> PartialEq<Vec<T, B>> for Vec<T, A>
 where
     T: PartialEq,
     A: Allocator,
+    B: Allocator,
 {
     #[inline]
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, other: &Vec<T, B>) -> bool {
         self.as_slice().eq(other.as_slice())
     }
 }
@@ -465,13 +637,14 @@ where
 {
 }
 
-impl<T, A> PartialOrd for Vec<T, A>
+impl<T, A, B> PartialOrd<Vec<T, B>> for Vec<T, A>
 where
     T: PartialOrd,
     A: Allocator,
+    B: Allocator,
 {
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Vec<T, B>) -> Option<Ordering> {
         self.as_slice().partial_cmp(other.as_slice())
     }
 }
@@ -487,11 +660,23 @@ where
     }
 }
 
+impl<T, A> Borrow<[T]> for Vec<T, A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn borrow(&self) -> &[T] {
+        self
+    }
+}
+
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, System> {
     #[inline]
     fn from(value: rust_alloc::vec::Vec<T>) -> Self {
+        use core::ptr::NonNull;
+
         // SAFETY: We know that the vector was allocated as expected using the
         // system allocator.
         unsafe {
@@ -501,8 +686,7 @@ impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, System> {
             let cap = value.capacity();
 
             let buf = System::slice_from_raw_parts(ptr, cap);
-
-            Self { buf, len }
+            Vec::from_raw_parts(buf, len)
         }
     }
 }

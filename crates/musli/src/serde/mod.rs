@@ -103,7 +103,6 @@ use serde::{Deserialize, Serialize};
 use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
-use crate::alloc::{self, String};
 use crate::{Context, Decoder, Encoder};
 
 struct SerdeContext<C>
@@ -122,7 +121,6 @@ where
     type Error = error::SerdeError;
     type Mark = C::Mark;
     type Allocator = C::Allocator;
-    type String = String<C::Allocator>;
 
     #[inline]
     fn clear(self) {
@@ -143,17 +141,6 @@ where
     #[inline]
     fn alloc(self) -> Self::Allocator {
         self.inner.alloc()
-    }
-
-    #[inline]
-    fn collect_string<T>(self, value: &T) -> Result<Self::String, Self::Error>
-    where
-        T: ?Sized + fmt::Display,
-    {
-        match alloc::collect_string(self.alloc(), value) {
-            Ok(string) => Ok(string),
-            Err(error) => Err(self.custom(error)),
-        }
     }
 
     #[inline]

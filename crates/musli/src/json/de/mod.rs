@@ -300,7 +300,6 @@ where
         })
     }
 
-    #[cfg(feature = "alloc")]
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
     where
@@ -309,10 +308,12 @@ where
         let cx = self.cx;
 
         self.decode_sequence(|seq| {
-            let mut bytes = rust_alloc::vec::Vec::with_capacity(seq.size_hint().or_default());
+            let mut bytes = Vec::with_capacity_in(seq.size_hint().or_default(), cx.alloc())
+                .map_err(cx.map())?;
 
             while let Some(item) = seq.try_decode_next()? {
-                bytes.push(item.decode_u8()?);
+                let b = item.decode_u8()?;
+                bytes.push(b).map_err(cx.map())?;
             }
 
             visitor.visit_owned(cx, bytes)

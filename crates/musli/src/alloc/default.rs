@@ -1,10 +1,10 @@
 use core::marker::PhantomData;
 
-use super::{Alloc, AllocError, AllocSlice, Allocator};
+use super::{Alloc, AllocError, Allocator};
 #[cfg(not(feature = "alloc"))]
-use super::{Slice, SliceBuf};
+use super::{Slice, SliceAlloc};
 #[cfg(feature = "alloc")]
-use super::{System, SystemAlloc, SystemBuf};
+use super::{System, SystemAlloc};
 
 /// The default stack buffer size for the default allocator provided through
 /// [`default()`].
@@ -50,36 +50,22 @@ macro_rules! implement {
             inner: $raw,
             _marker: PhantomData<&'a ()>,
         }
-
-        /// The default raw vector allocation.
-        ///
-        /// The exact implementation of this depends on if the `alloc` feature
-        /// is enabled.
-        ///
-        /// For more information, see [`default()`].
-        ///
-        /// [`default()`]: super::default()
-        pub struct DefaultRawVec<'a, T, const BUF: usize> {
-            inner: $raw_vec,
-            _marker: PhantomData<&'a ()>,
-        }
     };
 }
 
 #[cfg(feature = "alloc")]
-implement!(DefaultAllocator, System, SystemBuf<T>, SystemAlloc<T>);
+implement!(DefaultAllocator, System, SystemAlloc<T>, SystemAlloc<T>);
 
 #[cfg(not(feature = "alloc"))]
 implement!(
     DefaultAllocator,
     Slice<'buf>,
-    SliceBuf<'a, T>,
-    SliceBuf<'a, T>
+    SliceAlloc<'a, T>,
+    SliceAlloc<'a, T>
 );
 
 impl<'a, const BUF: usize> Allocator for &'a DefaultAllocator<'_, BUF> {
     type Alloc<T> = DefaultAlloc<'a, T, BUF>;
-    type AllocSlice<T> = DefaultRawVec<'a, T, BUF>;
 
     #[inline]
     fn alloc<T>(self, value: T) -> Result<Self::Alloc<T>, AllocError> {
@@ -90,9 +76,9 @@ impl<'a, const BUF: usize> Allocator for &'a DefaultAllocator<'_, BUF> {
     }
 
     #[inline]
-    fn alloc_slice<T>(self) -> Self::AllocSlice<T> {
-        DefaultRawVec {
-            inner: self.inner.alloc_slice(),
+    fn alloc_empty<T>(self) -> Self::Alloc<T> {
+        DefaultAlloc {
+            inner: self.inner.alloc_empty(),
             _marker: PhantomData,
         }
     }
@@ -108,17 +94,10 @@ impl<T, const BUF: usize> Alloc<T> for DefaultAlloc<'_, T, BUF> {
     fn as_mut_ptr(&mut self) -> *mut T {
         Alloc::as_mut_ptr(&mut self.inner)
     }
-}
-
-impl<T, const BUF: usize> AllocSlice<T> for DefaultRawVec<'_, T, BUF> {
-    #[inline]
-    fn as_ptr(&self) -> *const T {
-        AllocSlice::as_ptr(&self.inner)
-    }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut T {
-        AllocSlice::as_mut_ptr(&mut self.inner)
+    fn capacity(&self) -> usize {
+        self.inner.capacity()
     }
 
     #[inline]
@@ -129,7 +108,7 @@ impl<T, const BUF: usize> AllocSlice<T> for DefaultRawVec<'_, T, BUF> {
     #[inline]
     fn try_merge<B>(&mut self, this_len: usize, other: B, other_len: usize) -> Result<(), B>
     where
-        B: AllocSlice<T>,
+        B: Alloc<T>,
     {
         self.inner.try_merge(this_len, other, other_len)
     }
