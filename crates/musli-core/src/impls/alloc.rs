@@ -916,13 +916,13 @@ where
     {
         use std::os::windows::ffi::OsStrExt;
 
-        use crate::alloc::AllocSlice;
+        use crate::alloc::Alloc;
         use crate::en::VariantEncoder;
 
         let cx = encoder.cx();
 
         encoder.encode_variant_fn(|variant| {
-            let mut buf = cx.alloc().alloc_slice::<u8>();
+            let mut buf = cx.alloc().alloc_empty::<u8>();
             let mut len = 0;
 
             for w in self.encode_wide() {

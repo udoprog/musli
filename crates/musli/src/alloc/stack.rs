@@ -6,9 +6,9 @@ use core::marker::PhantomData;
 use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
 use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
-use core::ptr::{self, NonNull};
+use core::ptr;
 
-use super::{Alloc, AllocError, AllocSlice, Allocator};
+use super::{Alloc, AllocError, Allocator};
 
 // We keep max bytes to 2^31, since that ensures that addition between two
 // magnitutes never overflow.
@@ -113,7 +113,7 @@ pub struct Slice<'a> {
     // This must be an unsafe cell, since it's mutably accessed through an
     // immutable pointers. We simply make sure that those accesses do not
     // clobber each other, which we can do since the API is restricted through
-    // the `AllocSlice` trait.
+    // the `Alloc` trait.
     internal: UnsafeCell<Internal>,
     // The underlying vector being borrowed.
     _marker: PhantomData<&'a mut [MaybeUninit<u8>]>,
@@ -170,56 +170,53 @@ impl<'a> Slice<'a> {
 }
 
 impl<'a> Allocator for &'a Slice<'_> {
-    type Alloc<T> = SliceBuf<'a, T>;
-    type AllocSlice<T> = SliceBuf<'a, T>;
+    type Alloc<T> = SliceAlloc<'a, T>;
 
     #[inline]
     fn alloc<T>(self, value: T) -> Result<Self::Alloc<T>, AllocError> {
+        if size_of::<T>() == 0 {
+            return Ok(SliceAlloc::ZST);
+        }
+
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
-        let region = 'out: {
-            if size_of::<T>() == 0 {
-                break 'out None;
-            }
+        let region = unsafe {
+            let i = &mut *self.internal.get();
+            let region = i.alloc(size_of::<T>(), align_of::<T>());
 
-            unsafe {
-                let i = &mut *self.internal.get();
-                let region = i.alloc(size_of::<T>(), align_of::<T>());
+            let Some(region) = region else {
+                return Err(AllocError);
+            };
 
-                let Some(region) = region else {
-                    return Err(AllocError);
-                };
-
-                // Write the value into the region.
-                region.range.start.cast::<T>().write(value);
-                Some(region.id)
-            }
+            // Write the value into the region.
+            region.range.start.cast::<T>().write(value);
+            Some(region.id)
         };
 
-        Ok(SliceBuf {
+        Ok(SliceAlloc {
             region,
-            internal: &self.internal,
+            internal: Some(&self.internal),
             _marker: PhantomData,
         })
     }
 
     #[inline]
-    fn alloc_slice<T>(self) -> Self::AllocSlice<T> {
+    fn alloc_empty<T>(self) -> Self::Alloc<T> {
+        if size_of::<T>() == 0 {
+            return SliceAlloc::ZST;
+        }
+
         // SAFETY: We have exclusive access to the internal state, and it's only
         // held for the duration of this call.
-        let region = if size_of::<T>() == 0 {
-            None
-        } else {
-            unsafe {
-                (*self.internal.get())
-                    .alloc(0, align_of::<T>())
-                    .map(|r| r.id)
-            }
+        let region = unsafe {
+            (*self.internal.get())
+                .alloc(0, align_of::<T>())
+                .map(|r| r.id)
         };
 
-        SliceBuf {
+        SliceAlloc {
             region,
-            internal: &self.internal,
+            internal: Some(&self.internal),
             _marker: PhantomData,
         }
     }
@@ -228,49 +225,43 @@ impl<'a> Allocator for &'a Slice<'_> {
 /// A slice allocated buffer.
 ///
 /// See [`Slice`].
-pub struct SliceBuf<'a, T> {
+pub struct SliceAlloc<'a, T> {
     region: Option<HeaderId>,
-    internal: &'a UnsafeCell<Internal>,
+    internal: Option<&'a UnsafeCell<Internal>>,
     _marker: PhantomData<T>,
 }
 
-impl<T> Alloc<T> for SliceBuf<'_, T> {
+impl<T> SliceAlloc<'_, T> {
+    const ZST: Self = Self {
+        region: None,
+        internal: None,
+        _marker: PhantomData,
+    };
+}
+
+impl<T> SliceAlloc<'_, T> {
     #[inline]
-    fn as_ptr(&self) -> *const T {
-        let Some(region) = self.region else {
-            return NonNull::<T>::dangling().as_ptr().cast_const();
+    fn free(&mut self) {
+        let (Some(region), Some(internal)) = (self.region.take(), self.internal) else {
+            return;
         };
 
+        // SAFETY: We have exclusive access to the internal state.
         unsafe {
-            let i = &*self.internal.get();
-            let this = i.header(region);
-            this.range.start.cast_const().cast()
-        }
-    }
-
-    #[inline]
-    fn as_mut_ptr(&mut self) -> *mut T {
-        let Some(region) = self.region else {
-            return NonNull::<T>::dangling().as_ptr();
-        };
-
-        unsafe {
-            let i = &*self.internal.get();
-            let this = i.header(region);
-            this.range.start.cast()
+            (*internal.get()).free(region);
         }
     }
 }
 
-impl<T> AllocSlice<T> for SliceBuf<'_, T> {
+impl<T> Alloc<T> for SliceAlloc<'_, T> {
     #[inline]
     fn as_ptr(&self) -> *const T {
-        let Some(region) = self.region else {
+        let (Some(region), Some(internal)) = (self.region, self.internal) else {
             return ptr::NonNull::dangling().as_ptr();
         };
 
         unsafe {
-            let i = &*self.internal.get();
+            let i = &*internal.get();
             let this = i.header(region);
             this.range.start.cast_const().cast()
         }
@@ -278,22 +269,46 @@ impl<T> AllocSlice<T> for SliceBuf<'_, T> {
 
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut T {
-        let Some(region) = self.region else {
+        let (Some(region), Some(internal)) = (self.region, self.internal) else {
             return ptr::NonNull::dangling().as_ptr();
         };
 
         unsafe {
-            let i = &*self.internal.get();
+            let i = &*internal.get();
             let this = i.header(region);
             this.range.start.cast()
+        }
+    }
+
+    #[inline]
+    fn capacity(&self) -> usize {
+        let Some(internal) = self.internal else {
+            return usize::MAX;
+        };
+
+        let Some(region_id) = self.region else {
+            return 0;
+        };
+
+        // SAFETY: Due to invariants in the Buffer trait we know that these
+        // cannot be used incorrectly.
+        unsafe {
+            let i = &mut *internal.get();
+            i.region(region_id).capacity()
         }
     }
 
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> Result<(), AllocError> {
-        if additional == 0 || size_of::<T>() == 0 {
+        let Some(internal) = self.internal else {
+            debug_assert_eq!(
+                size_of::<T>(),
+                0,
+                "Only ZSTs should lack an internal pointer"
+            );
+            // ZSTs don't need to do any work to be resized.
             return Ok(());
-        }
+        };
 
         let Some(region_id) = self.region else {
             return Err(AllocError);
@@ -318,7 +333,7 @@ impl<T> AllocSlice<T> for SliceBuf<'_, T> {
         // SAFETY: Due to invariants in the Buffer trait we know that these
         // cannot be used incorrectly.
         unsafe {
-            let i = &mut *self.internal.get();
+            let i = &mut *internal.get();
 
             let region = i.region(region_id);
 
@@ -339,8 +354,14 @@ impl<T> AllocSlice<T> for SliceBuf<'_, T> {
     #[inline]
     fn try_merge<B>(&mut self, this_len: usize, buf: B, other_len: usize) -> Result<(), B>
     where
-        B: AllocSlice<T>,
+        B: Alloc<T>,
     {
+        let Some(internal) = self.internal else {
+            // T is a ZST, so merging is trivial. We can just return immediately
+            // here.
+            return Ok(());
+        };
+
         let Some(region) = self.region else {
             return Err(buf);
         };
@@ -353,7 +374,7 @@ impl<T> AllocSlice<T> for SliceBuf<'_, T> {
         let other_ptr = buf.as_ptr().cast();
 
         unsafe {
-            let i = &mut *self.internal.get();
+            let i = &mut *internal.get();
             let mut this = i.region(region);
 
             debug_assert!(this.capacity() >= this_len);
@@ -391,14 +412,10 @@ impl<T> AllocSlice<T> for SliceBuf<'_, T> {
     }
 }
 
-impl<T> Drop for SliceBuf<'_, T> {
+impl<T> Drop for SliceAlloc<'_, T> {
+    #[inline]
     fn drop(&mut self) {
-        if let Some(region) = self.region.take() {
-            // SAFETY: We have exclusive access to the internal state.
-            unsafe {
-                (*self.internal.get()).free(region);
-            }
-        }
+        self.free()
     }
 }
 

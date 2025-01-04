@@ -12,7 +12,7 @@ use core::marker;
 
 use crate::no_std::ToOwned;
 
-use crate::alloc::{AllocError, AllocSlice};
+use crate::alloc::{Alloc, AllocError};
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder,
     MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
@@ -72,7 +72,7 @@ pub struct Never<A = NeverMarker, B: ?Sized = NeverMarker> {
     _marker: marker::PhantomData<(A, B)>,
 }
 
-impl<T> AllocSlice<T> for Never<T> {
+impl<T> Alloc<T> for Never<T> {
     #[inline]
     fn as_ptr(&self) -> *const T {
         match self._never {}
@@ -84,6 +84,11 @@ impl<T> AllocSlice<T> for Never<T> {
     }
 
     #[inline]
+    fn capacity(&self) -> usize {
+        match self._never {}
+    }
+
+    #[inline]
     fn resize(&mut self, _: usize, _: usize) -> Result<(), AllocError> {
         match self._never {}
     }
@@ -91,7 +96,7 @@ impl<T> AllocSlice<T> for Never<T> {
     #[inline]
     fn try_merge<B>(&mut self, _: usize, _: B, _: usize) -> Result<(), B>
     where
-        B: AllocSlice<T>,
+        B: Alloc<T>,
     {
         match self._never {}
     }

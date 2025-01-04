@@ -9,14 +9,14 @@ use core::slice;
 
 #[cfg(feature = "alloc")]
 use super::System;
-use super::{AllocError, AllocSlice, Allocator};
+use super::{Alloc, AllocError, Allocator};
 
 /// A vector backed by an [`Allocator`].
 pub struct Vec<T, A>
 where
     A: Allocator,
 {
-    buf: A::AllocSlice<T>,
+    buf: A::Alloc<T>,
     len: usize,
 }
 
@@ -30,18 +30,6 @@ impl<T, A> Vec<T, A>
 where
     A: Allocator,
 {
-    /// Construct a buffer vector from raw parts.
-    #[inline]
-    const unsafe fn from_raw_parts(buf: A::AllocSlice<T>, len: usize) -> Self {
-        Self { buf, len }
-    }
-
-    /// Access the raw allocation.
-    #[cfg(test)]
-    pub(crate) const fn raw(&self) -> &A::AllocSlice<T> {
-        &self.buf
-    }
-
     /// Construct a new buffer vector.
     ///
     /// ## Examples
@@ -61,7 +49,7 @@ where
     #[inline]
     pub fn new_in(alloc: A) -> Self {
         Self {
-            buf: alloc.alloc_slice::<T>(),
+            buf: alloc.alloc_empty::<T>(),
             len: 0,
         }
     }
@@ -85,15 +73,15 @@ where
     /// # Ok::<_, AllocError>(())
     /// ```
     #[inline]
-    pub fn with_capacity_in(capacity: usize, alloc: A) -> Result<Self, AllocError> {
-        let mut buf = alloc.alloc_slice::<T>();
-        buf.resize(0, capacity)?;
+    pub fn with_capacity_in(cap: usize, alloc: A) -> Result<Self, AllocError> {
+        let mut buf = alloc.alloc_empty::<T>();
+        buf.resize(0, cap)?;
         Ok(Self { buf, len: 0 })
     }
 
     /// Construct a new buffer vector.
     #[inline]
-    pub const fn new(buf: A::AllocSlice<T>) -> Self {
+    pub const fn new(buf: A::Alloc<T>) -> Self {
         Self { buf, len: 0 }
     }
 
@@ -285,8 +273,14 @@ where
         unsafe { slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len) }
     }
 
+    /// Construct a buffer vector from raw parts.
     #[inline]
-    fn into_raw_parts(self) -> (A::AllocSlice<T>, usize) {
+    const unsafe fn from_raw_parts(buf: A::Alloc<T>, len: usize) -> Self {
+        Self { buf, len }
+    }
+
+    #[inline]
+    fn into_raw_parts(self) -> (A::Alloc<T>, usize) {
         let this = ManuallyDrop::new(self);
 
         // SAFETY: The interior buffer is valid and will not be dropped thanks to `ManuallyDrop`.
@@ -294,6 +288,12 @@ where
             let buf = ptr::addr_of!(this.buf).read();
             (buf, this.len)
         }
+    }
+
+    /// Access the raw allocation.
+    #[cfg(test)]
+    pub(crate) const fn raw(&self) -> &A::Alloc<T> {
+        &self.buf
     }
 }
 

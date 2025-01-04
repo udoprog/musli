@@ -4,10 +4,6 @@ mod allocator;
 #[doc(inline)]
 pub use self::allocator::Allocator;
 
-mod alloc_slice;
-#[doc(inline)]
-pub use self::alloc_slice::AllocSlice;
-
 #[allow(clippy::module_inception)]
 mod alloc;
 #[doc(inline)]

@@ -85,7 +85,7 @@ mod default;
 pub use self::default::{DefaultAllocator, DEFAULT_ARRAY_BUFFER};
 
 #[doc(inline)]
-pub use musli_core::alloc::{Alloc, AllocError, AllocSlice, Allocator};
+pub use musli_core::alloc::{Alloc, AllocError, Allocator};
 
 #[cfg(feature = "alloc")]
 mod system;
@@ -93,8 +93,6 @@ mod system;
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub use self::system::System;
-#[cfg(feature = "alloc")]
-use self::system::{SystemAlloc, SystemBuf};
 
 mod disabled;
 #[doc(inline)]
@@ -103,8 +101,6 @@ pub use self::disabled::Disabled;
 mod stack;
 #[doc(inline)]
 pub use self::stack::Slice;
-#[cfg(not(feature = "alloc"))]
-use self::stack::SliceBuf;
 
 mod array_buffer;
 pub use self::array_buffer::ArrayBuffer;

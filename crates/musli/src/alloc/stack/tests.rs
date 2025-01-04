@@ -581,7 +581,7 @@ fn flip_flop() {
 fn limits() {
     let mut buf = ArrayBuffer::<8>::with_size();
     let alloc = Slice::new(&mut buf);
-    assert!(alloc.alloc_slice::<u8>().region.is_none());
+    assert!(alloc.alloc_empty::<u8>().region.is_none());
 
     let mut buf = ArrayBuffer::<32>::with_size();
     let alloc = Slice::new(&mut buf);
