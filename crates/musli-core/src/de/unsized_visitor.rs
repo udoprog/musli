@@ -2,8 +2,8 @@ use core::borrow::Borrow;
 use core::fmt;
 use core::marker::PhantomData;
 
+use crate::alloc::ToOwned;
 use crate::expecting::{self, Expecting};
-use crate::no_std::ToOwned;
 use crate::Context;
 
 /// A visitor for data where we might need to borrow without copying from the
@@ -29,7 +29,7 @@ use crate::Context;
 pub trait UnsizedVisitor<'de, C, T>: Sized
 where
     C: Context,
-    T: ?Sized + ToOwned,
+    T: ?Sized + ToOwned<C::Allocator>,
 {
     /// The value produced.
     type Ok;
@@ -86,7 +86,7 @@ impl<'de, T, C, U> Expecting for ExpectingWrapper<'_, T, C, U>
 where
     T: UnsizedVisitor<'de, C, U>,
     C: Context,
-    U: ?Sized + ToOwned,
+    U: ?Sized + ToOwned<C::Allocator>,
 {
     #[inline(always)]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

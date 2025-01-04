@@ -1,5 +1,9 @@
 //! Traits related to memory allocation.
 
+mod to_owned;
+#[doc(inline)]
+pub use self::to_owned::ToOwned;
+
 mod allocator;
 #[doc(inline)]
 pub use self::allocator::Allocator;

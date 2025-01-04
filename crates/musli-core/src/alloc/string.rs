@@ -1,3 +1,4 @@
+use core::borrow::Borrow;
 use core::cmp::Ordering;
 use core::fmt;
 use core::ops::Deref;
@@ -70,6 +71,76 @@ where
         Self {
             buf: Vec::new_in(alloc),
         }
+    }
+
+    /// Coerce into a std string.
+    #[cfg(feature = "alloc")]
+    pub fn into_std(self) -> Result<rust_alloc::string::String, Self> {
+        match self.buf.into_std() {
+            Ok(buf) => {
+                // SAFETY: The buffer is guaranteed to be valid utf-8.
+                unsafe { Ok(rust_alloc::string::String::from_utf8_unchecked(buf)) }
+            }
+            Err(buf) => Err(Self { buf }),
+        }
+    }
+
+    /// Converts a vector of bytes to a `String` without checking that the
+    /// string contains valid UTF-8.
+    ///
+    /// See the safe version, [`from_utf8`], for more details.
+    ///
+    /// [`from_utf8`]: String::from_utf8
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because it does not check that the bytes passed
+    /// to it are valid UTF-8. If this constraint is violated, it may cause
+    /// memory unsafety issues with future users of the `String`, as the rest of
+    /// the standard library assumes that `String`s are valid UTF-8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::{AllocError, String};
+    ///
+    /// musli::alloc::default(|alloc| {
+    ///     let mut v = Vec::<u8, _>::new_in(alloc);
+    ///     // some bytes, in a vector
+    ///     v.extend_from_slice(&[240, 159, 146, 150])?;
+    ///
+    ///     let sparkle_heart = unsafe {
+    ///         String::from_utf8_unchecked(sparkle_heart)
+    ///     };
+    ///
+    ///     assert_eq!("💖", sparkle_heart);
+    ///     Ok::<_, AllocError>(())
+    /// });
+    /// # Ok::<_, AllocError>(())
+    /// ```
+    #[inline]
+    #[must_use]
+    pub unsafe fn from_utf8_unchecked(bytes: Vec<u8, A>) -> String<A> {
+        String { buf: bytes }
+    }
+
+    /// Converts a `String` into a byte vector.
+    ///
+    /// This consumes the `String`, so we do not need to copy its contents.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let s = String::try_from("hello")?;
+    /// let bytes = s.into_bytes();
+    ///
+    /// assert_eq!(&[104, 101, 108, 108, 111][..], &bytes[..]);
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    #[inline]
+    #[must_use = "`self` will be dropped if the result is not used"]
+    pub fn into_bytes(self) -> Vec<u8, A> {
+        self.buf
     }
 
     /// Extracts a string slice containing the entire `String`.
@@ -233,16 +304,16 @@ where
     }
 }
 
-#[cfg(feature = "alloc")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl From<rust_alloc::string::String> for String<System> {
+impl<A> Borrow<str> for String<A>
+where
+    A: Allocator,
+{
     #[inline]
-    fn from(value: rust_alloc::string::String) -> Self {
-        Self {
-            buf: Vec::from(value.into_bytes()),
-        }
+    fn borrow(&self) -> &str {
+        self
     }
 }
+
 macro_rules! impl_eq {
     ($lhs:ty, $rhs: ty) => {
         #[allow(unused_lifetimes)]
@@ -285,3 +356,14 @@ impl_eq! { String<A>, str }
 impl_eq! { String<A>, &'a str }
 #[cfg(feature = "alloc")]
 impl_eq! { Cow<'a, str>, String<A> }
+
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+impl From<rust_alloc::string::String> for String<System> {
+    #[inline]
+    fn from(value: rust_alloc::string::String) -> Self {
+        Self {
+            buf: Vec::from(value.into_bytes()),
+        }
+    }
+}

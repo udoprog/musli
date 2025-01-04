@@ -10,7 +10,7 @@
 use core::fmt;
 use core::marker;
 
-use crate::no_std::ToOwned;
+use crate::alloc::ToOwned;
 
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder,
@@ -361,7 +361,7 @@ where
 impl<C, A, T> UnsizedVisitor<'_, C, T> for Never<A, T>
 where
     C: Context,
-    T: ?Sized + ToOwned,
+    T: ?Sized + ToOwned<C::Allocator>,
 {
     type Ok = A;
 

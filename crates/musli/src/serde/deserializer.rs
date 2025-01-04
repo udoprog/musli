@@ -3,17 +3,13 @@ use core::fmt;
 
 use serde::de;
 
+use crate::alloc::{String, Vec};
 use crate::de::{
     Decoder, EntriesDecoder, MapDecoder, SequenceDecoder, SizeHint, VariantDecoder, Visitor,
 };
 use crate::hint::SequenceHint;
 use crate::mode::Text;
 use crate::Context;
-
-#[cfg(feature = "alloc")]
-use rust_alloc::string::String;
-#[cfg(feature = "alloc")]
-use rust_alloc::vec::Vec;
 
 pub struct Deserializer<D> {
     decoder: D,
@@ -451,8 +447,11 @@ where
 
     #[inline]
     #[cfg(feature = "alloc")]
-    fn visit_owned(self, _: C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
-        de::Visitor::visit_byte_buf(self.visitor, value)
+    fn visit_owned(self, _: C, value: Vec<u8, C::Allocator>) -> Result<Self::Ok, C::Error> {
+        match value.into_std() {
+            Ok(value) => de::Visitor::visit_byte_buf(self.visitor, value),
+            Err(value) => de::Visitor::visit_bytes(self.visitor, &value),
+        }
     }
 
     #[inline]
@@ -577,8 +576,11 @@ where
 
     #[inline]
     #[cfg(feature = "alloc")]
-    fn visit_owned(self, _: C, value: String) -> Result<Self::Ok, C::Error> {
-        de::Visitor::visit_string(self.visitor, value)
+    fn visit_owned(self, _: C, value: String<C::Allocator>) -> Result<Self::Ok, C::Error> {
+        match value.into_std() {
+            Ok(value) => de::Visitor::visit_string(self.visitor, value),
+            Err(value) => de::Visitor::visit_str(self.visitor, &value),
+        }
     }
 
     #[inline]

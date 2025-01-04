@@ -85,7 +85,7 @@ mod default;
 pub use self::default::{DefaultAllocator, DEFAULT_ARRAY_BUFFER};
 
 #[doc(inline)]
-pub use musli_core::alloc::{Alloc, AllocError, Allocator, Box, Disabled, String, Vec};
+pub use musli_core::alloc::{Alloc, AllocError, Allocator, Box, Disabled, String, ToOwned, Vec};
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]

@@ -1,3 +1,4 @@
+use core::borrow::Borrow;
 use core::cmp::Ordering;
 use core::fmt;
 use core::mem::ManuallyDrop;
@@ -50,6 +51,26 @@ where
         Self {
             buf: alloc.alloc_empty::<T>(),
             len: 0,
+        }
+    }
+
+    /// Coerce into a std vector.
+    #[cfg(feature = "alloc")]
+    pub fn into_std(self) -> Result<rust_alloc::vec::Vec<T>, Self> {
+        let mut this = ManuallyDrop::new(self);
+
+        // SAFETY: The implementation of `as_non_null_std` ensures that the
+        // allocation originates from the system allocator.
+        unsafe {
+            let Some((ptr, cap)) = this.buf.as_non_null_std() else {
+                return Err(ManuallyDrop::into_inner(this));
+            };
+
+            Ok(rust_alloc::vec::Vec::from_raw_parts(
+                ptr.as_ptr().cast(),
+                this.len,
+                cap,
+            ))
         }
     }
 
@@ -521,6 +542,16 @@ where
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.as_slice().cmp(other.as_slice())
+    }
+}
+
+impl<T, A> Borrow<[T]> for Vec<T, A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn borrow(&self) -> &[T] {
+        self
     }
 }
 

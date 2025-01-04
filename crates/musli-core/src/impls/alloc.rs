@@ -4,7 +4,7 @@ use core::fmt;
 use core::hash::{BuildHasher, Hash};
 use core::marker::PhantomData;
 
-use rust_alloc::borrow::{Cow, ToOwned};
+use rust_alloc::borrow::Cow;
 use rust_alloc::boxed::Box;
 use rust_alloc::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 use rust_alloc::ffi::CString;
@@ -20,6 +20,7 @@ use std::ffi::{OsStr, OsString};
 #[cfg(all(feature = "std", any(unix, windows)))]
 use std::path::{Path, PathBuf};
 
+use crate::alloc::ToOwned;
 use crate::de::{
     Decode, DecodeBytes, DecodeSliceBuilder, DecodeTrace, Decoder, EntryDecoder, MapDecoder,
     SequenceDecoder, UnsizedVisitor,
@@ -79,17 +80,13 @@ where
             }
 
             #[inline]
-            fn visit_owned(self, _: C, value: String) -> Result<Self::Ok, C::Error> {
-                Ok(value)
-            }
-
-            #[inline]
             fn visit_borrowed(self, cx: C, string: &'de str) -> Result<Self::Ok, C::Error> {
                 self.visit_ref(cx, string)
             }
 
             #[inline]
             fn visit_ref(self, _: C, string: &str) -> Result<Self::Ok, C::Error> {
+                use rust_alloc::borrow::ToOwned;
                 Ok(string.to_owned())
             }
         }
@@ -189,7 +186,7 @@ macro_rules! cow {
                     fn visit_owned(
                         self,
                         $cx: C,
-                        $owned: <$source as ToOwned>::Owned,
+                        $owned: <$source as ToOwned<C::Allocator>>::Owned,
                     ) -> Result<Self::Ok, C::Error> {
                         Ok($owned_expr)
                     }
@@ -222,9 +219,16 @@ cow! {
     IS_BITWISE_ENCODE,
     IS_BITWISE_DECODE,
     str, str, decode_string, _,
-    |owned| Cow::Owned(owned),
+    |owned| {
+        match owned.into_std() {
+            Ok(owned) => Cow::Owned(owned),
+            Err(owned) => {
+                Cow::Owned(rust_alloc::borrow::ToOwned::to_owned(owned.as_str()))
+            }
+        }
+    },
     |borrowed| Cow::Borrowed(borrowed),
-    |reference| Cow::Owned(reference.to_owned())
+    |reference| Cow::Owned(rust_alloc::borrow::ToOwned::to_owned(reference))
 }
 
 cow! {
@@ -234,9 +238,20 @@ cow! {
     IS_BITWISE_ENCODE,
     IS_BITWISE_DECODE,
     CStr, [u8], decode_bytes, cx,
-    |owned| Cow::Owned(CString::from_vec_with_nul(owned).map_err(cx.map())?),
+    |owned| {
+        match owned.into_std() {
+            Ok(owned) => Cow::Owned(CString::from_vec_with_nul(owned).map_err(cx.map())?),
+            Err(reference) => {
+                let value = CStr::from_bytes_with_nul(&reference).map_err(cx.map())?;
+                Cow::Owned(rust_alloc::borrow::ToOwned::to_owned(value))
+            }
+        }
+    },
     |borrowed| Cow::Borrowed(CStr::from_bytes_with_nul(borrowed).map_err(cx.map())?),
-    |reference| Cow::Owned(CStr::from_bytes_with_nul(reference).map_err(cx.map())?.to_owned())
+    |reference| {
+        let value = CStr::from_bytes_with_nul(reference).map_err(cx.map())?;
+        Cow::Owned(rust_alloc::borrow::ToOwned::to_owned(value))
+    }
 }
 
 cow! {
@@ -246,9 +261,14 @@ cow! {
     ENCODE_BYTES_PACKED,
     DECODE_BYTES_PACKED,
     [u8], [u8], decode_bytes, _,
-    |owned| Cow::Owned(owned),
+    |owned| {
+        match owned.into_std() {
+            Ok(owned) => Cow::Owned(owned),
+            Err(owned) => Cow::Owned(rust_alloc::borrow::ToOwned::to_owned(owned.as_slice())),
+        }
+    },
     |borrowed| Cow::Borrowed(borrowed),
-    |reference| Cow::Owned(reference.to_owned())
+    |reference| Cow::Owned(rust_alloc::borrow::ToOwned::to_owned(reference)),
 }
 
 macro_rules! slice_sequence {
@@ -748,8 +768,15 @@ where
             }
 
             #[inline]
-            fn visit_owned(self, cx: C, value: Vec<u8>) -> Result<Self::Ok, C::Error> {
-                CString::from_vec_with_nul(value).map_err(cx.map())
+            fn visit_owned(
+                self,
+                cx: C,
+                value: crate::alloc::Vec<u8, C::Allocator>,
+            ) -> Result<Self::Ok, C::Error> {
+                match value.into_std() {
+                    Ok(value) => CString::from_vec_with_nul(value).map_err(cx.map()),
+                    Err(value) => self.visit_ref(cx, &value),
+                }
             }
 
             #[inline]
@@ -759,9 +786,8 @@ where
 
             #[inline]
             fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
-                Ok(CStr::from_bytes_with_nul(bytes)
-                    .map_err(cx.map())?
-                    .to_owned())
+                let value = CStr::from_bytes_with_nul(bytes).map_err(cx.map())?;
+                Ok(rust_alloc::borrow::ToOwned::to_owned(value))
             }
         }
 
