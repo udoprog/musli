@@ -21,7 +21,7 @@ pub use self::disabled::Disabled;
 mod string;
 pub(crate) use self::string::collect_string;
 #[doc(inline)]
-pub use self::string::String;
+pub use self::string::{FromUtf8Error, String};
 
 mod vec;
 #[doc(inline)]

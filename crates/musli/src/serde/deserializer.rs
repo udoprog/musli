@@ -3,6 +3,7 @@ use core::fmt;
 
 use serde::de;
 
+#[cfg(feature = "alloc")]
 use crate::alloc::{String, Vec};
 use crate::de::{
     Decoder, EntriesDecoder, MapDecoder, SequenceDecoder, SizeHint, VariantDecoder, Visitor,

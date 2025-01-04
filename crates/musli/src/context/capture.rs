@@ -3,7 +3,6 @@ use core::error::Error;
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::alloc;
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
 use crate::{Allocator, Context};
@@ -32,7 +31,7 @@ where
     /// Construct a new capturing context using the [`System`] allocator.
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(alloc::System::new())
+        Self::with_alloc(System::new())
     }
 }
 

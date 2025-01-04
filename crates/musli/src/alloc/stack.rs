@@ -196,6 +196,7 @@ impl<'a> Allocator for &'a Slice<'_> {
         Ok(SliceAlloc {
             region,
             internal: Some(&self.internal),
+            cap: 1,
             _marker: PhantomData,
         })
     }
@@ -217,6 +218,7 @@ impl<'a> Allocator for &'a Slice<'_> {
         SliceAlloc {
             region,
             internal: Some(&self.internal),
+            cap: 0,
             _marker: PhantomData,
         }
     }
@@ -228,6 +230,9 @@ impl<'a> Allocator for &'a Slice<'_> {
 pub struct SliceAlloc<'a, T> {
     region: Option<HeaderId>,
     internal: Option<&'a UnsafeCell<Internal>>,
+    // Locally known capacity in units of `T`. The real capacity *might* be
+    // larger than this value.
+    cap: usize,
     _marker: PhantomData<T>,
 }
 
@@ -235,6 +240,7 @@ impl<T> SliceAlloc<'_, T> {
     const ZST: Self = Self {
         region: None,
         internal: None,
+        cap: usize::MAX,
         _marker: PhantomData,
     };
 }
@@ -300,6 +306,14 @@ impl<T> Alloc<T> for SliceAlloc<'_, T> {
 
     #[inline]
     fn resize(&mut self, len: usize, additional: usize) -> Result<(), AllocError> {
+        // Cheaply check the locally known capacity.
+        //
+        // This capacity is in units of `T`, and is only ever at risk of being
+        // too small if the allocation has been grown.
+        if len + additional <= self.cap {
+            return Ok(());
+        }
+
         let Some(internal) = self.internal else {
             debug_assert_eq!(
                 size_of::<T>(),
@@ -337,8 +351,11 @@ impl<T> Alloc<T> for SliceAlloc<'_, T> {
 
             let region = i.region(region_id);
 
+            let actual = region.capacity();
+
             // Region can already fit in the requested bytes.
-            if region.capacity() >= requested {
+            if actual >= requested {
+                self.cap = actual / size_of::<T>();
                 return Ok(());
             };
 
@@ -347,6 +364,7 @@ impl<T> Alloc<T> for SliceAlloc<'_, T> {
             };
 
             self.region = Some(region.id);
+            self.cap = region.capacity() / size_of::<T>();
             Ok(())
         }
     }

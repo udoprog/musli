@@ -93,13 +93,14 @@ where
     /// # Ok::<_, AllocError>(())
     /// ```
     #[inline]
-    pub fn with_capacity_in(cap: usize, alloc: A) -> Result<Self, AllocError> {
+    pub fn with_capacity_in(capacity: usize, alloc: A) -> Result<Self, AllocError> {
         let mut buf = alloc.alloc_empty::<T>();
-        buf.resize(0, cap)?;
+        buf.resize(0, capacity)?;
         Ok(Self { buf, len: 0 })
     }
 
-    /// Get the number of initialized elements in the buffer.
+    /// Returns the number of elements in the vector, also referred to as its
+    /// 'length'.
     ///
     /// ## Examples
     ///
@@ -119,6 +120,33 @@ where
     #[inline]
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    /// Returns the total number of elements the vector can hold without
+    /// reallocating.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use musli::alloc::{AllocError, Vec};
+    ///
+    /// musli::alloc::default(|alloc| {
+    ///     let mut a = Vec::new_in(alloc);
+    ///
+    ///     assert_eq!(a.len(), 0);
+    ///     assert_eq!(a.capacity(), 0);
+    ///
+    ///     a.extend_from_slice(b"Hello")?;
+    ///     assert_eq!(a.len(), 5);
+    ///     assert!(a.capacity() >= 5);
+    ///
+    ///     Ok::<_, AllocError>(())
+    /// })?;
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.buf.capacity()
     }
 
     /// Check if the buffer is empty.
@@ -505,13 +533,99 @@ where
     }
 }
 
-impl<T, A> PartialEq for Vec<T, A>
+macro_rules! impl_eq {
+    ($lhs:ty, $rhs: ty) => {
+        #[allow(unused_lifetimes)]
+        impl<'a, 'b, T, A> PartialEq<$rhs> for $lhs
+        where
+            T: PartialEq,
+            A: Allocator,
+        {
+            #[inline]
+            fn eq(&self, other: &$rhs) -> bool {
+                PartialEq::eq(&self[..], &other[..])
+            }
+
+            #[inline]
+            #[allow(clippy::partialeq_ne_impl)]
+            fn ne(&self, other: &$rhs) -> bool {
+                PartialEq::ne(&self[..], &other[..])
+            }
+        }
+
+        #[allow(unused_lifetimes)]
+        impl<'a, 'b, T, A> PartialEq<$lhs> for $rhs
+        where
+            T: PartialEq,
+            A: Allocator,
+        {
+            #[inline]
+            fn eq(&self, other: &$lhs) -> bool {
+                PartialEq::eq(&self[..], &other[..])
+            }
+
+            #[inline]
+            #[allow(clippy::partialeq_ne_impl)]
+            fn ne(&self, other: &$lhs) -> bool {
+                PartialEq::ne(&self[..], &other[..])
+            }
+        }
+    };
+}
+
+macro_rules! impl_eq_array {
+    ($lhs:ty, $rhs: ty) => {
+        #[allow(unused_lifetimes)]
+        impl<'a, 'b, T, A, const N: usize> PartialEq<$rhs> for $lhs
+        where
+            T: PartialEq,
+            A: Allocator,
+        {
+            #[inline]
+            fn eq(&self, other: &$rhs) -> bool {
+                PartialEq::eq(&self[..], &other[..])
+            }
+
+            #[inline]
+            #[allow(clippy::partialeq_ne_impl)]
+            fn ne(&self, other: &$rhs) -> bool {
+                PartialEq::ne(&self[..], &other[..])
+            }
+        }
+
+        #[allow(unused_lifetimes)]
+        impl<'a, 'b, T, A, const N: usize> PartialEq<$lhs> for $rhs
+        where
+            T: PartialEq,
+            A: Allocator,
+        {
+            #[inline]
+            fn eq(&self, other: &$lhs) -> bool {
+                PartialEq::eq(&self[..], &other[..])
+            }
+
+            #[inline]
+            #[allow(clippy::partialeq_ne_impl)]
+            fn ne(&self, other: &$lhs) -> bool {
+                PartialEq::ne(&self[..], &other[..])
+            }
+        }
+    };
+}
+
+impl_eq! { Vec<T, A>, [T] }
+impl_eq! { Vec<T, A>, &'a [T] }
+impl_eq_array! { Vec<T, A>, [T; N] }
+impl_eq_array! { Vec<T, A>, &'a [T; N] }
+
+impl<T, A, B> PartialEq<Vec<T, B>> for Vec<T, A>
 where
     T: PartialEq,
     A: Allocator,
+    B: Allocator,
 {
     #[inline]
-    fn eq(&self, other: &Self) -> bool {
+    fn eq(&self, other: &Vec<T, B>) -> bool {
         self.as_slice().eq(other.as_slice())
     }
 }
@@ -523,13 +637,14 @@ where
 {
 }
 
-impl<T, A> PartialOrd for Vec<T, A>
+impl<T, A, B> PartialOrd<Vec<T, B>> for Vec<T, A>
 where
     T: PartialOrd,
     A: Allocator,
+    B: Allocator,
 {
     #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Vec<T, B>) -> Option<Ordering> {
         self.as_slice().partial_cmp(other.as_slice())
     }
 }

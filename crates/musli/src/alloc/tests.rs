@@ -1,4 +1,21 @@
-use super::{Allocator, Vec};
+use super::{Allocator, ArrayBuffer, Slice, System, Vec};
+
+macro_rules! test_for_each {
+    ($system:ident, $stack:ident, $inner:ident) => {
+        #[test]
+        fn $system() {
+            let alloc = System::new();
+            $inner(alloc);
+        }
+
+        #[test]
+        fn $stack() {
+            let mut buf = ArrayBuffer::<16384>::with_size();
+            let alloc = Slice::new(&mut buf);
+            $inner(&alloc);
+        }
+    };
+}
 
 fn basic_allocations<A>(alloc: A)
 where
@@ -7,26 +24,26 @@ where
     let mut a = Vec::new_in(alloc);
     let mut b = Vec::new_in(alloc);
 
-    _ = b.extend_from_slice(b"He11o");
+    b.extend_from_slice(b"He11o").unwrap();
 
     assert_eq!(b.as_slice(), b"He11o");
     assert_eq!(b.len(), 5);
 
-    _ = a.extend_from_slice(b.as_slice());
+    a.extend_from_slice(b.as_slice()).unwrap();
 
     assert_eq!(a.as_slice(), b"He11o");
     assert_eq!(a.len(), 5);
 
-    _ = a.extend_from_slice(b" W0rld");
+    a.extend_from_slice(b" W0rld").unwrap();
 
     assert_eq!(a.as_slice(), b"He11o W0rld");
     assert_eq!(a.len(), 11);
 
     let mut c = Vec::new_in(alloc);
-    _ = c.extend_from_slice(b"!");
+    c.extend_from_slice(b"!").unwrap();
     assert_eq!(c.len(), 1);
 
-    _ = a.extend_from_slice(c.as_slice());
+    a.extend_from_slice(c.as_slice()).unwrap();
     assert_eq!(a.as_slice(), b"He11o W0rld!");
     assert_eq!(a.len(), 12);
 }
@@ -70,31 +87,14 @@ where
     }
 }
 
-#[test]
-fn system_basic() {
-    let alloc = super::System::new();
-    basic_allocations(alloc);
-}
-
-#[test]
-fn nostd_basic() {
-    let mut buf = super::ArrayBuffer::<4096>::new();
-    let alloc = super::Slice::new(&mut buf);
-    basic_allocations(&alloc);
-}
-
-#[test]
-fn system_grow() {
-    let alloc = super::System::new();
-    grow_allocations(alloc);
-}
-
 fn zst_allocations<A>(alloc: A)
 where
     A: Copy + Allocator,
 {
     let mut a = Vec::new_in(alloc);
     let mut b = Vec::new_in(alloc);
+
+    assert_eq!(b.capacity(), usize::MAX);
 
     assert!(a.extend_from_slice(&[(); 100]).is_ok());
     assert!(b.extend_from_slice(&[(); 100]).is_ok());
@@ -105,15 +105,6 @@ where
     assert_eq!(a.as_slice(), b.as_slice());
 }
 
-#[test]
-fn system_zst() {
-    let alloc = super::System::new();
-    zst_allocations(alloc);
-}
-
-#[test]
-fn stack_zst() {
-    let mut buf = super::ArrayBuffer::<4096>::new();
-    let alloc = super::Slice::new(&mut buf);
-    zst_allocations(&alloc);
-}
+test_for_each!(system_basic, stack_basic, basic_allocations);
+test_for_each!(system_grow, stack_grow, grow_allocations);
+test_for_each!(system_zst, stack_zst, zst_allocations);
