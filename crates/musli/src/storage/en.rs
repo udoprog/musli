@@ -142,15 +142,6 @@ where
     }
 
     #[inline]
-    fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
-    where
-        T: ?Sized + fmt::Display,
-    {
-        let buf = self.cx.collect_string(value)?;
-        self.encode_string(buf.as_ref())
-    }
-
-    #[inline]
     fn encode_bool(mut self, value: bool) -> Result<Self::Ok, C::Error> {
         self.writer.write_byte(self.cx, if value { 1 } else { 0 })
     }

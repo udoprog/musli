@@ -197,6 +197,7 @@ pub use musli_macros::visitor;
 #[doc(hidden)]
 pub mod __priv {
     pub use crate::alloc::Allocator;
+    use crate::alloc::String;
     pub use crate::context::Context;
     pub use crate::de::{
         AsDecoder, Decode, DecodeBytes, DecodePacked, DecodeTrace, Decoder, EntryDecoder,
@@ -214,7 +215,7 @@ pub mod __priv {
     pub use ::core::option::Option;
     pub use ::core::result::Result;
 
-    #[inline(always)]
+    #[inline]
     pub fn default<T>() -> T
     where
         T: ::core::default::Default,
@@ -223,7 +224,7 @@ pub mod __priv {
     }
 
     /// Note that this returns `true` if skipping was unsupported.
-    #[inline(always)]
+    #[inline]
     pub fn skip<'de, D>(decoder: D) -> Result<bool, D::Error>
     where
         D: Decoder<'de>,
@@ -232,11 +233,162 @@ pub mod __priv {
     }
 
     /// Note that this returns `true` if skipping was unsupported.
-    #[inline(always)]
+    #[inline]
     pub fn skip_field<'de, D>(decoder: D) -> Result<bool, <D::Cx as Context>::Error>
     where
         D: EntryDecoder<'de>,
     {
         skip(decoder.decode_value()?)
+    }
+
+    /// Collect and allocate a string from a [`Display`] implementation.
+    ///
+    /// [`Display`]: fmt::Display
+    #[inline]
+    pub fn collect_string<C>(
+        cx: C,
+        value: impl fmt::Display,
+    ) -> Result<String<C::Allocator>, C::Error>
+    where
+        C: Context,
+    {
+        match crate::alloc::collect_string(cx.alloc(), value) {
+            Ok(string) => Ok(string),
+            Err(error) => Err(cx.message(error)),
+        }
+    }
+
+    /// Helper methods to report errors.
+    pub mod m {
+        use core::fmt;
+
+        use crate::Context;
+
+        /// Report that an invalid variant tag was encountered.
+        #[inline]
+        pub fn invalid_variant_tag<C>(
+            cx: C,
+            type_name: &'static str,
+            tag: impl fmt::Debug,
+        ) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!(
+                "Type {type_name} received invalid variant tag {tag:?}"
+            ))
+        }
+
+        /// The value for the given tag could not be collected.
+        #[inline]
+        pub fn expected_tag<C>(cx: C, type_name: &'static str, tag: impl fmt::Debug) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!("Type {type_name} expected tag {tag:?}"))
+        }
+
+        /// Trying to decode an uninhabitable type.
+        #[inline]
+        pub fn uninhabitable<C>(cx: C, type_name: &'static str) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!(
+                "Type {type_name} cannot be decoded since it's uninhabitable"
+            ))
+        }
+
+        /// Encountered an unsupported field tag.
+        #[inline]
+        pub fn invalid_field_tag<C>(
+            cx: C,
+            type_name: &'static str,
+            tag: impl fmt::Debug,
+        ) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!(
+                "Type {type_name} is missing invalid field tag {tag:?}"
+            ))
+        }
+
+        /// Expected another field to decode.
+        #[inline]
+        pub fn expected_field_adjacent<C>(
+            cx: C,
+            type_name: &'static str,
+            tag: impl fmt::Debug,
+            content: impl fmt::Debug,
+        ) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!(
+                "Type {type_name} expected adjacent field {tag:?} or {content:?}"
+            ))
+        }
+
+        /// Missing adjacent tag when decoding.
+        #[inline]
+        pub fn missing_adjacent_tag<C>(
+            cx: C,
+            type_name: &'static str,
+            tag: impl fmt::Debug,
+        ) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!(
+                "Type {type_name} is missing adjacent tag {tag:?}"
+            ))
+        }
+
+        /// Encountered an unsupported field tag.
+        #[inline]
+        pub fn invalid_field_string_tag<C>(
+            cx: C,
+            type_name: &'static str,
+            field: impl fmt::Debug,
+        ) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!(
+                "Type {type_name} received invalid field tag {field:?}"
+            ))
+        }
+
+        /// Missing variant field required to decode.
+        #[inline]
+        pub fn missing_variant_field<C>(
+            cx: C,
+            type_name: &'static str,
+            tag: impl fmt::Debug,
+        ) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!(
+                "Type {type_name} is missing variant field {tag:?}"
+            ))
+        }
+
+        /// Encountered an unsupported variant field.
+        #[inline]
+        pub fn invalid_variant_field_tag<C>(
+            cx: C,
+            type_name: &'static str,
+            variant: impl fmt::Debug,
+            tag: impl fmt::Debug,
+        ) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!(
+                "Type {type_name} received invalid variant field tag {tag:?} for variant {variant:?}",
+            ))
+        }
     }
 }

@@ -4,7 +4,6 @@ use core::error::Error;
 use core::fmt;
 use core::str;
 
-use crate::alloc::{self, String};
 use crate::Allocator;
 
 /// Provides ergonomic access to the serialization context.
@@ -40,20 +39,6 @@ pub trait Context: Copy {
 
     /// Access the underlying allocator.
     fn alloc(self) -> Self::Allocator;
-
-    /// Collect and allocate a string from a [`Display`] implementation.
-    ///
-    /// [`Display`]: fmt::Display
-    #[inline]
-    fn collect_string<T>(self, value: &T) -> Result<String<Self::Allocator>, Self::Error>
-    where
-        T: ?Sized + fmt::Display,
-    {
-        match alloc::collect_string(self.alloc(), value) {
-            Ok(string) => Ok(string),
-            Err(error) => Err(self.message(error)),
-        }
-    }
 
     /// Generate a map function which maps an error using the `custom` function.
     #[inline]
@@ -101,127 +86,6 @@ pub trait Context: Copy {
     {
         _ = mark;
         self.custom(message)
-    }
-
-    /// Report that an invalid variant tag was encountered.
-    #[inline]
-    fn invalid_variant_tag<T>(self, type_name: &'static str, tag: &T) -> Self::Error
-    where
-        T: ?Sized + fmt::Debug,
-    {
-        self.message(format_args!(
-            "Type {type_name} received invalid variant tag {tag:?}"
-        ))
-    }
-
-    /// The value for the given tag could not be collected.
-    #[inline]
-    fn expected_tag<T>(self, type_name: &'static str, tag: &T) -> Self::Error
-    where
-        T: ?Sized + fmt::Debug,
-    {
-        self.message(format_args!("Type {type_name} expected tag {tag:?}"))
-    }
-
-    /// Trying to decode an uninhabitable type.
-    #[inline]
-    fn uninhabitable(self, type_name: &'static str) -> Self::Error {
-        self.message(format_args!(
-            "Type {type_name} cannot be decoded since it's uninhabitable"
-        ))
-    }
-
-    /// Encountered an unsupported field tag.
-    #[inline]
-    fn invalid_field_tag<T>(self, type_name: &'static str, tag: &T) -> Self::Error
-    where
-        T: ?Sized + fmt::Debug,
-    {
-        self.message(format_args!(
-            "Type {type_name} is missing invalid field tag {tag:?}"
-        ))
-    }
-
-    /// Expected another field to decode.
-    #[inline]
-    fn expected_field_adjacent<T, C>(
-        self,
-        type_name: &'static str,
-        tag: &T,
-        content: &C,
-    ) -> Self::Error
-    where
-        T: ?Sized + fmt::Debug,
-        C: ?Sized + fmt::Debug,
-    {
-        self.message(format_args!(
-            "Type {type_name} expected adjacent field {tag:?} or {content:?}"
-        ))
-    }
-
-    /// Missing adjacent tag when decoding.
-    #[inline]
-    fn missing_adjacent_tag<T>(self, type_name: &'static str, tag: &T) -> Self::Error
-    where
-        T: ?Sized + fmt::Debug,
-    {
-        self.message(format_args!(
-            "Type {type_name} is missing adjacent tag {tag:?}"
-        ))
-    }
-
-    /// Encountered an unsupported field tag.
-    #[inline]
-    fn invalid_field_string_tag(
-        self,
-        type_name: &'static str,
-        field: impl AsRef<str>,
-    ) -> Self::Error {
-        let field = field.as_ref();
-
-        self.message(format_args!(
-            "Type {type_name} received invalid field tag {field:?}"
-        ))
-    }
-
-    /// Missing variant field required to decode.
-    #[inline]
-    fn missing_variant_field<T>(self, type_name: &'static str, tag: &T) -> Self::Error
-    where
-        T: ?Sized + fmt::Debug,
-    {
-        self.message(format_args!(
-            "Type {type_name} is missing variant field {tag:?}"
-        ))
-    }
-
-    /// Indicate that a variant tag could not be determined.
-    #[inline]
-    fn missing_variant_tag(self, type_name: &'static str) -> Self::Error {
-        self.message(format_args!("Type {type_name} is missing variant tag"))
-    }
-
-    /// Encountered an unsupported variant field.
-    #[inline]
-    fn invalid_variant_field_tag<V, T>(
-        self,
-        type_name: &'static str,
-        variant: &V,
-        tag: &T,
-    ) -> Self::Error
-    where
-        V: ?Sized + fmt::Debug,
-        T: ?Sized + fmt::Debug,
-    {
-        self.message(format_args!(
-            "Type {type_name} received invalid variant field tag {tag:?} for variant {variant:?}",
-        ))
-    }
-
-    /// Missing variant field required to decode.
-    #[inline]
-    fn alloc_failed(self) -> Self::Error {
-        self.message("Failed to allocate")
     }
 
     /// Indicate that we've entered a struct with the given `name`.

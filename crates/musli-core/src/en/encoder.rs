@@ -1149,10 +1149,9 @@ pub trait Encoder: Sized {
     where
         T: ?Sized + fmt::Display,
     {
-        Err(self.cx().message(expecting::unsupported_type(
-            &expecting::CollectString,
-            ExpectingWrapper::new(&self),
-        )))
+        let cx = self.cx();
+        let buf = crate::alloc::collect_string(cx.alloc(), value).map_err(cx.map())?;
+        self.encode_string(buf.as_ref())
     }
 
     /// Encode an optional value that is present.

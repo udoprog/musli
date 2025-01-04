@@ -136,7 +136,6 @@ expect! {
     pub(crate) Isize("isize");
     pub(crate) Usize("usize");
     pub(crate) String("string");
-    pub(crate) CollectString("collected string");
     pub(crate) Bytes("bytes");
     pub(crate) Array("array");
     pub(crate) Map("map");

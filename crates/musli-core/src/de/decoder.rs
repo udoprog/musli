@@ -235,7 +235,7 @@ pub trait Decoder<'de>: Sized {
     ///         let discriminant = buffer.as_decoder()?.decode_map(|st| {
     ///             loop {
     ///                 let Some(mut e) = st.decode_entry()? else {
-    ///                     return Err(cx.missing_variant_tag("Enum"));
+    ///                     return Err(cx.message("Missing variant tag"));
     ///                 };
     ///
     ///                 let found = e.decode_key()?.decode_unsized(|string: &str| {
@@ -251,7 +251,7 @@ pub trait Decoder<'de>: Sized {
     ///         match discriminant {
     ///             0 => Ok(Enum::Empty),
     ///             1 => Ok(Enum::Person(buffer.as_decoder()?.decode()?)),
-    ///             other => Err(cx.invalid_variant_tag("Enum", &other)),
+    ///             other => Err(cx.message(format_args!("Invalid variant tag {other:?}"))),
     ///         }
     ///     }
     /// }
@@ -1557,14 +1557,14 @@ pub trait Decoder<'de>: Sized {
     ///                         integer = Some(field.decode_value()?.decode()?);
     ///                     }
     ///                     tag => {
-    ///                         return Err(cx.invalid_field_tag("Struct", tag));
+    ///                         return Err(cx.message(format_args!("Invalid field tag {tag:?}")));
     ///                     }
     ///                 }
     ///             }
     ///
     ///             Ok(Self {
-    ///                 string: string.ok_or_else(|| cx.expected_tag("Struct", "string"))?,
-    ///                 integer: integer.ok_or_else(|| cx.expected_tag("Struct", "integer"))?,
+    ///                 string: string.ok_or_else(|| cx.message("Expected tag `string`"))?,
+    ///                 integer: integer.ok_or_else(|| cx.message("Expected tag `integer`"))?,
     ///             })
     ///         })
     ///     }
@@ -1624,7 +1624,7 @@ pub trait Decoder<'de>: Sized {
     ///             match tag {
     ///                 0 => Ok(Self::Number(value.decode()?)),
     ///                 1 => Ok(Self::String(value.decode()?)),
-    ///                 tag => Err(cx.invalid_variant_tag("Enum", &tag)),
+    ///                 tag => Err(cx.message(format_args!("Invalid variant tag {tag:?}"))),
     ///             }
     ///         })
     ///     }

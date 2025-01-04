@@ -1,7 +1,5 @@
 #![allow(clippy::type_complexity)]
 
-use core::fmt;
-
 use crate::alloc::{Box, String, Vec};
 use crate::en::{Encode, Encoder};
 use crate::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
@@ -274,15 +272,6 @@ where
         string.push_str(s).map_err(self.cx.map())?;
         self.output.write(self.cx, Value::String(string))?;
         Ok(())
-    }
-
-    #[inline]
-    fn collect_string<T>(self, value: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
-    where
-        T: ?Sized + fmt::Display,
-    {
-        let buf = self.cx.collect_string(value)?;
-        self.encode_string(buf.as_ref())
     }
 
     #[inline]
