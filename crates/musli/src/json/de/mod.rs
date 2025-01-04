@@ -20,6 +20,7 @@ mod variant_decoder;
 use self::variant_decoder::JsonVariantDecoder;
 
 use core::fmt;
+use core::marker::PhantomData;
 use core::str;
 
 use crate::alloc::Vec;
@@ -42,20 +43,26 @@ use super::parser::{integer, Parser, StringReference, Token};
 const BUFFER_OPTIONS: Options = options::new().map_keys_as_numbers().build();
 
 /// A JSON decoder for Müsli.
-pub(crate) struct JsonDecoder<P, C> {
+pub(crate) struct JsonDecoder<P, C, M> {
     cx: C,
     parser: P,
+    _marker: PhantomData<M>,
 }
 
-impl<'de, P, C> JsonDecoder<P, C>
+impl<'de, P, C, M> JsonDecoder<P, C, M>
 where
     P: Parser<'de>,
     C: Context,
+    M: 'static,
 {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(cx: C, parser: P) -> Self {
-        Self { cx, parser }
+        Self {
+            cx,
+            parser,
+            _marker: PhantomData,
+        }
     }
 
     /// Skip over any values.
@@ -98,26 +105,27 @@ where
 }
 
 #[crate::decoder(crate)]
-impl<'de, P, C> Decoder<'de> for JsonDecoder<P, C>
+impl<'de, P, C, M> Decoder<'de> for JsonDecoder<P, C, M>
 where
     P: Parser<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = C::Mode;
+    type Mode = M;
     type Allocator = C::Allocator;
     type WithContext<U>
-        = JsonDecoder<P, U>
+        = JsonDecoder<P, U, M>
     where
         U: Context<Allocator = Self::Allocator>;
-    type DecodeBuffer = crate::value::IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator>;
-    type DecodePack = JsonSequenceDecoder<P, C>;
-    type DecodeSequence = JsonSequenceDecoder<P, C>;
-    type DecodeMap = JsonObjectDecoder<P, C>;
-    type DecodeMapEntries = JsonObjectDecoder<P, C>;
-    type DecodeSome = JsonDecoder<P, C>;
-    type DecodeVariant = JsonVariantDecoder<P, C>;
+    type DecodeBuffer = crate::value::IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
+    type DecodePack = JsonSequenceDecoder<P, C, M>;
+    type DecodeSequence = JsonSequenceDecoder<P, C, M>;
+    type DecodeMap = JsonObjectDecoder<P, C, M>;
+    type DecodeMapEntries = JsonObjectDecoder<P, C, M>;
+    type DecodeSome = JsonDecoder<P, C, M>;
+    type DecodeVariant = JsonVariantDecoder<P, C, M>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {

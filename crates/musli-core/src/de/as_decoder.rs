@@ -6,12 +6,14 @@ use super::Decoder;
 pub trait AsDecoder {
     /// Context associated with the decoder.
     type Cx: Context;
+    /// The mode of the decoder.
+    type Mode: 'static;
     /// The decoder we reborrow as.
     type Decoder<'this>: Decoder<
         'this,
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
-        Mode = <Self::Cx as Context>::Mode,
+        Mode = Self::Mode,
         Allocator = <Self::Cx as Context>::Allocator,
     >
     where

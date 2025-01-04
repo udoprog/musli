@@ -62,7 +62,7 @@ pub fn default_sequence_encode_slice<E, T>(
 ) -> Result<(), <E::Cx as Context>::Error>
 where
     E: ?Sized + SequenceEncoder,
-    T: Encode<<E::Cx as Context>::Mode>,
+    T: Encode<E::Mode>,
 {
     let cx = seq.cx();
 
@@ -86,7 +86,7 @@ pub fn default_sequence_encode_slices<E, T>(
 ) -> Result<(), <E::Cx as Context>::Error>
 where
     E: ?Sized + SequenceEncoder,
-    T: Encode<<E::Cx as Context>::Mode>,
+    T: Encode<E::Mode>,
 {
     let cx = seq.cx();
 

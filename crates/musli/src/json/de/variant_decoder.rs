@@ -1,18 +1,22 @@
+use core::marker::PhantomData;
+
 use crate::de::VariantDecoder;
 use crate::json::parser::{Parser, Token};
 use crate::Context;
 
 use super::{JsonDecoder, JsonKeyDecoder};
 
-pub(crate) struct JsonVariantDecoder<P, C> {
+pub(crate) struct JsonVariantDecoder<P, C, M> {
     cx: C,
     parser: P,
+    _marker: PhantomData<M>,
 }
 
-impl<'de, P, C> JsonVariantDecoder<P, C>
+impl<'de, P, C, M> JsonVariantDecoder<P, C, M>
 where
     P: Parser<'de>,
     C: Context,
+    M: 'static,
 {
     #[inline]
     pub(super) fn new(cx: C, mut parser: P) -> Result<Self, C::Error> {
@@ -23,7 +27,11 @@ where
         }
 
         parser.skip(cx, 1)?;
-        Ok(Self { cx, parser })
+        Ok(Self {
+            cx,
+            parser,
+            _marker: PhantomData,
+        })
     }
 
     #[inline]
@@ -41,18 +49,20 @@ where
     }
 }
 
-impl<'de, P, C> VariantDecoder<'de> for JsonVariantDecoder<P, C>
+impl<'de, P, C, M> VariantDecoder<'de> for JsonVariantDecoder<P, C, M>
 where
     P: Parser<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeTag<'this>
-        = JsonKeyDecoder<P::Mut<'this>, C>
+        = JsonKeyDecoder<P::Mut<'this>, C, M>
     where
         Self: 'this;
     type DecodeValue<'this>
-        = JsonDecoder<P::Mut<'this>, C>
+        = JsonDecoder<P::Mut<'this>, C, M>
     where
         Self: 'this;
 

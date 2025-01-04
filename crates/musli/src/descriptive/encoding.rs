@@ -125,8 +125,8 @@ where
     crate::macros::encoding_impls!(
         M,
         descriptive,
-        SelfEncoder::<_, OPT, _>::new,
-        SelfDecoder::<_, OPT, _>::new,
+        SelfEncoder::<OPT, _, _, M>::new,
+        SelfDecoder::<OPT, _, _, M>::new,
         IntoReader::into_reader,
         IntoWriter::into_writer,
     );

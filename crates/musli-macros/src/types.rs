@@ -20,9 +20,11 @@ pub(super) enum Ty {
 pub(super) enum Extra {
     /// `type Type = Never;`
     None,
+    /// `type Cx = C;`.
+    Cx,
     /// `type Error = <Self::Cx as Context>::Error;`
     Error,
-    /// `type Mode = <Self::Cx as Context>::Mode;`
+    /// `type Mode = M;`
     Mode,
     /// `type Allocator = <Self::Cx as Context>::Allocator;`
     Allocator,
@@ -31,6 +33,7 @@ pub(super) enum Extra {
 }
 
 pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
+    ("Cx", Extra::Cx),
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
     ("WithContext", Extra::Context),
@@ -45,6 +48,7 @@ pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
 ];
 
 pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
+    ("Cx", Extra::Cx),
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
     ("Allocator", Extra::Allocator),
@@ -207,8 +211,12 @@ impl Types {
             let generics;
 
             match extra {
+                Extra::Cx => {
+                    ty = syn::parse_quote!(C);
+                    generics = syn::Generics::default();
+                }
                 Extra::Mode => {
-                    ty = syn::parse_quote!(<Self::Cx as #crate_path::Context>::Mode);
+                    ty = syn::parse_quote!(M);
                     generics = syn::Generics::default();
                 }
                 Extra::Allocator => {
@@ -316,54 +324,33 @@ impl Types {
         never.segments.push({
             let mut s = syn::PathSegment::from(syn::Ident::new("Never", Span::call_site()));
 
-            let mut args = Punctuated::default();
+            let mut args = Vec::<syn::GenericArgument>::new();
 
             if let Some(arg) = argument {
                 args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
                     qself: None,
                     path: self_type(arg),
                 })));
-            } else {
-                args.push(syn::parse_quote!(()));
             }
 
             match extra {
                 Extra::Visitor(ty) => match ty {
                     Ty::Str => {
-                        args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-                            qself: None,
-                            path: ident_path(syn::Ident::new("str", Span::call_site())),
-                        })));
+                        args.push(syn::parse_quote!(str));
                     }
                     Ty::Bytes => {
-                        let mut path = syn::Path {
-                            leading_colon: None,
-                            segments: Punctuated::default(),
-                        };
-
-                        path.segments.push(syn::PathSegment::from(syn::Ident::new(
-                            "u8",
-                            Span::call_site(),
-                        )));
-
-                        args.push(syn::GenericArgument::Type(syn::Type::Slice(
-                            syn::TypeSlice {
-                                bracket_token: syn::token::Bracket::default(),
-                                elem: Box::new(syn::Type::Path(syn::TypePath {
-                                    qself: None,
-                                    path,
-                                })),
-                            },
-                        )));
+                        args.push(syn::parse_quote!([u8]));
                     }
                 },
                 Extra::Context => {
                     let u_param = syn::Ident::new(U_PARAM, Span::call_site());
                     args.push(syn::parse_quote!(#u_param));
+                    args.push(syn::parse_quote!(Self::Mode));
                 }
                 Extra::None => match kind {
                     Kind::SelfCx => {
                         args.push(syn::parse_quote!(Self::Cx));
+                        args.push(syn::parse_quote!(Self::Mode));
                     }
                     Kind::GenericCx => {}
                 },
@@ -371,13 +358,7 @@ impl Types {
             }
 
             if !args.is_empty() {
-                s.arguments =
-                    syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
-                        colon2_token: None,
-                        lt_token: <Token![<]>::default(),
-                        args,
-                        gt_token: <Token![>]>::default(),
-                    });
+                s.arguments = syn::PathArguments::AngleBracketed(syn::parse_quote!(<(#(#args,)*)>));
             }
 
             s

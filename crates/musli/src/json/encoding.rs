@@ -179,8 +179,8 @@ where
     crate::macros::encoding_impls!(
         M,
         json,
-        JsonEncoder::new,
-        JsonDecoder::new,
+        JsonEncoder::<_, _, M>::new,
+        JsonDecoder::<_, _, M>::new,
         IntoParser::into_parser,
         IntoWriter::into_writer,
     );
@@ -264,12 +264,12 @@ where
     #[inline]
     pub fn to_string_with<T, C>(self, cx: C, value: &T) -> Result<String, C::Error>
     where
-        C: Context<Mode = M>,
+        C: Context,
         T: ?Sized + Encode<M>,
     {
         cx.clear();
         let mut data = Vec::with_capacity(128);
-        T::encode(value, JsonEncoder::new(cx, &mut data))?;
+        T::encode(value, JsonEncoder::<_, _, M>::new(cx, &mut data))?;
         // SAFETY: Encoder is guaranteed to produce valid UTF-8.
         Ok(unsafe { String::from_utf8_unchecked(data) })
     }

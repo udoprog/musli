@@ -14,47 +14,54 @@ mod variant_encoder;
 use self::variant_encoder::JsonVariantEncoder;
 
 use core::fmt;
+use core::marker::PhantomData;
 
 use crate::en::{Encode, Encoder, SequenceEncoder};
 use crate::hint::{MapHint, SequenceHint};
 use crate::{Context, Writer};
 
 /// A JSON encoder for Müsli.
-pub(crate) struct JsonEncoder<W, C> {
+pub(crate) struct JsonEncoder<W, C, M> {
     cx: C,
     writer: W,
+    _marker: PhantomData<M>,
 }
 
-impl<W, C> JsonEncoder<W, C> {
+impl<W, C, M> JsonEncoder<W, C, M> {
     /// Construct a new fixed width message encoder.
     #[inline]
     pub(crate) fn new(cx: C, writer: W) -> Self {
-        Self { cx, writer }
+        Self {
+            cx,
+            writer,
+            _marker: PhantomData,
+        }
     }
 }
 
 #[crate::encoder(crate)]
-impl<C, W> Encoder for JsonEncoder<W, C>
+impl<W, C, M> Encoder for JsonEncoder<W, C, M>
 where
     W: Writer,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
     type Ok = ();
-    type Mode = C::Mode;
+    type Mode = M;
     type WithContext<U>
-        = JsonEncoder<W, U>
+        = JsonEncoder<W, U, M>
     where
         U: Context<Allocator = <Self::Cx as Context>::Allocator>;
-    type EncodePack = JsonArrayEncoder<W, C>;
+    type EncodePack = JsonArrayEncoder<W, C, M>;
     type EncodeSome = Self;
-    type EncodeSequence = JsonArrayEncoder<W, C>;
-    type EncodeMap = JsonObjectEncoder<W, C>;
-    type EncodeMapEntries = JsonObjectEncoder<W, C>;
-    type EncodeVariant = JsonVariantEncoder<W, C>;
-    type EncodeSequenceVariant = JsonArrayEncoder<W, C>;
-    type EncodeMapVariant = JsonObjectEncoder<W, C>;
+    type EncodeSequence = JsonArrayEncoder<W, C, M>;
+    type EncodeMap = JsonObjectEncoder<W, C, M>;
+    type EncodeMapEntries = JsonObjectEncoder<W, C, M>;
+    type EncodeVariant = JsonVariantEncoder<W, C, M>;
+    type EncodeSequenceVariant = JsonArrayEncoder<W, C, M>;
+    type EncodeMapVariant = JsonObjectEncoder<W, C, M>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -233,7 +240,7 @@ where
     where
         I: IntoIterator<Item: AsRef<[u8]>>,
     {
-        let mut seq = JsonArrayEncoder::new(self.cx, self.writer)?;
+        let mut seq = JsonArrayEncoder::<_, _, M>::new(self.cx, self.writer)?;
 
         for bb in vectors {
             for &b in bb.as_ref() {
@@ -291,7 +298,7 @@ where
         _: &SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, C::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         self.writer.write_byte(self.cx, b'{')?;
         JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
@@ -306,7 +313,7 @@ where
         _: &MapHint,
     ) -> Result<Self::EncodeMapVariant, C::Error>
     where
-        T: ?Sized + Encode<C::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         self.writer.write_byte(self.cx, b'{')?;
         JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
@@ -317,10 +324,10 @@ where
 
 /// Encode a sequence of chars as a string.
 #[inline]
-fn encode_string<C, W>(cx: C, mut w: W, bytes: &[u8]) -> Result<(), C::Error>
+fn encode_string<W, C>(cx: C, mut w: W, bytes: &[u8]) -> Result<(), C::Error>
 where
-    C: Context,
     W: Writer,
+    C: Context,
 {
     w.write_byte(cx, b'"')?;
 
@@ -388,10 +395,10 @@ static ESCAPE: [u8; 256] = [
 // Hex digits.
 static HEX_DIGITS: [u8; 16] = *b"0123456789abcdef";
 
-fn write_escape<C, W>(cx: C, mut writer: W, escape: u8, byte: u8) -> Result<(), C::Error>
+fn write_escape<W, C>(cx: C, mut writer: W, escape: u8, byte: u8) -> Result<(), C::Error>
 where
-    C: Context,
     W: Writer,
+    C: Context,
 {
     let s = match escape {
         BB => b"\\b",

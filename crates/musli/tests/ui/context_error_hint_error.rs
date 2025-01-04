@@ -13,5 +13,5 @@ impl fmt::Display for MyError {
 }
 
 fn main() {
-    let _cx = Capture::<Binary, MyError, _>::new();
+    let _cx = Capture::<MyError, _>::new();
 }

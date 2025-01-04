@@ -6,12 +6,14 @@ use super::Decoder;
 pub trait VariantDecoder<'de> {
     /// Context associated with the decoder.
     type Cx: Context;
+    /// The mode of the decoder.
+    type Mode: 'static;
     /// The decoder to use for the variant tag.
     type DecodeTag<'this>: Decoder<
         'de,
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
-        Mode = <Self::Cx as Context>::Mode,
+        Mode = Self::Mode,
         Allocator = <Self::Cx as Context>::Allocator,
     >
     where
@@ -21,7 +23,7 @@ pub trait VariantDecoder<'de> {
         'de,
         Cx = Self::Cx,
         Error = <Self::Cx as Context>::Error,
-        Mode = <Self::Cx as Context>::Mode,
+        Mode = Self::Mode,
         Allocator = <Self::Cx as Context>::Allocator,
     >
     where

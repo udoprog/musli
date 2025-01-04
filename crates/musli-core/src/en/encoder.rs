@@ -24,7 +24,7 @@ where
 #[must_use = "Encoders must be consumed through one of its encode_* methods"]
 pub trait Encoder: Sized {
     /// Context associated with the encoder.
-    type Cx: Context<Error = Self::Error, Mode = Self::Mode>;
+    type Cx: Context<Error = Self::Error>;
     /// The type returned by the encoder. For [Encode] implementations ensures
     /// that they are used correctly, since only functions returned by the
     /// [Encoder] is capable of returning this value.
@@ -34,25 +34,25 @@ pub trait Encoder: Sized {
     /// Mode associated with encoding.
     type Mode: 'static;
     /// Constructed [`Encoder`] with a different context.
-    type WithContext<U>: Encoder<Cx = U, Ok = Self::Ok, Error = U::Error, Mode = U::Mode>
+    type WithContext<U>: Encoder<Cx = U, Ok = Self::Ok, Error = U::Error, Mode = Self::Mode>
     where
         U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     /// A simple pack that packs a sequence of elements.
-    type EncodePack: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodePack: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>;
     /// Encoder returned when encoding an optional value which is present.
     type EncodeSome: Encoder<Cx = Self::Cx, Ok = Self::Ok, Error = Self::Error, Mode = Self::Mode>;
     /// The type of a sequence encoder.
-    type EncodeSequence: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeSequence: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>;
     /// The type of a map encoder.
-    type EncodeMap: MapEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeMap: MapEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>;
     /// Streaming encoder for map pairs.
-    type EncodeMapEntries: EntriesEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeMapEntries: EntriesEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>;
     /// Encoder for a struct variant.
-    type EncodeVariant: VariantEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeVariant: VariantEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>;
     /// Specialized encoder for a tuple variant.
-    type EncodeSequenceVariant: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeSequenceVariant: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>;
     /// Specialized encoder for a struct variant.
-    type EncodeMapVariant: MapEncoder<Cx = Self::Cx, Ok = Self::Ok>;
+    type EncodeMapVariant: MapEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::encoder]`][musli::encoder] attribute
@@ -2005,7 +2005,7 @@ pub trait Encoder: Sized {
     #[inline]
     fn encode_unit_variant<T>(self, tag: &T) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
-        T: ?Sized + Encode<<Self::Cx as Context>::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         self.encode_variant_fn(|variant| {
             variant.encode_tag()?.encode(tag)?;
@@ -2069,7 +2069,7 @@ pub trait Encoder: Sized {
         hint: &SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, <Self::Cx as Context>::Error>
     where
-        T: ?Sized + Encode<<Self::Cx as Context>::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::SequenceVariant,
@@ -2136,7 +2136,7 @@ pub trait Encoder: Sized {
         hint: &MapHint,
     ) -> Result<Self::EncodeMapVariant, <Self::Cx as Context>::Error>
     where
-        T: ?Sized + Encode<<Self::Cx as Context>::Mode>,
+        T: ?Sized + Encode<Self::Mode>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::MapVariant,

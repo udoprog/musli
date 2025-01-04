@@ -1,4 +1,5 @@
 use core::fmt;
+use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 use crate::alloc::Vec;
@@ -21,16 +22,24 @@ macro_rules! is_bitwise_slice {
 }
 
 /// A very simple decoder suitable for storage decoding.
-pub struct StorageDecoder<const OPT: Options, const PACK: bool, R, C> {
+pub struct StorageDecoder<const OPT: Options, const PACK: bool, R, C, M>
+where
+    M: 'static,
+{
     cx: C,
     reader: R,
+    _marker: PhantomData<M>,
 }
 
-impl<const OPT: Options, const PACK: bool, R, C> StorageDecoder<OPT, PACK, R, C> {
+impl<const OPT: Options, const PACK: bool, R, C, M> StorageDecoder<OPT, PACK, R, C, M> {
     /// Construct a new fixed width message decoder.
     #[inline]
     pub(crate) fn new(cx: C, reader: R) -> Self {
-        Self { cx, reader }
+        Self {
+            cx,
+            reader,
+            _marker: PhantomData,
+        }
     }
 }
 
@@ -39,32 +48,37 @@ impl<const OPT: Options, const PACK: bool, R, C> StorageDecoder<OPT, PACK, R, C>
 /// This simplifies implementing decoders that do not have any special handling
 /// for length-prefixed types.
 #[doc(hidden)]
-pub struct LimitedStorageDecoder<const OPT: Options, const PACK: bool, R, C> {
+pub struct LimitedStorageDecoder<const OPT: Options, const PACK: bool, R, C, M>
+where
+    M: 'static,
+{
     remaining: usize,
     cx: C,
     reader: R,
+    _marker: PhantomData<M>,
 }
 
 #[crate::decoder(crate)]
-impl<'de, const OPT: Options, const PACK: bool, R, C> Decoder<'de>
-    for StorageDecoder<OPT, PACK, R, C>
+impl<'de, const OPT: Options, const PACK: bool, R, C, M> Decoder<'de>
+    for StorageDecoder<OPT, PACK, R, C, M>
 where
     R: Reader<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = C::Mode;
+    type Mode = M;
     type Allocator = C::Allocator;
     type WithContext<U>
-        = StorageDecoder<OPT, PACK, R, U>
+        = StorageDecoder<OPT, PACK, R, U, M>
     where
         U: Context<Allocator = Self::Allocator>;
-    type DecodePack = StorageDecoder<OPT, true, R, C>;
+    type DecodePack = StorageDecoder<OPT, true, R, C, M>;
     type DecodeSome = Self;
-    type DecodeSequence = LimitedStorageDecoder<OPT, PACK, R, C>;
-    type DecodeMap = LimitedStorageDecoder<OPT, PACK, R, C>;
-    type DecodeMapEntries = LimitedStorageDecoder<OPT, PACK, R, C>;
+    type DecodeSequence = LimitedStorageDecoder<OPT, PACK, R, C, M>;
+    type DecodeMap = LimitedStorageDecoder<OPT, PACK, R, C, M>;
+    type DecodeMapEntries = LimitedStorageDecoder<OPT, PACK, R, C, M>;
     type DecodeVariant = Self;
 
     #[inline]
@@ -424,15 +438,17 @@ where
     }
 }
 
-impl<'de, const OPT: Options, const PACK: bool, R, C> SequenceDecoder<'de>
-    for StorageDecoder<OPT, PACK, R, C>
+impl<'de, const OPT: Options, const PACK: bool, R, C, M> SequenceDecoder<'de>
+    for StorageDecoder<OPT, PACK, R, C, M>
 where
     R: Reader<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeNext<'this>
-        = StorageDecoder<OPT, PACK, R::Mut<'this>, C>
+        = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -454,7 +470,7 @@ where
     }
 }
 
-impl<'de, const OPT: Options, const PACK: bool, R, C> LimitedStorageDecoder<OPT, PACK, R, C>
+impl<'de, const OPT: Options, const PACK: bool, R, C, M> LimitedStorageDecoder<OPT, PACK, R, C, M>
 where
     C: Context,
     R: Reader<'de>,
@@ -467,6 +483,7 @@ where
             cx,
             reader,
             remaining,
+            _marker: PhantomData,
         })
     }
 
@@ -476,19 +493,22 @@ where
             cx,
             reader,
             remaining,
+            _marker: PhantomData,
         }
     }
 }
 
-impl<'de, const OPT: Options, const PACK: bool, R, C> SequenceDecoder<'de>
-    for LimitedStorageDecoder<OPT, PACK, R, C>
+impl<'de, const OPT: Options, const PACK: bool, R, C, M> SequenceDecoder<'de>
+    for LimitedStorageDecoder<OPT, PACK, R, C, M>
 where
     R: Reader<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeNext<'this>
-        = StorageDecoder<OPT, PACK, R::Mut<'this>, C>
+        = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -524,19 +544,21 @@ where
     }
 }
 
-impl<'de, const OPT: Options, const PACK: bool, R, C> MapDecoder<'de>
-    for LimitedStorageDecoder<OPT, PACK, R, C>
+impl<'de, const OPT: Options, const PACK: bool, R, C, M> MapDecoder<'de>
+    for LimitedStorageDecoder<OPT, PACK, R, C, M>
 where
     R: Reader<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeEntry<'this>
-        = StorageDecoder<OPT, PACK, R::Mut<'this>, C>
+        = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
     where
         Self: 'this;
     type DecodeRemainingEntries<'this>
-        = LimitedStorageDecoder<OPT, PACK, R::Mut<'this>, C>
+        = LimitedStorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -572,15 +594,17 @@ where
     }
 }
 
-impl<'de, const OPT: Options, const PACK: bool, R, C> EntryDecoder<'de>
-    for StorageDecoder<OPT, PACK, R, C>
+impl<'de, const OPT: Options, const PACK: bool, R, C, M> EntryDecoder<'de>
+    for StorageDecoder<OPT, PACK, R, C, M>
 where
     R: Reader<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeKey<'this>
-        = StorageDecoder<OPT, PACK, R::Mut<'this>, C>
+        = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
     where
         Self: 'this;
     type DecodeValue = Self;
@@ -601,19 +625,21 @@ where
     }
 }
 
-impl<'de, const OPT: Options, const PACK: bool, R, C> EntriesDecoder<'de>
-    for LimitedStorageDecoder<OPT, PACK, R, C>
+impl<'de, const OPT: Options, const PACK: bool, R, C, M> EntriesDecoder<'de>
+    for LimitedStorageDecoder<OPT, PACK, R, C, M>
 where
     R: Reader<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeEntryKey<'this>
-        = StorageDecoder<OPT, PACK, R::Mut<'this>, C>
+        = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
     where
         Self: 'this;
     type DecodeEntryValue<'this>
-        = StorageDecoder<OPT, PACK, R::Mut<'this>, C>
+        = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
     where
         Self: 'this;
 
@@ -649,19 +675,21 @@ where
     }
 }
 
-impl<'de, const OPT: Options, const PACK: bool, R, C> VariantDecoder<'de>
-    for StorageDecoder<OPT, PACK, R, C>
+impl<'de, const OPT: Options, const PACK: bool, R, C, M> VariantDecoder<'de>
+    for StorageDecoder<OPT, PACK, R, C, M>
 where
     R: Reader<'de>,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeTag<'this>
-        = StorageDecoder<OPT, PACK, R::Mut<'this>, C>
+        = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
     where
         Self: 'this;
     type DecodeValue<'this>
-        = StorageDecoder<OPT, PACK, R::Mut<'this>, C>
+        = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
     where
         Self: 'this;
 

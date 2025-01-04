@@ -4,8 +4,6 @@ use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
-#[cfg(test)]
-use crate::mode::Binary;
 use crate::{Allocator, Context};
 
 use super::ContextError;
@@ -17,21 +15,19 @@ use super::ErrorMarker;
 ///
 /// Using this should result in code which essentially just uses the emitted
 /// error type directly.
-pub struct Same<M, E, A>
+pub struct Same<E, A>
 where
-    M: 'static,
     E: ContextError<A>,
     A: Allocator,
 {
     alloc: A,
-    _marker: PhantomData<(M, E)>,
+    _marker: PhantomData<E>,
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Same<M, E, System>
+impl<E> Same<E, System>
 where
-    M: 'static,
     E: ContextError<System>,
 {
     /// Construct a new same-error context with the [`System`] allocator.
@@ -41,9 +37,8 @@ where
     }
 }
 
-impl<M, E, A> Same<M, E, A>
+impl<E, A> Same<E, A>
 where
-    M: 'static,
     E: ContextError<A>,
     A: Allocator,
 {
@@ -58,7 +53,7 @@ where
 }
 
 #[cfg(test)]
-impl<A> Same<Binary, ErrorMarker, A>
+impl<A> Same<ErrorMarker, A>
 where
     A: Allocator,
 {
@@ -69,13 +64,11 @@ where
     }
 }
 
-impl<M, E, A> Context for &Same<M, E, A>
+impl<E, A> Context for &Same<E, A>
 where
-    M: 'static,
     E: ContextError<A>,
     A: Clone + Allocator,
 {
-    type Mode = M;
     type Error = E;
     type Mark = ();
     type Allocator = A;
@@ -113,9 +106,8 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<M, E> Default for Same<M, E, System>
+impl<E> Default for Same<E, System>
 where
-    M: 'static,
     E: ContextError<System>,
 {
     #[inline]

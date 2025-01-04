@@ -9,12 +9,14 @@ pub trait VariantEncoder {
     type Cx: Context;
     /// Result type of the encoder.
     type Ok;
+    /// The mode of the encoder.
+    type Mode: 'static;
     /// The encoder returned when advancing the map encoder to encode the key.
     type EncodeTag<'this>: Encoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
         Error = <Self::Cx as Context>::Error,
-        Mode = <Self::Cx as Context>::Mode,
+        Mode = Self::Mode,
     >
     where
         Self: 'this;
@@ -23,7 +25,7 @@ pub trait VariantEncoder {
         Cx = Self::Cx,
         Ok = Self::Ok,
         Error = <Self::Cx as Context>::Error,
-        Mode = <Self::Cx as Context>::Mode,
+        Mode = Self::Mode,
     >
     where
         Self: 'this;
@@ -51,8 +53,8 @@ pub trait VariantEncoder {
     ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         Self: Sized,
-        T: Encode<<Self::Cx as Context>::Mode>,
-        V: Encode<<Self::Cx as Context>::Mode>,
+        T: Encode<Self::Mode>,
+        V: Encode<Self::Mode>,
     {
         self.encode_tag()?.encode(tag)?;
         self.encode_data()?.encode(value)?;

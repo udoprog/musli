@@ -24,7 +24,7 @@ pub enum TryFastDecode<T, D> {
 #[must_use = "Decoders must be consumed through one of its decode_* methods"]
 pub trait Decoder<'de>: Sized {
     /// Context associated with the decoder.
-    type Cx: Context<Error = Self::Error, Mode = Self::Mode, Allocator = Self::Allocator>;
+    type Cx: Context<Error = Self::Error, Allocator = Self::Allocator>;
     /// Error associated with decoding.
     type Error;
     /// Mode associated with decoding.
@@ -37,13 +37,13 @@ pub trait Decoder<'de>: Sized {
         'de,
         Cx = U,
         Error = U::Error,
-        Mode = U::Mode,
+        Mode = Self::Mode,
         Allocator = U::Allocator,
     >
     where
         U: Context<Allocator = Self::Allocator>;
     /// Decoder returned by [`Decoder::decode_buffer`].
-    type DecodeBuffer: AsDecoder<Cx = Self::Cx>;
+    type DecodeBuffer: AsDecoder<Cx = Self::Cx, Mode = Self::Mode>;
     /// Decoder returned by [`Decoder::decode_option`].
     type DecodeSome: Decoder<
         'de,
@@ -53,15 +53,15 @@ pub trait Decoder<'de>: Sized {
         Allocator = Self::Allocator,
     >;
     /// Decoder used by [`Decoder::decode_pack`].
-    type DecodePack: SequenceDecoder<'de, Cx = Self::Cx>;
+    type DecodePack: SequenceDecoder<'de, Cx = Self::Cx, Mode = Self::Mode>;
     /// Decoder returned by [`Decoder::decode_sequence`].
-    type DecodeSequence: SequenceDecoder<'de, Cx = Self::Cx>;
+    type DecodeSequence: SequenceDecoder<'de, Cx = Self::Cx, Mode = Self::Mode>;
     /// Decoder returned by [`Decoder::decode_map`].
-    type DecodeMap: MapDecoder<'de, Cx = Self::Cx>;
+    type DecodeMap: MapDecoder<'de, Cx = Self::Cx, Mode = Self::Mode>;
     /// Decoder returned by [`Decoder::decode_map_entries`].
-    type DecodeMapEntries: EntriesDecoder<'de, Cx = Self::Cx>;
+    type DecodeMapEntries: EntriesDecoder<'de, Cx = Self::Cx, Mode = Self::Mode>;
     /// Decoder used by [`Decoder::decode_variant`].
-    type DecodeVariant: VariantDecoder<'de, Cx = Self::Cx>;
+    type DecodeVariant: VariantDecoder<'de, Cx = Self::Cx, Mode = Self::Mode>;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::decoder]`][musli::decoder] attribute
@@ -92,18 +92,21 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use std::fmt;
     /// use std::convert::Infallible;
+    /// use std::marker::PhantomData;
     ///
     /// use musli::Context;
     /// use musli::de::{self, Decoder, Decode};
     ///
-    /// struct MyDecoder<C> {
+    /// struct MyDecoder<C, M> {
     ///     cx: C,
+    ///     _marker: PhantomData<M>,
     /// }
     ///
     /// #[musli::decoder]
-    /// impl<'de, C> Decoder<'de> for MyDecoder<C>
+    /// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
     /// where
     ///     C: Context,
+    ///     M: 'static,
     /// {
     ///     type Cx = C;
     ///

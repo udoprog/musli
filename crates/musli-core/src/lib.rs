@@ -57,19 +57,22 @@ mod never;
 ///
 /// ```
 /// use std::fmt;
+/// use std::marker::PhantomData;
 ///
 /// use musli_core::Context;
 /// use musli_core::en::{Encoder, Encode};
 ///
-/// struct MyEncoder<'a, C> {
+/// struct MyEncoder<'a, C, M> {
 ///     value: &'a mut Option<u32>,
 ///     cx: C,
+///     _marker: PhantomData<M>,
 /// }
 ///
 /// #[musli_core::encoder(crate = musli_core)]
-/// impl<C> Encoder for MyEncoder<'_, C>
+/// impl<C, M> Encoder for MyEncoder<'_, C, M>
 /// where
 ///     C: Context,
+///     M: 'static,
 /// {
 ///     type Cx = C;
 ///     type Ok = ();
@@ -116,18 +119,21 @@ pub use musli_macros::encoder;
 ///
 /// ```
 /// use std::fmt;
+/// use std::marker::PhantomData;
 ///
 /// use musli_core::Context;
 /// use musli_core::de::{Decoder, Decode};
 ///
-/// struct MyDecoder<C> {
+/// struct MyDecoder<C, M> {
 ///     cx: C,
+///     _marker: PhantomData<M>,
 /// }
 ///
 /// #[musli_core::decoder(crate = musli_core)]
-/// impl<'de, C> Decoder<'de> for MyDecoder<C>
+/// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
 /// where
 ///     C: Context,
+///     M: 'static,
 /// {
 ///     type Cx = C;
 ///

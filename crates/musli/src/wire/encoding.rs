@@ -127,8 +127,8 @@ where
     crate::macros::encoding_impls!(
         M,
         wire,
-        WireEncoder::<_, OPT, _>::new,
-        WireDecoder::<_, OPT, _>::new,
+        WireEncoder::<OPT, _, _, M>::new,
+        WireDecoder::<OPT, _, _, M>::new,
         IntoReader::into_reader,
         IntoWriter::into_writer,
     );

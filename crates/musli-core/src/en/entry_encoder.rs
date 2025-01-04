@@ -8,12 +8,14 @@ pub trait EntryEncoder {
     type Cx: Context;
     /// Result type of the encoder.
     type Ok;
+    /// The mode of the encoder.
+    type Mode: 'static;
     /// The encoder returned when advancing the map encoder to encode the key.
     type EncodeKey<'this>: Encoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
         Error = <Self::Cx as Context>::Error,
-        Mode = <Self::Cx as Context>::Mode,
+        Mode = Self::Mode,
     >
     where
         Self: 'this;
@@ -22,7 +24,7 @@ pub trait EntryEncoder {
         Cx = Self::Cx,
         Ok = Self::Ok,
         Error = <Self::Cx as Context>::Error,
-        Mode = <Self::Cx as Context>::Mode,
+        Mode = Self::Mode,
     >
     where
         Self: 'this;
@@ -50,8 +52,8 @@ pub trait EntryEncoder {
     ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
     where
         Self: Sized,
-        K: Encode<<Self::Cx as Context>::Mode>,
-        V: Encode<<Self::Cx as Context>::Mode>,
+        K: Encode<Self::Mode>,
+        V: Encode<Self::Mode>,
     {
         self.encode_key()?.encode(key)?;
         self.encode_value()?.encode(value)?;

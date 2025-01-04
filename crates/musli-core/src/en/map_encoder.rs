@@ -8,8 +8,10 @@ pub trait MapEncoder {
     type Cx: Context;
     /// Result type of the encoder.
     type Ok;
+    /// The mode of the encoder.
+    type Mode: 'static;
     /// Encode the next pair.
-    type EncodeEntry<'this>: EntryEncoder<Cx = Self::Cx, Ok = Self::Ok>
+    type EncodeEntry<'this>: EntryEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>
     where
         Self: 'this;
 
@@ -37,8 +39,8 @@ pub trait MapEncoder {
     fn insert_entry<F, S>(&mut self, key: F, value: S) -> Result<(), <Self::Cx as Context>::Error>
     where
         Self: Sized,
-        F: Encode<<Self::Cx as Context>::Mode>,
-        S: Encode<<Self::Cx as Context>::Mode>,
+        F: Encode<Self::Mode>,
+        S: Encode<Self::Mode>,
     {
         self.encode_entry()?.insert_entry(key, value)?;
         Ok(())

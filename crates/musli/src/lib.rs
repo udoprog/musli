@@ -547,19 +547,22 @@ pub use musli_core::mode;
 ///
 /// ```
 /// use std::fmt;
+/// use std::marker::PhantomData;
 ///
 /// use musli::Context;
 /// use musli::en::{Encoder, Encode};
 ///
-/// struct MyEncoder<'a, C> {
+/// struct MyEncoder<'a, C, M> {
 ///     cx: C,
 ///     value: &'a mut Option<u32>,
+///     _marker: PhantomData<M>,
 /// }
 ///
 /// #[musli::encoder]
-/// impl<C> Encoder for MyEncoder<'_, C>
+/// impl<C, M> Encoder for MyEncoder<'_, C, M>
 /// where
 ///     C: Context,
+///     M: 'static,
 /// {
 ///     type Cx = C;
 ///     type Ok = ();
@@ -603,18 +606,21 @@ pub use musli_core::encoder;
 ///
 /// ```
 /// use std::fmt;
+/// use std::marker::PhantomData;
 ///
 /// use musli::Context;
 /// use musli::de::{Decoder, Decode};
 ///
-/// struct MyDecoder<C> {
+/// struct MyDecoder<C, M> {
 ///     cx: C,
+///     _marker: PhantomData<M>,
 /// }
 ///
 /// #[musli::decoder]
-/// impl<'de, C> Decoder<'de> for MyDecoder<C>
+/// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
 /// where
 ///     C: Context,
+///     M: 'static,
 /// {
 ///     type Cx = C;
 ///

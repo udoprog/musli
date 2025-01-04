@@ -31,19 +31,22 @@ pub enum NeverMarker {}
 ///
 /// ```
 /// use std::fmt;
+/// use std::marker::PhantomData;
 ///
 /// use musli::Context;
 /// use musli::de::{Decoder, Decode};
 ///
-/// struct MyDecoder<C> {
+/// struct MyDecoder<C, M> {
 ///     cx: C,
 ///     number: u32,
+///     _marker: PhantomData<M>,
 /// }
 ///
 /// #[musli::decoder]
-/// impl<'de, C> Decoder<'de> for MyDecoder<C>
+/// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
 /// where
 ///     C: Context,
+///     M: 'static,
 /// {
 ///     type Cx = C;
 ///
@@ -65,22 +68,23 @@ pub enum NeverMarker {}
 ///     }
 /// }
 /// ```
-pub struct Never<A = NeverMarker, B: ?Sized = NeverMarker> {
+pub struct Never<T: ?Sized = NeverMarker> {
     // Field makes type uninhabitable.
     _never: NeverMarker,
-    _marker: marker::PhantomData<(A, B)>,
+    _marker: marker::PhantomData<T>,
 }
 
-impl<'de, C> Decoder<'de> for Never<(), C>
+impl<'de, C, M> Decoder<'de> for Never<(C, M)>
 where
     C: Context,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = C::Mode;
+    type Mode = M;
     type Allocator = C::Allocator;
     type WithContext<U>
-        = Never<(), U>
+        = Never<(U, M)>
     where
         U: Context<Allocator = Self::Allocator>;
     type DecodeBuffer = Self;
@@ -137,11 +141,13 @@ where
     }
 }
 
-impl<C> AsDecoder for Never<(), C>
+impl<C, M> AsDecoder for Never<(C, M)>
 where
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type Decoder<'this>
         = Self
     where
@@ -153,11 +159,13 @@ where
     }
 }
 
-impl<C> EntriesDecoder<'_> for Never<(), C>
+impl<C, M> EntriesDecoder<'_> for Never<(C, M)>
 where
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeEntryKey<'this>
         = Self
     where
@@ -188,11 +196,13 @@ where
     }
 }
 
-impl<C> VariantDecoder<'_> for Never<(), C>
+impl<C, M> VariantDecoder<'_> for Never<(C, M)>
 where
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeTag<'this>
         = Self
     where
@@ -218,11 +228,13 @@ where
     }
 }
 
-impl<C> MapDecoder<'_> for Never<(), C>
+impl<C, M> MapDecoder<'_> for Never<(C, M)>
 where
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeEntry<'this>
         = Self
     where
@@ -255,11 +267,13 @@ where
     }
 }
 
-impl<C> EntryDecoder<'_> for Never<(), C>
+impl<C, M> EntryDecoder<'_> for Never<(C, M)>
 where
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeKey<'this>
         = Self
     where
@@ -282,11 +296,13 @@ where
     }
 }
 
-impl<C> SequenceDecoder<'_> for Never<(), C>
+impl<C, M> SequenceDecoder<'_> for Never<(C, M)>
 where
     C: Context,
+    M: 'static,
 {
     type Cx = C;
+    type Mode = M;
     type DecodeNext<'this>
         = Self
     where
@@ -308,17 +324,18 @@ where
     }
 }
 
-impl<C, A> Encoder for Never<A, C>
+impl<O, C, M> Encoder for Never<(O, C, M)>
 where
+    O: 'static,
     C: Context,
-    A: 'static,
+    M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
-    type Ok = A;
-    type Mode = C::Mode;
+    type Ok = O;
+    type Mode = M;
     type WithContext<U>
-        = Never<A, U>
+        = Never<(O, U, M)>
     where
         U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     type EncodePack = Self;
@@ -358,25 +375,27 @@ where
     }
 }
 
-impl<C, A, T> UnsizedVisitor<'_, C, T> for Never<A, T>
+impl<O, C, T> UnsizedVisitor<'_, C, T> for Never<(O, T)>
 where
     C: Context,
     T: ?Sized + ToOwned<C::Allocator>,
 {
-    type Ok = A;
+    type Ok = O;
 
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self._never {}
     }
 }
 
-impl<A, C> SequenceEncoder for Never<A, C>
+impl<O, C, M> SequenceEncoder for Never<(O, C, M)>
 where
-    A: 'static,
+    O: 'static,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
-    type Ok = A;
+    type Ok = O;
+    type Mode = M;
     type EncodeNext<'this>
         = Self
     where
@@ -398,13 +417,15 @@ where
     }
 }
 
-impl<A, C> MapEncoder for Never<A, C>
+impl<O, C, M> MapEncoder for Never<(O, C, M)>
 where
-    A: 'static,
+    O: 'static,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
-    type Ok = A;
+    type Ok = O;
+    type Mode = M;
     type EncodeEntry<'this>
         = Self
     where
@@ -425,13 +446,15 @@ where
     }
 }
 
-impl<A, C> EntryEncoder for Never<A, C>
+impl<O, C, M> EntryEncoder for Never<(O, C, M)>
 where
-    A: 'static,
+    O: 'static,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
-    type Ok = A;
+    type Ok = O;
+    type Mode = M;
     type EncodeKey<'this>
         = Self
     where
@@ -462,13 +485,15 @@ where
     }
 }
 
-impl<A, C> EntriesEncoder for Never<A, C>
+impl<O, C, M> EntriesEncoder for Never<(O, C, M)>
 where
-    A: 'static,
+    O: 'static,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
-    type Ok = A;
+    type Ok = O;
+    type Mode = M;
     type EncodeEntryKey<'this>
         = Self
     where
@@ -499,13 +524,15 @@ where
     }
 }
 
-impl<A, C> VariantEncoder for Never<A, C>
+impl<O, C, M> VariantEncoder for Never<(O, C, M)>
 where
-    A: 'static,
+    O: 'static,
     C: Context,
+    M: 'static,
 {
     type Cx = C;
-    type Ok = A;
+    type Ok = O;
+    type Mode = M;
     type EncodeTag<'this>
         = Self
     where
