@@ -21,7 +21,7 @@ struct Value<'a> {
 extern "C" fn main(_argc: c_int, _argv: *const *const u8) -> c_int {
     let mut buf = ArrayBuffer::new();
     let alloc = Slice::new(&mut buf);
-    let cx = context::with_alloc(&alloc);
+    let cx = context::with_alloc(&alloc).with_trace();
 
     let encoding = musli::json::Encoding::new();
 

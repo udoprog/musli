@@ -1,17 +1,10 @@
-#![allow(clippy::type_complexity)]
-
-use core::cell::{Cell, UnsafeCell};
-use core::fmt::{self, Write};
-use core::mem::take;
-use core::ops::Range;
-use core::slice;
+use core::fmt;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
-use crate::alloc::{String, Vec};
 use crate::{Allocator, Context};
 
-use super::{Access, ErrorMarker, Shared};
+use super::{ErrorMarker, Errors, NoTrace, Report, Trace, WithTrace};
 
 /// The default context which uses an allocator to track the location of errors.
 ///
@@ -22,25 +15,18 @@ use super::{Access, ErrorMarker, Shared};
 /// enabled, and will use the [`System`] allocator.
 ///
 /// [`with_alloc`]: super::with_alloc
-pub struct DefaultContext<A>
+pub struct DefaultContext<A, T>
 where
     A: Allocator,
+    T: Trace<A>,
 {
     alloc: A,
-    mark: Cell<usize>,
-    errors: UnsafeCell<Vec<(Range<usize>, String<A>), A>>,
-    path: UnsafeCell<Vec<Step<A>, A>>,
-    // How many elements of `path` we've gone over capacity.
-    cap: Cell<usize>,
-    include_type: bool,
-    access: Access,
+    trace: T,
 }
-
-impl<A> DefaultContext<A> where A: Allocator {}
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl DefaultContext<System> {
+impl DefaultContext<System, NoTrace> {
     /// Construct a new fully featured context which uses the [`System`]
     /// allocator for memory.
     ///
@@ -52,14 +38,14 @@ impl DefaultContext<System> {
 }
 
 #[cfg(feature = "alloc")]
-impl Default for DefaultContext<System> {
+impl Default for DefaultContext<System, NoTrace> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<A> DefaultContext<A>
+impl<A> DefaultContext<A, NoTrace>
 where
     A: Clone + Allocator,
 {
@@ -67,120 +53,81 @@ where
     /// configurable number of diagnostics.
     #[inline]
     pub(super) fn with_alloc(alloc: A) -> Self {
-        let errors = Vec::new_in(alloc.clone());
-        let path = Vec::new_in(alloc.clone());
-
         Self {
             alloc,
-            mark: Cell::new(0),
-            errors: UnsafeCell::new(errors),
-            path: UnsafeCell::new(path),
-            cap: Cell::new(0),
-            include_type: false,
-            access: Access::new(),
+            trace: NoTrace,
         }
-    }
-
-    /// Configure the context to visualize type information, and not just
-    /// variant and fields.
-    #[inline]
-    pub fn include_type(&mut self) -> &mut Self {
-        self.include_type = true;
-        self
-    }
-
-    /// Generate a line-separated report of all collected errors.
-    #[inline]
-    pub fn report(&self) -> Report<'_, A> {
-        Report {
-            errors: self.errors(),
-        }
-    }
-
-    /// Iterate over all collected errors.
-    #[inline]
-    pub fn errors(&self) -> Errors<'_, A> {
-        let access = self.access.shared();
-
-        Errors {
-            path: unsafe { (*self.path.get()).as_slice() },
-            errors: unsafe { (*self.errors.get()).as_slice().iter() },
-            cap: self.cap.get(),
-            _access: access,
-        }
-    }
-
-    /// Push an error into the collection.
-    #[inline]
-    fn push_error(&self, range: Range<usize>, error: String<A>) {
-        let _access = self.access.exclusive();
-
-        // SAFETY: We've checked that we have exclusive access just above.
-        unsafe {
-            _ = (*self.errors.get()).push((range, error));
-        }
-    }
-
-    /// Push a path.
-    #[inline]
-    fn push_path(&self, step: Step<A>) {
-        let _access = self.access.exclusive();
-
-        // SAFETY: We've checked that we have exclusive access just above.
-        let path = unsafe { &mut (*self.path.get()) };
-
-        if path.push(step).is_err() {
-            self.cap.set(self.cap.get() + 1);
-        }
-    }
-
-    /// Pop the last path.
-    #[inline]
-    fn pop_path(&self) {
-        let cap = self.cap.get();
-
-        if cap > 0 {
-            self.cap.set(cap - 1);
-            return;
-        }
-
-        let _access = self.access.exclusive();
-
-        // SAFETY: We've checked that we have exclusive access just above.
-        unsafe {
-            (*self.path.get()).pop();
-        }
-    }
-
-    #[inline]
-    fn format_string<T>(&self, value: T) -> Option<String<A>>
-    where
-        T: fmt::Display,
-    {
-        let mut string = String::new_in(self.alloc.clone());
-        write!(string, "{value}").ok()?;
-        Some(string)
     }
 }
 
-impl<A> Context for &DefaultContext<A>
+impl<A> DefaultContext<A, WithTrace<A>>
 where
     A: Clone + Allocator,
 {
+    /// If tracing is enabled through [`DefaultContext::with_trace`], this
+    /// configured the context to visualize type information, and not just
+    /// variant and fields.
+    #[inline]
+    pub fn with_type(mut self) -> Self {
+        self.trace.include_type();
+        self
+    }
+
+    /// Generate a line-separated report of all reported errors.
+    ///
+    /// This can be useful if you want a quick human-readable overview of
+    /// errors. The line separator used will be platform dependent.
+    #[inline]
+    pub fn report(&self) -> Report<'_, A> {
+        self.trace.report()
+    }
+
+    /// Iterate over all reported errors.
+    #[inline]
+    pub fn errors(&self) -> Errors<'_, A> {
+        self.trace.errors()
+    }
+}
+
+impl<A, B> DefaultContext<A, B>
+where
+    A: Clone + Allocator,
+    B: Trace<A>,
+{
+    /// Enable tracing through the current allocator `A`.
+    ///
+    /// Note that this makes diagnostics methods such as [`report`] and
+    /// [`errors`] available on the type.
+    ///
+    /// Tracing requires the configured allocator to work, if for example the
+    /// [`Disabled`] allocator was in use, no diagnostics would be collected.
+    ///
+    /// [`report`]: DefaultContext::report
+    /// [`errors`]: DefaultContext::errors
+    /// [`Disabled`]: crate::alloc::Disabled
+    #[inline]
+    pub fn with_trace(self) -> DefaultContext<A, WithTrace<A>> {
+        let trace = WithTrace::new_in(self.alloc.clone());
+
+        DefaultContext {
+            alloc: self.alloc,
+            trace,
+        }
+    }
+}
+
+impl<A, B> Context for &DefaultContext<A, B>
+where
+    A: Clone + Allocator,
+    B: Trace<A>,
+{
     type Error = ErrorMarker;
-    type Mark = usize;
+    type Mark = B::Mark;
     type Allocator = A;
 
     #[inline]
     fn clear(self) {
-        self.mark.set(0);
-        let _access = self.access.exclusive();
-
-        // SAFETY: We have acquired exclusive access just above.
-        unsafe {
-            (*self.errors.get()).clear();
-            (*self.path.get()).clear();
-        }
+        self.trace.clear();
     }
 
     #[inline]
@@ -193,10 +140,7 @@ where
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        if let Some(string) = self.format_string(message) {
-            self.push_error(self.mark.get()..self.mark.get(), string);
-        }
-
+        self.trace.custom(&self.alloc, message);
         ErrorMarker
     }
 
@@ -205,10 +149,7 @@ where
     where
         T: fmt::Display,
     {
-        if let Some(string) = self.format_string(message) {
-            self.push_error(self.mark.get()..self.mark.get(), string);
-        }
-
+        self.trace.message(&self.alloc, message);
         ErrorMarker
     }
 
@@ -217,10 +158,7 @@ where
     where
         T: fmt::Display,
     {
-        if let Some(string) = self.format_string(message) {
-            self.push_error(*mark..self.mark.get(), string);
-        }
-
+        self.trace.marked_message(&self.alloc, mark, message);
         ErrorMarker
     }
 
@@ -229,90 +167,82 @@ where
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        if let Some(string) = self.format_string(message) {
-            self.push_error(*mark..self.mark.get(), string);
-        }
-
+        self.trace.marked_custom(&self.alloc, mark, message);
         ErrorMarker
     }
 
     #[inline]
     fn mark(self) -> Self::Mark {
-        self.mark.get()
+        self.trace.mark()
     }
 
     #[inline]
     fn advance(self, n: usize) {
-        self.mark.set(self.mark.get().wrapping_add(n));
+        self.trace.advance(n);
     }
 
     #[inline]
-    fn enter_named_field<T>(self, name: &'static str, _: &T)
+    fn enter_named_field<T>(self, name: &'static str, field: T)
     where
-        T: ?Sized + fmt::Display,
+        T: fmt::Display,
     {
-        self.push_path(Step::Named(name));
+        self.trace.enter_named_field(name, field);
     }
 
     #[inline]
-    fn enter_unnamed_field<T>(self, index: u32, _: &T)
+    fn enter_unnamed_field<T>(self, index: u32, name: T)
     where
-        T: ?Sized + fmt::Display,
+        T: fmt::Display,
     {
-        self.push_path(Step::Unnamed(index));
+        self.trace.enter_unnamed_field(index, name);
     }
 
     #[inline]
     fn leave_field(self) {
-        self.pop_path();
+        self.trace.leave_field();
     }
 
     #[inline]
     fn enter_struct(self, name: &'static str) {
-        if self.include_type {
-            self.push_path(Step::Struct(name));
-        }
+        self.trace.enter_struct(name);
     }
 
     #[inline]
     fn leave_struct(self) {
-        if self.include_type {
-            self.pop_path();
-        }
+        self.trace.leave_struct();
     }
 
     #[inline]
     fn enter_enum(self, name: &'static str) {
-        if self.include_type {
-            self.push_path(Step::Enum(name));
-        }
+        self.trace.enter_enum(name);
     }
 
     #[inline]
     fn leave_enum(self) {
-        if self.include_type {
-            self.pop_path();
-        }
+        self.trace.leave_enum();
     }
 
     #[inline]
-    fn enter_variant<T>(self, name: &'static str, _: T) {
-        self.push_path(Step::Variant(name));
+    fn enter_variant<T>(self, name: &'static str, tag: T)
+    where
+        T: fmt::Display,
+    {
+        self.trace.enter_variant(name, tag);
     }
 
     #[inline]
     fn leave_variant(self) {
-        self.pop_path();
+        self.trace.leave_variant();
     }
 
     #[inline]
     fn enter_sequence_index(self, index: usize) {
-        self.push_path(Step::Index(index));
+        self.trace.enter_sequence_index(index);
     }
 
     #[inline]
     fn leave_sequence_index(self) {
-        self.pop_path();
+        self.trace.leave_sequence_index();
     }
 
     #[inline]
@@ -320,249 +250,11 @@ where
     where
         T: fmt::Display,
     {
-        if let Some(string) = self.format_string(field) {
-            self.push_path(Step::Key(string));
-        }
+        self.trace.enter_map_key(&self.alloc, field);
     }
 
     #[inline]
     fn leave_map_key(self) {
-        self.pop_path();
-    }
-}
-
-/// A line-separated report of all errors.
-pub struct Report<'a, A>
-where
-    A: Allocator,
-{
-    errors: Errors<'a, A>,
-}
-
-impl<A> fmt::Display for Report<'_, A>
-where
-    A: Allocator,
-{
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for error in self.errors.clone() {
-            writeln!(f, "{error}")?;
-        }
-
-        Ok(())
-    }
-}
-
-/// An iterator over available errors.
-///
-/// See [`DefaultContext::errors`].
-pub struct Errors<'a, A>
-where
-    A: Allocator,
-{
-    path: &'a [Step<A>],
-    cap: usize,
-    errors: slice::Iter<'a, (Range<usize>, String<A>)>,
-    _access: Shared<'a>,
-}
-
-impl<'a, A> Iterator for Errors<'a, A>
-where
-    A: Allocator,
-{
-    type Item = Error<'a, A>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let (range, error) = self.errors.next()?;
-        Some(Error::new(self.path, self.cap, range.clone(), error))
-    }
-}
-
-impl<A> Clone for Errors<'_, A>
-where
-    A: Allocator,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            path: self.path,
-            cap: self.cap,
-            errors: self.errors.clone(),
-            _access: self._access.clone(),
-        }
-    }
-}
-
-/// A collected error which has been context decorated.
-pub struct Error<'a, A>
-where
-    A: Allocator,
-{
-    path: &'a [Step<A>],
-    cap: usize,
-    range: Range<usize>,
-    error: &'a str,
-}
-
-impl<'a, A> Error<'a, A>
-where
-    A: Allocator,
-{
-    #[inline]
-    fn new(path: &'a [Step<A>], cap: usize, range: Range<usize>, error: &'a str) -> Self {
-        Self {
-            path,
-            cap,
-            range,
-            error,
-        }
-    }
-}
-
-impl<A> fmt::Display for Error<'_, A>
-where
-    A: Allocator,
-{
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let path = FormatPath::new(self.path, self.cap);
-
-        if self.range.start != 0 || self.range.end != 0 {
-            if self.range.start == self.range.end {
-                write!(f, "{path}: {} (at byte {})", self.error, self.range.start)?;
-            } else {
-                write!(
-                    f,
-                    "{path}: {} (at bytes {}-{})",
-                    self.error, self.range.start, self.range.end
-                )?;
-            }
-        } else {
-            write!(f, "{path}: {}", self.error)?;
-        }
-
-        Ok(())
-    }
-}
-
-/// A single traced step.
-#[derive(Debug)]
-pub(crate) enum Step<A>
-where
-    A: Allocator,
-{
-    Struct(&'static str),
-    Enum(&'static str),
-    Variant(&'static str),
-    Named(&'static str),
-    Unnamed(u32),
-    Index(usize),
-    Key(String<A>),
-}
-
-struct FormatPath<'a, A>
-where
-    A: Allocator,
-{
-    path: &'a [Step<A>],
-    cap: usize,
-}
-
-impl<'a, A> FormatPath<'a, A>
-where
-    A: Allocator,
-{
-    #[inline]
-    pub(crate) fn new(path: &'a [Step<A>], cap: usize) -> Self {
-        Self { path, cap }
-    }
-}
-
-impl<A> fmt::Display for FormatPath<'_, A>
-where
-    A: Allocator,
-{
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut has_type = false;
-        let mut has_field = false;
-        let mut level = 0;
-
-        for step in self.path {
-            match step {
-                Step::Struct(name) => {
-                    if take(&mut has_field) {
-                        write!(f, " = ")?;
-                    }
-
-                    write!(f, "{name}")?;
-                    has_type = true;
-                }
-                Step::Enum(name) => {
-                    if take(&mut has_field) {
-                        write!(f, " = ")?;
-                    }
-
-                    write!(f, "{name}::")?;
-                }
-                Step::Variant(name) => {
-                    if take(&mut has_field) {
-                        write!(f, " = ")?;
-                    }
-
-                    write!(f, "{name}")?;
-                    has_type = true;
-                }
-                Step::Named(name) => {
-                    if take(&mut has_type) {
-                        write!(f, " {{ ")?;
-                        level += 1;
-                    }
-
-                    write!(f, ".{name}")?;
-                    has_field = true;
-                }
-                Step::Unnamed(index) => {
-                    if take(&mut has_type) {
-                        write!(f, " {{ ")?;
-                        level += 1;
-                    }
-
-                    write!(f, ".{index}")?;
-                    has_field = true;
-                }
-                Step::Index(index) => {
-                    if take(&mut has_type) {
-                        write!(f, " {{ ")?;
-                        level += 1;
-                    }
-
-                    write!(f, "[{index}]")?;
-                    has_field = true;
-                }
-                Step::Key(key) => {
-                    if take(&mut has_type) {
-                        write!(f, " {{ ")?;
-                        level += 1;
-                    }
-
-                    write!(f, "[{}]", key)?;
-                    has_field = true;
-                }
-            }
-        }
-
-        for _ in 0..level {
-            write!(f, " }}")?;
-        }
-
-        match self.cap {
-            0 => {}
-            1 => write!(f, " .. *one capped step*")?,
-            n => write!(f, " .. *{n} capped steps*")?,
-        }
-
-        Ok(())
+        self.trace.leave_map_key();
     }
 }
