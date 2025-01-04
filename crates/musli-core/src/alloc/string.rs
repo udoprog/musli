@@ -13,10 +13,9 @@ use super::{AllocError, Allocator, Vec};
 
 /// Collect a string into a string buffer.
 #[inline]
-pub(crate) fn collect_string<A, T>(alloc: A, value: T) -> Result<String<A>, AllocError>
+pub(crate) fn collect_string<A>(alloc: A, value: impl fmt::Display) -> Result<String<A>, AllocError>
 where
     A: Allocator,
-    T: fmt::Display,
 {
     use core::fmt::Write;
 

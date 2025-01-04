@@ -22,6 +22,7 @@ impl ToTokens for Import<'_> {
 pub(crate) struct Tokens<'a> {
     pub(crate) allocator_t: Import<'a>,
     pub(crate) as_decoder_t: Import<'a>,
+    pub(crate) collect_string: Import<'a>,
     pub(crate) context_t: Import<'a>,
     pub(crate) decode_bytes_t: Import<'a>,
     pub(crate) decode_packed_t: Import<'a>,
@@ -37,6 +38,7 @@ pub(crate) struct Tokens<'a> {
     pub(crate) map_encoder_t: Import<'a>,
     pub(crate) map_entry_encoder_t: Import<'a>,
     pub(crate) map_hint: Import<'a>,
+    pub(crate) messages: Import<'a>,
     pub(crate) needs_drop: Import<'a>,
     pub(crate) offset_of: Import<'a>,
     pub(crate) option: Import<'a>,
@@ -61,6 +63,7 @@ impl<'a> Tokens<'a> {
         Self {
             allocator_t: Import(prefix, "Allocator"),
             as_decoder_t: Import(prefix, "AsDecoder"),
+            collect_string: Import(prefix, "collect_string"),
             context_t: Import(prefix, "Context"),
             decode_bytes_t: Import(prefix, "DecodeBytes"),
             decode_packed_t: Import(prefix, "DecodePacked"),
@@ -76,6 +79,7 @@ impl<'a> Tokens<'a> {
             map_encoder_t: Import(prefix, "MapEncoder"),
             map_entry_encoder_t: Import(prefix, "EntryEncoder"),
             map_hint: Import(prefix, "MapHint"),
+            messages: Import(prefix, "m"),
             needs_drop: Import(prefix, "needs_drop"),
             offset_of: Import(prefix, "offset_of"),
             option: Import(prefix, "Option"),

@@ -328,7 +328,7 @@ fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum<'_>) -> Result<TokenS
     let Ctxt { ctx_var, .. } = *cx;
 
     let Tokens {
-        context_t, result, ..
+        result, messages, ..
     } = b.tokens;
 
     let type_name = en.name;
@@ -350,7 +350,7 @@ fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum<'_>) -> Result<TokenS
 
     // Special case: uninhabitable types.
     Ok(if variants.is_empty() {
-        quote!(#result::Err(#context_t::uninhabitable(#ctx_var, #type_name)))
+        quote!(#result::Err(#messages::uninhabitable(#ctx_var, #type_name)))
     } else {
         quote!(#result::Ok(match self { #(#variants),* }))
     })
