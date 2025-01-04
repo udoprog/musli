@@ -4,6 +4,29 @@ mod allocator;
 #[doc(inline)]
 pub use self::allocator::Allocator;
 
+#[cfg(feature = "alloc")]
+mod system;
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+pub use self::system::{System, SystemAlloc};
+
+mod disabled;
+#[doc(inline)]
+pub use self::disabled::Disabled;
+
+mod string;
+pub(crate) use self::string::collect_string;
+#[doc(inline)]
+pub use self::string::String;
+
+mod vec;
+#[doc(inline)]
+pub use self::vec::Vec;
+
+mod boxed;
+#[doc(inline)]
+pub use self::boxed::Box;
+
 #[allow(clippy::module_inception)]
 mod alloc;
 #[doc(inline)]

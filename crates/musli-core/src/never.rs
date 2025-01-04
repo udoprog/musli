@@ -12,7 +12,6 @@ use core::marker;
 
 use crate::no_std::ToOwned;
 
-use crate::alloc::{Alloc, AllocError};
 use crate::de::{
     AsDecoder, Decode, DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder,
     MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
@@ -70,36 +69,6 @@ pub struct Never<A = NeverMarker, B: ?Sized = NeverMarker> {
     // Field makes type uninhabitable.
     _never: NeverMarker,
     _marker: marker::PhantomData<(A, B)>,
-}
-
-impl<T> Alloc<T> for Never<T> {
-    #[inline]
-    fn as_ptr(&self) -> *const T {
-        match self._never {}
-    }
-
-    #[inline]
-    fn as_mut_ptr(&mut self) -> *mut T {
-        match self._never {}
-    }
-
-    #[inline]
-    fn capacity(&self) -> usize {
-        match self._never {}
-    }
-
-    #[inline]
-    fn resize(&mut self, _: usize, _: usize) -> Result<(), AllocError> {
-        match self._never {}
-    }
-
-    #[inline]
-    fn try_merge<B>(&mut self, _: usize, _: B, _: usize) -> Result<(), B>
-    where
-        B: Alloc<T>,
-    {
-        match self._never {}
-    }
 }
 
 impl<'de, C> Decoder<'de> for Never<(), C>

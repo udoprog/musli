@@ -1096,9 +1096,14 @@ macro_rules! implement_error {
             where
                 T: core::fmt::Display,
             {
-                let err = match crate::alloc::collect_string(alloc, &message) {
-                    Ok(message) => Impl::Message(message),
-                    Err(error) => Impl::Alloc(error),
+                use core::fmt::Write;
+
+                let mut s = $crate::alloc::String::new_in(alloc);
+
+                let err = if core::write!(s, "{message}").is_ok() {
+                    Impl::Message(s)
+                } else {
+                    Impl::Alloc($crate::alloc::AllocError)
                 };
 
                 Self { err }

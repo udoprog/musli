@@ -9,7 +9,7 @@ use core::slice;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
-use crate::alloc::{self, String, Vec};
+use crate::alloc::{String, Vec};
 use crate::{Allocator, Context};
 
 use super::{Access, ErrorMarker, Shared};
@@ -175,7 +175,6 @@ where
     type Error = ErrorMarker;
     type Mark = usize;
     type Allocator = A;
-    type String = String<A>;
 
     #[inline]
     fn clear(self) {
@@ -192,17 +191,6 @@ where
     #[inline]
     fn alloc(self) -> Self::Allocator {
         self.alloc.clone()
-    }
-
-    #[inline]
-    fn collect_string<T>(self, value: &T) -> Result<Self::String, Self::Error>
-    where
-        T: ?Sized + fmt::Display,
-    {
-        match alloc::collect_string(self.alloc(), value) {
-            Ok(string) => Ok(string),
-            Err(error) => Err(self.custom(error)),
-        }
     }
 
     #[inline]

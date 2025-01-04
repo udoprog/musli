@@ -4,6 +4,7 @@ use core::error::Error;
 use core::fmt;
 use core::str;
 
+use crate::alloc::{self, String};
 use crate::Allocator;
 
 /// Provides ergonomic access to the serialization context.
@@ -18,8 +19,6 @@ pub trait Context: Copy {
     type Mark;
     /// The allocator associated with the context.
     type Allocator: Allocator;
-    /// An allocated buffer containing a valid string.
-    type String: AsRef<str>;
 
     /// Clear the state of the context, allowing it to be re-used.
     fn clear(self);
@@ -45,9 +44,16 @@ pub trait Context: Copy {
     /// Collect and allocate a string from a [`Display`] implementation.
     ///
     /// [`Display`]: fmt::Display
-    fn collect_string<T>(self, value: &T) -> Result<Self::String, Self::Error>
+    #[inline]
+    fn collect_string<T>(self, value: &T) -> Result<String<Self::Allocator>, Self::Error>
     where
-        T: ?Sized + fmt::Display;
+        T: ?Sized + fmt::Display,
+    {
+        match alloc::collect_string(self.alloc(), value) {
+            Ok(string) => Ok(string),
+            Err(error) => Err(self.message(error)),
+        }
+    }
 
     /// Generate a map function which maps an error using the `custom` function.
     #[inline]
@@ -76,29 +82,29 @@ pub trait Context: Copy {
     /// Report an error based on a mark.
     ///
     /// A mark is generated using [Context::mark] and indicates a prior state.
-    #[allow(unused_variables)]
-    #[inline(always)]
+    #[inline]
     fn marked_message<T>(self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: fmt::Display,
     {
+        _ = mark;
         self.message(message)
     }
 
     /// Report an error based on a mark.
     ///
     /// A mark is generated using [Context::mark] and indicates a prior state.
-    #[allow(unused_variables)]
-    #[inline(always)]
+    #[inline]
     fn marked_custom<T>(self, mark: &Self::Mark, message: T) -> Self::Error
     where
         T: 'static + Send + Sync + Error,
     {
+        _ = mark;
         self.custom(message)
     }
 
     /// Report that an invalid variant tag was encountered.
-    #[inline(always)]
+    #[inline]
     fn invalid_variant_tag<T>(self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
@@ -109,7 +115,7 @@ pub trait Context: Copy {
     }
 
     /// The value for the given tag could not be collected.
-    #[inline(always)]
+    #[inline]
     fn expected_tag<T>(self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
@@ -118,7 +124,7 @@ pub trait Context: Copy {
     }
 
     /// Trying to decode an uninhabitable type.
-    #[inline(always)]
+    #[inline]
     fn uninhabitable(self, type_name: &'static str) -> Self::Error {
         self.message(format_args!(
             "Type {type_name} cannot be decoded since it's uninhabitable"
@@ -126,7 +132,7 @@ pub trait Context: Copy {
     }
 
     /// Encountered an unsupported field tag.
-    #[inline(always)]
+    #[inline]
     fn invalid_field_tag<T>(self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
@@ -137,7 +143,7 @@ pub trait Context: Copy {
     }
 
     /// Expected another field to decode.
-    #[inline(always)]
+    #[inline]
     fn expected_field_adjacent<T, C>(
         self,
         type_name: &'static str,
@@ -154,7 +160,7 @@ pub trait Context: Copy {
     }
 
     /// Missing adjacent tag when decoding.
-    #[inline(always)]
+    #[inline]
     fn missing_adjacent_tag<T>(self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
@@ -165,8 +171,12 @@ pub trait Context: Copy {
     }
 
     /// Encountered an unsupported field tag.
-    #[inline(always)]
-    fn invalid_field_string_tag(self, type_name: &'static str, field: Self::String) -> Self::Error {
+    #[inline]
+    fn invalid_field_string_tag(
+        self,
+        type_name: &'static str,
+        field: impl AsRef<str>,
+    ) -> Self::Error {
         let field = field.as_ref();
 
         self.message(format_args!(
@@ -175,7 +185,7 @@ pub trait Context: Copy {
     }
 
     /// Missing variant field required to decode.
-    #[inline(always)]
+    #[inline]
     fn missing_variant_field<T>(self, type_name: &'static str, tag: &T) -> Self::Error
     where
         T: ?Sized + fmt::Debug,
@@ -186,13 +196,13 @@ pub trait Context: Copy {
     }
 
     /// Indicate that a variant tag could not be determined.
-    #[inline(always)]
+    #[inline]
     fn missing_variant_tag(self, type_name: &'static str) -> Self::Error {
         self.message(format_args!("Type {type_name} is missing variant tag"))
     }
 
     /// Encountered an unsupported variant field.
-    #[inline(always)]
+    #[inline]
     fn invalid_variant_field_tag<V, T>(
         self,
         type_name: &'static str,
@@ -209,7 +219,7 @@ pub trait Context: Copy {
     }
 
     /// Missing variant field required to decode.
-    #[inline(always)]
+    #[inline]
     fn alloc_failed(self) -> Self::Error {
         self.message("Failed to allocate")
     }
@@ -221,13 +231,13 @@ pub trait Context: Copy {
     /// This will be matched with a corresponding call to [`leave_struct`].
     ///
     /// [`leave_struct`]: Context::leave_struct
-    #[inline(always)]
+    #[inline]
     fn enter_struct(self, type_name: &'static str) {
         _ = type_name;
     }
 
     /// Trace that we've left the last struct that was entered.
-    #[inline(always)]
+    #[inline]
     fn leave_struct(self) {}
 
     /// Indicate that we've entered an enum with the given `name`.
@@ -237,13 +247,13 @@ pub trait Context: Copy {
     /// This will be matched with a corresponding call to [`leave_enum`].
     ///
     /// [`leave_enum`]: Context::leave_enum
-    #[inline(always)]
+    #[inline]
     fn enter_enum(self, type_name: &'static str) {
         _ = type_name;
     }
 
     /// Trace that we've left the last enum that was entered.
-    #[inline(always)]
+    #[inline]
     fn leave_enum(self) {}
 
     /// Trace that we've entered the given named field.
@@ -268,7 +278,7 @@ pub trait Context: Copy {
     /// ```
     ///
     /// [`leave_field`]: Context::leave_field
-    #[inline(always)]
+    #[inline]
     fn enter_named_field<T>(self, type_name: &'static str, tag: &T)
     where
         T: ?Sized + fmt::Display,
@@ -296,7 +306,7 @@ pub trait Context: Copy {
     /// ```
     ///
     /// [`leave_field`]: Context::leave_field
-    #[inline(always)]
+    #[inline]
     fn enter_unnamed_field<T>(self, index: u32, name: &T)
     where
         T: ?Sized + fmt::Display,
@@ -312,7 +322,7 @@ pub trait Context: Copy {
     ///
     /// [`enter_named_field`]: Context::enter_named_field
     /// [`enter_unnamed_field`]: Context::enter_unnamed_field
-    #[inline(always)]
+    #[inline]
     fn leave_field(self) {}
 
     /// Trace that we've entered the given variant in an enum.
@@ -339,7 +349,7 @@ pub trait Context: Copy {
     /// ```
     ///
     /// [`leave_variant`]: Context::leave_variant
-    #[inline(always)]
+    #[inline]
     fn enter_variant<T>(self, type_name: &'static str, tag: T)
     where
         T: fmt::Display,
@@ -354,11 +364,11 @@ pub trait Context: Copy {
     /// [`enter_variant`].
     ///
     /// [`enter_variant`]: Context::enter_variant
-    #[inline(always)]
+    #[inline]
     fn leave_variant(self) {}
 
     /// Trace a that a map key has been entered.
-    #[inline(always)]
+    #[inline]
     fn enter_map_key<T>(self, field: T)
     where
         T: fmt::Display,
@@ -372,14 +382,14 @@ pub trait Context: Copy {
     /// [`enter_map_key`].
     ///
     /// [`enter_map_key`]: Context::enter_map_key
-    #[allow(unused_variables)]
-    #[inline(always)]
+    #[inline]
     fn leave_map_key(self) {}
 
     /// Trace a sequence field.
-    #[allow(unused_variables)]
-    #[inline(always)]
-    fn enter_sequence_index(self, index: usize) {}
+    #[inline]
+    fn enter_sequence_index(self, index: usize) {
+        _ = index;
+    }
 
     /// Trace that we've left the last sequence index that was entered.
     ///
@@ -387,7 +397,6 @@ pub trait Context: Copy {
     /// [`enter_sequence_index`].
     ///
     /// [`enter_sequence_index`]: Context::enter_sequence_index
-    #[allow(unused_variables)]
-    #[inline(always)]
+    #[inline]
     fn leave_sequence_index(self) {}
 }
