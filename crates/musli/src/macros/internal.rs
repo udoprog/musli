@@ -333,7 +333,7 @@ macro_rules! encoding_impls {
             W: $writer_trait,
             T: ?Sized + Encode<$mode>,
         {
-            let cx = $crate::context::Same::with_alloc(System::new());
+            let cx = $crate::context::Same::new();
             self.encode_with(&cx, writer, value)
         }
 
@@ -379,7 +379,7 @@ macro_rules! encoding_impls {
         where
             T: ?Sized + Encode<$mode>,
         {
-            let cx = $crate::context::Same::with_alloc(System::new());
+            let cx = $crate::context::Same::new();
             self.to_slice_with(&cx, out, value)
         }
 
@@ -462,7 +462,7 @@ macro_rules! encoding_impls {
         where
             T: ?Sized + Encode<$mode>,
         {
-            let cx = $crate::context::Same::with_alloc(System::new());
+            let cx = $crate::context::Same::new();
             self.to_fixed_bytes_with(&cx, value)
         }
 
@@ -555,7 +555,7 @@ macro_rules! encoding_impls {
             R: $reader_trait<'de>,
             T: Decode<'de, $mode, System>,
         {
-            let cx = $crate::context::Same::with_alloc(System::new());
+            let cx = $crate::context::Same::new();
             self.decode_with(&cx, reader)
         }
 
@@ -594,7 +594,7 @@ macro_rules! encoding_impls {
         where
             T: Decode<'de, $mode, System>,
         {
-            let cx = $crate::context::Same::with_alloc(System::new());
+            let cx = $crate::context::Same::new();
             self.from_slice_with(&cx, bytes)
         }
 

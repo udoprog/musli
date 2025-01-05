@@ -7,6 +7,7 @@ use core::ops::Range;
 use core::slice;
 
 use crate::alloc::{Allocator, String, Vec};
+use crate::context::ErrorMarker;
 
 use super::{Access, Shared};
 
@@ -374,7 +375,28 @@ where
 
 /// Trace configuration indicating that tracing is fully disabled.
 #[non_exhaustive]
-pub struct NoTrace;
+pub struct NoTrace {
+    /// Simple indicator whether an error has or has not occured.
+    error: Cell<bool>,
+}
+
+impl NoTrace {
+    #[inline]
+    pub(super) const fn new() -> Self {
+        Self {
+            error: Cell::new(false),
+        }
+    }
+
+    #[inline]
+    pub(super) fn unwrap(self) -> ErrorMarker {
+        if self.error.get() {
+            return ErrorMarker;
+        }
+
+        panic!("did not error")
+    }
+}
 
 impl<A> Trace<A> for NoTrace
 where

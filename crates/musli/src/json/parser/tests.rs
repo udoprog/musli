@@ -10,7 +10,7 @@ use crate::json::parser::SliceParser;
 #[test]
 fn test_decode_exponent() {
     crate::alloc::default(|alloc| {
-        let cx = context::Same::<Error<_>, _>::with_alloc(alloc);
+        let cx = context::Same::<Error<_>, _>::new_in(alloc);
 
         macro_rules! test_number {
             ($ty:ty, $num:expr, $expected:expr) => {
@@ -47,7 +47,7 @@ fn test_decode_exponent() {
 #[test]
 fn test_decode_unsigned() {
     crate::alloc::default(|alloc| {
-        let cx = context::Same::<Error<_>, _>::with_alloc(alloc);
+        let cx = context::Same::<Error<_>, _>::new_in(alloc);
 
         macro_rules! test_number {
             ($ty:ty, $num:expr) => {
@@ -115,7 +115,7 @@ fn test_decode_unsigned() {
 #[test]
 fn test_decode_signed() {
     crate::alloc::default(|alloc| {
-        let cx = context::Same::<Error<_>, _>::with_alloc(alloc);
+        let cx = context::Same::<Error<_>, _>::new_in(alloc);
 
         macro_rules! test_number {
             ($ty:ty, $num:expr) => {

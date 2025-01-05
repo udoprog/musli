@@ -353,14 +353,15 @@
 //!   serialized (or the format) demands it.
 //! * *Disable error handling*. Code generation will be able to remove
 //!   everything related to error handling, like allocations. To do this we can
-//!   make use of the [`Ignore`] context. If an error happens, we are only
-//!   informed of that fact through a zero-sized marker type.
+//!   make use of the [default context] without configuring it for tracing. If
+//!   an error happens, we are only informed of that fact through a zero-sized
+//!   marker type.
 //!
 //! We achieve this through the following methods:
 //!
 //! ```
 //! use musli::alloc::{Allocator, System};
-//! use musli::context::{ErrorMarker as Error, Ignore};
+//! use musli::context::{self, ErrorMarker as Error};
 //! use musli::options::{self, Float, Integer, Width, Options};
 //! use musli::storage::Encoding;
 //! use musli::{Decode, Encode};
@@ -377,7 +378,7 @@
 //!     T: Encode<Packed>,
 //!     A: Clone + Allocator,
 //! {
-//!     let cx = Ignore::with_alloc(alloc);
+//!     let cx = context::new_in(alloc);
 //!     let w = ENCODING.to_slice_with(&cx, &mut buf[..], value)?;
 //!     Ok(&buf[..w])
 //! }
@@ -388,7 +389,7 @@
 //!     T: Decode<'buf, Packed, A>,
 //!     A: Clone + Allocator,
 //! {
-//!     let cx = Ignore::with_alloc(alloc);
+//!     let cx = context::new_in(alloc);
 //!     ENCODING.from_slice_with(&cx, buf)
 //! }
 //! ```
@@ -468,7 +469,6 @@
 //! [`derives`]: <https://docs.rs/musli/latest/musli/_help/derives/index.html>
 //! [`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
 //! [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
-//! [`Ignore`]: <https://docs.rs/musli/latest/musli/context/struct.Ignore.html>
 //! [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/index.html>
 //! [`musli::json`]: <https://docs.rs/musli/latest/musli/json/index.html>
 //! [`musli::packed`]: <https://docs.rs/musli/latest/musli/packed/index.html>
@@ -486,6 +486,7 @@
 //! [benchmarks]: <https://udoprog.github.io/musli/benchmarks/>
 //! [bit packing]: <https://github.com/udoprog/musli/blob/main/crates/musli/src/descriptive/tag.rs>
 //! [completely uses visitors]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_u32
+//! [default context]: <https://docs.rs/musli/latest/musli/context/new_in.html>
 //! [detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
 //! [musli-name-type]: <https://docs.rs/musli/latest/musli/_help/derives/index.html#musliname_type-->
 //! [no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/>

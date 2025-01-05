@@ -42,7 +42,7 @@ pub mod musli_packed {
     use alloc::vec::Vec;
 
     use musli::alloc::System;
-    use musli::context::{ErrorMarker as Error, Ignore};
+    use musli::context::{self, ErrorMarker as Error};
     use musli::options::{self, Options};
     use musli::storage::Encoding;
     use musli::{Decode, Encode};
@@ -61,7 +61,7 @@ pub mod musli_packed {
         T: Encode<Packed>,
     {
         let len = buf.len();
-        let cx = Ignore::new();
+        let cx = context::new();
         let w = ENCODING.encode_with(&cx, &mut buf[..], value)?;
         let w = len - w;
         Ok(&buf[..w])
@@ -71,7 +71,7 @@ pub mod musli_packed {
     where
         T: Decode<'buf, Packed, System>,
     {
-        let cx = Ignore::new();
+        let cx = context::new();
         ENCODING.from_slice_with(&cx, buf)
     }
 }

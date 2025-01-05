@@ -8,7 +8,10 @@ use crate::{Allocator, Context};
 
 use super::{ContextError, ErrorMarker};
 
-/// A simple non-diagnostical capturing context.
+/// Capture one the first reported error `E` and use the [`ErrorMarker`] as an
+/// error.
+///
+/// The captured error can be accessed through the [`Capture::unwrap`] method.
 pub struct Capture<E, A>
 where
     E: ContextError<A>,
@@ -27,7 +30,7 @@ where
     /// Construct a new capturing context using the [`System`] allocator.
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(System::new())
+        Self::new_in(System::new())
     }
 }
 
@@ -37,7 +40,8 @@ where
     A: Clone + Allocator,
 {
     /// Construct a new capturing allocator.
-    pub fn with_alloc(alloc: A) -> Self {
+    #[inline]
+    pub fn new_in(alloc: A) -> Self {
         Self {
             alloc,
             error: UnsafeCell::new(None),
@@ -45,6 +49,7 @@ where
     }
 
     /// Construct an error or panic.
+    #[inline]
     pub fn unwrap(self) -> E {
         let alloc = self.alloc();
 
