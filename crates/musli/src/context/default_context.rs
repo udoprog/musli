@@ -9,12 +9,12 @@ use super::{ErrorMarker, Errors, NoTrace, Report, Trace, WithTrace};
 /// The default context which uses an allocator to track the location of errors.
 ///
 /// This uses the provided allocator to allocate memory for the collected
-/// diagnostics. The allocator to use can be provided using [`with_alloc`].
+/// diagnostics. The allocator to use can be provided using [`new_in`].
 ///
 /// The default constructor is only available when the `alloc` feature is
 /// enabled, and will use the [`System`] allocator.
 ///
-/// [`with_alloc`]: super::with_alloc
+/// [`new_in`]: super::new_in
 pub struct DefaultContext<A, T>
 where
     A: Allocator,
@@ -33,7 +33,7 @@ impl DefaultContext<System, NoTrace> {
     /// [`System`]: crate::alloc::System
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(crate::alloc::System::new())
+        Self::new_in(crate::alloc::System::new())
     }
 }
 
@@ -52,11 +52,17 @@ where
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
     #[inline]
-    pub(super) fn with_alloc(alloc: A) -> Self {
+    pub(super) fn new_in(alloc: A) -> Self {
         Self {
             alloc,
-            trace: NoTrace,
+            trace: NoTrace::new(),
         }
+    }
+
+    /// Unwrap the error marker or panic if there is no error.
+    #[inline]
+    pub fn unwrap(self) -> ErrorMarker {
+        self.trace.unwrap()
     }
 }
 

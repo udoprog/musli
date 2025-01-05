@@ -342,14 +342,15 @@ The tradeoffs we will be showcasing to achieve speed here are:
   serialized (or the format) demands it.
 * *Disable error handling*. Code generation will be able to remove
   everything related to error handling, like allocations. To do this we can
-  make use of the [`Ignore`] context. If an error happens, we are only
-  informed of that fact through a zero-sized marker type.
+  make use of the [default context] without configuring it for tracing. If
+  an error happens, we are only informed of that fact through a zero-sized
+  marker type.
 
 We achieve this through the following methods:
 
 ```rust
-use musli::alloc::System;
-use musli::context::{ErrorMarker as Error, Ignore};
+use musli::alloc::{Allocator, System};
+use musli::context::{self, ErrorMarker as Error};
 use musli::options::{self, Float, Integer, Width, Options};
 use musli::storage::Encoding;
 use musli::{Decode, Encode};
@@ -361,21 +362,23 @@ const OPTIONS: Options = options::new().fixed().native_byte_order().build();
 const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
 #[inline]
-pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T, alloc: &Slice<'_>) -> Result<&'buf [u8], Error>
+pub fn encode<'buf, T, A>(buf: &'buf mut [u8], value: &T, alloc: A) -> Result<&'buf [u8], Error>
 where
     T: Encode<Packed>,
+    A: Clone + Allocator,
 {
-    let cx = Ignore::with_alloc(alloc);
+    let cx = context::new_in(alloc);
     let w = ENCODING.to_slice_with(&cx, &mut buf[..], value)?;
     Ok(&buf[..w])
 }
 
 #[inline]
-pub fn decode<'buf, T>(buf: &'buf [u8], alloc: &Slice<'_>) -> Result<T, Error>
+pub fn decode<'buf, T, A>(buf: &'buf [u8], alloc: A) -> Result<T, Error>
 where
-    T: Decode<'buf, Packed, System>,
+    T: Decode<'buf, Packed, A>,
+    A: Clone + Allocator,
 {
-    let cx = Ignore::with_alloc(alloc);
+    let cx = context::new_in(alloc);
     ENCODING.from_slice_with(&cx, buf)
 }
 ```
@@ -454,7 +457,6 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [`derives`]: <https://docs.rs/musli/latest/musli/_help/derives/index.html>
 [`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
 [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
-[`Ignore`]: <https://docs.rs/musli/latest/musli/context/struct.Ignore.html>
 [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/index.html>
 [`musli::json`]: <https://docs.rs/musli/latest/musli/json/index.html>
 [`musli::packed`]: <https://docs.rs/musli/latest/musli/packed/index.html>
@@ -472,6 +474,7 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [benchmarks]: <https://udoprog.github.io/musli/benchmarks/>
 [bit packing]: <https://github.com/udoprog/musli/blob/main/crates/musli/src/descriptive/tag.rs>
 [completely uses visitors]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_u32
+[default context]: <https://docs.rs/musli/latest/musli/context/new_in.html>
 [detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
 [musli-name-type]: <https://docs.rs/musli/latest/musli/_help/derives/index.html#musliname_type-->
 [no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/>

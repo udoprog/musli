@@ -29,10 +29,6 @@ mod capture;
 #[doc(inline)]
 pub use self::capture::Capture;
 
-mod ignore;
-#[doc(inline)]
-pub use self::ignore::Ignore;
-
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
 use crate::Allocator;
@@ -48,7 +44,7 @@ use crate::Allocator;
 /// use musli::context;
 ///
 /// musli::alloc::default(|alloc| {
-///     let cx = context::with_alloc(alloc);
+///     let cx = context::new_in(alloc);
 ///     let encoding = musli::json::Encoding::new();
 ///     let string = encoding.to_string_with(&cx, &42)?;
 ///     assert_eq!(string, "42");
@@ -65,7 +61,7 @@ use crate::Allocator;
 ///
 /// let mut buf = alloc::ArrayBuffer::new();
 /// let alloc = alloc::Slice::new(&mut buf);
-/// let cx = context::with_alloc(&alloc);
+/// let cx = context::new_in(&alloc);
 ///
 /// let encoding = musli::json::Encoding::new();
 /// let string = encoding.to_string_with(&cx, &42)?;
@@ -73,11 +69,11 @@ use crate::Allocator;
 /// # Ok::<_, musli::context::ErrorMarker>(())
 /// ```
 ///
-pub fn with_alloc<A>(alloc: A) -> DefaultContext<A, NoTrace>
+pub fn new_in<A>(alloc: A) -> DefaultContext<A, NoTrace>
 where
     A: Clone + Allocator,
 {
-    DefaultContext::with_alloc(alloc)
+    DefaultContext::new_in(alloc)
 }
 
 /// Construct a new default context using the static [`System`] allocator.

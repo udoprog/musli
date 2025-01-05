@@ -21,7 +21,7 @@ struct Collection {
 fn trace_no_std() {
     let mut buf = ArrayBuffer::<1024>::with_size();
     let alloc = Slice::new(&mut buf);
-    let cx = context::with_alloc(&alloc).with_trace();
+    let cx = context::new_in(&alloc).with_trace();
 
     let mut values = HashMap::new();
 
@@ -39,7 +39,7 @@ fn trace_no_std() {
         unreachable!()
     };
 
-    let cx = context::with_alloc(&alloc).with_trace();
+    let cx = context::new_in(&alloc).with_trace();
 
     let Ok(..) = encoding.from_slice_with::<_, Collection>(&cx, &bytes) else {
         if let Some(error) = cx.errors().next() {

@@ -33,7 +33,7 @@ where
     /// Construct a new same-error context with the [`System`] allocator.
     #[inline]
     pub fn new() -> Self {
-        Self::with_alloc(crate::alloc::System::new())
+        Self::new_in(crate::alloc::System::new())
     }
 }
 
@@ -44,7 +44,7 @@ where
 {
     /// Construct a new `Same` context with a custom allocator.
     #[inline]
-    pub fn with_alloc(alloc: A) -> Self {
+    pub fn new_in(alloc: A) -> Self {
         Self {
             alloc,
             _marker: PhantomData,
@@ -60,7 +60,7 @@ where
     /// Construct a new `Same` capturing context.
     #[inline]
     pub(crate) fn with_marker(alloc: A) -> Self {
-        Self::with_alloc(alloc)
+        Self::new_in(alloc)
     }
 }
 

@@ -220,7 +220,7 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        let cx = crate::context::Same::with_alloc(System::new());
+        let cx = crate::context::Same::new();
         self.to_string_with(&cx, value)
     }
 
