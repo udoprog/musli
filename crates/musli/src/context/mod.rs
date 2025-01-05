@@ -7,7 +7,7 @@ use self::access::{Access, Shared};
 
 mod trace;
 #[doc(inline)]
-pub use self::trace::{Error, Errors, NoTrace, Report, Trace, WithTrace};
+pub use self::trace::{Error, Errors, NoTrace, Report, Trace, TraceConfig, TraceImpl};
 
 mod error_marker;
 #[doc(inline)]
@@ -68,7 +68,7 @@ use crate::Allocator;
 /// assert_eq!(string, "42");
 /// # Ok::<_, musli::context::ErrorMarker>(())
 /// ```
-///
+#[inline]
 pub fn new_in<A>(alloc: A) -> DefaultContext<A, NoTrace>
 where
     A: Clone + Allocator,
@@ -76,9 +76,7 @@ where
     DefaultContext::new_in(alloc)
 }
 
-/// Construct a new default context using the static [`System`] allocator.
-///
-/// [`System`]: crate::alloc::System
+/// Construct a new default context using the [`System`] allocator.
 ///
 /// # Examples
 ///
@@ -96,6 +94,7 @@ where
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[inline]
 pub fn new() -> DefaultContext<System, NoTrace> {
     DefaultContext::new()
 }

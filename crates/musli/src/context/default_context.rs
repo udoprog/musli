@@ -4,36 +4,36 @@ use core::fmt;
 use crate::alloc::System;
 use crate::{Allocator, Context};
 
-use super::{ErrorMarker, Errors, NoTrace, Report, Trace, WithTrace};
+use super::{ErrorMarker, Errors, NoTrace, Report, Trace, TraceConfig, TraceImpl};
 
 /// The default context which uses an allocator to track the location of errors.
 ///
-/// This uses the provided allocator to allocate memory for the collected
-/// diagnostics. The allocator to use can be provided using [`new_in`].
+/// This is typically constructed using [`new`] and by default uses the
+/// [`System`] allocator to allocate memory. To customized the allocator to use
+/// [`new_in`] can be used during construction.
 ///
 /// The default constructor is only available when the `alloc` feature is
 /// enabled, and will use the [`System`] allocator.
 ///
+/// [`new`]: super::new
 /// [`new_in`]: super::new_in
-pub struct DefaultContext<A, T>
+pub struct DefaultContext<A, B>
 where
-    A: Allocator,
-    T: Trace<A>,
+    A: Clone + Allocator,
+    B: TraceConfig,
 {
     alloc: A,
-    trace: T,
+    trace: B::Impl<A>,
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl DefaultContext<System, NoTrace> {
-    /// Construct a new fully featured context which uses the [`System`]
-    /// allocator for memory.
-    ///
-    /// [`System`]: crate::alloc::System
+    /// Construct the default context which uses the [`System`] allocator for
+    /// memory.
     #[inline]
     pub fn new() -> Self {
-        Self::new_in(crate::alloc::System::new())
+        Self::new_in(System::new())
     }
 }
 
@@ -53,10 +53,9 @@ where
     /// configurable number of diagnostics.
     #[inline]
     pub(super) fn new_in(alloc: A) -> Self {
-        Self {
-            alloc,
-            trace: NoTrace::new(),
-        }
+        let trace = NoTrace::new_in(alloc.clone());
+
+        Self { alloc, trace }
     }
 
     /// Unwrap the error marker or panic if there is no error.
@@ -66,7 +65,7 @@ where
     }
 }
 
-impl<A> DefaultContext<A, WithTrace<A>>
+impl<A> DefaultContext<A, Trace>
 where
     A: Clone + Allocator,
 {
@@ -98,7 +97,7 @@ where
 impl<A, B> DefaultContext<A, B>
 where
     A: Clone + Allocator,
-    B: Trace<A>,
+    B: TraceConfig,
 {
     /// Enable tracing through the current allocator `A`.
     ///
@@ -112,8 +111,8 @@ where
     /// [`errors`]: DefaultContext::errors
     /// [`Disabled`]: crate::alloc::Disabled
     #[inline]
-    pub fn with_trace(self) -> DefaultContext<A, WithTrace<A>> {
-        let trace = WithTrace::new_in(self.alloc.clone());
+    pub fn with_trace(self) -> DefaultContext<A, Trace> {
+        let trace = Trace::new_in(self.alloc.clone());
 
         DefaultContext {
             alloc: self.alloc,
@@ -125,10 +124,10 @@ where
 impl<A, B> Context for &DefaultContext<A, B>
 where
     A: Clone + Allocator,
-    B: Trace<A>,
+    B: TraceConfig,
 {
     type Error = ErrorMarker;
-    type Mark = B::Mark;
+    type Mark = <<B as TraceConfig>::Impl<A> as TraceImpl>::Mark;
     type Allocator = A;
 
     #[inline]
@@ -146,7 +145,7 @@ where
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        self.trace.custom(&self.alloc, message);
+        self.trace.custom(&self.alloc, &message);
         ErrorMarker
     }
 
@@ -155,7 +154,7 @@ where
     where
         T: fmt::Display,
     {
-        self.trace.message(&self.alloc, message);
+        self.trace.message(&self.alloc, &message);
         ErrorMarker
     }
 
@@ -164,7 +163,7 @@ where
     where
         T: fmt::Display,
     {
-        self.trace.marked_message(&self.alloc, mark, message);
+        self.trace.marked_message(&self.alloc, mark, &message);
         ErrorMarker
     }
 
@@ -173,7 +172,7 @@ where
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        self.trace.marked_custom(&self.alloc, mark, message);
+        self.trace.marked_custom(&self.alloc, mark, &message);
         ErrorMarker
     }
 
@@ -192,7 +191,7 @@ where
     where
         T: fmt::Display,
     {
-        self.trace.enter_named_field(name, field);
+        self.trace.enter_named_field(name, &field);
     }
 
     #[inline]
@@ -200,7 +199,7 @@ where
     where
         T: fmt::Display,
     {
-        self.trace.enter_unnamed_field(index, name);
+        self.trace.enter_unnamed_field(index, &name);
     }
 
     #[inline]
@@ -233,7 +232,7 @@ where
     where
         T: fmt::Display,
     {
-        self.trace.enter_variant(name, tag);
+        self.trace.enter_variant(name, &tag);
     }
 
     #[inline]
@@ -256,7 +255,7 @@ where
     where
         T: fmt::Display,
     {
-        self.trace.enter_map_key(&self.alloc, field);
+        self.trace.enter_map_key(&self.alloc, &field);
     }
 
     #[inline]
