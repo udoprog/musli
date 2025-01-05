@@ -2,6 +2,7 @@
 
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
+use core::marker::PhantomData;
 use core::mem::take;
 use core::ops::Range;
 use core::slice;
@@ -15,18 +16,34 @@ mod sealed {
     use crate::alloc::Allocator;
 
     pub trait Sealed {}
-    impl<A> Sealed for super::WithTrace<A> where A: Allocator {}
+    impl<A> Sealed for super::WithTraceImpl<A> where A: Allocator {}
+    impl<A> Sealed for super::NoTraceImpl<A> where A: Allocator {}
+    impl Sealed for super::Trace {}
     impl Sealed for super::NoTrace {}
 }
 
+/// Trait for marker types indicating the tracing configuration.
+pub trait TraceConfig: self::sealed::Sealed {
+    #[doc(hidden)]
+    type Impl<A>: TraceImpl<Allocator = A>
+    where
+        A: Clone + Allocator;
+
+    #[doc(hidden)]
+    fn new_in<A>(alloc: A) -> Self::Impl<A>
+    where
+        A: Clone + Allocator;
+}
+
 /// The trait governing tracing in a default context.
-pub trait Trace<A>
+pub trait TraceImpl
 where
     Self: Sized + self::sealed::Sealed,
-    A: Allocator,
 {
     #[doc(hidden)]
     type Mark;
+    #[doc(hidden)]
+    type Allocator: Allocator;
 
     #[doc(hidden)]
     fn clear(&self);
@@ -38,32 +55,32 @@ where
     fn mark(&self) -> Self::Mark;
 
     #[doc(hidden)]
-    fn custom<T>(&self, alloc: &A, message: T)
+    fn custom<T>(&self, alloc: &Self::Allocator, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug;
 
     #[doc(hidden)]
-    fn message<T>(&self, alloc: &A, message: T)
+    fn message<T>(&self, alloc: &Self::Allocator, message: &T)
     where
         T: fmt::Display;
 
     #[doc(hidden)]
-    fn marked_message<T>(&self, alloc: &A, mark: &Self::Mark, message: T)
+    fn marked_message<T>(&self, alloc: &Self::Allocator, mark: &Self::Mark, message: &T)
     where
         T: fmt::Display;
 
     #[doc(hidden)]
-    fn marked_custom<T>(&self, alloc: &A, mark: &Self::Mark, message: T)
+    fn marked_custom<T>(&self, alloc: &Self::Allocator, mark: &Self::Mark, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug;
 
     #[doc(hidden)]
-    fn enter_named_field<T>(&self, name: &'static str, field: T)
+    fn enter_named_field<T>(&self, name: &'static str, field: &T)
     where
         T: fmt::Display;
 
     #[doc(hidden)]
-    fn enter_unnamed_field<T>(&self, index: u32, name: T)
+    fn enter_unnamed_field<T>(&self, index: u32, name: &T)
     where
         T: fmt::Display;
 
@@ -83,7 +100,7 @@ where
     fn leave_enum(&self);
 
     #[doc(hidden)]
-    fn enter_variant<T>(&self, name: &'static str, _: T)
+    fn enter_variant<T>(&self, name: &'static str, _: &T)
     where
         T: fmt::Display;
 
@@ -97,7 +114,7 @@ where
     fn leave_sequence_index(&self);
 
     #[doc(hidden)]
-    fn enter_map_key<T>(&self, alloc: &A, field: T)
+    fn enter_map_key<T>(&self, alloc: &Self::Allocator, field: &T)
     where
         T: fmt::Display;
 
@@ -105,9 +122,28 @@ where
     fn leave_map_key(&self);
 }
 
+/// Marker type indicating that tracing is enabled.
+#[non_exhaustive]
+pub struct Trace;
+
+impl TraceConfig for Trace {
+    type Impl<A>
+        = WithTraceImpl<A>
+    where
+        A: Clone + Allocator;
+
+    #[inline]
+    fn new_in<A>(alloc: A) -> Self::Impl<A>
+    where
+        A: Clone + Allocator,
+    {
+        WithTraceImpl::new_in(alloc)
+    }
+}
+
 /// Trace configuration indicating that tracing is enabled through the allocator
 /// `A`.
-pub struct WithTrace<A>
+pub struct WithTraceImpl<A>
 where
     A: Allocator,
 {
@@ -120,7 +156,7 @@ where
     access: Access,
 }
 
-impl<A> WithTrace<A>
+impl<A> WithTraceImpl<A>
 where
     A: Clone + Allocator,
 {
@@ -220,11 +256,12 @@ where
     }
 }
 
-impl<A> Trace<A> for WithTrace<A>
+impl<A> TraceImpl for WithTraceImpl<A>
 where
     A: Clone + Allocator,
 {
     type Mark = usize;
+    type Allocator = A;
 
     #[inline]
     fn clear(&self) {
@@ -249,7 +286,7 @@ where
     }
 
     #[inline]
-    fn custom<T>(&self, alloc: &A, message: T)
+    fn custom<T>(&self, alloc: &Self::Allocator, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -259,7 +296,7 @@ where
     }
 
     #[inline]
-    fn message<T>(&self, alloc: &A, message: T)
+    fn message<T>(&self, alloc: &Self::Allocator, message: &T)
     where
         T: fmt::Display,
     {
@@ -269,7 +306,7 @@ where
     }
 
     #[inline]
-    fn marked_message<T>(&self, alloc: &A, mark: &Self::Mark, message: T)
+    fn marked_message<T>(&self, alloc: &Self::Allocator, mark: &Self::Mark, message: &T)
     where
         T: fmt::Display,
     {
@@ -279,7 +316,7 @@ where
     }
 
     #[inline]
-    fn marked_custom<T>(&self, alloc: &A, mark: &Self::Mark, message: T)
+    fn marked_custom<T>(&self, alloc: &Self::Allocator, mark: &Self::Mark, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -289,7 +326,7 @@ where
     }
 
     #[inline]
-    fn enter_named_field<T>(&self, name: &'static str, _: T)
+    fn enter_named_field<T>(&self, name: &'static str, _: &T)
     where
         T: fmt::Display,
     {
@@ -297,7 +334,7 @@ where
     }
 
     #[inline]
-    fn enter_unnamed_field<T>(&self, index: u32, _: T)
+    fn enter_unnamed_field<T>(&self, index: u32, _: &T)
     where
         T: fmt::Display,
     {
@@ -338,7 +375,7 @@ where
     }
 
     #[inline]
-    fn enter_variant<T>(&self, name: &'static str, _: T) {
+    fn enter_variant<T>(&self, name: &'static str, _: &T) {
         self.push_path(Step::Variant(name));
     }
 
@@ -358,7 +395,7 @@ where
     }
 
     #[inline]
-    fn enter_map_key<T>(&self, alloc: &A, field: T)
+    fn enter_map_key<T>(&self, alloc: &Self::Allocator, field: &T)
     where
         T: fmt::Display,
     {
@@ -373,18 +410,21 @@ where
     }
 }
 
-/// Trace configuration indicating that tracing is fully disabled.
-#[non_exhaustive]
-pub struct NoTrace {
+pub struct NoTraceImpl<A> {
     /// Simple indicator whether an error has or has not occured.
     error: Cell<bool>,
+    _marker: PhantomData<A>,
 }
 
-impl NoTrace {
+impl<A> NoTraceImpl<A>
+where
+    A: Allocator,
+{
     #[inline]
     pub(super) const fn new() -> Self {
         Self {
             error: Cell::new(false),
+            _marker: PhantomData,
         }
     }
 
@@ -398,11 +438,31 @@ impl NoTrace {
     }
 }
 
-impl<A> Trace<A> for NoTrace
+/// Trace configuration indicating that tracing is fully disabled.
+#[non_exhaustive]
+pub struct NoTrace;
+
+impl TraceConfig for NoTrace {
+    type Impl<A>
+        = NoTraceImpl<A>
+    where
+        A: Clone + Allocator;
+
+    #[inline]
+    fn new_in<A>(_: A) -> Self::Impl<A>
+    where
+        A: Clone + Allocator,
+    {
+        NoTraceImpl::new()
+    }
+}
+
+impl<A> TraceImpl for NoTraceImpl<A>
 where
     A: Allocator,
 {
     type Mark = usize;
+    type Allocator = A;
 
     #[inline]
     fn clear(&self) {}
@@ -418,7 +478,7 @@ where
     }
 
     #[inline]
-    fn custom<T>(&self, alloc: &A, message: T)
+    fn custom<T>(&self, alloc: &Self::Allocator, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -427,7 +487,7 @@ where
     }
 
     #[inline]
-    fn message<T>(&self, alloc: &A, message: T)
+    fn message<T>(&self, alloc: &Self::Allocator, message: &T)
     where
         T: fmt::Display,
     {
@@ -436,7 +496,7 @@ where
     }
 
     #[inline]
-    fn marked_message<T>(&self, alloc: &A, mark: &Self::Mark, message: T)
+    fn marked_message<T>(&self, alloc: &Self::Allocator, mark: &Self::Mark, message: &T)
     where
         T: fmt::Display,
     {
@@ -446,7 +506,7 @@ where
     }
 
     #[inline]
-    fn marked_custom<T>(&self, alloc: &A, mark: &Self::Mark, message: T)
+    fn marked_custom<T>(&self, alloc: &Self::Allocator, mark: &Self::Mark, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -456,7 +516,7 @@ where
     }
 
     #[inline]
-    fn enter_named_field<T>(&self, name: &'static str, field: T)
+    fn enter_named_field<T>(&self, name: &'static str, field: &T)
     where
         T: fmt::Display,
     {
@@ -465,7 +525,7 @@ where
     }
 
     #[inline]
-    fn enter_unnamed_field<T>(&self, index: u32, field: T)
+    fn enter_unnamed_field<T>(&self, index: u32, field: &T)
     where
         T: fmt::Display,
     {
@@ -493,7 +553,7 @@ where
     fn leave_enum(&self) {}
 
     #[inline]
-    fn enter_variant<T>(&self, name: &'static str, variant: T)
+    fn enter_variant<T>(&self, name: &'static str, variant: &T)
     where
         T: fmt::Display,
     {
@@ -513,7 +573,7 @@ where
     fn leave_sequence_index(&self) {}
 
     #[inline]
-    fn enter_map_key<T>(&self, alloc: &A, field: T)
+    fn enter_map_key<T>(&self, alloc: &Self::Allocator, field: &T)
     where
         T: fmt::Display,
     {
