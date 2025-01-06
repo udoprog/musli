@@ -1,5 +1,3 @@
-use crate::Context;
-
 use super::{Decode, DecodeSliceBuilder, Decoder, SequenceDecoder};
 
 /// Default implementation to decode a slice.
@@ -7,8 +5,8 @@ use super::{Decode, DecodeSliceBuilder, Decoder, SequenceDecoder};
 pub fn default_decode_slice<'de, D, V, T>(decoder: D) -> Result<V, D::Error>
 where
     D: Decoder<'de>,
-    V: DecodeSliceBuilder<T>,
-    T: Decode<'de, D::Mode, <D::Cx as Context>::Allocator>,
+    V: DecodeSliceBuilder<T, D::Allocator>,
+    T: Decode<'de, D::Mode, D::Allocator>,
 {
     use crate::Context;
 

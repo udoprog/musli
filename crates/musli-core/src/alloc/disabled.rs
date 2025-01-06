@@ -46,6 +46,7 @@ impl<T> Alloc<T> for EmptyBuf<T> {
 ///
 /// If any operation requires allocations this will error.
 #[non_exhaustive]
+#[derive(Clone, Copy)]
 pub struct Disabled;
 
 impl Disabled {

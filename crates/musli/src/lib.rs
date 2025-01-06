@@ -376,7 +376,7 @@
 //! pub fn encode<'buf, T, A>(buf: &'buf mut [u8], value: &T, alloc: A) -> Result<&'buf [u8], Error>
 //! where
 //!     T: Encode<Packed>,
-//!     A: Clone + Allocator,
+//!     A: Allocator,
 //! {
 //!     let cx = context::new_in(alloc);
 //!     let w = ENCODING.to_slice_with(&cx, &mut buf[..], value)?;
@@ -387,7 +387,7 @@
 //! pub fn decode<'buf, T, A>(buf: &'buf [u8], alloc: A) -> Result<T, Error>
 //! where
 //!     T: Decode<'buf, Packed, A>,
-//!     A: Clone + Allocator,
+//!     A: Allocator,
 //! {
 //!     let cx = context::new_in(alloc);
 //!     ENCODING.from_slice_with(&cx, buf)

@@ -18,7 +18,6 @@ use super::ErrorMarker;
 pub struct Same<E, A>
 where
     E: ContextError<A>,
-    A: Allocator,
 {
     alloc: A,
     _marker: PhantomData<E>,
@@ -67,7 +66,7 @@ where
 impl<E, A> Context for &Same<E, A>
 where
     E: ContextError<A>,
-    A: Clone + Allocator,
+    A: Allocator,
 {
     type Error = E;
     type Mark = ();
@@ -84,7 +83,7 @@ where
 
     #[inline]
     fn alloc(self) -> Self::Allocator {
-        self.alloc.clone()
+        self.alloc
     }
 
     #[inline]

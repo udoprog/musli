@@ -2,7 +2,6 @@ use core::ffi::CStr;
 use core::fmt;
 #[cfg(feature = "std")]
 use core::hash::{BuildHasher, Hash};
-use core::marker::PhantomData;
 
 use rust_alloc::borrow::Cow;
 use rust_alloc::boxed::Box;
@@ -22,8 +21,8 @@ use std::path::{Path, PathBuf};
 
 use crate::alloc::ToOwned;
 use crate::de::{
-    Decode, DecodeBytes, DecodeSliceBuilder, DecodeTrace, Decoder, EntryDecoder, MapDecoder,
-    SequenceDecoder, UnsizedVisitor,
+    Decode, DecodeBytes, DecodeTrace, Decoder, EntryDecoder, MapDecoder, SequenceDecoder,
+    UnsizedVisitor,
 };
 use crate::en::{
     Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntryEncoder, MapEncoder,
@@ -271,129 +270,6 @@ cow! {
     |reference| Cow::Owned(rust_alloc::borrow::ToOwned::to_owned(reference)),
 }
 
-macro_rules! slice_sequence {
-    (
-        $(#[$($meta:meta)*])*
-        $cx:ident,
-        $ty:ident <T $(: $trait0:ident $(+ $trait:ident)*)? $(, $extra:ident: $extra_bound0:ident $(+ $extra_bound:ident)*)*>,
-        $insert:ident,
-        $access:ident,
-    ) => {
-        $(#[$($meta)*])*
-        impl<M, T $(, $extra)*> Encode<M> for $ty<T $(, $extra)*>
-        where
-            T: Encode<M>,
-            $($extra: $extra_bound0 $(+ $extra_bound)*),*
-        {
-            const IS_BITWISE_ENCODE: bool = false;
-
-            type Encode = Self;
-
-            #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-            where
-                E: Encoder<Mode = M>,
-            {
-                encoder.encode_slice(self)
-            }
-
-            #[inline]
-            fn as_encode(&self) -> &Self::Encode {
-                self
-            }
-        }
-
-        $(#[$($meta)*])*
-        impl<'de, M, A, T $(, $extra)*> Decode<'de, M, A> for $ty<T $(, $extra)*>
-        where
-            A: Allocator,
-            T: Decode<'de, M, A> $(+ $trait0 $(+ $trait)*)*,
-            $($extra: $extra_bound0 $(+ $extra_bound)*),*
-        {
-            const IS_BITWISE_DECODE: bool = false;
-
-            #[inline]
-            fn decode<D>(decoder: D) -> Result<Self, D::Error>
-            where
-                D: Decoder<'de, Mode = M, Allocator = A>,
-            {
-                struct Builder<'de, M, A, T $(, $extra)*>($ty<T $(, $extra)*>, PhantomData<(M, A, &'de ())>);
-
-                impl<'de, M, A, T $(, $extra)*> DecodeSliceBuilder<T> for Builder<'de, M, A, T $(, $extra)*>
-                where
-                    A: Allocator,
-                    T: Decode<'de, M, A> $(+ $trait0 $(+ $trait)*)*,
-                    $($extra: $extra_bound0 $(+ $extra_bound)*),*
-                {
-                    #[inline]
-                    fn new<C>(_: C) -> Result<Self, C::Error>
-                    where
-                        C: Context,
-                    {
-                        Ok(Builder($ty::new(), PhantomData))
-                    }
-
-                    #[inline]
-                    fn with_capacity<C>(_: C, size: usize) -> Result<Self, C::Error>
-                    where
-                        C: Context,
-                    {
-                        Ok(Builder($ty::with_capacity(size), PhantomData))
-                    }
-
-                    #[inline]
-                    fn push<C>(&mut self, _: C, value: T) -> Result<(), C::Error>
-                    where
-                        C: Context,
-                    {
-                        self.0.$insert(value);
-                        Ok(())
-                    }
-
-                    #[inline]
-                    fn reserve<C>(&mut self, _: C, capacity: usize) -> Result<(), C::Error>
-                    where
-                        C: Context,
-                    {
-                        self.0.reserve(capacity);
-                        Ok(())
-                    }
-
-                    #[inline]
-                    unsafe fn set_len(&mut self, len: usize) {
-                        self.0.set_len(len);
-                    }
-
-                    #[inline]
-                    fn as_mut_ptr(&mut self) -> *mut T {
-                        self.0.as_mut_ptr()
-                    }
-                }
-
-                let Builder(value, PhantomData) = decoder.decode_slice()?;
-                Ok(value)
-            }
-        }
-
-        $(#[$($meta)*])*
-        impl<M, T $(, $extra)*> EncodePacked<M> for $ty<T $(, $extra)*>
-        where
-            T: Encode<M>,
-            $($extra: $extra_bound0 $(+ $extra_bound)*),*
-        {
-            #[inline]
-            fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
-            where
-                E: Encoder<Mode = M>,
-            {
-                encoder.encode_pack_fn(|pack| {
-                    pack.encode_slice(self)
-                })
-            }
-        }
-    }
-}
-
 macro_rules! sequence {
     (
         $(#[$($meta:meta)*])*
@@ -505,7 +381,14 @@ macro_rules! sequence {
     }
 }
 
-slice_sequence!(cx, Vec<T>, push, seq,);
+crate::internal::macros::slice_sequence! {
+    cx,
+    Vec<T>,
+    || Vec::new(),
+    |vec, value| vec.push(value),
+    |vec, capacity| vec.reserve(capacity),
+    |size| Vec::with_capacity(size),
+}
 
 impl<M, T> Encode<M> for VecDeque<T>
 where
@@ -562,8 +445,15 @@ where
     }
 }
 
-sequence!(cx, BTreeSet<T: Ord>, insert, seq, BTreeSet::new());
-sequence!(
+sequence! {
+    cx,
+    BTreeSet<T: Ord>,
+    insert,
+    seq,
+    BTreeSet::new()
+}
+
+sequence! {
     #[cfg(feature = "std")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
     cx,
@@ -571,14 +461,15 @@ sequence!(
     insert,
     seq,
     HashSet::with_capacity_and_hasher(size_hint::cautious(seq.size_hint()), S::default())
-);
-sequence!(
+}
+
+sequence! {
     cx,
     BinaryHeap<T: Ord>,
     push,
     seq,
     BinaryHeap::with_capacity(size_hint::cautious(seq.size_hint()))
-);
+}
 
 macro_rules! map {
     (

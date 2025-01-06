@@ -319,7 +319,7 @@ where
     #[inline]
     fn decode_slice<V, T>(mut self) -> Result<V, <Self::Cx as Context>::Error>
     where
-        V: DecodeSliceBuilder<T>,
+        V: DecodeSliceBuilder<T, Self::Allocator>,
         T: Decode<'de, Self::Mode, Self::Allocator>,
     {
         // Check that the type is packed inside of the slice.

@@ -33,6 +33,29 @@ pub use self::capture::Capture;
 use crate::alloc::System;
 use crate::Allocator;
 
+/// Construct a new default context using the [`System`] allocator.
+///
+/// # Examples
+///
+/// ```
+/// use musli::context;
+///
+/// musli::alloc::default(|alloc| {
+///     let cx = context::new();
+///     let encoding = musli::json::Encoding::new();
+///     let string = encoding.to_string_with(&cx, &42)?;
+///     assert_eq!(string, "42");
+///     Ok(())
+/// })?;
+/// # Ok::<_, musli::context::ErrorMarker>(())
+/// ```
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[inline]
+pub fn new() -> DefaultContext<System, NoTrace> {
+    DefaultContext::new()
+}
+
 /// Construct a new default context using the provided allocator.
 ///
 /// # Examples
@@ -71,30 +94,7 @@ use crate::Allocator;
 #[inline]
 pub fn new_in<A>(alloc: A) -> DefaultContext<A, NoTrace>
 where
-    A: Clone + Allocator,
+    A: Allocator,
 {
     DefaultContext::new_in(alloc)
-}
-
-/// Construct a new default context using the [`System`] allocator.
-///
-/// # Examples
-///
-/// ```
-/// use musli::context;
-///
-/// musli::alloc::default(|alloc| {
-///     let cx = context::new();
-///     let encoding = musli::json::Encoding::new();
-///     let string = encoding.to_string_with(&cx, &42)?;
-///     assert_eq!(string, "42");
-///     Ok(())
-/// })?;
-/// # Ok::<_, musli::context::ErrorMarker>(())
-/// ```
-#[cfg(feature = "alloc")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-#[inline]
-pub fn new() -> DefaultContext<System, NoTrace> {
-    DefaultContext::new()
 }

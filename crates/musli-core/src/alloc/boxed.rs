@@ -6,7 +6,15 @@ use core::ops::{Deref, DerefMut};
 
 use super::{Alloc, AllocError, Allocator};
 
-/// A pointer type that uniquely owns a heap allocation of type `T`.
+/// A Müsli-allocated pointer type that uniquely owns a heap allocation of type
+/// `T`.
+///
+/// This is a [`Box`][std-box] type capable of using the allocator provided
+/// through a [`Context`]. Therefore it can be safely used in no-std
+/// environments.
+///
+/// [std-box]: std::boxed::Box
+/// [`Context`]: crate::Context
 pub struct Box<T, A>
 where
     A: Allocator,
