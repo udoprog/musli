@@ -1319,7 +1319,7 @@ pub trait Decoder<'de>: Sized {
     #[inline]
     fn decode_slice<V, T>(self) -> Result<V, <Self::Cx as Context>::Error>
     where
-        V: DecodeSliceBuilder<T>,
+        V: DecodeSliceBuilder<T, Self::Allocator>,
         T: Decode<'de, Self::Mode, Self::Allocator>,
     {
         utils::default_decode_slice(self)

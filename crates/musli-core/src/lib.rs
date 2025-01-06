@@ -16,6 +16,11 @@ extern crate alloc as rust_alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+mod expecting;
+mod impls;
+mod internal;
+mod never;
+
 pub mod alloc;
 #[doc(inline)]
 pub use self::alloc::Allocator;
@@ -34,11 +39,6 @@ pub use self::en::{Encode, Encoder};
 
 pub mod hint;
 pub mod mode;
-
-mod expecting;
-mod impls;
-mod internal;
-mod never;
 
 /// This is an attribute macro that must be used when implementing a
 /// [`Encoder`].

@@ -1,7 +1,7 @@
 use super::{Alloc, AllocError};
 
 /// An allocator that can be used in combination with a context.
-pub trait Allocator {
+pub trait Allocator: Copy {
     /// A raw allocation from the allocator.
     type Alloc<T>: Alloc<T>;
 

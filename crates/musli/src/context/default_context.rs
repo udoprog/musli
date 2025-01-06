@@ -19,7 +19,7 @@ use super::{ErrorMarker, Errors, NoTrace, Report, Trace, TraceConfig, TraceImpl}
 /// [`new_in`]: super::new_in
 pub struct DefaultContext<A, B>
 where
-    A: Clone + Allocator,
+    A: Allocator,
     B: TraceConfig,
 {
     alloc: A,
@@ -47,14 +47,13 @@ impl Default for DefaultContext<System, NoTrace> {
 
 impl<A> DefaultContext<A, NoTrace>
 where
-    A: Clone + Allocator,
+    A: Allocator,
 {
     /// Construct a new context which uses allocations to a fixed but
     /// configurable number of diagnostics.
     #[inline]
     pub(super) fn new_in(alloc: A) -> Self {
-        let trace = NoTrace::new_in(alloc.clone());
-
+        let trace = NoTrace::new_in(alloc);
         Self { alloc, trace }
     }
 
@@ -67,7 +66,7 @@ where
 
 impl<A> DefaultContext<A, Trace>
 where
-    A: Clone + Allocator,
+    A: Allocator,
 {
     /// If tracing is enabled through [`DefaultContext::with_trace`], this
     /// configured the context to visualize type information, and not just
@@ -96,7 +95,7 @@ where
 
 impl<A, B> DefaultContext<A, B>
 where
-    A: Clone + Allocator,
+    A: Allocator,
     B: TraceConfig,
 {
     /// Enable tracing through the current allocator `A`.
@@ -112,7 +111,7 @@ where
     /// [`Disabled`]: crate::alloc::Disabled
     #[inline]
     pub fn with_trace(self) -> DefaultContext<A, Trace> {
-        let trace = Trace::new_in(self.alloc.clone());
+        let trace = Trace::new_in(self.alloc);
 
         DefaultContext {
             alloc: self.alloc,
@@ -123,7 +122,7 @@ where
 
 impl<A, B> Context for &DefaultContext<A, B>
 where
-    A: Clone + Allocator,
+    A: Allocator,
     B: TraceConfig,
 {
     type Error = ErrorMarker;
@@ -137,7 +136,7 @@ where
 
     #[inline]
     fn alloc(self) -> Self::Allocator {
-        self.alloc.clone()
+        self.alloc
     }
 
     #[inline]
@@ -145,7 +144,7 @@ where
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        self.trace.custom(&self.alloc, &message);
+        self.trace.custom(self.alloc, &message);
         ErrorMarker
     }
 
@@ -154,7 +153,7 @@ where
     where
         T: fmt::Display,
     {
-        self.trace.message(&self.alloc, &message);
+        self.trace.message(self.alloc, &message);
         ErrorMarker
     }
 
@@ -163,7 +162,7 @@ where
     where
         T: fmt::Display,
     {
-        self.trace.marked_message(&self.alloc, mark, &message);
+        self.trace.marked_message(self.alloc, mark, &message);
         ErrorMarker
     }
 
@@ -172,7 +171,7 @@ where
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
-        self.trace.marked_custom(&self.alloc, mark, &message);
+        self.trace.marked_custom(self.alloc, mark, &message);
         ErrorMarker
     }
 
@@ -255,7 +254,7 @@ where
     where
         T: fmt::Display,
     {
-        self.trace.enter_map_key(&self.alloc, &field);
+        self.trace.enter_map_key(self.alloc, &field);
     }
 
     #[inline]

@@ -8,9 +8,6 @@
 use core::error::Error;
 use core::fmt;
 
-#[cfg(any(feature = "alloc", feature = "std"))]
-use crate::Allocator;
-
 #[cfg(feature = "alloc")]
 use rust_alloc::string::{String, ToString};
 
@@ -36,10 +33,7 @@ pub trait ContextError<A> {
 }
 
 #[cfg(feature = "std")]
-impl<A> ContextError<A> for std::io::Error
-where
-    A: Allocator,
-{
+impl<A> ContextError<A> for std::io::Error {
     fn custom<T>(_: A, message: T) -> Self
     where
         T: 'static + Send + Sync + Error,
@@ -56,10 +50,7 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl<A> ContextError<A> for String
-where
-    A: Allocator,
-{
+impl<A> ContextError<A> for String {
     #[inline]
     fn custom<T>(_: A, message: T) -> Self
     where

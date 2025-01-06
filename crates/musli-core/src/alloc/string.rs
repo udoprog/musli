@@ -4,8 +4,12 @@ use core::error::Error;
 use core::fmt;
 use core::ops::Deref;
 use core::str::{self, Utf8Error};
+
 #[cfg(feature = "alloc")]
 use rust_alloc::borrow::Cow;
+
+use crate::de::UnsizedVisitor;
+use crate::{Context, Decode, Decoder, Encode, Encoder};
 
 #[cfg(feature = "alloc")]
 use super::System;
@@ -28,7 +32,19 @@ where
     Ok(string)
 }
 
-/// Wrapper around a buffer that is guaranteed to be a valid utf-8 string.
+/// A Müsli-allocated UTF-8–encoded, growable string.
+///
+/// `String` is the most common string type. It has ownership over the contents
+/// of the string, stored in a heap-allocated buffer (see
+/// [Representation](#representation)). It is closely related to its borrowed
+/// counterpart, the primitive [`str`].
+///
+/// This is a [`String`][std-string] type capable of using the allocator
+/// provided through a [`Context`]. Therefore it can be safely used in no-std
+/// environments.
+///
+/// [std-string]: std::string::String
+/// [`str`]: prim@str
 pub struct String<A>
 where
     A: Allocator,
@@ -605,6 +621,19 @@ impl_eq! { String<A>, &'a str }
 #[cfg(feature = "alloc")]
 impl_eq! { Cow<'a, str>, String<A> }
 
+/// Conversion from a std [`String`][std-string] to a Müsli-allocated [`String`]
+/// in the [`System`] allocator.
+///
+/// [std-string]: rust_alloc::string::String
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::String;
+///
+/// let value = std::string::String::from("Hello World");
+/// let value2 = String::from(value);
+/// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl From<rust_alloc::string::String> for String<System> {
@@ -744,5 +773,86 @@ where
     #[must_use]
     pub fn utf8_error(&self) -> Utf8Error {
         self.error
+    }
+}
+
+impl<M, A> Encode<M> for String<A>
+where
+    A: Allocator,
+{
+    const IS_BITWISE_ENCODE: bool = false;
+
+    type Encode = str;
+
+    #[inline]
+    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    where
+        E: Encoder<Mode = M>,
+    {
+        self.as_str().encode(encoder)
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
+}
+
+/// Decode implementation for a Müsli-allocated [`String`].
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::String;
+/// use musli::{Allocator, Decode};
+///
+/// #[derive(Decode)]
+/// struct Struct<A> where A: Allocator {
+///     field: String<A>
+/// }
+/// ```
+impl<'de, M, A> Decode<'de, M, A> for String<A>
+where
+    A: Allocator,
+{
+    const IS_BITWISE_DECODE: bool = false;
+
+    #[inline]
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Mode = M, Allocator = A>,
+    {
+        struct Visitor;
+
+        impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
+        where
+            C: Context,
+        {
+            type Ok = String<C::Allocator>;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "string")
+            }
+
+            #[inline]
+            fn visit_owned(self, _: C, value: String<C::Allocator>) -> Result<Self::Ok, C::Error> {
+                Ok(value)
+            }
+
+            #[inline]
+            fn visit_borrowed(self, cx: C, string: &'de str) -> Result<Self::Ok, C::Error> {
+                self.visit_ref(cx, string)
+            }
+
+            #[inline]
+            fn visit_ref(self, cx: C, string: &str) -> Result<Self::Ok, C::Error> {
+                let mut s = String::new_in(cx.alloc());
+                s.push_str(string).map_err(cx.map())?;
+                Ok(s)
+            }
+        }
+
+        decoder.decode_string(Visitor)
     }
 }

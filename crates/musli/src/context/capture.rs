@@ -37,7 +37,7 @@ where
 impl<E, A> Capture<E, A>
 where
     E: ContextError<A>,
-    A: Clone + Allocator,
+    A: Allocator,
 {
     /// Construct a new capturing allocator.
     #[inline]
@@ -64,7 +64,7 @@ where
 impl<E, A> Context for &Capture<E, A>
 where
     E: ContextError<A>,
-    A: Clone + Allocator,
+    A: Allocator,
 {
     type Error = ErrorMarker;
     type Mark = ();
@@ -87,7 +87,7 @@ where
 
     #[inline]
     fn alloc(self) -> Self::Allocator {
-        self.alloc.clone()
+        self.alloc
     }
 
     #[inline]

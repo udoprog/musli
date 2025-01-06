@@ -6,11 +6,27 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
+use crate::de::{DecodeBytes, UnsizedVisitor};
+use crate::{Context, Decoder};
+
 #[cfg(feature = "alloc")]
 use super::System;
 use super::{Alloc, AllocError, Allocator, Disabled};
 
-/// A vector backed by an [`Allocator`].
+/// A Müsli-allocated contiguous growable array type, written as `Vec<T>`, short
+/// for 'vector'.
+///
+/// `String` is the most common string type. It has ownership over the contents
+/// of the string, stored in a heap-allocated buffer (see
+/// [Representation](#representation)). It is closely related to its borrowed
+/// counterpart, the primitive [`str`].
+///
+/// This is a [`Vec`][std-vec] type capable of using the allocator provided
+/// through a [`Context`]. Therefore it can be safely used in no-std
+/// environments.
+///
+/// [std-vec]: std::vec::Vec
+/// [`str`]: prim@str
 pub struct Vec<T, A>
 where
     A: Allocator,
@@ -147,6 +163,38 @@ where
     #[inline]
     pub fn capacity(&self) -> usize {
         self.buf.capacity()
+    }
+
+    /// Reserves capacity for at least `additional` more elements to be inserted
+    /// in the given `Vec<T>`. The collection may reserve more space to
+    /// speculatively avoid frequent reallocations. After calling `reserve`,
+    /// capacity will be greater than or equal to `self.len() + additional`.
+    /// Does nothing if capacity is already sufficient.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the new capacity exceeds `isize::MAX` _bytes_.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::{AllocError, Vec};
+    ///
+    /// musli::alloc::default(|alloc| {
+    ///     let mut vec = Vec::new_in(alloc);
+    ///     vec.push(1)?;
+    ///     vec.reserve(10)?;
+    ///     assert!(vec.capacity() >= 11);
+    ///     Ok::<_, AllocError>(())
+    /// })?;
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    pub fn reserve(&mut self, additional: usize) -> Result<(), AllocError> {
+        if size_of::<T>() != 0 {
+            self.buf.resize(self.len, additional)?;
+        }
+
+        Ok(())
     }
 
     /// Check if the buffer is empty.
@@ -377,6 +425,28 @@ where
         Self { buf, len }
     }
 
+    /// Forces the length of the vector to `new_len`.
+    ///
+    /// This is a low-level operation that maintains none of the normal
+    /// invariants of the type. Normally changing the length of a vector is done
+    /// using one of the safe operations instead, such as [`extend`], or
+    /// [`clear`].
+    ///
+    /// [`extend`]: Extend::extend
+    /// [`clear`]: Vec::clear
+    ///
+    /// # Safety
+    ///
+    /// - `new_len` must be less than or equal to [`capacity()`].
+    /// - The elements at `old_len..new_len` must be initialized.
+    ///
+    /// [`capacity()`]: Vec::capacity
+    #[inline]
+    pub unsafe fn set_len(&mut self, new_len: usize) {
+        debug_assert!(new_len <= self.capacity());
+        self.len = new_len;
+    }
+
     /// Access a reference to the raw underlying allocation.
     pub const fn raw(&self) -> &A::Alloc<T> {
         &self.buf
@@ -533,6 +603,26 @@ where
     }
 }
 
+impl<T, A> AsRef<[T]> for Vec<T, A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn as_ref(&self) -> &[T] {
+        self
+    }
+}
+
+impl<T, A> AsMut<[T]> for Vec<T, A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn as_mut(&mut self) -> &mut [T] {
+        self
+    }
+}
+
 macro_rules! impl_eq {
     ($lhs:ty, $rhs: ty) => {
         #[allow(unused_lifetimes)]
@@ -670,6 +760,19 @@ where
     }
 }
 
+/// Conversion from a std [`Vec`][std-vec] to a Müsli-allocated [`Vec`] in the
+/// [`System`] allocator.
+///
+/// [std-vec]: rust_alloc::vec::Vec
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::Vec;
+///
+/// let values = vec![1, 2, 3, 4];
+/// let values2 = Vec::from(values);
+/// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, System> {
@@ -689,4 +792,68 @@ impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, System> {
             Vec::from_raw_parts(buf, len)
         }
     }
+}
+
+/// Decode implementation for a Müsli-allocated byte array stored in a [`Vec`].
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::Vec;
+/// use musli::{Allocator, Decode};
+///
+/// #[derive(Decode)]
+/// struct Struct<A> where A: Allocator {
+///     #[musli(bytes)]
+///     field: Vec<u8, A>
+/// }
+/// ```
+impl<'de, M, A> DecodeBytes<'de, M, A> for Vec<u8, A>
+where
+    A: Allocator,
+{
+    const DECODE_BYTES_PACKED: bool = false;
+
+    #[inline]
+    fn decode_bytes<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Mode = M, Allocator = A>,
+    {
+        struct Visitor;
+
+        impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
+        where
+            C: Context,
+        {
+            type Ok = Vec<u8, C::Allocator>;
+
+            #[inline]
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "bytes")
+            }
+
+            #[inline]
+            fn visit_owned(self, _: C, value: Vec<u8, C::Allocator>) -> Result<Self::Ok, C::Error> {
+                Ok(value)
+            }
+
+            #[inline]
+            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+                let mut buf = Vec::new_in(cx.alloc());
+                buf.extend_from_slice(bytes).map_err(cx.map())?;
+                Ok(buf)
+            }
+        }
+
+        decoder.decode_bytes(Visitor)
+    }
+}
+
+crate::internal::macros::slice_sequence! {
+    cx,
+    Vec<T, A>,
+    || Vec::new_in(cx.alloc()),
+    |vec, value| vec.push(value).map_err(cx.map())?,
+    |vec, capacity| vec.reserve(capacity).map_err(cx.map())?,
+    |capacity| Vec::with_capacity_in(capacity, cx.alloc()).map_err(cx.map())?,
 }

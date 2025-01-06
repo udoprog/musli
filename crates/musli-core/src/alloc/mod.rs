@@ -1,4 +1,12 @@
-//! Traits related to memory allocation.
+//! # Müsli Rust core allocation and collections library
+//!
+//! This library provides smart pointers and collections for managing allocated
+//! values. This is similar to the Rust [`alloc`][std-alloc] crate, it provides
+//! similar but more limited functionality. However it can do so safely using
+//! the Müsli-specific [`Allocator`] trait allowing these types to be used in
+//! `no_std` environments without requiring a nightly compiler or `unsafe`.
+//!
+//! [std-alloc]: rust_alloc
 
 mod to_owned;
 #[doc(inline)]

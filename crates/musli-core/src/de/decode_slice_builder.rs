@@ -1,26 +1,30 @@
-use crate::Context;
+use crate::{Allocator, Context};
 
 /// Trait used to decode a slice into a type.
-pub trait DecodeSliceBuilder<T>: Sized {
+pub trait DecodeSliceBuilder<T, A>
+where
+    Self: Sized,
+    A: Allocator,
+{
     /// Construct a new empty container.
     fn new<C>(cx: C) -> Result<Self, C::Error>
     where
-        C: Context;
+        C: Context<Allocator = A>;
 
     /// Construct a new container with the given capacity hint.
-    fn with_capacity<C>(cx: C, hint: usize) -> Result<Self, C::Error>
+    fn with_capacity<C>(cx: C, capacity: usize) -> Result<Self, C::Error>
     where
-        C: Context;
+        C: Context<Allocator = A>;
 
     /// Push a value into the container.
     fn push<C>(&mut self, cx: C, value: T) -> Result<(), C::Error>
     where
-        C: Context;
+        C: Context<Allocator = A>;
 
     /// Reserve additional space for `capacity` elements in the collection.
     fn reserve<C>(&mut self, cx: C, capacity: usize) -> Result<(), C::Error>
     where
-        C: Context;
+        C: Context<Allocator = A>;
 
     /// Mark the given length as initialized.
     ///
