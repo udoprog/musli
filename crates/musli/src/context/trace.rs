@@ -2,7 +2,6 @@
 
 use core::cell::{Cell, UnsafeCell};
 use core::fmt;
-use core::marker::PhantomData;
 use core::mem::take;
 use core::ops::Range;
 use core::slice;
@@ -16,13 +15,13 @@ mod sealed {
 
     pub trait Sealed {}
     impl<A> Sealed for super::WithTraceImpl<A> where A: Allocator {}
-    impl<A> Sealed for super::NoTraceImpl<A> where A: Allocator {}
+    impl Sealed for super::NoTraceImpl {}
     impl Sealed for super::Trace {}
     impl Sealed for super::NoTrace {}
 }
 
-/// Trait for marker types indicating the tracing configuration.
-pub trait TraceConfig
+/// Trait for marker types indicating the tracing mode to use.
+pub trait TraceMode
 where
     Self: self::sealed::Sealed,
 {
@@ -132,7 +131,7 @@ where
 #[non_exhaustive]
 pub struct Trace;
 
-impl TraceConfig for Trace {
+impl TraceMode for Trace {
     type Impl<A>
         = WithTraceImpl<A>
     where
@@ -415,29 +414,8 @@ where
     }
 }
 
-pub struct NoTraceImpl<A> {
-    /// Simple indicator whether an error has or has not occured.
-    error: Cell<bool>,
-    _marker: PhantomData<A>,
-}
-
-impl<A> NoTraceImpl<A>
-where
-    A: Allocator,
-{
-    #[inline]
-    pub(super) const fn new() -> Self {
-        Self {
-            error: Cell::new(false),
-            _marker: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub(super) fn is_error(&self) -> bool {
-        self.error.get()
-    }
-}
+#[non_exhaustive]
+pub struct NoTraceImpl;
 
 /// Trace configuration indicating that tracing is fully disabled.
 ///
@@ -448,9 +426,9 @@ where
 #[non_exhaustive]
 pub struct NoTrace;
 
-impl TraceConfig for NoTrace {
+impl TraceMode for NoTrace {
     type Impl<A>
-        = NoTraceImpl<A>
+        = NoTraceImpl
     where
         A: Allocator;
 
@@ -459,23 +437,21 @@ impl TraceConfig for NoTrace {
     where
         A: Allocator,
     {
-        NoTraceImpl::new()
+        NoTraceImpl
     }
 }
 
-impl<A> TraceImpl<A> for NoTraceImpl<A>
+impl<A> TraceImpl<A> for NoTraceImpl
 where
     A: Allocator,
 {
-    type Mark = usize;
+    type Mark = ();
 
     #[inline]
     fn clear(&self) {}
 
     #[inline]
-    fn mark(&self) -> Self::Mark {
-        0
-    }
+    fn mark(&self) -> Self::Mark {}
 
     #[inline]
     fn advance(&self, n: usize) {

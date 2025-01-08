@@ -7,19 +7,19 @@ use super::{ContextError, ErrorMarker};
 
 mod sealed {
     pub trait Sealed {}
-    impl Sealed for super::NoCapture {}
-    impl<E, A> Sealed for super::CaptureError<E, A> {}
-    impl<E, A> Sealed for super::SameError<E, A> {}
+    impl Sealed for super::Ignore {}
+    impl<E> Sealed for super::Capture<E> {}
+    impl<E> Sealed for super::Emit<E> {}
 }
 
 /// The trait governing how error capture is implemented.
 ///
-/// See [`DefaultContext::with_capture`] or [`DefaultContext::with_same`] for
+/// See [`DefaultContext::with_capture`] or [`DefaultContext::with_error`] for
 /// more information.
 ///
 /// [`DefaultContext::with_capture`]: super::DefaultContext::with_capture
-/// [`DefaultContext::with_same`]: super::DefaultContext::with_same
-pub trait Capture<A>
+/// [`DefaultContext::with_error`]: super::DefaultContext::with_error
+pub trait ErrorMode<A>
 where
     Self: self::sealed::Sealed,
 {
@@ -41,10 +41,24 @@ where
 }
 
 /// Disable error capture.
+///
+/// The error produced will be an [`ErrorMarker`] which is a zero-sized
+/// placeholder type.
+///
+/// To capture an error, use [`with_capture::<E>`]. To produce an error see
+/// [`with_error::<E>`].
+///
+/// This is the default behavior you get when calling [`new`] or [`new_in`].
+///
+/// [`with_capture::<E>`]: super::DefaultContext::with_capture
+/// [`with_error::<E>`]: super::DefaultContext::with_error
+///
+/// [`new`]: super::new
+/// [`new_in`]: super::new_in
 #[non_exhaustive]
-pub struct NoCapture;
+pub struct Ignore;
 
-impl<A> Capture<A> for NoCapture {
+impl<A> ErrorMode<A> for Ignore {
     type Error = ErrorMarker;
 
     #[inline]
@@ -71,16 +85,16 @@ impl<A> Capture<A> for NoCapture {
     }
 }
 
-/// Capture an error of the specified type.
+/// Emit an error of the specified type `E`.
 ///
-/// See [`DefaultContext::with_same`] for more information.
+/// See [`DefaultContext::with_error`] for more information.
 ///
-/// [`DefaultContext::with_same`]: super::DefaultContext::with_same
-pub struct SameError<E, A> {
-    _marker: PhantomData<(E, A)>,
+/// [`DefaultContext::with_error`]: super::DefaultContext::with_error
+pub struct Emit<E> {
+    _marker: PhantomData<E>,
 }
 
-impl<E, A> SameError<E, A> {
+impl<E> Emit<E> {
     #[inline]
     pub(super) fn new() -> Self {
         Self {
@@ -89,7 +103,7 @@ impl<E, A> SameError<E, A> {
     }
 }
 
-impl<E, A> Capture<A> for SameError<E, A>
+impl<E, A> ErrorMode<A> for Emit<E>
 where
     E: ContextError<A>,
 {
@@ -115,27 +129,25 @@ where
     }
 }
 
-/// Capture an error of the specified type.
+/// Capture an error of the specified type `E`.
 ///
 /// See [`DefaultContext::with_capture`] for more information.
 ///
 /// [`DefaultContext::with_capture`]: super::DefaultContext::with_capture
-pub struct CaptureError<E, A> {
+pub struct Capture<E> {
     error: UnsafeCell<Option<E>>,
-    _marker: PhantomData<A>,
 }
 
-impl<E, A> CaptureError<E, A> {
+impl<E> Capture<E> {
     #[inline]
     pub(super) fn new() -> Self {
         Self {
             error: UnsafeCell::new(None),
-            _marker: PhantomData,
         }
     }
 }
 
-impl<E, A> CaptureError<E, A> {
+impl<E> Capture<E> {
     #[inline]
     pub(super) fn unwrap(&self) -> E {
         // SAFETY: We're restricting access to the context, so that this is
@@ -161,7 +173,7 @@ impl<E, A> CaptureError<E, A> {
     }
 }
 
-impl<E, A> Capture<A> for CaptureError<E, A>
+impl<E, A> ErrorMode<A> for Capture<E>
 where
     E: ContextError<A>,
 {

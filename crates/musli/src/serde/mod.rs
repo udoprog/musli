@@ -143,21 +143,98 @@ where
     }
 
     #[inline]
-    fn custom<T>(self, error: T) -> Self::Error
+    fn custom<E>(self, error: E) -> Self::Error
     where
-        T: 'static + Send + Sync + Error,
+        E: 'static + Send + Sync + Error,
     {
         *self.error.borrow_mut() = Some(self.inner.custom(error));
         error::SerdeError::Captured
     }
 
     #[inline]
-    fn message<T>(self, message: T) -> Self::Error
+    fn message<M>(self, message: M) -> Self::Error
     where
-        T: fmt::Display,
+        M: fmt::Display,
     {
         *self.error.borrow_mut() = Some(self.inner.message(message));
         error::SerdeError::Captured
+    }
+
+    #[inline]
+    fn enter_struct(self, type_name: &'static str) {
+        self.inner.enter_struct(type_name);
+    }
+
+    #[inline]
+    fn leave_struct(self) {
+        self.inner.leave_struct();
+    }
+
+    #[inline]
+    fn enter_enum(self, type_name: &'static str) {
+        self.inner.enter_enum(type_name);
+    }
+
+    #[inline]
+    fn leave_enum(self) {
+        self.inner.leave_enum();
+    }
+
+    #[inline]
+    fn enter_named_field<F>(self, type_name: &'static str, field: F)
+    where
+        F: fmt::Display,
+    {
+        self.inner.enter_named_field(type_name, field);
+    }
+
+    #[inline]
+    fn enter_unnamed_field<F>(self, index: u32, name: F)
+    where
+        F: fmt::Display,
+    {
+        self.inner.enter_unnamed_field(index, name);
+    }
+
+    #[inline]
+    fn leave_field(self) {
+        self.inner.leave_field();
+    }
+
+    #[inline]
+    fn enter_variant<V>(self, type_name: &'static str, tag: V)
+    where
+        V: fmt::Display,
+    {
+        self.inner.enter_variant(type_name, tag);
+    }
+
+    #[inline]
+    fn leave_variant(self) {
+        self.inner.leave_variant();
+    }
+
+    #[inline]
+    fn enter_map_key<K>(self, field: K)
+    where
+        K: fmt::Display,
+    {
+        self.inner.enter_map_key(field);
+    }
+
+    #[inline]
+    fn leave_map_key(self) {
+        self.inner.leave_map_key();
+    }
+
+    #[inline]
+    fn enter_sequence_index(self, index: usize) {
+        self.inner.enter_sequence_index(index);
+    }
+
+    #[inline]
+    fn leave_sequence_index(self) {
+        self.inner.leave_sequence_index();
     }
 }
 
