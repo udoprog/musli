@@ -57,7 +57,7 @@ fn test_continuation_encoding() {
     {
         crate::alloc::default(|alloc| {
             let mut out = Vec::new();
-            let cx = crate::context::Same::with_marker(alloc);
+            let cx = crate::context::new_in(alloc);
             c::encode(&cx, crate::wrap::wrap(&mut out), value).unwrap();
             out
         })

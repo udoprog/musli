@@ -220,7 +220,7 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        let cx = crate::context::Same::new();
+        let cx = crate::context::new().with_same();
         self.to_string_with(&cx, value)
     }
 
@@ -236,7 +236,6 @@ where
     /// use musli::{Decode, Encode};
     /// use musli::json;
     /// use musli::alloc::System;
-    /// use musli::context::Same;
     /// # use musli::json::Error;
     ///
     /// const ENCODING: json::Encoding = json::Encoding::new();
@@ -247,7 +246,7 @@ where
     ///     age: u32,
     /// }
     ///
-    /// let cx = Same::new();
+    /// let cx = musli::context::new().with_same();
     ///
     /// let mut data = ENCODING.to_string_with(&cx, &Person {
     ///     name: "Aristotle".to_string(),

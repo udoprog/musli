@@ -19,7 +19,6 @@ impl fmt::Display for ErrorMarker {
 
 impl core::error::Error for ErrorMarker {}
 
-#[cfg(test)]
 impl<A> crate::context::ContextError<A> for ErrorMarker
 where
     A: crate::Allocator,

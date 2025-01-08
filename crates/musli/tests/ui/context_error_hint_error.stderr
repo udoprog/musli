@@ -1,37 +1,15 @@
-warning: unused import: `musli::mode::Binary`
- --> tests/ui/context_error_hint_error.rs:4:5
-  |
-4 | use musli::mode::Binary;
-  |     ^^^^^^^^^^^^^^^^^^^
-  |
-  = note: `#[warn(unused_imports)]` on by default
-
-error[E0599]: the function or associated item `new` exists for struct `Capture<MyError, _>`, but its trait bounds were not satisfied
-  --> tests/ui/context_error_hint_error.rs:16:38
-   |
-7  | struct MyError;
-   | -------------- doesn't satisfy `MyError: ContextError<musli::alloc::System>`
-...
-16 |     let _cx = Capture::<MyError, _>::new();
-   |                                      ^^^ function or associated item cannot be called on `Capture<MyError, _>` due to unsatisfied trait bounds
-   |
-   = note: the following trait bounds were not satisfied:
-           `MyError: ContextError<musli::alloc::System>`
-note: the trait `ContextError` must be implemented
-  --> src/context/context_error.rs
-   |
-   | pub trait ContextError<A> {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^
-
 error[E0277]: `ContextError` must be implemented for `MyError`, or any error type captured by custom contexts
-  --> tests/ui/context_error_hint_error.rs:16:15
+  --> tests/ui/context_error_hint_error.rs:15:45
    |
-16 |     let _cx = Capture::<MyError, _>::new();
-   |               ^^^^^^^^^^^^^^^^^^^^^ the trait `ContextError<_>` is not implemented for `MyError`
+15 |     let _cx = context::new().with_capture::<MyError>();
+   |                              ------------   ^^^^^^^ the trait `ContextError<musli::alloc::System>` is not implemented for `MyError`
+   |                              |
+   |                              required by a bound introduced by this call
    |
    = note: use `musli::context::ErrorMarker` to ignore errors
    = note: use `std::io::Error` and `std::string::String`, if the `std` or `alloc` features are enabled for `musli`
    = help: the following other types implement trait `ContextError<A>`:
+             ErrorMarker
              musli::descriptive::Error<A>
              musli::json::Error<A>
              musli::packed::Error<A>
@@ -40,11 +18,11 @@ error[E0277]: `ContextError` must be implemented for `MyError`, or any error typ
              musli::wire::Error<A>
              std::io::Error
              std::string::String
-note: required by a bound in `musli::context::Capture`
-  --> src/context/capture.rs
+note: required by a bound in `DefaultContext::<A, B, C>::with_capture`
+  --> src/context/default_context.rs
    |
-   | pub struct Capture<E, A>
-   |            ------- required by a bound in this struct
-   | where
-   |     E: ContextError<A>,
-   |        ^^^^^^^^^^^^^^^ required by this bound in `Capture`
+   |     pub fn with_capture<E>(self) -> DefaultContext<A, B, CaptureError<E, A>>
+   |            ------------ required by a bound in this associated function
+   |     where
+   |         E: ContextError<A>,
+   |            ^^^^^^^^^^^^^^^ required by this bound in `DefaultContext::<A, B, C>::with_capture`
