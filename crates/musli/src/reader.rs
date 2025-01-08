@@ -22,7 +22,10 @@ mod sealed {
 }
 
 /// Coerce a type into a [`Reader`].
-pub trait IntoReader<'de>: self::sealed::Sealed {
+pub trait IntoReader<'de>
+where
+    Self: self::sealed::Sealed,
+{
     /// The reader type.
     type Reader: Reader<'de>;
 
@@ -34,7 +37,10 @@ pub trait IntoReader<'de>: self::sealed::Sealed {
 ///
 /// This requires the reader to be able to hand out contiguous references to the
 /// byte source through [`Reader::read_bytes`].
-pub trait Reader<'de>: self::sealed::Sealed {
+pub trait Reader<'de>
+where
+    Self: self::sealed::Sealed,
+{
     /// Type borrowed from self.
     ///
     /// Why oh why would we want to do this over having a simple `&'this mut T`?

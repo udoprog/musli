@@ -22,9 +22,12 @@ mod sealed {
 }
 
 /// Trait for marker types indicating the tracing configuration.
-pub trait TraceConfig: self::sealed::Sealed {
+pub trait TraceConfig
+where
+    Self: self::sealed::Sealed,
+{
     #[doc(hidden)]
-    type Impl<A>: TraceImpl<Allocator = A>
+    type Impl<A>: TraceImpl<A>
     where
         A: Allocator;
 
@@ -34,15 +37,15 @@ pub trait TraceConfig: self::sealed::Sealed {
         A: Allocator;
 }
 
-/// The trait governing tracing in a default context.
-pub trait TraceImpl
+/// The trait governing how tracing works in a [`DefaultContext`].
+///
+/// [`DefaultContext`]: super::DefaultContext
+pub trait TraceImpl<A>
 where
-    Self: Sized + self::sealed::Sealed,
+    Self: self::sealed::Sealed,
 {
     #[doc(hidden)]
     type Mark;
-    #[doc(hidden)]
-    type Allocator: Allocator;
 
     #[doc(hidden)]
     fn clear(&self);
@@ -54,22 +57,22 @@ where
     fn mark(&self) -> Self::Mark;
 
     #[doc(hidden)]
-    fn custom<T>(&self, alloc: Self::Allocator, message: &T)
+    fn custom<T>(&self, alloc: A, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug;
 
     #[doc(hidden)]
-    fn message<T>(&self, alloc: Self::Allocator, message: &T)
+    fn message<T>(&self, alloc: A, message: &T)
     where
         T: fmt::Display;
 
     #[doc(hidden)]
-    fn marked_message<T>(&self, alloc: Self::Allocator, mark: &Self::Mark, message: &T)
+    fn marked_message<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: fmt::Display;
 
     #[doc(hidden)]
-    fn marked_custom<T>(&self, alloc: Self::Allocator, mark: &Self::Mark, message: &T)
+    fn marked_custom<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug;
 
@@ -113,7 +116,7 @@ where
     fn leave_sequence_index(&self);
 
     #[doc(hidden)]
-    fn enter_map_key<T>(&self, alloc: Self::Allocator, field: &T)
+    fn enter_map_key<T>(&self, alloc: A, field: &T)
     where
         T: fmt::Display;
 
@@ -122,6 +125,10 @@ where
 }
 
 /// Marker type indicating that tracing is enabled.
+///
+/// See [`DefaultContext::with_trace`] for more information.
+///
+/// [`DefaultContext::with_trace`]: super::DefaultContext::with_trace
 #[non_exhaustive]
 pub struct Trace;
 
@@ -255,12 +262,11 @@ where
     }
 }
 
-impl<A> TraceImpl for WithTraceImpl<A>
+impl<A> TraceImpl<A> for WithTraceImpl<A>
 where
     A: Allocator,
 {
     type Mark = usize;
-    type Allocator = A;
 
     #[inline]
     fn clear(&self) {
@@ -285,7 +291,7 @@ where
     }
 
     #[inline]
-    fn custom<T>(&self, alloc: Self::Allocator, message: &T)
+    fn custom<T>(&self, alloc: A, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -295,7 +301,7 @@ where
     }
 
     #[inline]
-    fn message<T>(&self, alloc: Self::Allocator, message: &T)
+    fn message<T>(&self, alloc: A, message: &T)
     where
         T: fmt::Display,
     {
@@ -305,7 +311,7 @@ where
     }
 
     #[inline]
-    fn marked_message<T>(&self, alloc: Self::Allocator, mark: &Self::Mark, message: &T)
+    fn marked_message<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: fmt::Display,
     {
@@ -315,7 +321,7 @@ where
     }
 
     #[inline]
-    fn marked_custom<T>(&self, alloc: Self::Allocator, mark: &Self::Mark, message: &T)
+    fn marked_custom<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -394,7 +400,7 @@ where
     }
 
     #[inline]
-    fn enter_map_key<T>(&self, alloc: Self::Allocator, field: &T)
+    fn enter_map_key<T>(&self, alloc: A, field: &T)
     where
         T: fmt::Display,
     {
@@ -434,6 +440,11 @@ where
 }
 
 /// Trace configuration indicating that tracing is fully disabled.
+///
+/// This is the default behavior you get when calling [`new`] or [`new_in`].
+///
+/// [`new`]: super::new
+/// [`new_in`]: super::new_in
 #[non_exhaustive]
 pub struct NoTrace;
 
@@ -452,12 +463,11 @@ impl TraceConfig for NoTrace {
     }
 }
 
-impl<A> TraceImpl for NoTraceImpl<A>
+impl<A> TraceImpl<A> for NoTraceImpl<A>
 where
     A: Allocator,
 {
     type Mark = usize;
-    type Allocator = A;
 
     #[inline]
     fn clear(&self) {}
@@ -473,7 +483,7 @@ where
     }
 
     #[inline]
-    fn custom<T>(&self, alloc: Self::Allocator, message: &T)
+    fn custom<T>(&self, alloc: A, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -482,7 +492,7 @@ where
     }
 
     #[inline]
-    fn message<T>(&self, alloc: Self::Allocator, message: &T)
+    fn message<T>(&self, alloc: A, message: &T)
     where
         T: fmt::Display,
     {
@@ -491,7 +501,7 @@ where
     }
 
     #[inline]
-    fn marked_message<T>(&self, alloc: Self::Allocator, mark: &Self::Mark, message: &T)
+    fn marked_message<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: fmt::Display,
     {
@@ -501,7 +511,7 @@ where
     }
 
     #[inline]
-    fn marked_custom<T>(&self, alloc: Self::Allocator, mark: &Self::Mark, message: &T)
+    fn marked_custom<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -568,7 +578,7 @@ where
     fn leave_sequence_index(&self) {}
 
     #[inline]
-    fn enter_map_key<T>(&self, alloc: Self::Allocator, field: &T)
+    fn enter_map_key<T>(&self, alloc: A, field: &T)
     where
         T: fmt::Display,
     {

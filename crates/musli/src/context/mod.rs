@@ -9,13 +9,17 @@ mod trace;
 #[doc(inline)]
 pub use self::trace::{Error, Errors, NoTrace, Report, Trace, TraceConfig, TraceImpl};
 
+mod capture;
+#[doc(inline)]
+pub use self::capture::{Capture, CaptureError, NoCapture, SameError};
+
 mod error_marker;
 #[doc(inline)]
 pub use self::error_marker::ErrorMarker;
 
 mod default_context;
 #[doc(inline)]
-pub use self::default_context::{DefaultContext, NoCapture};
+pub use self::default_context::DefaultContext;
 
 mod context_error;
 #[doc(inline)]
