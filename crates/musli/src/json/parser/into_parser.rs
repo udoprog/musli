@@ -11,7 +11,10 @@ mod sealed {
 }
 
 /// Trait for types which can be converted into a [`Parser`].
-pub trait IntoParser<'de>: self::sealed::Sealed {
+pub trait IntoParser<'de>
+where
+    Self: self::sealed::Sealed,
+{
     /// The parser type being converted into.
     type Parser: Parser<'de>;
 

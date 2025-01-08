@@ -34,6 +34,7 @@ pub trait ContextError<A> {
 
 #[cfg(feature = "std")]
 impl<A> ContextError<A> for std::io::Error {
+    #[inline]
     fn custom<T>(_: A, message: T) -> Self
     where
         T: 'static + Send + Sync + Error,
@@ -41,6 +42,7 @@ impl<A> ContextError<A> for std::io::Error {
         std::io::Error::new(std::io::ErrorKind::Other, message)
     }
 
+    #[inline]
     fn message<T>(_: A, message: T) -> Self
     where
         T: fmt::Display,

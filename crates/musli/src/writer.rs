@@ -23,7 +23,10 @@ mod sealed {
 }
 
 /// Coerce a type into a [`Writer`].
-pub trait IntoWriter: self::sealed::Sealed {
+pub trait IntoWriter
+where
+    Self: self::sealed::Sealed,
+{
     /// The output of the writer which will be returned after writing.
     type Ok;
 

@@ -1,155 +1,14 @@
-use core::cell::UnsafeCell;
 use core::error::Error;
 use core::fmt;
-use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
 use crate::{Allocator, Context};
 
-use super::{ContextError, ErrorMarker, Errors, NoTrace, Report, Trace, TraceConfig, TraceImpl};
-
-/// The trait implementing how an error is captured.
-pub trait Capture<A>
-where
-    A: Allocator,
-{
-    #[doc(hidden)]
-    type Error;
-
-    #[doc(hidden)]
-    fn clear(&self);
-
-    #[doc(hidden)]
-    fn message<T>(&self, alloc: A, message: T) -> Self::Error
-    where
-        T: fmt::Display;
-
-    #[doc(hidden)]
-    fn custom<T>(&self, alloc: A, error: T) -> Self::Error
-    where
-        T: 'static + Send + Sync + Error;
-}
-
-/// Disable error capture.
-#[non_exhaustive]
-pub struct NoCapture;
-
-impl<A> Capture<A> for NoCapture
-where
-    A: Allocator,
-{
-    type Error = ErrorMarker;
-
-    #[inline]
-    fn clear(&self) {}
-
-    #[inline]
-    fn message<T>(&self, alloc: A, message: T) -> Self::Error
-    where
-        T: fmt::Display,
-    {
-        _ = alloc;
-        _ = message;
-        ErrorMarker
-    }
-
-    #[inline]
-    fn custom<T>(&self, alloc: A, error: T) -> Self::Error
-    where
-        T: 'static + Send + Sync + Error,
-    {
-        _ = alloc;
-        _ = error;
-        ErrorMarker
-    }
-}
-
-/// Capture an error of the specified type.
-pub struct SameError<E, A>
-where
-    A: Allocator,
-{
-    _marker: PhantomData<(E, A)>,
-}
-
-impl<E, A> Capture<A> for SameError<E, A>
-where
-    E: ContextError<A>,
-    A: Allocator,
-{
-    type Error = E;
-
-    #[inline]
-    fn clear(&self) {}
-
-    #[inline]
-    fn message<T>(&self, alloc: A, message: T) -> Self::Error
-    where
-        T: fmt::Display,
-    {
-        E::message(alloc, message)
-    }
-
-    #[inline]
-    fn custom<T>(&self, alloc: A, error: T) -> Self::Error
-    where
-        T: 'static + Send + Sync + Error,
-    {
-        E::custom(alloc, error)
-    }
-}
-
-/// Capture an error of the specified type.
-pub struct CaptureError<E, A> {
-    error: UnsafeCell<Option<E>>,
-    _marker: PhantomData<A>,
-}
-
-impl<E, A> Capture<A> for CaptureError<E, A>
-where
-    E: ContextError<A>,
-    A: Allocator,
-{
-    type Error = ErrorMarker;
-
-    #[inline]
-    fn clear(&self) {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            (*self.error.get()) = None;
-        }
-    }
-
-    #[inline]
-    fn message<T>(&self, alloc: A, message: T) -> Self::Error
-    where
-        T: fmt::Display,
-    {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            (*self.error.get()) = Some(E::message(alloc, message));
-        }
-
-        ErrorMarker
-    }
-
-    #[inline]
-    fn custom<T>(&self, alloc: A, error: T) -> Self::Error
-    where
-        T: 'static + Send + Sync + Error,
-    {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            (*self.error.get()) = Some(E::custom(alloc, error));
-        }
-
-        ErrorMarker
-    }
-}
+use super::{
+    Capture, CaptureError, ContextError, Errors, NoCapture, NoTrace, Report, SameError, Trace,
+    TraceConfig, TraceImpl,
+};
 
 /// The default context which uses an allocator to track the location of errors.
 ///
@@ -318,10 +177,7 @@ where
         DefaultContext {
             alloc: self.alloc,
             trace: self.trace,
-            capture: CaptureError {
-                error: UnsafeCell::new(None),
-                _marker: PhantomData,
-            },
+            capture: CaptureError::new(),
         }
     }
 
@@ -368,9 +224,7 @@ where
         DefaultContext {
             alloc: self.alloc,
             trace: self.trace,
-            capture: SameError {
-                _marker: PhantomData,
-            },
+            capture: SameError::new(),
         }
     }
 }
@@ -384,27 +238,13 @@ where
     /// Unwrap the error marker or panic if there is no error.
     #[inline]
     pub fn unwrap(&self) -> E {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            match (*self.capture.error.get()).take() {
-                Some(error) => error,
-                None => panic!("no error captured"),
-            }
-        }
+        self.capture.unwrap()
     }
 
     /// Coerce a captured error into a result.
     #[inline]
     pub fn result(&self) -> Result<(), E> {
-        // SAFETY: We're restricting access to the context, so that this is
-        // safe.
-        unsafe {
-            match (*self.capture.error.get()).take() {
-                Some(error) => Err(error),
-                None => Ok(()),
-            }
-        }
+        self.capture.result()
     }
 }
 
@@ -415,7 +255,7 @@ where
     C: Capture<A>,
 {
     type Error = C::Error;
-    type Mark = <<B as TraceConfig>::Impl<A> as TraceImpl>::Mark;
+    type Mark = <<B as TraceConfig>::Impl<A> as TraceImpl<A>>::Mark;
     type Allocator = A;
 
     #[inline]
