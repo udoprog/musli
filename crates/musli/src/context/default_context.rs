@@ -1,10 +1,155 @@
+use core::cell::UnsafeCell;
+use core::error::Error;
 use core::fmt;
+use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
 use crate::{Allocator, Context};
 
-use super::{ErrorMarker, Errors, NoTrace, Report, Trace, TraceConfig, TraceImpl};
+use super::{ContextError, ErrorMarker, Errors, NoTrace, Report, Trace, TraceConfig, TraceImpl};
+
+/// The trait implementing how an error is captured.
+pub trait Capture<A>
+where
+    A: Allocator,
+{
+    #[doc(hidden)]
+    type Error;
+
+    #[doc(hidden)]
+    fn clear(&self);
+
+    #[doc(hidden)]
+    fn message<T>(&self, alloc: A, message: T) -> Self::Error
+    where
+        T: fmt::Display;
+
+    #[doc(hidden)]
+    fn custom<T>(&self, alloc: A, error: T) -> Self::Error
+    where
+        T: 'static + Send + Sync + Error;
+}
+
+/// Disable error capture.
+#[non_exhaustive]
+pub struct NoCapture;
+
+impl<A> Capture<A> for NoCapture
+where
+    A: Allocator,
+{
+    type Error = ErrorMarker;
+
+    #[inline]
+    fn clear(&self) {}
+
+    #[inline]
+    fn message<T>(&self, alloc: A, message: T) -> Self::Error
+    where
+        T: fmt::Display,
+    {
+        _ = alloc;
+        _ = message;
+        ErrorMarker
+    }
+
+    #[inline]
+    fn custom<T>(&self, alloc: A, error: T) -> Self::Error
+    where
+        T: 'static + Send + Sync + Error,
+    {
+        _ = alloc;
+        _ = error;
+        ErrorMarker
+    }
+}
+
+/// Capture an error of the specified type.
+pub struct SameError<E, A>
+where
+    A: Allocator,
+{
+    _marker: PhantomData<(E, A)>,
+}
+
+impl<E, A> Capture<A> for SameError<E, A>
+where
+    E: ContextError<A>,
+    A: Allocator,
+{
+    type Error = E;
+
+    #[inline]
+    fn clear(&self) {}
+
+    #[inline]
+    fn message<T>(&self, alloc: A, message: T) -> Self::Error
+    where
+        T: fmt::Display,
+    {
+        E::message(alloc, message)
+    }
+
+    #[inline]
+    fn custom<T>(&self, alloc: A, error: T) -> Self::Error
+    where
+        T: 'static + Send + Sync + Error,
+    {
+        E::custom(alloc, error)
+    }
+}
+
+/// Capture an error of the specified type.
+pub struct CaptureError<E, A> {
+    error: UnsafeCell<Option<E>>,
+    _marker: PhantomData<A>,
+}
+
+impl<E, A> Capture<A> for CaptureError<E, A>
+where
+    E: ContextError<A>,
+    A: Allocator,
+{
+    type Error = ErrorMarker;
+
+    #[inline]
+    fn clear(&self) {
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            (*self.error.get()) = None;
+        }
+    }
+
+    #[inline]
+    fn message<T>(&self, alloc: A, message: T) -> Self::Error
+    where
+        T: fmt::Display,
+    {
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            (*self.error.get()) = Some(E::message(alloc, message));
+        }
+
+        ErrorMarker
+    }
+
+    #[inline]
+    fn custom<T>(&self, alloc: A, error: T) -> Self::Error
+    where
+        T: 'static + Send + Sync + Error,
+    {
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            (*self.error.get()) = Some(E::custom(alloc, error));
+        }
+
+        ErrorMarker
+    }
+}
 
 /// The default context which uses an allocator to track the location of errors.
 ///
@@ -17,18 +162,19 @@ use super::{ErrorMarker, Errors, NoTrace, Report, Trace, TraceConfig, TraceImpl}
 ///
 /// [`new`]: super::new
 /// [`new_in`]: super::new_in
-pub struct DefaultContext<A, B>
+pub struct DefaultContext<A, B, C>
 where
     A: Allocator,
     B: TraceConfig,
 {
     alloc: A,
     trace: B::Impl<A>,
+    capture: C,
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl DefaultContext<System, NoTrace> {
+impl DefaultContext<System, NoTrace, NoCapture> {
     /// Construct the default context which uses the [`System`] allocator for
     /// memory.
     #[inline]
@@ -38,14 +184,14 @@ impl DefaultContext<System, NoTrace> {
 }
 
 #[cfg(feature = "alloc")]
-impl Default for DefaultContext<System, NoTrace> {
+impl Default for DefaultContext<System, NoTrace, NoCapture> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<A> DefaultContext<A, NoTrace>
+impl<A> DefaultContext<A, NoTrace, NoCapture>
 where
     A: Allocator,
 {
@@ -54,17 +200,21 @@ where
     #[inline]
     pub(super) fn new_in(alloc: A) -> Self {
         let trace = NoTrace::new_in(alloc);
-        Self { alloc, trace }
+        Self {
+            alloc,
+            trace,
+            capture: NoCapture,
+        }
     }
 
     /// Unwrap the error marker or panic if there is no error.
     #[inline]
-    pub fn unwrap(self) -> ErrorMarker {
-        self.trace.unwrap()
+    pub fn is_error(self) -> bool {
+        self.trace.is_error()
     }
 }
 
-impl<A> DefaultContext<A, Trace>
+impl<A, C> DefaultContext<A, Trace, C>
 where
     A: Allocator,
 {
@@ -93,10 +243,11 @@ where
     }
 }
 
-impl<A, B> DefaultContext<A, B>
+impl<A, B, C> DefaultContext<A, B, C>
 where
     A: Allocator,
     B: TraceConfig,
+    C: Capture<A>,
 {
     /// Enable tracing through the current allocator `A`.
     ///
@@ -110,28 +261,167 @@ where
     /// [`errors`]: DefaultContext::errors
     /// [`Disabled`]: crate::alloc::Disabled
     #[inline]
-    pub fn with_trace(self) -> DefaultContext<A, Trace> {
+    pub fn with_trace(self) -> DefaultContext<A, Trace, C> {
         let trace = Trace::new_in(self.alloc);
 
         DefaultContext {
             alloc: self.alloc,
             trace,
+            capture: self.capture,
+        }
+    }
+
+    /// Capture the specified error type.
+    ///
+    /// This gives access to the last captured error through
+    /// [`DefaultContext::unwrap`] and [`DefaultContext::result`].
+    ///
+    /// Capturing instead of forwarding the error might be beneficial if the
+    /// error type is large.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Decode, Encode};
+    /// use musli::alloc::System;
+    /// use musli::context;
+    /// use musli::json::{Encoding, Error};
+    ///
+    /// const ENCODING: Encoding = Encoding::new();
+    ///
+    /// #[derive(Decode, Encode)]
+    /// struct Person {
+    ///     name: String,
+    ///     age: u32,
+    /// }
+    ///
+    /// let cx = context::new().with_capture::<Error>();
+    ///
+    /// let mut data = Vec::new();
+    ///
+    /// ENCODING.encode_with(&cx, &mut data, &Person {
+    ///     name: "Aristotle".to_string(),
+    ///     age: 61,
+    /// })?;
+    ///
+    /// assert!(cx.result().is_ok());
+    ///
+    /// let _: Result<Person, _> = ENCODING.from_slice_with(&cx, &data[..data.len() - 2]);
+    /// assert!(cx.result().is_err());
+    /// Ok::<_, musli::context::ErrorMarker>(())
+    /// ```
+    #[inline]
+    pub fn with_capture<E>(self) -> DefaultContext<A, B, CaptureError<E, A>>
+    where
+        E: ContextError<A>,
+    {
+        DefaultContext {
+            alloc: self.alloc,
+            trace: self.trace,
+            capture: CaptureError {
+                error: UnsafeCell::new(None),
+                _marker: PhantomData,
+            },
+        }
+    }
+
+    /// Forward the specified error type.
+    ///
+    /// This causes the method receiving the context to return the specified
+    /// error type directly.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Decode, Encode};
+    /// use musli::alloc::System;
+    /// use musli::context;
+    /// use musli::json::{Encoding, Error};
+    ///
+    /// const ENCODING: Encoding = Encoding::new();
+    ///
+    /// #[derive(Decode, Encode)]
+    /// struct Person {
+    ///     name: String,
+    ///     age: u32,
+    /// }
+    ///
+    /// let cx = context::new().with_same();
+    ///
+    /// let mut data = Vec::new();
+    ///
+    /// ENCODING.encode_with(&cx, &mut data, &Person {
+    ///     name: "Aristotle".to_string(),
+    ///     age: 61,
+    /// })?;
+    ///
+    /// let person: Person = ENCODING.from_slice_with(&cx, &data[..])?;
+    /// assert_eq!(person.name, "Aristotle");
+    /// assert_eq!(person.age, 61);
+    /// Ok::<_, Error>(())
+    /// ```
+    #[inline]
+    pub fn with_same<E>(self) -> DefaultContext<A, B, SameError<E, A>>
+    where
+        E: ContextError<A>,
+    {
+        DefaultContext {
+            alloc: self.alloc,
+            trace: self.trace,
+            capture: SameError {
+                _marker: PhantomData,
+            },
         }
     }
 }
 
-impl<A, B> Context for &DefaultContext<A, B>
+impl<A, B, E> DefaultContext<A, B, CaptureError<E, A>>
 where
     A: Allocator,
     B: TraceConfig,
+    E: ContextError<A>,
 {
-    type Error = ErrorMarker;
+    /// Unwrap the error marker or panic if there is no error.
+    #[inline]
+    pub fn unwrap(&self) -> E {
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            match (*self.capture.error.get()).take() {
+                Some(error) => error,
+                None => panic!("no error captured"),
+            }
+        }
+    }
+
+    /// Coerce a captured error into a result.
+    #[inline]
+    pub fn result(&self) -> Result<(), E> {
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            match (*self.capture.error.get()).take() {
+                Some(error) => Err(error),
+                None => Ok(()),
+            }
+        }
+    }
+}
+
+impl<A, B, C> Context for &DefaultContext<A, B, C>
+where
+    A: Allocator,
+    B: TraceConfig,
+    C: Capture<A>,
+{
+    type Error = C::Error;
     type Mark = <<B as TraceConfig>::Impl<A> as TraceImpl>::Mark;
     type Allocator = A;
 
     #[inline]
     fn clear(self) {
         self.trace.clear();
+        self.capture.clear();
     }
 
     #[inline]
@@ -142,10 +432,10 @@ where
     #[inline]
     fn custom<T>(self, message: T) -> Self::Error
     where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+        T: 'static + Send + Sync + Error,
     {
         self.trace.custom(self.alloc, &message);
-        ErrorMarker
+        self.capture.custom(self.alloc, message)
     }
 
     #[inline]
@@ -154,7 +444,7 @@ where
         T: fmt::Display,
     {
         self.trace.message(self.alloc, &message);
-        ErrorMarker
+        self.capture.message(self.alloc, message)
     }
 
     #[inline]
@@ -163,16 +453,16 @@ where
         T: fmt::Display,
     {
         self.trace.marked_message(self.alloc, mark, &message);
-        ErrorMarker
+        self.capture.message(self.alloc, message)
     }
 
     #[inline]
     fn marked_custom<T>(self, mark: &Self::Mark, message: T) -> Self::Error
     where
-        T: 'static + Send + Sync + fmt::Display + fmt::Debug,
+        T: 'static + Send + Sync + Error,
     {
         self.trace.marked_custom(self.alloc, mark, &message);
-        ErrorMarker
+        self.capture.custom(self.alloc, message)
     }
 
     #[inline]

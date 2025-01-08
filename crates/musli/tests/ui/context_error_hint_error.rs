@@ -1,7 +1,6 @@
 use core::fmt;
 
-use musli::context::Capture;
-use musli::mode::Binary;
+use musli::context;
 
 #[derive(Debug)]
 struct MyError;
@@ -13,5 +12,5 @@ impl fmt::Display for MyError {
 }
 
 fn main() {
-    let _cx = Capture::<MyError, _>::new();
+    let _cx = context::new().with_capture::<MyError>();
 }

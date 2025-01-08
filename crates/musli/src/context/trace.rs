@@ -8,7 +8,6 @@ use core::ops::Range;
 use core::slice;
 
 use crate::alloc::{Allocator, String, Vec};
-use crate::context::ErrorMarker;
 
 use super::{Access, Shared};
 
@@ -429,12 +428,8 @@ where
     }
 
     #[inline]
-    pub(super) fn unwrap(self) -> ErrorMarker {
-        if self.error.get() {
-            return ErrorMarker;
-        }
-
-        panic!("did not error")
+    pub(super) fn is_error(&self) -> bool {
+        self.error.get()
     }
 }
 

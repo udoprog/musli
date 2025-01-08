@@ -15,19 +15,11 @@ pub use self::error_marker::ErrorMarker;
 
 mod default_context;
 #[doc(inline)]
-pub use self::default_context::DefaultContext;
+pub use self::default_context::{DefaultContext, NoCapture};
 
 mod context_error;
 #[doc(inline)]
 pub use self::context_error::ContextError;
-
-mod same;
-#[doc(inline)]
-pub use self::same::Same;
-
-mod capture;
-#[doc(inline)]
-pub use self::capture::Capture;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::System;
@@ -52,7 +44,7 @@ use crate::Allocator;
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[inline]
-pub fn new() -> DefaultContext<System, NoTrace> {
+pub fn new() -> DefaultContext<System, NoTrace, NoCapture> {
     DefaultContext::new()
 }
 
@@ -92,7 +84,7 @@ pub fn new() -> DefaultContext<System, NoTrace> {
 /// # Ok::<_, musli::context::ErrorMarker>(())
 /// ```
 #[inline]
-pub fn new_in<A>(alloc: A) -> DefaultContext<A, NoTrace>
+pub fn new_in<A>(alloc: A) -> DefaultContext<A, NoTrace, NoCapture>
 where
     A: Allocator,
 {
