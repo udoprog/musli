@@ -48,7 +48,7 @@ where
     use crate::en::Encoder;
 
     let mut output = Value::Unit;
-    let cx = crate::context::new().with_same();
+    let cx = crate::context::new().with_error();
     ValueEncoder::<OPTIONS, _, _, Binary>::new(&cx, &mut output).encode(value)?;
     Ok(output)
 }
@@ -62,7 +62,7 @@ where
     T: Decode<'de, Binary, System>,
 {
     use crate::de::Decoder;
-    let cx = crate::context::new().with_same();
+    let cx = crate::context::new().with_error();
     value.decoder::<OPTIONS, _, Binary>(&cx).decode()
 }
 

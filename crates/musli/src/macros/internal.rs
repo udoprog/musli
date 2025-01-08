@@ -333,7 +333,7 @@ macro_rules! encoding_impls {
             W: $writer_trait,
             T: ?Sized + Encode<$mode>,
         {
-            let cx = $crate::context::new().with_same();
+            let cx = $crate::context::new().with_error();
             self.encode_with(&cx, writer, value)
         }
 
@@ -379,7 +379,7 @@ macro_rules! encoding_impls {
         where
             T: ?Sized + Encode<$mode>,
         {
-            let cx = $crate::context::new().with_same();
+            let cx = $crate::context::new().with_error();
             self.to_slice_with(&cx, out, value)
         }
 
@@ -462,7 +462,7 @@ macro_rules! encoding_impls {
         where
             T: ?Sized + Encode<$mode>,
         {
-            let cx = $crate::context::new().with_same();
+            let cx = $crate::context::new().with_error();
             self.to_fixed_bytes_with(&cx, value)
         }
 
@@ -555,7 +555,7 @@ macro_rules! encoding_impls {
             R: $reader_trait<'de>,
             T: Decode<'de, $mode, System>,
         {
-            let cx = $crate::context::new().with_same();
+            let cx = $crate::context::new().with_error();
             self.decode_with(&cx, reader)
         }
 
@@ -594,7 +594,7 @@ macro_rules! encoding_impls {
         where
             T: Decode<'de, $mode, System>,
         {
-            let cx = $crate::context::new().with_same();
+            let cx = $crate::context::new().with_error();
             self.from_slice_with(&cx, bytes)
         }
 
@@ -639,7 +639,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let cx = context::new().with_same();
+        /// let cx = context::new().with_error();
         ///
         /// let mut data = Vec::new();
         ///
@@ -692,7 +692,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let cx = context::new().with_same();
+        /// let cx = context::new().with_error();
         ///
         /// let mut data = Vec::new();
         /// data.resize(128, 0);
@@ -750,7 +750,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let cx = context::new().with_same();
+        /// let cx = context::new().with_error();
         ///
         /// let data = ENCODING.to_vec_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
@@ -799,7 +799,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let cx = context::new().with_same();
+        /// let cx = context::new().with_error();
         ///
         /// let data: FixedBytes<128> = ENCODING.to_fixed_bytes_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
@@ -848,7 +848,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let cx = context::new().with_same();
+        /// let cx = context::new().with_error();
         ///
         /// let mut data = Vec::new();
         ///
@@ -900,7 +900,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let cx = context::new().with_same();
+        /// let cx = context::new().with_error();
         ///
         /// let buf = ENCODING.to_vec_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),
@@ -950,7 +950,7 @@ macro_rules! encoding_impls {
         ///     age: u32,
         /// }
         ///
-        /// let cx = context::new().with_same();
+        /// let cx = context::new().with_error();
         ///
         /// let buf = ENCODING.to_vec_with(&cx, &Person {
         ///     name: "Aristotle".to_string(),

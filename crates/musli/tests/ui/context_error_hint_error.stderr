@@ -18,11 +18,11 @@ error[E0277]: `ContextError` must be implemented for `MyError`, or any error typ
              musli::wire::Error<A>
              std::io::Error
              std::string::String
-note: required by a bound in `DefaultContext::<A, B, C>::with_capture`
+note: required by a bound in `DefaultContext::<A, T, C>::with_capture`
   --> src/context/default_context.rs
    |
-   |     pub fn with_capture<E>(self) -> DefaultContext<A, B, CaptureError<E, A>>
+   |     pub fn with_capture<E>(self) -> DefaultContext<A, T, Capture<E>>
    |            ------------ required by a bound in this associated function
    |     where
    |         E: ContextError<A>,
-   |            ^^^^^^^^^^^^^^^ required by this bound in `DefaultContext::<A, B, C>::with_capture`
+   |            ^^^^^^^^^^^^^^^ required by this bound in `DefaultContext::<A, T, C>::with_capture`

@@ -45,7 +45,7 @@ macro_rules! test_fns {
                 }
             }
 
-            let cx = $crate::context::new_in($crate::alloc::System::new()).with_trace().with_type();
+            let cx = $crate::context::new().with_trace().with_type();
 
             let out = match encoding.to_vec_with(&cx, &value) {
                 Ok(out) => out,
@@ -129,7 +129,7 @@ macro_rules! test_fns {
                 }
             }
 
-            let cx = $crate::context::new_in($crate::alloc::System::new()).with_trace().with_type();
+            let cx = $crate::context::new().with_trace().with_type();
 
             out.clear();
 

@@ -220,7 +220,7 @@ where
     where
         T: ?Sized + Encode<M>,
     {
-        let cx = crate::context::new().with_same();
+        let cx = crate::context::new().with_error();
         self.to_string_with(&cx, value)
     }
 
@@ -246,7 +246,7 @@ where
     ///     age: u32,
     /// }
     ///
-    /// let cx = musli::context::new().with_same();
+    /// let cx = musli::context::new().with_error();
     ///
     /// let mut data = ENCODING.to_string_with(&cx, &Person {
     ///     name: "Aristotle".to_string(),
