@@ -6,8 +6,8 @@ use crate::alloc::System;
 use crate::{Allocator, Context};
 
 use super::{
-    Capture, CaptureError, ContextError, Errors, NoCapture, NoTrace, Report, SameError, Trace,
-    TraceConfig, TraceImpl,
+    Capture, ContextError, Emit, ErrorMode, Errors, Ignore, NoTrace, Report, Trace, TraceImpl,
+    TraceMode,
 };
 
 /// The default context which uses an allocator to track the location of errors.
@@ -21,36 +21,27 @@ use super::{
 ///
 /// [`new`]: super::new
 /// [`new_in`]: super::new_in
-pub struct DefaultContext<A, B, C>
+pub struct DefaultContext<A, T, C>
 where
     A: Allocator,
-    B: TraceConfig,
+    T: TraceMode,
 {
     alloc: A,
-    trace: B::Impl<A>,
+    trace: T::Impl<A>,
     capture: C,
 }
 
 #[cfg(feature = "alloc")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl DefaultContext<System, NoTrace, NoCapture> {
+impl DefaultContext<System, NoTrace, Ignore> {
     /// Construct the default context which uses the [`System`] allocator for
     /// memory.
     #[inline]
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self::new_in(System::new())
     }
 }
 
-#[cfg(feature = "alloc")]
-impl Default for DefaultContext<System, NoTrace, NoCapture> {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<A> DefaultContext<A, NoTrace, NoCapture>
+impl<A> DefaultContext<A, NoTrace, Ignore>
 where
     A: Allocator,
 {
@@ -62,51 +53,24 @@ where
         Self {
             alloc,
             trace,
-            capture: NoCapture,
+            capture: Ignore,
         }
     }
+}
 
-    /// Unwrap the error marker or panic if there is no error.
+#[cfg(feature = "alloc")]
+impl Default for DefaultContext<System, NoTrace, Ignore> {
     #[inline]
-    pub fn is_error(self) -> bool {
-        self.trace.is_error()
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-impl<A, C> DefaultContext<A, Trace, C>
+impl<A, T, C> DefaultContext<A, T, C>
 where
     A: Allocator,
-{
-    /// If tracing is enabled through [`DefaultContext::with_trace`], this
-    /// configured the context to visualize type information, and not just
-    /// variant and fields.
-    #[inline]
-    pub fn with_type(mut self) -> Self {
-        self.trace.include_type();
-        self
-    }
-
-    /// Generate a line-separated report of all reported errors.
-    ///
-    /// This can be useful if you want a quick human-readable overview of
-    /// errors. The line separator used will be platform dependent.
-    #[inline]
-    pub fn report(&self) -> Report<'_, A> {
-        self.trace.report()
-    }
-
-    /// Iterate over all reported errors.
-    #[inline]
-    pub fn errors(&self) -> Errors<'_, A> {
-        self.trace.errors()
-    }
-}
-
-impl<A, B, C> DefaultContext<A, B, C>
-where
-    A: Allocator,
-    B: TraceConfig,
-    C: Capture<A>,
+    T: TraceMode,
+    C: ErrorMode<A>,
 {
     /// Enable tracing through the current allocator `A`.
     ///
@@ -170,21 +134,21 @@ where
     /// Ok::<_, musli::context::ErrorMarker>(())
     /// ```
     #[inline]
-    pub fn with_capture<E>(self) -> DefaultContext<A, B, CaptureError<E, A>>
+    pub fn with_capture<E>(self) -> DefaultContext<A, T, Capture<E>>
     where
         E: ContextError<A>,
     {
         DefaultContext {
             alloc: self.alloc,
             trace: self.trace,
-            capture: CaptureError::new(),
+            capture: Capture::new(),
         }
     }
 
-    /// Forward the specified error type.
+    /// Emit the specified error type `E`.
     ///
     /// This causes the method receiving the context to return the specified
-    /// error type directly.
+    /// error type directly instead through [`Context::Error`].
     ///
     /// # Examples
     ///
@@ -202,7 +166,7 @@ where
     ///     age: u32,
     /// }
     ///
-    /// let cx = context::new().with_same();
+    /// let cx = context::new().with_error();
     ///
     /// let mut data = Vec::new();
     ///
@@ -217,22 +181,90 @@ where
     /// Ok::<_, Error>(())
     /// ```
     #[inline]
-    pub fn with_same<E>(self) -> DefaultContext<A, B, SameError<E, A>>
+    pub fn with_error<E>(self) -> DefaultContext<A, T, Emit<E>>
     where
         E: ContextError<A>,
     {
         DefaultContext {
             alloc: self.alloc,
             trace: self.trace,
-            capture: SameError::new(),
+            capture: Emit::new(),
         }
     }
 }
 
-impl<A, B, E> DefaultContext<A, B, CaptureError<E, A>>
+impl<A, C> DefaultContext<A, Trace, C>
 where
     A: Allocator,
-    B: TraceConfig,
+{
+    /// If tracing is enabled through [`DefaultContext::with_trace`], this
+    /// configured the context to visualize type information, and not just
+    /// variant and fields.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::context;
+    ///
+    /// let cx = context::new().with_trace().with_type();
+    /// ```
+    #[inline]
+    pub fn with_type(mut self) -> Self {
+        self.trace.include_type();
+        self
+    }
+
+    /// Generate a line-separated report of all reported errors.
+    ///
+    /// This can be useful if you want a quick human-readable overview of
+    /// errors. The line separator used will be platform dependent.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::context::{self, ErrorMarker};
+    /// use musli::value::Value;
+    /// use musli::json::Encoding;
+    ///
+    /// const ENCODING: Encoding = Encoding::new();
+    ///
+    /// let cx = context::new().with_trace();
+    ///
+    /// let ErrorMarker = ENCODING.from_str_with::<_, Value<_>>(&cx, "not json").unwrap_err();
+    /// let report = cx.report();
+    /// println!("{report}");
+    /// ```
+    #[inline]
+    pub fn report(&self) -> Report<'_, A> {
+        self.trace.report()
+    }
+
+    /// Iterate over all reported errors.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::context::{self, ErrorMarker};
+    /// use musli::value::Value;
+    /// use musli::json::Encoding;
+    ///
+    /// const ENCODING: Encoding = Encoding::new();
+    ///
+    /// let cx = context::new().with_trace();
+    ///
+    /// let ErrorMarker = ENCODING.from_str_with::<_, Value<_>>(&cx, "not json").unwrap_err();
+    /// assert!(cx.errors().count() > 0);
+    /// ```
+    #[inline]
+    pub fn errors(&self) -> Errors<'_, A> {
+        self.trace.errors()
+    }
+}
+
+impl<A, T, E> DefaultContext<A, T, Capture<E>>
+where
+    A: Allocator,
+    T: TraceMode,
     E: ContextError<A>,
 {
     /// Unwrap the error marker or panic if there is no error.
@@ -248,14 +280,14 @@ where
     }
 }
 
-impl<A, B, C> Context for &DefaultContext<A, B, C>
+impl<A, T, C> Context for &DefaultContext<A, T, C>
 where
     A: Allocator,
-    B: TraceConfig,
-    C: Capture<A>,
+    T: TraceMode,
+    C: ErrorMode<A>,
 {
     type Error = C::Error;
-    type Mark = <<B as TraceConfig>::Impl<A> as TraceImpl<A>>::Mark;
+    type Mark = <<T as TraceMode>::Impl<A> as TraceImpl<A>>::Mark;
     type Allocator = A;
 
     #[inline]
@@ -270,36 +302,36 @@ where
     }
 
     #[inline]
-    fn custom<T>(self, message: T) -> Self::Error
+    fn custom<E>(self, message: E) -> Self::Error
     where
-        T: 'static + Send + Sync + Error,
+        E: 'static + Send + Sync + Error,
     {
         self.trace.custom(self.alloc, &message);
         self.capture.custom(self.alloc, message)
     }
 
     #[inline]
-    fn message<T>(self, message: T) -> Self::Error
+    fn message<M>(self, message: M) -> Self::Error
     where
-        T: fmt::Display,
+        M: fmt::Display,
     {
         self.trace.message(self.alloc, &message);
         self.capture.message(self.alloc, message)
     }
 
     #[inline]
-    fn marked_message<T>(self, mark: &Self::Mark, message: T) -> Self::Error
+    fn marked_message<M>(self, mark: &Self::Mark, message: M) -> Self::Error
     where
-        T: fmt::Display,
+        M: fmt::Display,
     {
         self.trace.marked_message(self.alloc, mark, &message);
         self.capture.message(self.alloc, message)
     }
 
     #[inline]
-    fn marked_custom<T>(self, mark: &Self::Mark, message: T) -> Self::Error
+    fn marked_custom<E>(self, mark: &Self::Mark, message: E) -> Self::Error
     where
-        T: 'static + Send + Sync + Error,
+        E: 'static + Send + Sync + Error,
     {
         self.trace.marked_custom(self.alloc, mark, &message);
         self.capture.custom(self.alloc, message)
@@ -316,17 +348,17 @@ where
     }
 
     #[inline]
-    fn enter_named_field<T>(self, name: &'static str, field: T)
+    fn enter_named_field<F>(self, name: &'static str, field: F)
     where
-        T: fmt::Display,
+        F: fmt::Display,
     {
         self.trace.enter_named_field(name, &field);
     }
 
     #[inline]
-    fn enter_unnamed_field<T>(self, index: u32, name: T)
+    fn enter_unnamed_field<F>(self, index: u32, name: F)
     where
-        T: fmt::Display,
+        F: fmt::Display,
     {
         self.trace.enter_unnamed_field(index, &name);
     }
@@ -357,9 +389,9 @@ where
     }
 
     #[inline]
-    fn enter_variant<T>(self, name: &'static str, tag: T)
+    fn enter_variant<V>(self, name: &'static str, tag: V)
     where
-        T: fmt::Display,
+        V: fmt::Display,
     {
         self.trace.enter_variant(name, &tag);
     }
@@ -380,9 +412,9 @@ where
     }
 
     #[inline]
-    fn enter_map_key<T>(self, field: T)
+    fn enter_map_key<F>(self, field: F)
     where
-        T: fmt::Display,
+        F: fmt::Display,
     {
         self.trace.enter_map_key(self.alloc, &field);
     }

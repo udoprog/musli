@@ -10,7 +10,7 @@ use crate::Allocator;
 ///
 /// This is used to among other things report diagnostics.
 pub trait Context: Copy {
-    /// Error produced by context.
+    /// Error produced by the context.
     type Error;
     /// A mark during processing.
     type Mark;
@@ -40,9 +40,9 @@ pub trait Context: Copy {
 
     /// Generate a map function which maps an error using the `custom` function.
     #[inline]
-    fn map<T>(self) -> impl FnOnce(T) -> Self::Error
+    fn map<E>(self) -> impl FnOnce(E) -> Self::Error
     where
-        T: 'static + Send + Sync + Error,
+        E: 'static + Send + Sync + Error,
     {
         move |error| self.custom(error)
     }
@@ -50,25 +50,25 @@ pub trait Context: Copy {
     /// Report a custom error, which is not encapsulated by the error type
     /// expected by the context. This is essentially a type-erased way of
     /// reporting error-like things out from the context.
-    fn custom<T>(self, error: T) -> Self::Error
+    fn custom<E>(self, error: E) -> Self::Error
     where
-        T: 'static + Send + Sync + Error;
+        E: 'static + Send + Sync + Error;
 
     /// Report a message as an error.
     ///
     /// This is made available to format custom error messages in `no_std`
     /// environments. The error message is to be collected by formatting `T`.
-    fn message<T>(self, message: T) -> Self::Error
+    fn message<M>(self, message: M) -> Self::Error
     where
-        T: fmt::Display;
+        M: fmt::Display;
 
     /// Report an error based on a mark.
     ///
     /// A mark is generated using [Context::mark] and indicates a prior state.
     #[inline]
-    fn marked_message<T>(self, mark: &Self::Mark, message: T) -> Self::Error
+    fn marked_message<M>(self, mark: &Self::Mark, message: M) -> Self::Error
     where
-        T: fmt::Display,
+        M: fmt::Display,
     {
         _ = mark;
         self.message(message)
@@ -78,9 +78,9 @@ pub trait Context: Copy {
     ///
     /// A mark is generated using [Context::mark] and indicates a prior state.
     #[inline]
-    fn marked_custom<T>(self, mark: &Self::Mark, message: T) -> Self::Error
+    fn marked_custom<E>(self, mark: &Self::Mark, message: E) -> Self::Error
     where
-        T: 'static + Send + Sync + Error,
+        E: 'static + Send + Sync + Error,
     {
         _ = mark;
         self.custom(message)
@@ -141,9 +141,9 @@ pub trait Context: Copy {
     ///
     /// [`leave_field`]: Context::leave_field
     #[inline]
-    fn enter_named_field<T>(self, type_name: &'static str, field: T)
+    fn enter_named_field<F>(self, type_name: &'static str, field: F)
     where
-        T: fmt::Display,
+        F: fmt::Display,
     {
         _ = type_name;
         _ = field;
@@ -169,9 +169,9 @@ pub trait Context: Copy {
     ///
     /// [`leave_field`]: Context::leave_field
     #[inline]
-    fn enter_unnamed_field<T>(self, index: u32, name: T)
+    fn enter_unnamed_field<F>(self, index: u32, name: F)
     where
-        T: fmt::Display,
+        F: fmt::Display,
     {
         _ = index;
         _ = name;
@@ -212,9 +212,9 @@ pub trait Context: Copy {
     ///
     /// [`leave_variant`]: Context::leave_variant
     #[inline]
-    fn enter_variant<T>(self, type_name: &'static str, tag: T)
+    fn enter_variant<V>(self, type_name: &'static str, tag: V)
     where
-        T: fmt::Display,
+        V: fmt::Display,
     {
         _ = type_name;
         _ = tag;
@@ -231,9 +231,9 @@ pub trait Context: Copy {
 
     /// Trace a that a map key has been entered.
     #[inline]
-    fn enter_map_key<T>(self, field: T)
+    fn enter_map_key<K>(self, field: K)
     where
-        T: fmt::Display,
+        K: fmt::Display,
     {
         _ = field;
     }

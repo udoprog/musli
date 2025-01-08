@@ -7,11 +7,11 @@ use self::access::{Access, Shared};
 
 mod trace;
 #[doc(inline)]
-pub use self::trace::{Error, Errors, NoTrace, Report, Trace, TraceConfig, TraceImpl};
+pub use self::trace::{Error, Errors, NoTrace, Report, Trace, TraceImpl, TraceMode};
 
 mod capture;
 #[doc(inline)]
-pub use self::capture::{Capture, CaptureError, NoCapture, SameError};
+pub use self::capture::{Capture, Emit, ErrorMode, Ignore};
 
 mod error_marker;
 #[doc(inline)]
@@ -48,7 +48,7 @@ use crate::Allocator;
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[inline]
-pub fn new() -> DefaultContext<System, NoTrace, NoCapture> {
+pub fn new() -> DefaultContext<System, NoTrace, Ignore> {
     DefaultContext::new()
 }
 
@@ -88,7 +88,7 @@ pub fn new() -> DefaultContext<System, NoTrace, NoCapture> {
 /// # Ok::<_, musli::context::ErrorMarker>(())
 /// ```
 #[inline]
-pub fn new_in<A>(alloc: A) -> DefaultContext<A, NoTrace, NoCapture>
+pub fn new_in<A>(alloc: A) -> DefaultContext<A, NoTrace, Ignore>
 where
     A: Allocator,
 {
