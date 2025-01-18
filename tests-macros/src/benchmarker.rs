@@ -539,7 +539,7 @@ fn mangle_reset_lifetimes(
     for p in take(&mut generics.params) {
         match p {
             syn::GenericParam::Lifetime(lt) => {
-                if lifetime.map_or(false, |p| p.lifetime == lt.lifetime) {
+                if lifetime.is_some_and(|p| p.lifetime == lt.lifetime) {
                     continue;
                 }
 
@@ -580,7 +580,7 @@ fn mangle_decode_lifetimes(
     for p in take(&mut generics.params) {
         match p {
             syn::GenericParam::Lifetime(lt) => {
-                if lifetime.map_or(false, |p| p.lifetime == lt.lifetime) {
+                if lifetime.is_some_and(|p| p.lifetime == lt.lifetime) {
                     continue;
                 }
 
