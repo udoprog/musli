@@ -13,6 +13,10 @@ help: include the missing field in the pattern
    |          ~~~~~~~~~~~~~~~~
 help: if you don't care about this missing field, you can explicitly ignore it
    |
+15 |     field, sneaky_field: _ }
+   |          ~~~~~~~~~~~~~~~~~~~
+help: or always ignore missing fields here
+   |
 15 |     field, .. }
    |          ~~~~~~
 
@@ -66,6 +70,10 @@ help: include the missing field in the pattern
 40 |         field, sneaky_field },
    |              ~~~~~~~~~~~~~~~~
 help: if you don't care about this missing field, you can explicitly ignore it
+   |
+40 |         field, sneaky_field: _ },
+   |              ~~~~~~~~~~~~~~~~~~~
+help: or always ignore missing fields here
    |
 40 |         field, .. },
    |              ~~~~~~
