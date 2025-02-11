@@ -1,0 +1,33 @@
+[package]
+name = "musli-axum"
+version = "0.0.126"
+authors = ["John-John Tedro <udoprog@tedro.se>"]
+edition = "2021"
+description = """
+Types for integrating Müsli with axum.
+"""
+documentation = "https://docs.rs/musli"
+readme = "README.md"
+homepage = "https://github.com/udoprog/musli"
+repository = "https://github.com/udoprog/musli"
+license = "MIT OR Apache-2.0"
+keywords = ["framework", "http", "web"]
+categories = ["asynchronous", "network-programming", "web-programming::http-server"]
+
+[features]
+default = ["alloc", "std", "ws", "json"]
+alloc = ["musli/alloc"]
+std = ["musli/std"]
+api = []
+json = ["musli/json", "axum/json", "dep:bytes", "dep:mime"]
+ws = ["api", "axum/ws", "dep:rand", "tokio/time", "dep:tokio-stream"]
+
+[dependencies]
+musli = { path = "../musli", version = "0.0.126", default-features = false }
+axum = { version = "0.8.1", default-features = false, optional = true }
+bytes = { version = "1.10.0", optional = true }
+mime = { version = "0.3.17", default-features = false, optional = true }
+rand = { version = "0.8.5", default-features = false, optional = true, features = ["small_rng"] }
+tracing = { version = "0.1.40", default-features = false }
+tokio = { version = "1.37.0", default-features = false, features = ["time"], optional = true }
+tokio-stream = { version = "0.1.15", default-features = false, optional = true }
