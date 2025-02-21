@@ -252,7 +252,7 @@ pub mod __priv {
 
     /// Note that this returns `true` if skipping was unsupported.
     #[inline]
-    pub fn skip_field<'de, D>(decoder: D) -> Result<bool, <D::Cx as Context>::Error>
+    pub fn skip_field<'de, D>(decoder: D) -> Result<bool, D::Error>
     where
         D: EntryDecoder<'de>,
     {

@@ -55,11 +55,13 @@ pub enum NeverMarker {}
 ///         self.cx
 ///     }
 ///
+///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
-///     fn decode_u32(self) -> Result<u32, C::Error> {
+///     #[inline]
+///     fn decode_u32(self) -> Result<u32, Self::Error> {
 ///         if self.number == 42 {
 ///             return Ok(self.number);
 ///         }
@@ -105,7 +107,7 @@ where
     #[inline]
     fn decode<T>(self) -> Result<T, Self::Error>
     where
-        T: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
+        T: Decode<'de, Self::Mode, Self::Allocator>,
     {
         match self._never {}
     }
@@ -135,6 +137,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type Decoder<'this>
         = Self
@@ -142,7 +145,7 @@ where
         Self: 'this;
 
     #[inline]
-    fn as_decoder(&self) -> Result<Self::Decoder<'_>, C::Error> {
+    fn as_decoder(&self) -> Result<Self::Decoder<'_>, Self::Error> {
         match self._never {}
     }
 }
@@ -153,6 +156,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeEntryKey<'this>
         = Self
@@ -169,17 +173,17 @@ where
     }
 
     #[inline]
-    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
+    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
+    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn end_entries(self) -> Result<(), C::Error> {
+    fn end_entries(self) -> Result<(), Self::Error> {
         match self._never {}
     }
 }
@@ -190,6 +194,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeTag<'this>
         = Self
@@ -206,12 +211,12 @@ where
     }
 
     #[inline]
-    fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
+    fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
+    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, Self::Error> {
         match self._never {}
     }
 }
@@ -222,6 +227,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeEntry<'this>
         = Self
@@ -243,14 +249,14 @@ where
     }
 
     #[inline]
-    fn decode_entry(&mut self) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
+    fn decode_entry(&mut self) -> Result<Option<Self::DecodeEntry<'_>>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
     fn decode_remaining_entries(
         &mut self,
-    ) -> Result<Self::DecodeRemainingEntries<'_>, <Self::Cx as Context>::Error> {
+    ) -> Result<Self::DecodeRemainingEntries<'_>, Self::Error> {
         match self._never {}
     }
 }
@@ -261,6 +267,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeKey<'this>
         = Self
@@ -274,12 +281,12 @@ where
     }
 
     #[inline]
-    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
+    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn decode_value(self) -> Result<Self::DecodeValue, C::Error> {
+    fn decode_value(self) -> Result<Self::DecodeValue, Self::Error> {
         match self._never {}
     }
 }
@@ -290,6 +297,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeNext<'this>
         = Self
@@ -302,12 +310,12 @@ where
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, Self::Error> {
         match self._never {}
     }
 }
@@ -343,7 +351,7 @@ where
     }
 
     #[inline]
-    fn encode<T>(self, _: T) -> Result<Self::Ok, C::Error>
+    fn encode<T>(self, _: T) -> Result<Self::Ok, Self::Error>
     where
         T: Encode<Self::Mode>,
     {
@@ -357,6 +365,7 @@ where
     T: ?Sized + ToOwned<C::Allocator>,
 {
     type Ok = O;
+    type Error = C::Error;
 
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self._never {}
@@ -371,6 +380,7 @@ where
 {
     type Cx = C;
     type Ok = O;
+    type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
         = Self
@@ -383,12 +393,12 @@ where
     }
 
     #[inline]
-    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn finish_sequence(self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }
@@ -401,6 +411,7 @@ where
 {
     type Cx = C;
     type Ok = O;
+    type Error = C::Error;
     type Mode = M;
     type EncodeEntry<'this>
         = Self
@@ -413,11 +424,11 @@ where
     }
 
     #[inline]
-    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, Self::Error> {
         match self._never {}
     }
 
-    fn finish_map(self) -> Result<Self::Ok, C::Error> {
+    fn finish_map(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }
@@ -430,6 +441,7 @@ where
 {
     type Cx = C;
     type Ok = O;
+    type Error = C::Error;
     type Mode = M;
     type EncodeKey<'this>
         = Self
@@ -446,17 +458,17 @@ where
     }
 
     #[inline]
-    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn finish_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entry(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }
@@ -469,6 +481,7 @@ where
 {
     type Cx = C;
     type Ok = O;
+    type Error = C::Error;
     type Mode = M;
     type EncodeEntryKey<'this>
         = Self
@@ -485,17 +498,17 @@ where
     }
 
     #[inline]
-    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
+    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
+    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn finish_entries(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entries(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }
@@ -508,6 +521,7 @@ where
 {
     type Cx = C;
     type Ok = O;
+    type Error = C::Error;
     type Mode = M;
     type EncodeTag<'this>
         = Self
@@ -524,17 +538,17 @@ where
     }
 
     #[inline]
-    fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
+    fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
+    fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, Self::Error> {
         match self._never {}
     }
 
     #[inline]
-    fn finish_variant(self) -> Result<Self::Ok, C::Error> {
+    fn finish_variant(self) -> Result<Self::Ok, Self::Error> {
         match self._never {}
     }
 }

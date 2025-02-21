@@ -23,20 +23,15 @@ where
     C: Context,
     M: 'static,
 {
-    pub(super) fn new_in(
-        cx: C,
-        first: bool,
-        len: Option<usize>,
-        parser: P,
-    ) -> Result<Self, C::Error> {
-        Ok(Self {
+    pub(super) fn new_in(cx: C, first: bool, len: Option<usize>, parser: P) -> Self {
+        Self {
             cx,
             first,
             len,
             parser,
             finalized: false,
             _marker: PhantomData,
-        })
+        }
     }
 
     #[inline]
@@ -122,6 +117,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeEntry<'this>
         = JsonObjectPairDecoder<P::Mut<'this>, C, M>
@@ -143,7 +139,7 @@ where
     }
 
     #[inline]
-    fn decode_entry(&mut self) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
+    fn decode_entry(&mut self) -> Result<Option<Self::DecodeEntry<'_>>, Self::Error> {
         if !self.parse_map_key()? {
             return Ok(None);
         }
@@ -157,14 +153,19 @@ where
     #[inline]
     fn decode_remaining_entries(
         &mut self,
-    ) -> Result<Self::DecodeRemainingEntries<'_>, <Self::Cx as Context>::Error> {
+    ) -> Result<Self::DecodeRemainingEntries<'_>, Self::Error> {
         if replace(&mut self.finalized, true) {
             return Err(self
                 .cx
                 .message("Cannot decode remaining entries after finalizing"));
         }
 
-        JsonObjectDecoder::new_in(self.cx, self.first, self.len, self.parser.borrow_mut())
+        Ok(JsonObjectDecoder::new_in(
+            self.cx,
+            self.first,
+            self.len,
+            self.parser.borrow_mut(),
+        ))
     }
 }
 
@@ -175,6 +176,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeEntryKey<'this>
         = JsonKeyDecoder<P::Mut<'this>, C, M>
@@ -191,7 +193,7 @@ where
     }
 
     #[inline]
-    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
+    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, Self::Error> {
         if !self.parse_map_key()? {
             return Ok(None);
         }
@@ -200,7 +202,7 @@ where
     }
 
     #[inline]
-    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
+    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, Self::Error> {
         let actual = self.parser.lex(self.cx);
 
         if !matches!(actual, Token::Colon) {
@@ -214,7 +216,7 @@ where
     }
 
     #[inline]
-    fn end_entries(self) -> Result<(), C::Error> {
+    fn end_entries(self) -> Result<(), Self::Error> {
         self.skip_object_remaining()
     }
 }

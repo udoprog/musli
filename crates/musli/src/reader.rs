@@ -81,6 +81,7 @@ where
             C: Context,
         {
             type Ok = ();
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -103,10 +104,10 @@ where
     }
 
     /// Read a slice out of the current reader.
-    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8]>;
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>;
 
     /// Read into the given buffer which might not have been initialized.
     ///
@@ -146,6 +147,7 @@ where
             C: Context,
         {
             type Ok = [u8; N];
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -241,10 +243,10 @@ impl<'de> Reader<'de> for &'de [u8] {
     }
 
     #[inline]
-    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>,
     {
         if self.len() < n {
             return Err(cx.custom(SliceUnderflow::new(n, self.len())));
@@ -414,10 +416,10 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     }
 
     #[inline]
-    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>,
     {
         let outcome = bounds_check_add(cx, &self.range, n)?;
 
@@ -554,10 +556,10 @@ where
     }
 
     #[inline]
-    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>,
     {
         self.bounds_check(cx, n)?;
         self.reader.read_bytes(cx, n, visitor)
@@ -649,10 +651,10 @@ where
     }
 
     #[inline]
-    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, C::Error>
+    fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>,
     {
         (**self).read_bytes(cx, n, visitor)
     }

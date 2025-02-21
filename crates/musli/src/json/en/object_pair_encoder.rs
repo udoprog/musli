@@ -33,6 +33,7 @@ where
 {
     type Cx = C;
     type Ok = ();
+    type Error = C::Error;
     type Mode = M;
     type EncodeKey<'this>
         = JsonObjectKeyEncoder<W::Mut<'this>, C, M>
@@ -49,7 +50,7 @@ where
     }
 
     #[inline]
-    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, C::Error> {
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, Self::Error> {
         if !self.empty {
             self.writer.write_byte(self.cx, b',')?;
         }
@@ -58,13 +59,13 @@ where
     }
 
     #[inline]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, C::Error> {
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, Self::Error> {
         self.writer.write_byte(self.cx, b':')?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_entry(self) -> Result<Self::Ok, C::Error> {
+    fn finish_entry(self) -> Result<Self::Ok, Self::Error> {
         Ok(())
     }
 }

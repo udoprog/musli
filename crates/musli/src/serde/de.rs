@@ -462,6 +462,7 @@ where
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
+    type Error = C::Error;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -470,7 +471,7 @@ where
 
     #[inline]
     #[cfg(feature = "alloc")]
-    fn visit_owned(self, cx: C, value: Vec<u8, C::Allocator>) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, cx: C, value: Vec<u8, C::Allocator>) -> Result<Self::Ok, Self::Error> {
         match value.into_std() {
             Ok(value) => de::Visitor::visit_byte_buf(self.visitor, value).map_err(err(cx)),
             Err(value) => de::Visitor::visit_bytes(self.visitor, &value).map_err(err(cx)),
@@ -478,12 +479,12 @@ where
     }
 
     #[inline]
-    fn visit_borrowed(self, cx: C, value: &'de [u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_borrowed(self, cx: C, value: &'de [u8]) -> Result<Self::Ok, Self::Error> {
         de::Visitor::visit_borrowed_bytes(self.visitor, value).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_ref(self, cx: C, value: &[u8]) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: C, value: &[u8]) -> Result<Self::Ok, Self::Error> {
         de::Visitor::visit_bytes(self.visitor, value).map_err(err(cx))
     }
 }
@@ -594,6 +595,7 @@ where
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
+    type Error = C::Error;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -602,7 +604,7 @@ where
 
     #[inline]
     #[cfg(feature = "alloc")]
-    fn visit_owned(self, cx: C, value: String<C::Allocator>) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, cx: C, value: String<C::Allocator>) -> Result<Self::Ok, Self::Error> {
         match value.into_std() {
             Ok(value) => de::Visitor::visit_string(self.visitor, value).map_err(err(cx)),
             Err(value) => de::Visitor::visit_str(self.visitor, &value).map_err(err(cx)),
@@ -610,12 +612,12 @@ where
     }
 
     #[inline]
-    fn visit_borrowed(self, cx: C, value: &'de str) -> Result<Self::Ok, C::Error> {
+    fn visit_borrowed(self, cx: C, value: &'de str) -> Result<Self::Ok, Self::Error> {
         de::Visitor::visit_borrowed_str(self.visitor, value).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_ref(self, cx: C, value: &str) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: C, value: &str) -> Result<Self::Ok, Self::Error> {
         de::Visitor::visit_str(self.visitor, value).map_err(err(cx))
     }
 }
@@ -729,6 +731,7 @@ where
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
+    type Error = C::Error;
     type String = StringVisitor<V>;
     type Bytes = BytesVisitor<V>;
 
@@ -738,42 +741,42 @@ where
     }
 
     #[inline]
-    fn visit_empty(self, cx: C) -> Result<Self::Ok, C::Error> {
+    fn visit_empty(self, cx: C) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_unit().map_err(err(cx))
     }
 
     #[inline]
-    fn visit_bool(self, cx: C, v: bool) -> Result<Self::Ok, C::Error> {
+    fn visit_bool(self, cx: C, v: bool) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_bool(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_char(self, cx: C, v: char) -> Result<Self::Ok, C::Error> {
+    fn visit_char(self, cx: C, v: char) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_char(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_u8(self, cx: C, v: u8) -> Result<Self::Ok, C::Error> {
+    fn visit_u8(self, cx: C, v: u8) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_u8(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_u16(self, cx: C, v: u16) -> Result<Self::Ok, C::Error> {
+    fn visit_u16(self, cx: C, v: u16) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_u16(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_u32(self, cx: C, v: u32) -> Result<Self::Ok, C::Error> {
+    fn visit_u32(self, cx: C, v: u32) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_u32(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_u64(self, cx: C, v: u64) -> Result<Self::Ok, C::Error> {
+    fn visit_u64(self, cx: C, v: u64) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_u64(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_u128(self, cx: C, v: u128) -> Result<Self::Ok, C::Error> {
+    fn visit_u128(self, cx: C, v: u128) -> Result<Self::Ok, Self::Error> {
         // Serde's 128-bit support is very broken, so just try to avoid it if we can.
         // See: https://github.com/serde-rs/serde/issues/2576
         if let Ok(v) = u64::try_from(v) {
@@ -784,27 +787,27 @@ where
     }
 
     #[inline]
-    fn visit_i8(self, cx: C, v: i8) -> Result<Self::Ok, C::Error> {
+    fn visit_i8(self, cx: C, v: i8) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_i8(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_i16(self, cx: C, v: i16) -> Result<Self::Ok, C::Error> {
+    fn visit_i16(self, cx: C, v: i16) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_i16(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_i32(self, cx: C, v: i32) -> Result<Self::Ok, C::Error> {
+    fn visit_i32(self, cx: C, v: i32) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_i32(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_i64(self, cx: C, v: i64) -> Result<Self::Ok, C::Error> {
+    fn visit_i64(self, cx: C, v: i64) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_i64(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_i128(self, cx: C, v: i128) -> Result<Self::Ok, C::Error> {
+    fn visit_i128(self, cx: C, v: i128) -> Result<Self::Ok, Self::Error> {
         // Serde's 128-bit support is very broken, so just try to avoid it if we can.
         // See: https://github.com/serde-rs/serde/issues/2576
         if let Ok(v) = i64::try_from(v) {
@@ -815,54 +818,58 @@ where
     }
 
     #[inline]
-    fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
+    fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_u64(v as u64).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
+    fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_i64(v as i64).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_f32(self, cx: C, v: f32) -> Result<Self::Ok, C::Error> {
+    fn visit_f32(self, cx: C, v: f32) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_f32(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_f64(self, cx: C, v: f64) -> Result<Self::Ok, C::Error> {
+    fn visit_f64(self, cx: C, v: f64) -> Result<Self::Ok, Self::Error> {
         self.visitor.visit_f64(v).map_err(err(cx))
     }
 
     #[inline]
-    fn visit_option<D>(self, cx: C, v: Option<D>) -> Result<Self::Ok, C::Error>
-    where
-        D: Decoder<'de, Cx = C>,
-    {
-        match v {
-            Some(v) => self
-                .visitor
-                .visit_some(Deserializer::new(v))
-                .map_err(err(cx)),
-            None => self.visitor.visit_none().map_err(err(cx)),
-        }
+    fn visit_none(self, cx: C) -> Result<Self::Ok, Self::Error> {
+        self.visitor.visit_none().map_err(err(cx))
     }
 
     #[inline]
-    fn visit_sequence<D>(self, decoder: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_some<D>(self, decoder: D) -> Result<Self::Ok, Self::Error>
+    where
+        D: Decoder<'de, Cx = C>,
+    {
+        let cx = decoder.cx();
+
+        self.visitor
+            .visit_some(Deserializer::new(decoder))
+            .map_err(err(cx))
+    }
+
+    #[inline]
+    fn visit_sequence<D>(self, decoder: &mut D) -> Result<Self::Ok, Self::Error>
     where
         D: ?Sized + SequenceDecoder<'de, Cx = C>,
     {
         let cx = decoder.cx();
+
         self.visitor
             .visit_seq(SeqAccess::new(decoder))
             .map_err(err(cx))
     }
 
     #[inline]
-    fn visit_map<D>(self, decoder: &mut D) -> Result<Self::Ok, C::Error>
+    fn visit_map<D>(self, decoder: &mut D) -> Result<Self::Ok, Self::Error>
     where
-        D: ?Sized + MapDecoder<'de, Cx = C>,
+        D: ?Sized + MapDecoder<'de, Cx = C, Error = Self::Error>,
     {
         let mut decoder = decoder.decode_remaining_entries()?;
         let value = self
@@ -874,12 +881,12 @@ where
     }
 
     #[inline]
-    fn visit_string(self, _: C, _: SizeHint) -> Result<Self::String, C::Error> {
+    fn visit_string(self, _: C, _: SizeHint) -> Result<Self::String, Self::Error> {
         Ok(StringVisitor::new(self.visitor))
     }
 
     #[inline]
-    fn visit_bytes(self, _: C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
+    fn visit_bytes(self, _: C, _: SizeHint) -> Result<Self::Bytes, Self::Error> {
         Ok(BytesVisitor::new(self.visitor))
     }
 }

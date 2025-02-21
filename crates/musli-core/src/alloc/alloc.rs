@@ -54,7 +54,10 @@ use super::AllocError;
 /// });
 /// # Ok::<_, AllocError>(())
 /// ```
-pub trait Alloc<T>: Sized {
+pub trait Alloc<T>
+where
+    Self: Sized,
+{
     /// Get a pointer into the allocation.
     ///
     /// ## Examples

@@ -58,6 +58,7 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
 ];
 
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
+    ("Error", Extra::Error),
     ("String", Extra::Visitor(Ty::Str)),
     ("Bytes", Extra::Visitor(Ty::Bytes)),
 ];
@@ -215,42 +216,40 @@ impl Types {
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
         }
 
+        let path_cx: syn::Path = match kind {
+            Kind::SelfCx => {
+                syn::parse_quote!(Self::Cx)
+            }
+            Kind::GenericCx => match &found_cx {
+                Some(p) => syn::parse_quote!(#p),
+                None => syn::parse_quote!(__C),
+            },
+        };
+
         for (ident, extra) in missing {
             let ty;
-            let generics;
 
             match extra {
                 Extra::Cx => {
-                    ty = match &found_cx {
-                        Some(p) => syn::parse_quote!(#p),
-                        None => syn::parse_quote!(__C),
-                    };
-
-                    generics = syn::Generics::default();
+                    ty = syn::parse_quote!(#path_cx);
                 }
                 Extra::Mode => {
                     ty = match &found_mode {
                         Some(p) => syn::parse_quote!(#p),
                         None => syn::parse_quote!(__M),
                     };
-
-                    generics = syn::Generics::default();
                 }
                 Extra::Allocator => {
-                    ty = syn::parse_quote!(<Self::Cx as #crate_path::Context>::Allocator);
-                    generics = syn::Generics::default();
+                    ty = syn::parse_quote!(<#path_cx as #crate_path::Context>::Allocator);
                 }
                 Extra::Error => {
-                    ty = syn::parse_quote!(<Self::Cx as #crate_path::Context>::Error);
-                    generics = syn::Generics::default();
+                    ty = syn::parse_quote!(<#path_cx as #crate_path::Context>::Error);
                 }
                 _ => {
                     ty = syn::Type::Path(syn::TypePath {
                         qself: None,
                         path: self.never_type(crate_path, argument, extra, kind)?,
                     });
-
-                    generics = syn::Generics::default();
                 }
             };
 
@@ -260,7 +259,7 @@ impl Types {
                 defaultness: None,
                 type_token: <Token![type]>::default(),
                 ident,
-                generics,
+                generics: syn::Generics::default(),
                 eq_token: <Token![=]>::default(),
                 ty,
                 semi_token: <Token![;]>::default(),

@@ -63,67 +63,67 @@ where
     }
 
     #[inline]
-    fn encode_u8(mut self, value: u8) -> Result<Self::Ok, C::Error> {
+    fn encode_u8(mut self, value: u8) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_u16(mut self, value: u16) -> Result<Self::Ok, C::Error> {
+    fn encode_u16(mut self, value: u16) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_u32(mut self, value: u32) -> Result<Self::Ok, C::Error> {
+    fn encode_u32(mut self, value: u32) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_u64(mut self, value: u64) -> Result<Self::Ok, C::Error> {
+    fn encode_u64(mut self, value: u64) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_u128(mut self, value: u128) -> Result<Self::Ok, C::Error> {
+    fn encode_u128(mut self, value: u128) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_i8(mut self, value: i8) -> Result<Self::Ok, C::Error> {
+    fn encode_i8(mut self, value: i8) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_i16(mut self, value: i16) -> Result<Self::Ok, C::Error> {
+    fn encode_i16(mut self, value: i16) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_i32(mut self, value: i32) -> Result<Self::Ok, C::Error> {
+    fn encode_i32(mut self, value: i32) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_i64(mut self, value: i64) -> Result<Self::Ok, C::Error> {
+    fn encode_i64(mut self, value: i64) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_i128(mut self, value: i128) -> Result<Self::Ok, C::Error> {
+    fn encode_i128(mut self, value: i128) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_usize(mut self, value: usize) -> Result<Self::Ok, C::Error> {
+    fn encode_usize(mut self, value: usize) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_isize(mut self, value: isize) -> Result<Self::Ok, C::Error> {
+    fn encode_isize(mut self, value: isize) -> Result<Self::Ok, Self::Error> {
         format_integer!(self, value)
     }
 
     #[inline]
-    fn encode_string(self, string: &str) -> Result<Self::Ok, C::Error> {
+    fn encode_string(self, string: &str) -> Result<Self::Ok, Self::Error> {
         super::encode_string(self.cx, self.writer, string.as_bytes())
     }
 }

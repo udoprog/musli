@@ -72,6 +72,7 @@ where
             C: Context,
         {
             type Ok = String;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -79,12 +80,12 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: C, string: &'de str) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, string: &'de str) -> Result<Self::Ok, Self::Error> {
                 self.visit_ref(cx, string)
             }
 
             #[inline]
-            fn visit_ref(self, _: C, string: &str) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: C, string: &str) -> Result<Self::Ok, Self::Error> {
                 use rust_alloc::borrow::ToOwned;
                 Ok(string.to_owned())
             }
@@ -175,6 +176,7 @@ macro_rules! cow {
                     C: Context,
                 {
                     type Ok = Cow<'de, $ty>;
+                    type Error = C::Error;
 
                     #[inline]
                     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -186,7 +188,7 @@ macro_rules! cow {
                         self,
                         $cx: C,
                         $owned: <$source as ToOwned<C::Allocator>>::Owned,
-                    ) -> Result<Self::Ok, C::Error> {
+                    ) -> Result<Self::Ok, Self::Error> {
                         Ok($owned_expr)
                     }
 
@@ -195,12 +197,16 @@ macro_rules! cow {
                         self,
                         $cx: C,
                         $borrowed: &'de $source,
-                    ) -> Result<Self::Ok, C::Error> {
+                    ) -> Result<Self::Ok, Self::Error> {
                         Ok($borrowed_expr)
                     }
 
                     #[inline]
-                    fn visit_ref(self, $cx: C, $reference: &$source) -> Result<Self::Ok, C::Error> {
+                    fn visit_ref(
+                        self,
+                        $cx: C,
+                        $reference: &$source,
+                    ) -> Result<Self::Ok, Self::Error> {
                         Ok($reference_expr)
                     }
                 }
@@ -652,6 +658,7 @@ where
             C: Context,
         {
             type Ok = CString;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -663,7 +670,7 @@ where
                 self,
                 cx: C,
                 value: crate::alloc::Vec<u8, C::Allocator>,
-            ) -> Result<Self::Ok, C::Error> {
+            ) -> Result<Self::Ok, Self::Error> {
                 match value.into_std() {
                     Ok(value) => CString::from_vec_with_nul(value).map_err(cx.map()),
                     Err(value) => self.visit_ref(cx, &value),
@@ -671,12 +678,12 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
                 self.visit_ref(cx, bytes)
             }
 
             #[inline]
-            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                 let value = CStr::from_bytes_with_nul(bytes).map_err(cx.map())?;
                 Ok(rust_alloc::borrow::ToOwned::to_owned(value))
             }
@@ -938,6 +945,7 @@ where
                         C: Context,
                     {
                         type Ok = OsString;
+                        type Error = C::Error;
 
                         #[inline]
                         fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -945,7 +953,7 @@ where
                         }
 
                         #[inline]
-                        fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+                        fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                             let mut buf = Vec::with_capacity(bytes.len() / 2);
 
                             for pair in bytes.chunks_exact(2) {
@@ -1089,6 +1097,7 @@ where
             C: Context,
         {
             type Ok = Vec<u8>;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1096,12 +1105,12 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, _: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
                 Ok(bytes.to_vec())
             }
 
             #[inline]
-            fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, _: C, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                 Ok(bytes.to_vec())
             }
         }

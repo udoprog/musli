@@ -826,6 +826,7 @@ where
             C: Context,
         {
             type Ok = Vec<u8, C::Allocator>;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -833,12 +834,16 @@ where
             }
 
             #[inline]
-            fn visit_owned(self, _: C, value: Vec<u8, C::Allocator>) -> Result<Self::Ok, C::Error> {
+            fn visit_owned(
+                self,
+                _: C,
+                value: Vec<u8, C::Allocator>,
+            ) -> Result<Self::Ok, Self::Error> {
                 Ok(value)
             }
 
             #[inline]
-            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                 let mut buf = Vec::new_in(cx.alloc());
                 buf.extend_from_slice(bytes).map_err(cx.map())?;
                 Ok(buf)

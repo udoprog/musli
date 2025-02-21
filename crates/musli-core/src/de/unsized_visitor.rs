@@ -26,13 +26,16 @@ use crate::Context;
 /// [`Decoder::decode_bytes`]: crate::de::Decoder::decode_bytes
 /// [`Decoder::decode_string`]: crate::de::Decoder::decode_string
 /// [`Decoder::decode_unsized`]: crate::de::Decoder::decode_unsized
-pub trait UnsizedVisitor<'de, C, T>: Sized
+pub trait UnsizedVisitor<'de, C, T>
 where
-    C: Context,
+    Self: Sized,
+    C: Context<Error = Self::Error>,
     T: ?Sized + ToOwned<C::Allocator>,
 {
-    /// The value produced.
+    /// The value produced by the visitor.
     type Ok;
+    /// The error produced by the visitor.
+    type Error;
 
     /// Format an error indicating what was expected by this visitor.
     ///
@@ -41,20 +44,20 @@ where
 
     /// Visit an owned value.
     #[inline(always)]
-    fn visit_owned(self, cx: C, value: T::Owned) -> Result<Self::Ok, C::Error> {
+    fn visit_owned(self, cx: C, value: T::Owned) -> Result<Self::Ok, Self::Error> {
         self.visit_ref(cx, value.borrow())
     }
 
     /// Visit a string that is borrowed directly from the source data.
     #[inline(always)]
-    fn visit_borrowed(self, cx: C, value: &'de T) -> Result<Self::Ok, C::Error> {
+    fn visit_borrowed(self, cx: C, value: &'de T) -> Result<Self::Ok, Self::Error> {
         self.visit_ref(cx, value)
     }
 
     /// Visit a value reference that is provided from the decoder in any manner
     /// possible. Which might require additional decoding work.
     #[inline(always)]
-    fn visit_ref(self, cx: C, _: &T) -> Result<Self::Ok, C::Error> {
+    fn visit_ref(self, cx: C, _: &T) -> Result<Self::Ok, Self::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::AnyValue,
             ExpectingWrapper::new(&self),
@@ -84,7 +87,7 @@ where
 
 impl<'de, T, C, U> Expecting for ExpectingWrapper<'_, T, C, U>
 where
-    T: UnsizedVisitor<'de, C, U>,
+    T: UnsizedVisitor<'de, C, U, Error = C::Error>,
     C: Context,
     U: ?Sized + ToOwned<C::Allocator>,
 {

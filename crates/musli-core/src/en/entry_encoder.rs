@@ -5,16 +5,18 @@ use super::{Encode, Encoder};
 /// Trait governing how to encode a map entry.
 pub trait EntryEncoder {
     /// Context associated with the encoder.
-    type Cx: Context;
+    type Cx: Context<Error = Self::Error>;
     /// Result type of the encoder.
     type Ok;
+    /// Error associated with encoding.
+    type Error;
     /// The mode of the encoder.
     type Mode: 'static;
     /// The encoder returned when advancing the map encoder to encode the key.
     type EncodeKey<'this>: Encoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
-        Error = <Self::Cx as Context>::Error,
+        Error = Self::Error,
         Mode = Self::Mode,
     >
     where
@@ -23,7 +25,7 @@ pub trait EntryEncoder {
     type EncodeValue<'this>: Encoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
-        Error = <Self::Cx as Context>::Error,
+        Error = Self::Error,
         Mode = Self::Mode,
     >
     where
@@ -34,22 +36,18 @@ pub trait EntryEncoder {
 
     /// Return the encoder for the key in the entry.
     #[must_use = "Encoders must be consumed"]
-    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, <Self::Cx as Context>::Error>;
+    fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, Self::Error>;
 
     /// Return encoder for value in the entry.
     #[must_use = "Encoders must be consumed"]
-    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, <Self::Cx as Context>::Error>;
+    fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, Self::Error>;
 
     /// Stop encoding this pair.
-    fn finish_entry(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_entry(self) -> Result<Self::Ok, Self::Error>;
 
     /// Insert the pair immediately.
     #[inline]
-    fn insert_entry<K, V>(
-        mut self,
-        key: K,
-        value: V,
-    ) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    fn insert_entry<K, V>(mut self, key: K, value: V) -> Result<Self::Ok, Self::Error>
     where
         Self: Sized,
         K: Encode<Self::Mode>,

@@ -5,16 +5,18 @@ use super::{utils, Encode, Encoder};
 /// Trait governing how to encode a sequence.
 pub trait SequenceEncoder {
     /// Context associated with the encoder.
-    type Cx: Context;
+    type Cx: Context<Error = Self::Error>;
     /// Result type of the encoder.
     type Ok;
+    /// Error associated with encoding.
+    type Error;
     /// The mode of the encoder.
     type Mode: 'static;
     /// The encoder returned when advancing the sequence encoder.
     type EncodeNext<'this>: Encoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
-        Error = <Self::Cx as Context>::Error,
+        Error = Self::Error,
         Mode = Self::Mode,
     >
     where
@@ -25,11 +27,11 @@ pub trait SequenceEncoder {
 
     /// Return encoder for the next element.
     #[must_use = "Encoders must be consumed"]
-    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, <Self::Cx as Context>::Error>;
+    fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, Self::Error>;
 
     /// Push an element into the sequence.
     #[inline]
-    fn push<T>(&mut self, value: T) -> Result<(), <Self::Cx as Context>::Error>
+    fn push<T>(&mut self, value: T) -> Result<(), Self::Error>
     where
         T: Encode<Self::Mode>,
     {
@@ -42,10 +44,7 @@ pub trait SequenceEncoder {
     /// This can be called multiple types and has the same effect as calling
     /// `push` for each value.
     #[inline]
-    fn encode_slice<T>(
-        &mut self,
-        slice: impl AsRef<[T]>,
-    ) -> Result<(), <Self::Cx as Context>::Error>
+    fn encode_slice<T>(&mut self, slice: impl AsRef<[T]>) -> Result<(), Self::Error>
     where
         T: Encode<Self::Mode>,
     {
@@ -60,7 +59,7 @@ pub trait SequenceEncoder {
     fn encode_slices<T>(
         &mut self,
         slices: impl IntoIterator<Item: AsRef<[T]>>,
-    ) -> Result<(), <Self::Cx as Context>::Error>
+    ) -> Result<(), Self::Error>
     where
         T: Encode<Self::Mode>,
     {
@@ -68,5 +67,5 @@ pub trait SequenceEncoder {
     }
 
     /// Finish encoding the sequence.
-    fn finish_sequence(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    fn finish_sequence(self) -> Result<Self::Ok, Self::Error>;
 }

@@ -27,6 +27,7 @@ where
     T: Signed,
 {
     type Ok = T;
+    type Error = C::Error;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -48,6 +48,7 @@ where
 {
     type Cx = C;
     type Ok = ();
+    type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
         = JsonEncoder<W::Mut<'this>, C, M>

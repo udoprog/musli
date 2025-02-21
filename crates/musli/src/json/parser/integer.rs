@@ -561,7 +561,10 @@ mod traits {
     use core::fmt;
     use core::ops::{Add, Not};
 
-    pub(crate) trait Unsigned: Sized + fmt::Debug + Add<Self, Output = Self> {
+    pub(crate) trait Unsigned
+    where
+        Self: Sized + fmt::Debug + Add<Self, Output = Self>,
+    {
         type Signed: Signed<Unsigned = Self>;
 
         const ZERO: Self;
@@ -591,7 +594,10 @@ mod traits {
             F: FromUnsigned<Self>;
     }
 
-    pub(crate) trait Signed: Sized + fmt::Debug {
+    pub(crate) trait Signed
+    where
+        Self: Sized + fmt::Debug,
+    {
         type Unsigned: Unsigned<Signed = Self>;
     }
 
@@ -599,7 +605,10 @@ mod traits {
         fn from_unsigned(value: T) -> Self;
     }
 
-    pub(crate) trait Float: Sized + Add<Self, Output = Self> {
+    pub(crate) trait Float
+    where
+        Self: Sized + Add<Self, Output = Self>,
+    {
         fn negate(self) -> Self;
 
         fn pow10(self, e: i32) -> Self;

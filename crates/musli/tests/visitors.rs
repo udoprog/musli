@@ -26,6 +26,7 @@ where
             C: Context,
         {
             type Ok = &'de [u8];
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -33,7 +34,7 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, _: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
                 Ok(bytes)
             }
         }
@@ -86,6 +87,7 @@ where
             C: Context,
         {
             type Ok = &'de str;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -93,7 +95,7 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, _: C, bytes: &'de str) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, bytes: &'de str) -> Result<Self::Ok, Self::Error> {
                 Ok(bytes)
             }
         }

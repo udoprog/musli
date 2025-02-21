@@ -479,6 +479,7 @@ where
             C: Context,
         {
             type Ok = &'de str;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -486,7 +487,7 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, _: C, string: &'de str) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, string: &'de str) -> Result<Self::Ok, Self::Error> {
                 Ok(string)
             }
         }
@@ -510,6 +511,7 @@ impl<'de, M> DecodeUnsized<'de, M> for str {
             F: FnOnce(&str) -> Result<O, C::Error>,
         {
             type Ok = O;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -541,6 +543,7 @@ impl<'de, M> DecodeUnsized<'de, M> for [u8] {
             F: FnOnce(&[u8]) -> Result<O, C::Error>,
         {
             type Ok = O;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -597,6 +600,7 @@ where
             C: Context,
         {
             type Ok = &'de [u8];
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -604,7 +608,7 @@ where
             }
 
             #[inline]
-            fn visit_borrowed(self, _: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, _: C, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
                 Ok(bytes)
             }
         }
@@ -628,6 +632,7 @@ impl<'de, M> DecodeUnsizedBytes<'de, M> for [u8] {
             F: FnOnce(&[u8]) -> Result<O, C::Error>,
         {
             type Ok = O;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

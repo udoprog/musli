@@ -12,26 +12,21 @@ use super::{Decoder, SizeHint};
 #[must_use = "Must call end_entries to complete decoding"]
 pub trait EntriesDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: Context;
+    type Cx: Context<Error = Self::Error>;
+    /// Error associated with decoding.
+    type Error;
     /// The mode of the decoder.
     type Mode: 'static;
     /// The decoder to use for a tuple field index.
-    type DecodeEntryKey<'this>: Decoder<
-        'de,
-        Cx = Self::Cx,
-        Error = <Self::Cx as Context>::Error,
-        Mode = Self::Mode,
-        Allocator = <Self::Cx as Context>::Allocator,
-    >
+    type DecodeEntryKey<'this>: Decoder<'de, Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>
     where
         Self: 'this;
     /// The decoder to use for a tuple field value.
     type DecodeEntryValue<'this>: Decoder<
         'de,
         Cx = Self::Cx,
-        Error = <Self::Cx as Context>::Error,
+        Error = Self::Error,
         Mode = Self::Mode,
-        Allocator = <Self::Cx as Context>::Allocator,
     >
     where
         Self: 'this;

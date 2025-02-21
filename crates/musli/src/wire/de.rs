@@ -240,25 +240,25 @@ where
     }
 
     #[inline]
-    fn skip(self) -> Result<(), C::Error> {
+    fn skip(self) -> Result<(), Self::Error> {
         self.skip_any()
     }
 
     #[inline]
-    fn try_skip(self) -> Result<Skip, C::Error> {
+    fn try_skip(self) -> Result<Skip, Self::Error> {
         self.skip()?;
         Ok(Skip::Skipped)
     }
 
     #[inline]
-    fn decode_empty(self) -> Result<(), C::Error> {
+    fn decode_empty(self) -> Result<(), Self::Error> {
         self.skip()
     }
 
     #[inline]
-    fn decode_pack<F, O>(mut self, f: F) -> Result<O, C::Error>
+    fn decode_pack<F, O>(mut self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
     {
         let mark = self.cx.mark();
         let len = self.decode_len(&mark)?;
@@ -269,7 +269,7 @@ where
     }
 
     #[inline]
-    fn decode_array<const N: usize>(mut self) -> Result<[u8; N], C::Error> {
+    fn decode_array<const N: usize>(mut self) -> Result<[u8; N], Self::Error> {
         let mark = self.cx.mark();
         let len = self.decode_len(&mark)?;
 
@@ -287,9 +287,9 @@ where
     }
 
     #[inline]
-    fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error>,
     {
         let mark = self.cx.mark();
         let len = self.decode_len(&mark)?;
@@ -297,18 +297,19 @@ where
     }
 
     #[inline]
-    fn decode_string<V>(self, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, str>,
+        V: UnsizedVisitor<'de, C, str, Error = Self::Error>,
     {
         struct Visitor<V>(V);
 
         impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
             C: Context,
-            V: UnsizedVisitor<'de, C, str>,
+            V: UnsizedVisitor<'de, C, str, Error = C::Error>,
         {
             type Ok = V::Ok;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -320,19 +321,19 @@ where
                 self,
                 cx: C,
                 bytes: Vec<u8, C::Allocator>,
-            ) -> Result<Self::Ok, C::Error> {
+            ) -> Result<Self::Ok, Self::Error> {
                 let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
             }
 
             #[inline]
-            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_borrowed(cx, string)
             }
 
             #[inline]
-            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, C::Error> {
+            fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
                 let string = crate::str::from_utf8(bytes).map_err(cx.map())?;
                 self.0.visit_ref(cx, string)
             }
@@ -342,7 +343,7 @@ where
     }
 
     #[inline]
-    fn decode_bool(mut self) -> Result<bool, C::Error> {
+    fn decode_bool(mut self) -> Result<bool, Self::Error> {
         const FALSE: Tag = Tag::new(Kind::Continuation, 0);
         const TRUE: Tag = Tag::new(Kind::Continuation, 1);
 
@@ -356,7 +357,7 @@ where
     }
 
     #[inline]
-    fn decode_char(self) -> Result<char, C::Error> {
+    fn decode_char(self) -> Result<char, Self::Error> {
         let cx = self.cx;
         let num = self.decode_u32()?;
 
@@ -367,59 +368,59 @@ where
     }
 
     #[inline]
-    fn decode_u8(self) -> Result<u8, C::Error> {
+    fn decode_u8(self) -> Result<u8, Self::Error> {
         crate::wire::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
-    fn decode_u16(self) -> Result<u16, C::Error> {
+    fn decode_u16(self) -> Result<u16, Self::Error> {
         crate::wire::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
-    fn decode_u32(self) -> Result<u32, C::Error> {
+    fn decode_u32(self) -> Result<u32, Self::Error> {
         crate::wire::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
-    fn decode_u64(self) -> Result<u64, C::Error> {
+    fn decode_u64(self) -> Result<u64, Self::Error> {
         crate::wire::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
-    fn decode_u128(self) -> Result<u128, C::Error> {
+    fn decode_u128(self) -> Result<u128, Self::Error> {
         crate::wire::int::decode_unsigned::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
-    fn decode_i8(self) -> Result<i8, C::Error> {
+    fn decode_i8(self) -> Result<i8, Self::Error> {
         Ok(self.decode_u8()? as i8)
     }
 
     #[inline]
-    fn decode_i16(self) -> Result<i16, C::Error> {
+    fn decode_i16(self) -> Result<i16, Self::Error> {
         crate::wire::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
-    fn decode_i32(self) -> Result<i32, C::Error> {
+    fn decode_i32(self) -> Result<i32, Self::Error> {
         crate::wire::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
-    fn decode_i64(self) -> Result<i64, C::Error> {
+    fn decode_i64(self) -> Result<i64, Self::Error> {
         crate::wire::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
-    fn decode_i128(self) -> Result<i128, C::Error> {
+    fn decode_i128(self) -> Result<i128, Self::Error> {
         crate::wire::int::decode_signed::<_, _, _, OPT>(self.cx, self.reader)
     }
 
     /// Decode a 32-bit floating point value by reading the 32-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
     #[inline]
-    fn decode_f32(self) -> Result<f32, C::Error> {
+    fn decode_f32(self) -> Result<f32, Self::Error> {
         let bits = self.decode_u32()?;
         Ok(f32::from_bits(bits))
     }
@@ -427,23 +428,23 @@ where
     /// Decode a 64-bit floating point value by reading the 64-bit in-memory
     /// IEEE 754 encoding byte-by-byte.
     #[inline]
-    fn decode_f64(self) -> Result<f64, C::Error> {
+    fn decode_f64(self) -> Result<f64, Self::Error> {
         let bits = self.decode_u64()?;
         Ok(f64::from_bits(bits))
     }
 
     #[inline]
-    fn decode_usize(self) -> Result<usize, C::Error> {
+    fn decode_usize(self) -> Result<usize, Self::Error> {
         crate::wire::int::decode_length::<_, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]
-    fn decode_isize(self) -> Result<isize, C::Error> {
+    fn decode_isize(self) -> Result<isize, Self::Error> {
         Ok(self.decode_usize()? as isize)
     }
 
     #[inline]
-    fn decode_option(mut self) -> Result<Option<Self::DecodeSome>, C::Error> {
+    fn decode_option(mut self) -> Result<Option<Self::DecodeSome>, Self::Error> {
         // Options are encoded as empty or sequences with a single element.
         const NONE: Tag = Tag::new(Kind::Sequence, 0);
         const SOME: Tag = Tag::new(Kind::Sequence, 1);
@@ -458,9 +459,9 @@ where
     }
 
     #[inline]
-    fn decode_sequence<F, O>(self, f: F) -> Result<O, <Self::Cx as Context>::Error>
+    fn decode_sequence<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, <Self::Cx as Context>::Error>,
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
         let mut decoder = self.shared_decode_sequence()?;
         let output = f(&mut decoder)?;
@@ -469,17 +470,17 @@ where
     }
 
     #[inline]
-    fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, C::Error>
+    fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
         self.decode_sequence(f)
     }
 
     #[inline]
-    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
+    fn decode_map<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
         let mut decoder = self.shared_decode_pair_sequence()?;
         let output = f(&mut decoder)?;
@@ -488,25 +489,25 @@ where
     }
 
     #[inline]
-    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
         self.decode_map(f)
     }
 
     #[inline]
-    fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
+    fn decode_map_entries<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, Self::Error>,
     {
         self.decode_map(f)
     }
 
     #[inline]
-    fn decode_variant<F, O>(mut self, f: F) -> Result<O, C::Error>
+    fn decode_variant<F, O>(mut self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeVariant) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeVariant) -> Result<O, Self::Error>,
     {
         let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
@@ -528,6 +529,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeNext<'this>
         = StorageDecoder<OPT, true, <Limit<R> as Reader<'de>>::Mut<'this>, C, M>
@@ -540,12 +542,12 @@ where
     }
 
     #[inline]
-    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, Self::Error> {
         Ok(Some(self.decode_next()?))
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, Self::Error> {
         Ok(StorageDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 }
@@ -557,6 +559,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeNext<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>
@@ -574,7 +577,7 @@ where
     }
 
     #[inline]
-    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, C::Error> {
+    fn try_decode_next(&mut self) -> Result<Option<Self::DecodeNext<'_>>, Self::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -584,7 +587,7 @@ where
     }
 
     #[inline]
-    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, C::Error> {
+    fn decode_next(&mut self) -> Result<Self::DecodeNext<'_>, Self::Error> {
         if self.remaining == 0 {
             return Err(self
                 .cx
@@ -603,6 +606,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeTag<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>
@@ -619,12 +623,12 @@ where
     }
 
     #[inline]
-    fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, C::Error> {
+    fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, Self::Error> {
         Ok(WireDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, C::Error> {
+    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, Self::Error> {
         Ok(WireDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 }
@@ -636,6 +640,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeEntry<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>
@@ -657,7 +662,7 @@ where
     }
 
     #[inline]
-    fn decode_entry(&mut self) -> Result<Option<Self::DecodeEntry<'_>>, C::Error> {
+    fn decode_entry(&mut self) -> Result<Option<Self::DecodeEntry<'_>>, Self::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -667,7 +672,9 @@ where
     }
 
     #[inline]
-    fn decode_remaining_entries(&mut self) -> Result<Self::DecodeRemainingEntries<'_>, C::Error> {
+    fn decode_remaining_entries(
+        &mut self,
+    ) -> Result<Self::DecodeRemainingEntries<'_>, Self::Error> {
         Ok(RemainingWireDecoder::new(
             self.cx,
             self.reader.borrow_mut(),
@@ -683,6 +690,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeKey<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>
@@ -696,12 +704,12 @@ where
     }
 
     #[inline]
-    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, C::Error> {
+    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, Self::Error> {
         Ok(WireDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn decode_value(self) -> Result<Self::DecodeValue, C::Error> {
+    fn decode_value(self) -> Result<Self::DecodeValue, Self::Error> {
         Ok(self)
     }
 }
@@ -713,6 +721,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeEntryKey<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>
@@ -729,7 +738,7 @@ where
     }
 
     #[inline]
-    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, C::Error> {
+    fn decode_entry_key(&mut self) -> Result<Option<Self::DecodeEntryKey<'_>>, Self::Error> {
         if self.remaining == 0 {
             return Ok(None);
         }
@@ -739,12 +748,12 @@ where
     }
 
     #[inline]
-    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, C::Error> {
+    fn decode_entry_value(&mut self) -> Result<Self::DecodeEntryValue<'_>, Self::Error> {
         Ok(WireDecoder::new(self.cx, self.reader.borrow_mut()))
     }
 
     #[inline]
-    fn end_entries(self) -> Result<(), C::Error> {
+    fn end_entries(self) -> Result<(), Self::Error> {
         self.skip_remaining_entries()?;
         Ok(())
     }
