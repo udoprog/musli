@@ -10,18 +10,11 @@ use super::error::{err, SerdeError};
 
 use serde::ser::{self, Serialize};
 
-pub(super) struct Serializer<E>
-where
-    E: Encoder,
-{
+pub(super) struct Serializer<E> {
     encoder: E,
 }
 
-impl<E> Serializer<E>
-where
-    E: Encoder,
-{
-    /// Construct a new deserializer out of an encoder.
+impl<E> Serializer<E> {
     #[inline]
     pub(super) fn new(encoder: E) -> Self {
         Self { encoder }
@@ -297,17 +290,12 @@ where
     Ok(output)
 }
 
-pub(super) struct SerializeSeq<E>
-where
-    E: SequenceEncoder,
-{
+pub(super) struct SerializeSeq<E> {
     encoder: E,
 }
 
-impl<E> SerializeSeq<E>
-where
-    E: SequenceEncoder,
-{
+impl<E> SerializeSeq<E> {
+    #[inline]
     fn new(encoder: E) -> Self {
         Self { encoder }
     }
@@ -399,17 +387,11 @@ where
     }
 }
 
-pub(super) struct SerializeMap<E>
-where
-    E: EntriesEncoder,
-{
+pub(super) struct SerializeMap<E> {
     encoder: E,
 }
 
-impl<E> SerializeMap<E>
-where
-    E: EntriesEncoder,
-{
+impl<E> SerializeMap<E> {
     #[inline]
     fn new(encoder: E) -> Self {
         Self { encoder }
@@ -449,17 +431,12 @@ where
     }
 }
 
-pub(super) struct SerializeStruct<E>
-where
-    E: MapEncoder,
-{
+pub(super) struct SerializeStruct<E> {
     encoder: E,
 }
 
-impl<E> SerializeStruct<E>
-where
-    E: MapEncoder,
-{
+impl<E> SerializeStruct<E> {
+    #[inline]
     fn new(encoder: E) -> Self {
         Self { encoder }
     }
@@ -490,17 +467,12 @@ where
     }
 }
 
-pub(super) struct SerializeStructVariant<E>
-where
-    E: MapEncoder,
-{
+pub(super) struct SerializeStructVariant<E> {
     encoder: E,
 }
 
-impl<E> SerializeStructVariant<E>
-where
-    E: MapEncoder,
-{
+impl<E> SerializeStructVariant<E> {
+    #[inline]
     fn new(encoder: E) -> Self {
         Self { encoder }
     }
