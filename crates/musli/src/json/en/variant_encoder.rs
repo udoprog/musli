@@ -21,6 +21,7 @@ where
     #[inline]
     pub(super) fn new(cx: C, mut writer: W) -> Result<Self, C::Error> {
         writer.write_byte(cx, b'{')?;
+
         Ok(Self {
             cx,
             writer,
@@ -37,6 +38,7 @@ where
 {
     type Cx = C;
     type Ok = ();
+    type Error = C::Error;
     type Mode = M;
     type EncodeTag<'this>
         = JsonObjectKeyEncoder<W::Mut<'this>, C, M>

@@ -5,14 +5,16 @@ use super::Decoder;
 /// Trait governing how to decode a variant.
 pub trait VariantDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: Context;
+    type Cx: Context<Error = Self::Error>;
+    /// Error associated with decoding.
+    type Error;
     /// The mode of the decoder.
     type Mode: 'static;
     /// The decoder to use for the variant tag.
     type DecodeTag<'this>: Decoder<
         'de,
         Cx = Self::Cx,
-        Error = <Self::Cx as Context>::Error,
+        Error = Self::Error,
         Mode = Self::Mode,
         Allocator = <Self::Cx as Context>::Allocator,
     >
@@ -22,7 +24,7 @@ pub trait VariantDecoder<'de> {
     type DecodeValue<'this>: Decoder<
         'de,
         Cx = Self::Cx,
-        Error = <Self::Cx as Context>::Error,
+        Error = Self::Error,
         Mode = Self::Mode,
         Allocator = <Self::Cx as Context>::Allocator,
     >
@@ -37,9 +39,9 @@ pub trait VariantDecoder<'de> {
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "Decoders must be consumed"]
-    fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, <Self::Cx as Context>::Error>;
+    fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, Self::Error>;
 
     /// Decode the second value in the pair..
     #[must_use = "Decoders must be consumed"]
-    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, <Self::Cx as Context>::Error>;
+    fn decode_value(&mut self) -> Result<Self::DecodeValue<'_>, Self::Error>;
 }

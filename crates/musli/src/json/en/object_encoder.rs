@@ -47,6 +47,7 @@ where
 {
     type Cx = C;
     type Ok = ();
+    type Error = C::Error;
     type Mode = M;
     type EncodeEntry<'this>
         = JsonObjectPairEncoder<W::Mut<'this>, C, M>
@@ -59,7 +60,7 @@ where
     }
 
     #[inline]
-    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, C::Error> {
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, Self::Error> {
         self.len += 1;
 
         Ok(JsonObjectPairEncoder::new(
@@ -70,7 +71,7 @@ where
     }
 
     #[inline]
-    fn finish_map(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_map(mut self) -> Result<Self::Ok, Self::Error> {
         self.writer.write_bytes(self.cx, self.end)
     }
 }
@@ -83,6 +84,7 @@ where
 {
     type Cx = C;
     type Ok = ();
+    type Error = C::Error;
     type Mode = M;
     type EncodeEntryKey<'this>
         = JsonObjectKeyEncoder<W::Mut<'this>, C, M>
@@ -99,7 +101,7 @@ where
     }
 
     #[inline]
-    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, C::Error> {
+    fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, Self::Error> {
         if self.len > 0 {
             self.writer.write_byte(self.cx, b',')?;
         }
@@ -109,13 +111,13 @@ where
     }
 
     #[inline]
-    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, C::Error> {
+    fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, Self::Error> {
         self.writer.write_byte(self.cx, b':')?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_entries(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_entries(mut self) -> Result<Self::Ok, Self::Error> {
         self.writer.write_byte(self.cx, b'}')
     }
 }

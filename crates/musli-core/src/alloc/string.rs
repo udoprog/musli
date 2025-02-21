@@ -829,6 +829,7 @@ where
             C: Context,
         {
             type Ok = String<C::Allocator>;
+            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

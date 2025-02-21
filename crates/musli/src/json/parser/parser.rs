@@ -144,10 +144,10 @@ pub trait Parser<'de>: private::Sealed {
     /// Parse an unknown number and try to coerce it into the best fit type
     /// through [Visitor].
     #[doc(hidden)]
-    fn parse_number<C, V>(&mut self, cx: C, visitor: V) -> Result<V::Ok, C::Error>
+    fn parse_number<C, V>(&mut self, cx: C, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: Visitor<'de, C>,
+        V: Visitor<'de, C, Error = C::Error>,
     {
         let signed = decode_signed_full::<i128, _, _>(cx, self)?;
 

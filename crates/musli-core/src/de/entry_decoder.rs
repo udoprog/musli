@@ -5,14 +5,16 @@ use super::{Decoder, SizeHint};
 /// Trait governing how to decode a map entry.
 pub trait EntryDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: Context;
+    type Cx: Context<Error = Self::Error>;
+    /// Error associated with decoding.
+    type Error;
     /// The mode of the decoder.
     type Mode: 'static;
     /// The decoder to use for a tuple field index.
     type DecodeKey<'this>: Decoder<
         'de,
         Cx = Self::Cx,
-        Error = <Self::Cx as Context>::Error,
+        Error = Self::Error,
         Mode = Self::Mode,
         Allocator = <Self::Cx as Context>::Allocator,
     >
@@ -22,7 +24,7 @@ pub trait EntryDecoder<'de> {
     type DecodeValue: Decoder<
         'de,
         Cx = Self::Cx,
-        Error = <Self::Cx as Context>::Error,
+        Error = Self::Error,
         Mode = Self::Mode,
         Allocator = <Self::Cx as Context>::Allocator,
     >;
@@ -41,9 +43,9 @@ pub trait EntryDecoder<'de> {
     /// If this is a map the first value would be the key of the map, if this is
     /// a struct the first value would be the field of the struct.
     #[must_use = "Decoders must be consumed"]
-    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, <Self::Cx as Context>::Error>;
+    fn decode_key(&mut self) -> Result<Self::DecodeKey<'_>, Self::Error>;
 
     /// Decode the second value in the pair..
     #[must_use = "Decoders must be consumed"]
-    fn decode_value(self) -> Result<Self::DecodeValue, <Self::Cx as Context>::Error>;
+    fn decode_value(self) -> Result<Self::DecodeValue, Self::Error>;
 }

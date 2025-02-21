@@ -134,18 +134,18 @@ where
     }
 
     #[inline]
-    fn skip(self) -> Result<(), C::Error> {
+    fn skip(self) -> Result<(), Self::Error> {
         self.skip_any()
     }
 
     #[inline]
-    fn try_skip(self) -> Result<Skip, C::Error> {
+    fn try_skip(self) -> Result<Skip, Self::Error> {
         self.skip()?;
         Ok(Skip::Skipped)
     }
 
     #[inline]
-    fn decode_buffer(self) -> Result<Self::DecodeBuffer, C::Error> {
+    fn decode_buffer(self) -> Result<Self::DecodeBuffer, Self::Error> {
         let cx = self.cx;
         let value = self.decode::<crate::value::Value<C::Allocator>>()?;
         // JSON: Encodes numbers in objects as strings, so we need to permit
@@ -154,12 +154,12 @@ where
     }
 
     #[inline]
-    fn decode_empty(self) -> Result<(), C::Error> {
+    fn decode_empty(self) -> Result<(), Self::Error> {
         self.skip()
     }
 
     #[inline]
-    fn decode_bool(mut self) -> Result<bool, C::Error> {
+    fn decode_bool(mut self) -> Result<bool, Self::Error> {
         match self.parser.lex(self.cx) {
             Token::True => {
                 self.parse_true()?;
@@ -176,7 +176,7 @@ where
     }
 
     #[inline]
-    fn decode_char(mut self) -> Result<char, C::Error> {
+    fn decode_char(mut self) -> Result<char, Self::Error> {
         let start = self.cx.mark();
         let mut scratch = Vec::new_in(self.cx.alloc());
 
@@ -197,77 +197,77 @@ where
     }
 
     #[inline]
-    fn decode_u8(mut self) -> Result<u8, C::Error> {
+    fn decode_u8(mut self) -> Result<u8, Self::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_u16(mut self) -> Result<u16, C::Error> {
+    fn decode_u16(mut self) -> Result<u16, Self::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_u32(mut self) -> Result<u32, C::Error> {
+    fn decode_u32(mut self) -> Result<u32, Self::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_u64(mut self) -> Result<u64, C::Error> {
+    fn decode_u64(mut self) -> Result<u64, Self::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_u128(mut self) -> Result<u128, C::Error> {
+    fn decode_u128(mut self) -> Result<u128, Self::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_i8(mut self) -> Result<i8, C::Error> {
+    fn decode_i8(mut self) -> Result<i8, Self::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_i16(mut self) -> Result<i16, C::Error> {
+    fn decode_i16(mut self) -> Result<i16, Self::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_i32(mut self) -> Result<i32, C::Error> {
+    fn decode_i32(mut self) -> Result<i32, Self::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_i64(mut self) -> Result<i64, C::Error> {
+    fn decode_i64(mut self) -> Result<i64, Self::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_i128(mut self) -> Result<i128, C::Error> {
+    fn decode_i128(mut self) -> Result<i128, Self::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_usize(mut self) -> Result<usize, C::Error> {
+    fn decode_usize(mut self) -> Result<usize, Self::Error> {
         parse_unsigned(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_isize(mut self) -> Result<isize, C::Error> {
+    fn decode_isize(mut self) -> Result<isize, Self::Error> {
         parse_signed(self.cx, self.parser.borrow_mut())
     }
 
     #[inline]
-    fn decode_f32(mut self) -> Result<f32, C::Error> {
+    fn decode_f32(mut self) -> Result<f32, Self::Error> {
         self.parser.parse_f32(self.cx)
     }
 
     #[inline]
-    fn decode_f64(mut self) -> Result<f64, C::Error> {
+    fn decode_f64(mut self) -> Result<f64, Self::Error> {
         self.parser.parse_f64(self.cx)
     }
 
     #[inline]
-    fn decode_array<const N: usize>(self) -> Result<[u8; N], C::Error> {
+    fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
         let cx = self.cx;
         let mark = cx.mark();
 
@@ -297,9 +297,9 @@ where
     }
 
     #[inline]
-    fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, [u8]>,
+        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error>,
     {
         let cx = self.cx;
 
@@ -317,9 +317,9 @@ where
     }
 
     #[inline]
-    fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, str>,
+        V: UnsizedVisitor<'de, C, str, Error = Self::Error>,
     {
         let mut scratch = Vec::new_in(self.cx.alloc());
 
@@ -330,7 +330,7 @@ where
     }
 
     #[inline]
-    fn decode_option(mut self) -> Result<Option<Self::DecodeSome>, C::Error> {
+    fn decode_option(mut self) -> Result<Option<Self::DecodeSome>, Self::Error> {
         if self.parser.lex(self.cx).is_null() {
             self.parse_null()?;
             Ok(None)
@@ -340,9 +340,9 @@ where
     }
 
     #[inline]
-    fn decode_pack<F, O>(self, f: F) -> Result<O, C::Error>
+    fn decode_pack<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodePack) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonSequenceDecoder::new(self.cx, None, self.parser)?;
         let output = f(&mut decoder)?;
@@ -351,9 +351,9 @@ where
     }
 
     #[inline]
-    fn decode_sequence<F, O>(self, f: F) -> Result<O, C::Error>
+    fn decode_sequence<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonSequenceDecoder::new(self.cx, None, self.parser)?;
         let output = f(&mut decoder)?;
@@ -362,9 +362,9 @@ where
     }
 
     #[inline]
-    fn decode_sequence_hint<F, O>(self, hint: &SequenceHint, f: F) -> Result<O, C::Error>
+    fn decode_sequence_hint<F, O>(self, hint: &SequenceHint, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonSequenceDecoder::new(self.cx, Some(hint.size), self.parser)?;
         let output = f(&mut decoder)?;
@@ -373,9 +373,9 @@ where
     }
 
     #[inline]
-    fn decode_map<F, O>(self, f: F) -> Result<O, C::Error>
+    fn decode_map<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
         let output = f(&mut decoder)?;
@@ -384,9 +384,9 @@ where
     }
 
     #[inline]
-    fn decode_map_hint<F, O>(self, hint: &MapHint, f: F) -> Result<O, C::Error>
+    fn decode_map_hint<F, O>(self, hint: &MapHint, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeMap) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonObjectDecoder::new(self.cx, Some(hint.size), self.parser)?;
         let output = f(&mut decoder)?;
@@ -395,17 +395,17 @@ where
     }
 
     #[inline]
-    fn decode_map_entries<F, O>(self, f: F) -> Result<O, C::Error>
+    fn decode_map_entries<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, Self::Error>,
     {
         self.decode_map(f)
     }
 
     #[inline]
-    fn decode_variant<F, O>(self, f: F) -> Result<O, C::Error>
+    fn decode_variant<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodeVariant) -> Result<O, C::Error>,
+        F: FnOnce(&mut Self::DecodeVariant) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonVariantDecoder::new(self.cx, self.parser)?;
         let output = f(&mut decoder)?;
@@ -414,17 +414,17 @@ where
     }
 
     #[inline]
-    fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: Visitor<'de, C>,
+        V: Visitor<'de, C, Error = Self::Error>,
     {
         self.parser.parse_number(self.cx, visitor)
     }
 
     #[inline]
-    fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, C::Error>
+    fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: Visitor<'de, C>,
+        V: Visitor<'de, C, Error = Self::Error>,
     {
         let cx = self.cx;
 

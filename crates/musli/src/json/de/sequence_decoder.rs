@@ -100,6 +100,7 @@ where
     M: 'static,
 {
     type Cx = C;
+    type Error = C::Error;
     type Mode = M;
     type DecodeNext<'this>
         = JsonDecoder<P::Mut<'this>, C, M>

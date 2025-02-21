@@ -5,40 +5,46 @@ use super::{Encode, EntryEncoder};
 /// Encoder for a map.
 pub trait MapEncoder {
     /// Context associated with the encoder.
-    type Cx: Context;
+    type Cx: Context<Error = Self::Error>;
     /// Result type of the encoder.
     type Ok;
+    /// Error associated with encoding.
+    type Error;
     /// The mode of the encoder.
     type Mode: 'static;
     /// Encode the next pair.
-    type EncodeEntry<'this>: EntryEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>
+    type EncodeEntry<'this>: EntryEncoder<
+        Cx = Self::Cx,
+        Ok = Self::Ok,
+        Error = Self::Error,
+        Mode = Self::Mode,
+    >
     where
         Self: 'this;
 
     /// Access the context associated with the encoder.
     fn cx(&self) -> Self::Cx;
 
-    /// Encode the next pair.
+    /// Encode the next map entry.
     #[must_use = "Encoders must be consumed"]
-    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, <Self::Cx as Context>::Error>;
+    fn encode_entry(&mut self) -> Result<Self::EncodeEntry<'_>, Self::Error>;
 
     /// Simplified encoder for a map entry, which ensures that encoding is
     /// always finished.
     #[inline]
-    fn encode_entry_fn<F>(&mut self, f: F) -> Result<Self::Ok, <Self::Cx as Context>::Error>
+    fn encode_entry_fn<F>(&mut self, f: F) -> Result<Self::Ok, Self::Error>
     where
-        F: FnOnce(&mut Self::EncodeEntry<'_>) -> Result<(), <Self::Cx as Context>::Error>,
+        F: FnOnce(&mut Self::EncodeEntry<'_>) -> Result<(), Self::Error>,
     {
         let mut encoder = self.encode_entry()?;
         f(&mut encoder)?;
         encoder.finish_entry()
     }
 
-    /// Insert a pair immediately.
+    /// Insert a map entry.
     #[inline]
-    fn insert_entry<F, S>(&mut self, key: F, value: S) -> Result<(), <Self::Cx as Context>::Error>
+    fn insert_entry<F, S>(&mut self, key: F, value: S) -> Result<(), Self::Error>
     where
-        Self: Sized,
         F: Encode<Self::Mode>,
         S: Encode<Self::Mode>,
     {
@@ -46,6 +52,6 @@ pub trait MapEncoder {
         Ok(())
     }
 
-    /// Finish encoding pairs.
-    fn finish_map(self) -> Result<Self::Ok, <Self::Cx as Context>::Error>;
+    /// Finish encoding a map.
+    fn finish_map(self) -> Result<Self::Ok, Self::Error>;
 }
