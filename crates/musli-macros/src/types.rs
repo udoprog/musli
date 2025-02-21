@@ -6,8 +6,6 @@ use syn::parse::Parse;
 use syn::punctuated::Punctuated;
 use syn::Token;
 
-const U_PARAM: &str = "__U";
-
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Ty {
     /// `str`.
@@ -28,7 +26,6 @@ pub(super) enum Extra {
     Mode,
     /// `type Allocator = <Self::Cx as Context>::Allocator;`
     Allocator,
-    Context,
     Visitor(Ty),
 }
 
@@ -36,7 +33,6 @@ pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
     ("Cx", Extra::Cx),
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
-    ("WithContext", Extra::Context),
     ("EncodeSome", Extra::None),
     ("EncodePack", Extra::None),
     ("EncodeSequence", Extra::None),
@@ -52,7 +48,6 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
     ("Allocator", Extra::Allocator),
-    ("WithContext", Extra::Context),
     ("DecodeBuffer", Extra::None),
     ("DecodeSome", Extra::None),
     ("DecodePack", Extra::None),
@@ -111,6 +106,7 @@ pub(super) struct Types {
 }
 
 impl Parse for Types {
+    #[inline]
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         Ok(Self {
             item_impl: input.parse()?,
@@ -144,6 +140,19 @@ impl Types {
             .iter()
             .map(|(ident, extra)| (syn::Ident::new(ident, Span::call_site()), *extra))
             .collect::<BTreeMap<_, _>>();
+
+        let mut found_cx = None;
+        let mut found_mode = None;
+
+        for p in self.item_impl.generics.type_params() {
+            let name = p.ident.to_string();
+
+            if name.starts_with("C") {
+                found_cx = Some(found_cx.unwrap_or_else(|| p.ident.clone()));
+            } else if name.starts_with("M") {
+                found_mode = Some(found_mode.unwrap_or_else(|| p.ident.clone()));
+            }
+        }
 
         // List of associated types which are specified, but under a `cfg`
         // attribute so its conditions need to be inverted.
@@ -212,11 +221,19 @@ impl Types {
 
             match extra {
                 Extra::Cx => {
-                    ty = syn::parse_quote!(C);
+                    ty = match &found_cx {
+                        Some(p) => syn::parse_quote!(#p),
+                        None => syn::parse_quote!(__C),
+                    };
+
                     generics = syn::Generics::default();
                 }
                 Extra::Mode => {
-                    ty = syn::parse_quote!(M);
+                    ty = match &found_mode {
+                        Some(p) => syn::parse_quote!(#p),
+                        None => syn::parse_quote!(__M),
+                    };
+
                     generics = syn::Generics::default();
                 }
                 Extra::Allocator => {
@@ -226,41 +243,6 @@ impl Types {
                 Extra::Error => {
                     ty = syn::parse_quote!(<Self::Cx as #crate_path::Context>::Error);
                     generics = syn::Generics::default();
-                }
-                Extra::Context => {
-                    let u_param = syn::Ident::new(U_PARAM, Span::call_site());
-
-                    let mut params = Punctuated::default();
-
-                    params.push(syn::GenericParam::Type(syn::TypeParam {
-                        attrs: Vec::new(),
-                        ident: u_param.clone(),
-                        colon_token: None,
-                        bounds: Punctuated::default(),
-                        eq_token: None,
-                        default: None,
-                    }));
-
-                    ty = syn::Type::Path(syn::TypePath {
-                        qself: None,
-                        path: self.never_type(crate_path, argument, extra, kind)?,
-                    });
-
-                    let mut where_clause = syn::WhereClause {
-                        where_token: <Token![where]>::default(),
-                        predicates: Punctuated::default(),
-                    };
-
-                    where_clause
-                        .predicates
-                        .push(syn::parse_quote!(#u_param: #crate_path::Context<Allocator = <Self::Cx as Context>::Allocator>));
-
-                    generics = syn::Generics {
-                        lt_token: Some(<Token![<]>::default()),
-                        params,
-                        gt_token: Some(<Token![>]>::default()),
-                        where_clause: Some(where_clause),
-                    };
                 }
                 _ => {
                     ty = syn::Type::Path(syn::TypePath {
@@ -342,11 +324,6 @@ impl Types {
                         args.push(syn::parse_quote!([u8]));
                     }
                 },
-                Extra::Context => {
-                    let u_param = syn::Ident::new(U_PARAM, Span::call_site());
-                    args.push(syn::parse_quote!(#u_param));
-                    args.push(syn::parse_quote!(Self::Mode));
-                }
                 Extra::None => match kind {
                     Kind::SelfCx => {
                         args.push(syn::parse_quote!(Self::Cx));

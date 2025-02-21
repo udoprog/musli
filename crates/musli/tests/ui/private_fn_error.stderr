@@ -10,7 +10,6 @@ note: the function `decode` is defined here
 21 | /     fn decode<'de, D, T, const N: usize>(__decoder: D) -> Result<[T; N], D::Error>
 22 | |     where
 23 | |         D: Decoder<'de>,
-24 | |     {
-25 | |         todo!()
+...  |
 26 | |     }
    | |_____^

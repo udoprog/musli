@@ -94,214 +94,85 @@ mod deserializer;
 mod error;
 mod serializer;
 
-use core::cell::RefCell;
-use core::error::Error;
-use core::fmt;
-
 use serde::{Deserialize, Serialize};
 
 use self::deserializer::Deserializer;
 use self::serializer::Serializer;
 
-use crate::{Context, Decoder, Encoder};
+use crate::{Decoder, Encoder};
 
-struct SerdeContext<C>
-where
-    C: Context,
-{
-    error: RefCell<Option<C::Error>>,
-    inner: C,
-}
-
-impl<C> Context for &SerdeContext<C>
-where
-    C: Context,
-{
-    type Error = error::SerdeError;
-    type Mark = C::Mark;
-    type Allocator = C::Allocator;
-
-    #[inline]
-    fn clear(self) {
-        self.inner.clear();
-        *self.error.borrow_mut() = None;
-    }
-
-    #[inline]
-    fn mark(self) -> Self::Mark {
-        self.inner.mark()
-    }
-
-    #[inline]
-    fn advance(self, n: usize) {
-        self.inner.advance(n)
-    }
-
-    #[inline]
-    fn alloc(self) -> Self::Allocator {
-        self.inner.alloc()
-    }
-
-    #[inline]
-    fn custom<E>(self, error: E) -> Self::Error
-    where
-        E: 'static + Send + Sync + Error,
-    {
-        *self.error.borrow_mut() = Some(self.inner.custom(error));
-        error::SerdeError::Captured
-    }
-
-    #[inline]
-    fn message<M>(self, message: M) -> Self::Error
-    where
-        M: fmt::Display,
-    {
-        *self.error.borrow_mut() = Some(self.inner.message(message));
-        error::SerdeError::Captured
-    }
-
-    #[inline]
-    fn enter_struct(self, type_name: &'static str) {
-        self.inner.enter_struct(type_name);
-    }
-
-    #[inline]
-    fn leave_struct(self) {
-        self.inner.leave_struct();
-    }
-
-    #[inline]
-    fn enter_enum(self, type_name: &'static str) {
-        self.inner.enter_enum(type_name);
-    }
-
-    #[inline]
-    fn leave_enum(self) {
-        self.inner.leave_enum();
-    }
-
-    #[inline]
-    fn enter_named_field<F>(self, type_name: &'static str, field: F)
-    where
-        F: fmt::Display,
-    {
-        self.inner.enter_named_field(type_name, field);
-    }
-
-    #[inline]
-    fn enter_unnamed_field<F>(self, index: u32, name: F)
-    where
-        F: fmt::Display,
-    {
-        self.inner.enter_unnamed_field(index, name);
-    }
-
-    #[inline]
-    fn leave_field(self) {
-        self.inner.leave_field();
-    }
-
-    #[inline]
-    fn enter_variant<V>(self, type_name: &'static str, tag: V)
-    where
-        V: fmt::Display,
-    {
-        self.inner.enter_variant(type_name, tag);
-    }
-
-    #[inline]
-    fn leave_variant(self) {
-        self.inner.leave_variant();
-    }
-
-    #[inline]
-    fn enter_map_key<K>(self, field: K)
-    where
-        K: fmt::Display,
-    {
-        self.inner.enter_map_key(field);
-    }
-
-    #[inline]
-    fn leave_map_key(self) {
-        self.inner.leave_map_key();
-    }
-
-    #[inline]
-    fn enter_sequence_index(self, index: usize) {
-        self.inner.enter_sequence_index(index);
-    }
-
-    #[inline]
-    fn leave_sequence_index(self) {
-        self.inner.leave_sequence_index();
-    }
-}
-
-/// Encode the given serde value `T` to the given [Encoder] using the serde
+/// Encode the given serde value `T` to the given [`Encoder`] using the serde
 /// compatibility layer.
+///
+/// ## Examples
+///
+/// ```
+/// use serde::{Serialize, Deserialize};
+/// use musli::{Encode, Decode};
+/// use url::Url;
+///
+/// #[derive(Serialize, Deserialize)]
+/// struct Address {
+///     street: String,
+///     city: String,
+///     zip: u32,
+/// }
+///
+/// #[derive(Encode, Decode)]
+/// #[musli(name_all = "name")]
+/// struct Person {
+///     name: String,
+///     #[musli(with = musli::serde)]
+///     address: Address,
+///     #[musli(with = musli::serde)]
+///     url: Url,
+/// }
+/// ```
+#[inline]
 pub fn encode<E, T>(value: &T, encoder: E) -> Result<E::Ok, E::Error>
 where
     E: Encoder,
     T: Serialize,
 {
     let cx = encoder.cx();
-
-    let cx = SerdeContext {
-        error: RefCell::new(None),
-        inner: cx,
-    };
-
-    let encoder = encoder.with_context(&cx)?;
-
     let serializer = Serializer::new(encoder);
-
-    let error = match value.serialize(serializer) {
-        Ok(value) => return Ok(value),
-        Err(error) => error,
-    };
-
-    if let Some(error) = error.report(cx.inner) {
-        return Err(error);
-    }
-
-    let Some(error) = cx.error.borrow_mut().take() else {
-        return Err(cx.inner.message("error during encoding (no information)"));
-    };
-
-    Err(error)
+    value.serialize(serializer).map_err(error::err(cx))
 }
 
-/// Decode the given serde value `T` from the given [Decoder] using the serde
+/// Decode the given serde value `T` from the given [`Decoder`] using the serde
 /// compatibility layer.
+///
+/// ## Examples
+///
+/// ```
+/// use serde::{Serialize, Deserialize};
+/// use musli::{Encode, Decode};
+/// use url::Url;
+///
+/// #[derive(Serialize, Deserialize)]
+/// struct Address {
+///     street: String,
+///     city: String,
+///     zip: u32,
+/// }
+///
+/// #[derive(Encode, Decode)]
+/// #[musli(name_all = "name")]
+/// struct Person {
+///     name: String,
+///     #[musli(with = musli::serde)]
+///     address: Address,
+///     #[musli(with = musli::serde)]
+///     url: Url,
+/// }
+/// ```
+#[inline]
 pub fn decode<'de, D, T>(decoder: D) -> Result<T, D::Error>
 where
     D: Decoder<'de>,
     T: Deserialize<'de>,
 {
     let cx = decoder.cx();
-
-    let cx = SerdeContext {
-        error: RefCell::new(None),
-        inner: cx,
-    };
-
-    let decoder = decoder.with_context(&cx)?;
-
     let deserializer = Deserializer::new(decoder);
-
-    let error = match T::deserialize(deserializer) {
-        Ok(value) => return Ok(value),
-        Err(error) => error,
-    };
-
-    if let Some(error) = error.report(cx.inner) {
-        return Err(error);
-    }
-
-    let Some(error) = cx.error.borrow_mut().take() else {
-        return Err(cx.inner.message("error during encoding (no information)"));
-    };
-
-    Err(error)
+    T::deserialize(deserializer).map_err(error::err(cx))
 }

@@ -43,22 +43,10 @@ where
     type Error = C::Error;
     type Ok = ();
     type Mode = M;
-    type WithContext<U>
-        = JsonObjectKeyEncoder<W, U, M>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
         self.cx
-    }
-
-    #[inline]
-    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
-    {
-        Ok(JsonObjectKeyEncoder::new(cx, self.writer))
     }
 
     #[inline]

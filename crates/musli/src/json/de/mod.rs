@@ -115,10 +115,6 @@ where
     type Error = C::Error;
     type Mode = M;
     type Allocator = C::Allocator;
-    type WithContext<U>
-        = JsonDecoder<P, U, M>
-    where
-        U: Context<Allocator = Self::Allocator>;
     type DecodeBuffer = crate::value::IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
     type DecodePack = JsonSequenceDecoder<P, C, M>;
     type DecodeSequence = JsonSequenceDecoder<P, C, M>;
@@ -130,14 +126,6 @@ where
     #[inline]
     fn cx(&self) -> Self::Cx {
         self.cx
-    }
-
-    #[inline]
-    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = Self::Allocator>,
-    {
-        Ok(JsonDecoder::new(cx, self.parser))
     }
 
     #[inline]

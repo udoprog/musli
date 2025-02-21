@@ -71,8 +71,8 @@ where
 /// the value already, this applies to types which implements [`EncodeBytes`]
 /// and [`DecodeBytes`].
 ///
-/// [`Vec`]: alloc::vec::Vec
-/// [`VecDeque`]: alloc::collections::VecDeque
+/// [`Vec`]: rust_alloc::vec::Vec
+/// [`VecDeque`]: rust_alloc::collections::VecDeque
 /// [bytes]: crate::_help::derives
 /// [data model of Müsli]: crate::_help::data_model
 ///
@@ -105,8 +105,8 @@ where
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
 #[musli(crate, transparent)]
-#[musli(mode = Binary, bound = {T: EncodeBytes<Binary>}, decode_bound<A> = {T: for<'de> DecodeBytes<'de, Binary, A>})]
-#[musli(mode = Text, bound = {T: EncodeBytes<Text>}, decode_bound<A> = {T: for<'de> DecodeBytes<'de, Text, A>})]
+#[musli(mode = Binary, bound = {T: EncodeBytes<Binary>}, decode_bound<'de, A> = {T: DecodeBytes<'de, Binary, A>})]
+#[musli(mode = Text, bound = {T: EncodeBytes<Text>}, decode_bound<'de, A> = {T: DecodeBytes<'de, Text, A>})]
 #[repr(transparent)]
 pub struct Bytes<T>(#[musli(bytes)] pub T);
 
@@ -173,7 +173,7 @@ where
 /// ```
 #[derive(Encode, Decode)]
 #[musli(crate, transparent)]
-#[musli(mode = Binary, bound = {T: EncodePacked<Binary>}, decode_bound<A> = {T: for<'de> DecodePacked<'de, Binary, A>})]
-#[musli(mode = Text, bound = {T: EncodePacked<Text>}, decode_bound<A> = {T: for<'de> DecodePacked<'de, Text, A>})]
+#[musli(mode = Binary, bound = {T: EncodePacked<Binary>}, decode_bound<'de, A> = {T: DecodePacked<'de, Binary, A>})]
+#[musli(mode = Text, bound = {T: EncodePacked<Text>}, decode_bound<'de, A> = {T: DecodePacked<'de, Text, A>})]
 #[repr(transparent)]
 pub struct Packed<T>(#[musli(packed)] pub T);

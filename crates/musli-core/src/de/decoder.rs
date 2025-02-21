@@ -31,17 +31,6 @@ pub trait Decoder<'de>: Sized {
     type Mode: 'static;
     /// The allocator associated with the decoder.
     type Allocator: Allocator;
-    /// [`Decoder`] with a different context returned by
-    /// [`Decoder::with_context`]
-    type WithContext<U>: Decoder<
-        'de,
-        Cx = U,
-        Error = U::Error,
-        Mode = Self::Mode,
-        Allocator = U::Allocator,
-    >
-    where
-        U: Context<Allocator = Self::Allocator>;
     /// Decoder returned by [`Decoder::decode_buffer`].
     type DecodeBuffer: AsDecoder<Cx = Self::Cx, Mode = Self::Mode>;
     /// Decoder returned by [`Decoder::decode_option`].
@@ -71,18 +60,6 @@ pub trait Decoder<'de>: Sized {
 
     /// Access the context associated with the decoder.
     fn cx(&self) -> Self::Cx;
-
-    /// Construct an decoder with a different context.
-    #[inline]
-    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, <Self::Cx as Context>::Error>
-    where
-        U: Context<Allocator = Self::Allocator>,
-    {
-        Err(self.cx().message(format_args!(
-            "Context switch not supported, expected {}",
-            ExpectingWrapper::new(&self).format()
-        )))
-    }
 
     /// Format the human-readable message that should occur if the decoder was
     /// expecting to decode some specific kind of value.
