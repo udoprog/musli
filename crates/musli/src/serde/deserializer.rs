@@ -6,7 +6,8 @@ use serde::de;
 #[cfg(feature = "alloc")]
 use crate::alloc::{String, Vec};
 use crate::de::{
-    Decoder, EntriesDecoder, MapDecoder, SequenceDecoder, SizeHint, VariantDecoder, Visitor,
+    Decoder, EntriesDecoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
+    Visitor,
 };
 use crate::hint::SequenceHint;
 use crate::mode::Text;
@@ -19,7 +20,6 @@ pub(super) struct Deserializer<D> {
 }
 
 impl<D> Deserializer<D> {
-    /// Construct a new deserializer out of a decoder.
     #[inline]
     pub(super) fn new(decoder: D) -> Self {
         Self { decoder }
@@ -189,6 +189,7 @@ where
         Ok(self.decoder.decode_bytes(BytesVisitor::new(visitor))?)
     }
 
+    #[inline]
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -362,6 +363,7 @@ impl<'a, D> SequenceAccess<'a, D>
 where
     D: ?Sized,
 {
+    #[inline]
     fn new(decoder: &'a mut D) -> Self {
         SequenceAccess { decoder }
     }
@@ -454,7 +456,7 @@ impl<V> BytesVisitor<V> {
     }
 }
 
-impl<'de, C, V> crate::de::UnsizedVisitor<'de, C, [u8]> for BytesVisitor<V>
+impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for BytesVisitor<V>
 where
     C: Context,
     V: de::Visitor<'de>,
@@ -497,6 +499,7 @@ impl<'a, D> SeqAccess<'a, D>
 where
     D: ?Sized,
 {
+    #[inline]
     fn new(decoder: &'a mut D) -> Self {
         Self { decoder }
     }
@@ -538,6 +541,7 @@ impl<'a, D> MapAccess<'a, D>
 where
     D: ?Sized,
 {
+    #[inline]
     fn new(decoder: &'a mut D) -> Self {
         Self { decoder }
     }
@@ -578,12 +582,13 @@ struct StringVisitor<V> {
 }
 
 impl<V> StringVisitor<V> {
+    #[inline]
     fn new(visitor: V) -> Self {
         Self { visitor }
     }
 }
 
-impl<'de, C, V> crate::de::UnsizedVisitor<'de, C, str> for StringVisitor<V>
+impl<'de, C, V> UnsizedVisitor<'de, C, str> for StringVisitor<V>
 where
     C: Context,
     V: de::Visitor<'de>,
@@ -626,6 +631,7 @@ impl<'a, D> EnumAccess<'a, D>
 where
     D: ?Sized,
 {
+    #[inline]
     fn new(decoder: &'a mut D) -> Self {
         Self { decoder }
     }
@@ -710,6 +716,7 @@ struct AnyVisitor<V> {
 }
 
 impl<V> AnyVisitor<V> {
+    #[inline]
     fn new(visitor: V) -> Self {
         Self { visitor }
     }
@@ -807,21 +814,59 @@ where
         self.visitor.visit_i128(v).map_err(err(cx))
     }
 
+    #[cfg(target_pointer_width = "16")]
     #[inline]
     fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
-        if let Some(value) = unsigned_value(self.visitor, v).map_err(err(cx))? {
-            return Ok(value);
-        }
+        self.visitor.visit_u16(v as u16).map_err(err(cx))
+    }
 
+    #[cfg(target_pointer_width = "32")]
+    #[inline]
+    fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
+        self.visitor.visit_u32(v as u32).map_err(err(cx))
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[inline]
+    fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
+        self.visitor.visit_u64(v as u64).map_err(err(cx))
+    }
+
+    #[cfg(not(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    )))]
+    #[inline]
+    fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(format_args!("Unsupported usize value {v}")))
     }
 
+    #[cfg(target_pointer_width = "16")]
     #[inline]
     fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
-        if let Some(value) = signed_value(self.visitor, v).map_err(err(cx))? {
-            return Ok(value);
-        }
+        self.visitor.visit_i16(v as i16).map_err(err(cx))
+    }
 
+    #[cfg(target_pointer_width = "32")]
+    #[inline]
+    fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
+        self.visitor.visit_i32(v as i32).map_err(err(cx))
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[inline]
+    fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
+        self.visitor.visit_i64(v as i64).map_err(err(cx))
+    }
+
+    #[cfg(not(any(
+        target_pointer_width = "16",
+        target_pointer_width = "32",
+        target_pointer_width = "64"
+    )))]
+    #[inline]
+    fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
         Err(cx.message(format_args!("Unsupported isize value {v}")))
     }
 
@@ -865,13 +910,12 @@ where
     where
         D: ?Sized + MapDecoder<'de, Cx = C>,
     {
-        let mut map_decoder = decoder.decode_remaining_entries()?;
-        let cx = map_decoder.cx();
+        let mut decoder = decoder.decode_remaining_entries()?;
         let value = self
             .visitor
-            .visit_map(MapAccess::new(&mut map_decoder))
-            .map_err(err(cx))?;
-        map_decoder.end_entries()?;
+            .visit_map(MapAccess::new(&mut decoder))
+            .map_err(err(decoder.cx()))?;
+        decoder.end_entries()?;
         Ok(value)
     }
 
@@ -884,44 +928,4 @@ where
     fn visit_bytes(self, _: C, _: SizeHint) -> Result<Self::Bytes, C::Error> {
         Ok(BytesVisitor::new(self.visitor))
     }
-}
-
-fn unsigned_value<'de, V, E>(visitor: V, v: usize) -> Result<Option<V::Value>, E>
-where
-    V: de::Visitor<'de>,
-    E: de::Error,
-{
-    if let Ok(v) = u32::try_from(v) {
-        return Ok(Some(visitor.visit_u32(v)?));
-    }
-
-    if let Ok(v) = u64::try_from(v) {
-        return Ok(Some(visitor.visit_u64(v)?));
-    }
-
-    if let Ok(v) = u128::try_from(v) {
-        return Ok(Some(visitor.visit_u128(v)?));
-    }
-
-    Ok(None)
-}
-
-fn signed_value<'de, V, E>(visitor: V, v: isize) -> Result<Option<V::Value>, E>
-where
-    V: de::Visitor<'de>,
-    E: de::Error,
-{
-    if let Ok(v) = i32::try_from(v) {
-        return Ok(Some(visitor.visit_i32(v)?));
-    }
-
-    if let Ok(v) = i64::try_from(v) {
-        return Ok(Some(visitor.visit_i64(v)?));
-    }
-
-    if let Ok(v) = i128::try_from(v) {
-        return Ok(Some(visitor.visit_i128(v)?));
-    }
-
-    Ok(None)
 }
