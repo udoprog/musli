@@ -814,60 +814,14 @@ where
         self.visitor.visit_i128(v).map_err(err(cx))
     }
 
-    #[cfg(target_pointer_width = "16")]
-    #[inline]
-    fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_u16(v as u16).map_err(err(cx))
-    }
-
-    #[cfg(target_pointer_width = "32")]
-    #[inline]
-    fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_u32(v as u32).map_err(err(cx))
-    }
-
-    #[cfg(target_pointer_width = "64")]
     #[inline]
     fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_u64(v as u64).map_err(err(cx))
     }
 
-    #[cfg(not(any(
-        target_pointer_width = "16",
-        target_pointer_width = "32",
-        target_pointer_width = "64"
-    )))]
-    #[inline]
-    fn visit_usize(self, cx: C, v: usize) -> Result<Self::Ok, C::Error> {
-        Err(cx.message(format_args!("Unsupported usize value {v}")))
-    }
-
-    #[cfg(target_pointer_width = "16")]
-    #[inline]
-    fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_i16(v as i16).map_err(err(cx))
-    }
-
-    #[cfg(target_pointer_width = "32")]
-    #[inline]
-    fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
-        self.visitor.visit_i32(v as i32).map_err(err(cx))
-    }
-
-    #[cfg(target_pointer_width = "64")]
     #[inline]
     fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
         self.visitor.visit_i64(v as i64).map_err(err(cx))
-    }
-
-    #[cfg(not(any(
-        target_pointer_width = "16",
-        target_pointer_width = "32",
-        target_pointer_width = "64"
-    )))]
-    #[inline]
-    fn visit_isize(self, cx: C, v: isize) -> Result<Self::Ok, C::Error> {
-        Err(cx.message(format_args!("Unsupported isize value {v}")))
     }
 
     #[inline]
