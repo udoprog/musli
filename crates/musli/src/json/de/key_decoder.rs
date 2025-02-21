@@ -56,22 +56,10 @@ where
     type Error = C::Error;
     type Mode = M;
     type Allocator = C::Allocator;
-    type WithContext<U>
-        = JsonKeyDecoder<P, U, M>
-    where
-        U: Context<Allocator = Self::Allocator>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
         self.cx
-    }
-
-    #[inline]
-    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = Self::Allocator>,
-    {
-        Ok(JsonKeyDecoder::new(cx, self.parser))
     }
 
     #[inline]

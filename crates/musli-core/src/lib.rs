@@ -48,10 +48,14 @@ pub mod mode;
 /// language level in Rust. So this attribute macro polyfills any missing types
 /// automatically.
 ///
-/// Note that using derives directly from `musli_core` requires you to use the
-/// `#[musli_core::encoder(crate = musli_core)]` attribute.
-///
 /// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// Note that if the `Cx` or `Mode` associated types are not specified, they
+/// will be defaulted to any type parameters which starts with the uppercase `C`
+/// or `M` respectively.
+///
+/// Note that using this macro directly from `musli_core` requires you to use
+/// the `#[musli_core::encoder(crate = musli_core)]` attribute.
 ///
 /// # Examples
 ///
@@ -59,8 +63,8 @@ pub mod mode;
 /// use std::fmt;
 /// use std::marker::PhantomData;
 ///
-/// use musli_core::Context;
-/// use musli_core::en::{Encoder, Encode};
+/// use musli::Context;
+/// use musli::en::{Encoder, Encode};
 ///
 /// struct MyEncoder<'a, C, M> {
 ///     value: &'a mut Option<u32>,
@@ -68,7 +72,7 @@ pub mod mode;
 ///     _marker: PhantomData<M>,
 /// }
 ///
-/// #[musli_core::encoder(crate = musli_core)]
+/// #[musli::encoder]
 /// impl<C, M> Encoder for MyEncoder<'_, C, M>
 /// where
 ///     C: Context,
@@ -82,10 +86,12 @@ pub mod mode;
 ///         self.cx
 ///     }
 ///
+///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
+///     #[inline]
 ///     fn encode<T>(self, value: T) -> Result<Self::Ok, C::Error>
 ///     where
 ///         T: Encode<Self::Mode>,
@@ -110,10 +116,14 @@ pub use musli_macros::encoder;
 /// language level in Rust. So this attribute macro polyfills any missing types
 /// automatically.
 ///
+/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// Note that if the `Cx` or `Mode` associated types are not specified, they
+/// will be defaulted to any type parameters which starts with the uppercase `C`
+/// or `M` respectively.
+///
 /// Note that using derives directly from `musli_core` requires you to use the
 /// `#[musli_core::decoder(crate = musli_core)]` attribute.
-///
-/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
 ///
 /// # Examples
 ///
@@ -121,15 +131,15 @@ pub use musli_macros::encoder;
 /// use std::fmt;
 /// use std::marker::PhantomData;
 ///
-/// use musli_core::Context;
-/// use musli_core::de::{Decoder, Decode};
+/// use musli::Context;
+/// use musli::de::{Decoder, Decode};
 ///
 /// struct MyDecoder<C, M> {
 ///     cx: C,
 ///     _marker: PhantomData<M>,
 /// }
 ///
-/// #[musli_core::decoder(crate = musli_core)]
+/// #[musli::decoder]
 /// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
 /// where
 ///     C: Context,
@@ -142,10 +152,12 @@ pub use musli_macros::encoder;
 ///         self.cx
 ///     }
 ///
+///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
+///     #[inline]
 ///     fn decode_u32(self) -> Result<u32, Self::Error> {
 ///         Ok(42)
 ///     }

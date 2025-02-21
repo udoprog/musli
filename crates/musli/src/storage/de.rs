@@ -70,10 +70,6 @@ where
     type Error = C::Error;
     type Mode = M;
     type Allocator = C::Allocator;
-    type WithContext<U>
-        = StorageDecoder<OPT, PACK, R, U, M>
-    where
-        U: Context<Allocator = Self::Allocator>;
     type DecodePack = StorageDecoder<OPT, true, R, C, M>;
     type DecodeSome = Self;
     type DecodeSequence = LimitedStorageDecoder<OPT, PACK, R, C, M>;
@@ -84,14 +80,6 @@ where
     #[inline]
     fn cx(&self) -> Self::Cx {
         self.cx
-    }
-
-    #[inline]
-    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = Self::Allocator>,
-    {
-        Ok(StorageDecoder::new(cx, self.reader))
     }
 
     #[inline]

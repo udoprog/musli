@@ -33,10 +33,6 @@ pub trait Encoder: Sized {
     type Error;
     /// Mode associated with encoding.
     type Mode: 'static;
-    /// Constructed [`Encoder`] with a different context.
-    type WithContext<U>: Encoder<Cx = U, Ok = Self::Ok, Error = U::Error, Mode = Self::Mode>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     /// A simple pack that packs a sequence of elements.
     type EncodePack: SequenceEncoder<Cx = Self::Cx, Ok = Self::Ok, Mode = Self::Mode>;
     /// Encoder returned when encoding an optional value which is present.
@@ -62,17 +58,6 @@ pub trait Encoder: Sized {
 
     /// Access the context associated with the encoder.
     fn cx(&self) -> Self::Cx;
-
-    /// Construct an encoder with a different context.
-    fn with_context<U>(self, _: U) -> Result<Self::WithContext<U>, <Self::Cx as Context>::Error>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
-    {
-        Err(self.cx().message(format_args!(
-            "Context switch not supported, expected {}",
-            ExpectingWrapper::new(&self).format()
-        )))
-    }
 
     /// An expectation error. Every other implementation defers to this to
     /// report that something unexpected happened.

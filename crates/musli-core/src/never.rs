@@ -83,10 +83,6 @@ where
     type Error = C::Error;
     type Mode = M;
     type Allocator = C::Allocator;
-    type WithContext<U>
-        = Never<(U, M)>
-    where
-        U: Context<Allocator = Self::Allocator>;
     type DecodeBuffer = Self;
     type DecodePack = Self;
     type DecodeSequence = Self;
@@ -98,14 +94,6 @@ where
 
     #[inline]
     fn cx(&self) -> Self::Cx {
-        match self._never {}
-    }
-
-    #[inline]
-    fn with_context<U>(self, _: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = Self::Allocator>,
-    {
         match self._never {}
     }
 
@@ -334,10 +322,6 @@ where
     type Error = C::Error;
     type Ok = O;
     type Mode = M;
-    type WithContext<U>
-        = Never<(O, U, M)>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     type EncodePack = Self;
     type EncodeSome = Self;
     type EncodeSequence = Self;
@@ -350,14 +334,6 @@ where
 
     #[inline]
     fn cx(&self) -> Self::Cx {
-        match self._never {}
-    }
-
-    #[inline]
-    fn with_context<U>(self, _: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
-    {
         match self._never {}
     }
 

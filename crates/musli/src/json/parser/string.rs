@@ -117,8 +117,8 @@ where
                 fn encode_surrogate(scratch: &mut Vec<u8, impl Allocator>, n: u16) -> bool {
                     scratch
                         .extend_from_slice(&[
-                            (n >> 12 & 0b0000_1111) as u8 | 0b1110_0000,
-                            (n >> 6 & 0b0011_1111) as u8 | 0b1000_0000,
+                            ((n >> 12) & 0b0000_1111) as u8 | 0b1110_0000,
+                            ((n >> 6) & 0b0011_1111) as u8 | 0b1000_0000,
                             (n & 0b0011_1111) as u8 | 0b1000_0000,
                         ])
                         .is_ok()
@@ -175,7 +175,7 @@ where
                                 .marked_message(&start, "Lone leading surrogate in hex escape"));
                         }
 
-                        let n = (((n1 - 0xD800) as u32) << 10 | (n2 - 0xDC00) as u32) + 0x1_0000;
+                        let n = ((((n1 - 0xD800) as u32) << 10) | (n2 - 0xDC00) as u32) + 0x1_0000;
 
                         match char::from_u32(n) {
                             Some(c) => c,
@@ -258,7 +258,7 @@ where
                                 .marked_message(&start, "Lone leading surrogate in hex escape"));
                         }
 
-                        let n = (((n1 - 0xD800) as u32) << 10 | (n2 - 0xDC00) as u32) + 0x1_0000;
+                        let n = ((((n1 - 0xD800) as u32) << 10) | (n2 - 0xDC00) as u32) + 0x1_0000;
 
                         if char::from_u32(n).is_none() {
                             return Err(self.cx.marked_message(&start, "Invalid unicode"));

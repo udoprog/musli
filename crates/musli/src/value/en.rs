@@ -100,10 +100,6 @@ where
     type Error = C::Error;
     type Ok = ();
     type Mode = M;
-    type WithContext<U>
-        = ValueEncoder<OPT, O, U, M>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     type EncodeSome = ValueEncoder<OPT, SomeValueWriter<O>, C, M>;
     type EncodePack = PackValueEncoder<OPT, O, C, M>;
     type EncodeSequence = SequenceValueEncoder<OPT, O, C, M>;
@@ -116,14 +112,6 @@ where
     #[inline]
     fn cx(&self) -> Self::Cx {
         self.cx
-    }
-
-    #[inline]
-    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
-    {
-        Ok(ValueEncoder::new(cx, self.output))
     }
 
     #[inline]

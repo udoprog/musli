@@ -101,10 +101,6 @@ where
     type Error = C::Error;
     type Mode = M;
     type Allocator = C::Allocator;
-    type WithContext<U>
-        = ValueDecoder<'de, OPT, U, A, M>
-    where
-        U: Context<Allocator = Self::Allocator>;
     type DecodeBuffer = AsValueDecoder<'de, OPT, C, A, M>;
     type DecodeSome = Self;
     type DecodePack = StorageDecoder<OPT, true, SliceReader<'de>, C, M>;
@@ -116,14 +112,6 @@ where
     #[inline]
     fn cx(&self) -> Self::Cx {
         self.cx
-    }
-
-    #[inline]
-    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = Self::Allocator>,
-    {
-        Ok(ValueDecoder::new(cx, self.value))
     }
 
     #[inline]

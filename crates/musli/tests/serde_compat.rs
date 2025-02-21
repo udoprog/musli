@@ -219,8 +219,8 @@ struct Struct {
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
 #[generate(crate)]
-#[musli(mode = Binary, bound = {T: Encode<Binary>}, decode_bound<A> = {T: for<'de> Decode<'de, Binary, A>})]
-#[musli(mode = Text, bound = {T: Encode<Text>}, decode_bound<A> = {T: for<'de> Decode<'de, Text, A>})]
+#[musli(mode = Binary, bound = {T: Encode<Binary>}, decode_bound<'de, A> = {T: Decode<'de, Binary, A>})]
+#[musli(mode = Text, bound = {T: Encode<Text>}, decode_bound<'de, A> = {T: Decode<'de, Text, A>})]
 struct StructWith<T> {
     a: u32,
     b: T,

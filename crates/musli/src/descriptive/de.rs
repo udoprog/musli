@@ -230,10 +230,6 @@ where
     type Error = C::Error;
     type Mode = M;
     type Allocator = C::Allocator;
-    type WithContext<U>
-        = SelfDecoder<OPT, R, U, M>
-    where
-        U: Context<Allocator = Self::Allocator>;
     type DecodeBuffer = crate::value::IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
     type DecodePack = SelfDecoder<OPT, Limit<R>, C, M>;
     type DecodeSome = Self;
@@ -245,14 +241,6 @@ where
     #[inline]
     fn cx(&self) -> Self::Cx {
         self.cx
-    }
-
-    #[inline]
-    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = Self::Allocator>,
-    {
-        Ok(SelfDecoder::new(cx, self.reader))
     }
 
     #[inline]

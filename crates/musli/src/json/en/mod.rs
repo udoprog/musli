@@ -50,10 +50,6 @@ where
     type Error = C::Error;
     type Ok = ();
     type Mode = M;
-    type WithContext<U>
-        = JsonEncoder<W, U, M>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>;
     type EncodePack = JsonArrayEncoder<W, C, M>;
     type EncodeSome = Self;
     type EncodeSequence = JsonArrayEncoder<W, C, M>;
@@ -66,14 +62,6 @@ where
     #[inline]
     fn cx(&self) -> Self::Cx {
         self.cx
-    }
-
-    #[inline]
-    fn with_context<U>(self, cx: U) -> Result<Self::WithContext<U>, C::Error>
-    where
-        U: Context<Allocator = <Self::Cx as Context>::Allocator>,
-    {
-        Ok(JsonEncoder::new(cx, self.writer))
     }
 
     #[inline]

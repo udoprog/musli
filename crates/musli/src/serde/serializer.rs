@@ -6,9 +6,11 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::mode::Text;
 use crate::{Context, Encoder};
 
+use super::error::{err, SerdeError};
+
 use serde::ser::{self, Serialize};
 
-pub struct Serializer<E>
+pub(super) struct Serializer<E>
 where
     E: Encoder,
 {
@@ -21,17 +23,17 @@ where
 {
     /// Construct a new deserializer out of an encoder.
     #[inline]
-    pub fn new(encoder: E) -> Self {
+    pub(super) fn new(encoder: E) -> Self {
         Self { encoder }
     }
 }
 
 impl<E> ser::Serializer for Serializer<E>
 where
-    E: Encoder<Cx: Context<Error: ser::Error>>,
+    E: Encoder,
 {
     type Ok = E::Ok;
-    type Error = <E::Cx as Context>::Error;
+    type Error = SerdeError<<E::Cx as Context>::Error>;
 
     type SerializeSeq = SerializeSeq<E::EncodeSequence>;
     type SerializeTuple = SerializeSeq<E::EncodeSequence>;
@@ -43,87 +45,87 @@ where
 
     #[inline]
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_bool(v)
+        Ok(self.encoder.encode_bool(v)?)
     }
 
     #[inline]
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_i8(v)
+        Ok(self.encoder.encode_i8(v)?)
     }
 
     #[inline]
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_i16(v)
+        Ok(self.encoder.encode_i16(v)?)
     }
 
     #[inline]
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_i32(v)
+        Ok(self.encoder.encode_i32(v)?)
     }
 
     #[inline]
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_i64(v)
+        Ok(self.encoder.encode_i64(v)?)
     }
 
     #[inline]
     fn serialize_i128(self, v: i128) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_i128(v)
+        Ok(self.encoder.encode_i128(v)?)
     }
 
     #[inline]
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_u8(v)
+        Ok(self.encoder.encode_u8(v)?)
     }
 
     #[inline]
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_u16(v)
+        Ok(self.encoder.encode_u16(v)?)
     }
 
     #[inline]
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_u32(v)
+        Ok(self.encoder.encode_u32(v)?)
     }
 
     #[inline]
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_u64(v)
+        Ok(self.encoder.encode_u64(v)?)
     }
 
     #[inline]
     fn serialize_u128(self, v: u128) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_u128(v)
+        Ok(self.encoder.encode_u128(v)?)
     }
 
     #[inline]
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_f32(v)
+        Ok(self.encoder.encode_f32(v)?)
     }
 
     #[inline]
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_f64(v)
+        Ok(self.encoder.encode_f64(v)?)
     }
 
     #[inline]
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_char(v)
+        Ok(self.encoder.encode_char(v)?)
     }
 
     #[inline]
     fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_string(v)
+        Ok(self.encoder.encode_string(v)?)
     }
 
     #[inline]
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_bytes(v)
+        Ok(self.encoder.encode_bytes(v)?)
     }
 
     #[inline]
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_none()
+        Ok(self.encoder.encode_none()?)
     }
 
     #[inline]
@@ -137,12 +139,12 @@ where
 
     #[inline]
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_empty()
+        Ok(self.encoder.encode_empty()?)
     }
 
     #[inline]
     fn serialize_unit_struct(self, _: &'static str) -> Result<Self::Ok, Self::Error> {
-        self.encoder.encode_empty()
+        Ok(self.encoder.encode_empty()?)
     }
 
     #[inline]
@@ -179,7 +181,8 @@ where
         T: ?Sized + ser::Serialize,
     {
         encode_variant(self.encoder, variant_name, move |encoder| {
-            value.serialize(Serializer::new(encoder))
+            let err = err(encoder.cx());
+            value.serialize(Serializer::new(encoder)).map_err(err)
         })
     }
 
@@ -232,7 +235,9 @@ where
         let cx = self.encoder.cx();
 
         let Some(len) = len else {
-            return Err(cx.message("Can only serialize maps with known lengths"));
+            return Err(SerdeError::from(
+                cx.message("Can only serialize maps with known lengths"),
+            ));
         };
 
         let hint = MapHint::with_size(len);
@@ -269,7 +274,7 @@ where
     where
         T: ?Sized + fmt::Display,
     {
-        self.encoder.collect_string(value)
+        Ok(self.encoder.collect_string(value)?)
     }
 
     #[inline]
@@ -279,13 +284,9 @@ where
 }
 
 #[inline]
-fn encode_variant<E, T, F, O>(
-    encoder: E,
-    variant_tag: &T,
-    f: F,
-) -> Result<O, <E::Cx as Context>::Error>
+fn encode_variant<E, T, F, O>(encoder: E, variant_tag: &T, f: F) -> Result<O, SerdeError<E::Error>>
 where
-    E: Encoder<Cx: Context<Error: ser::Error>>,
+    E: Encoder,
     T: ?Sized + Serialize,
     F: FnOnce(<E::EncodeVariant as VariantEncoder>::EncodeData<'_>) -> Result<O, E::Error>,
 {
@@ -296,7 +297,7 @@ where
     Ok(output)
 }
 
-pub struct SerializeSeq<E>
+pub(super) struct SerializeSeq<E>
 where
     E: SequenceEncoder,
 {
@@ -314,10 +315,10 @@ where
 
 impl<E> ser::SerializeSeq for SerializeSeq<E>
 where
-    E: SequenceEncoder<Cx: Context<Error: ser::Error>>,
+    E: SequenceEncoder,
 {
     type Ok = E::Ok;
-    type Error = <E::Cx as Context>::Error;
+    type Error = SerdeError<<E::Cx as Context>::Error>;
 
     #[inline]
     fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -331,16 +332,16 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.finish_sequence()
+        Ok(self.encoder.finish_sequence()?)
     }
 }
 
 impl<E> ser::SerializeTupleStruct for SerializeSeq<E>
 where
-    E: SequenceEncoder<Cx: Context<Error: ser::Error>>,
+    E: SequenceEncoder,
 {
     type Ok = E::Ok;
-    type Error = <E::Cx as Context>::Error;
+    type Error = SerdeError<<E::Cx as Context>::Error>;
 
     #[inline]
     fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -358,10 +359,10 @@ where
 
 impl<E> ser::SerializeTuple for SerializeSeq<E>
 where
-    E: SequenceEncoder<Cx: Context<Error: ser::Error>>,
+    E: SequenceEncoder,
 {
     type Ok = E::Ok;
-    type Error = <E::Cx as Context>::Error;
+    type Error = SerdeError<<E::Cx as Context>::Error>;
 
     #[inline]
     fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -379,10 +380,10 @@ where
 
 impl<E> ser::SerializeTupleVariant for SerializeSeq<E>
 where
-    E: SequenceEncoder<Cx: Context<Error: ser::Error>>,
+    E: SequenceEncoder,
 {
     type Ok = E::Ok;
-    type Error = <E::Cx as Context>::Error;
+    type Error = SerdeError<<E::Cx as Context>::Error>;
 
     #[inline]
     fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -398,7 +399,7 @@ where
     }
 }
 
-pub struct SerializeMap<E>
+pub(super) struct SerializeMap<E>
 where
     E: EntriesEncoder,
 {
@@ -409,6 +410,7 @@ impl<E> SerializeMap<E>
 where
     E: EntriesEncoder,
 {
+    #[inline]
     fn new(encoder: E) -> Self {
         Self { encoder }
     }
@@ -416,10 +418,10 @@ where
 
 impl<E> ser::SerializeMap for SerializeMap<E>
 where
-    E: EntriesEncoder<Cx: Context<Error: ser::Error>>,
+    E: EntriesEncoder,
 {
     type Ok = E::Ok;
-    type Error = <E::Cx as Context>::Error;
+    type Error = SerdeError<<E::Cx as Context>::Error>;
 
     #[inline]
     fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
@@ -443,11 +445,11 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.finish_entries()
+        Ok(self.encoder.finish_entries()?)
     }
 }
 
-pub struct SerializeStruct<E>
+pub(super) struct SerializeStruct<E>
 where
     E: MapEncoder,
 {
@@ -465,10 +467,10 @@ where
 
 impl<E> ser::SerializeStruct for SerializeStruct<E>
 where
-    E: MapEncoder<Cx: Context<Error: ser::Error>>,
+    E: MapEncoder,
 {
     type Ok = E::Ok;
-    type Error = <E::Cx as Context>::Error;
+    type Error = SerdeError<<E::Cx as Context>::Error>;
 
     #[inline]
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
@@ -484,11 +486,11 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.finish_map()
+        Ok(self.encoder.finish_map()?)
     }
 }
 
-pub struct SerializeStructVariant<E>
+pub(super) struct SerializeStructVariant<E>
 where
     E: MapEncoder,
 {
@@ -506,10 +508,10 @@ where
 
 impl<E> ser::SerializeStructVariant for SerializeStructVariant<E>
 where
-    E: MapEncoder<Cx: Context<Error: ser::Error>>,
+    E: MapEncoder,
 {
     type Ok = E::Ok;
-    type Error = <E::Cx as Context>::Error;
+    type Error = SerdeError<<E::Cx as Context>::Error>;
 
     #[inline]
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
@@ -517,8 +519,11 @@ where
         T: ?Sized + ser::Serialize,
     {
         self.encoder.encode_entry_fn(|field| {
+            let err = err(field.cx());
             field.encode_key()?.encode(key)?;
-            value.serialize(Serializer::new(field.encode_value()?))?;
+            value
+                .serialize(Serializer::new(field.encode_value()?))
+                .map_err(err)?;
             Ok(())
         })?;
 
@@ -527,6 +532,6 @@ where
 
     #[inline]
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.encoder.finish_map()
+        Ok(self.encoder.finish_map()?)
     }
 }

@@ -87,29 +87,29 @@ fn ensure_width() {
 }
 
 /// 8-bit unsigned number.
-pub(crate) const U8: u8 = (Width::U8 as u8) << 2 | NumberKind::Unsigned as u8;
+pub(crate) const U8: u8 = ((Width::U8 as u8) << 2) | NumberKind::Unsigned as u8;
 /// 16-bit unsigned number.
-pub(crate) const U16: u8 = (Width::U16 as u8) << 2 | NumberKind::Unsigned as u8;
+pub(crate) const U16: u8 = ((Width::U16 as u8) << 2) | NumberKind::Unsigned as u8;
 /// 32-bit unsigned number.
-pub(crate) const U32: u8 = (Width::U32 as u8) << 2 | NumberKind::Unsigned as u8;
+pub(crate) const U32: u8 = ((Width::U32 as u8) << 2) | NumberKind::Unsigned as u8;
 /// 64-bit unsigned number.
-pub(crate) const U64: u8 = (Width::U64 as u8) << 2 | NumberKind::Unsigned as u8;
+pub(crate) const U64: u8 = ((Width::U64 as u8) << 2) | NumberKind::Unsigned as u8;
 /// 128-bit number hint.
-pub(crate) const U128: u8 = (Width::U128 as u8) << 2 | NumberKind::Unsigned as u8;
+pub(crate) const U128: u8 = ((Width::U128 as u8) << 2) | NumberKind::Unsigned as u8;
 /// 8-bit signed number.
-pub(crate) const I8: u8 = (Width::U8 as u8) << 2 | NumberKind::Signed as u8;
+pub(crate) const I8: u8 = ((Width::U8 as u8) << 2) | NumberKind::Signed as u8;
 /// 16-bit signed number.
-pub(crate) const I16: u8 = (Width::U16 as u8) << 2 | NumberKind::Signed as u8;
+pub(crate) const I16: u8 = ((Width::U16 as u8) << 2) | NumberKind::Signed as u8;
 /// 32-bit signed number.
-pub(crate) const I32: u8 = (Width::U32 as u8) << 2 | NumberKind::Signed as u8;
+pub(crate) const I32: u8 = ((Width::U32 as u8) << 2) | NumberKind::Signed as u8;
 /// 64-bit signed number.
-pub(crate) const I64: u8 = (Width::U64 as u8) << 2 | NumberKind::Signed as u8;
+pub(crate) const I64: u8 = ((Width::U64 as u8) << 2) | NumberKind::Signed as u8;
 /// 128-bit signed number.
-pub(crate) const I128: u8 = (Width::U128 as u8) << 2 | NumberKind::Signed as u8;
+pub(crate) const I128: u8 = ((Width::U128 as u8) << 2) | NumberKind::Signed as u8;
 /// 32-bit float hint.
-pub(crate) const F32: u8 = (Width::U32 as u8) << 2 | NumberKind::Float as u8;
+pub(crate) const F32: u8 = ((Width::U32 as u8) << 2) | NumberKind::Float as u8;
 /// 64-bit float hint.
-pub(crate) const F64: u8 = (Width::U64 as u8) << 2 | NumberKind::Float as u8;
+pub(crate) const F64: u8 = ((Width::U64 as u8) << 2) | NumberKind::Float as u8;
 /// The marker for a usize.
 #[cfg(target_pointer_width = "32")]
 pub(crate) const USIZE: u8 = U32;

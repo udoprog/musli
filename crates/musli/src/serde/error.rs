@@ -7,72 +7,114 @@ use rust_alloc::boxed::Box;
 #[cfg(feature = "alloc")]
 use rust_alloc::format;
 
-#[derive(Debug)]
-pub enum SerdeError {
-    Captured,
+enum SerdeErrorKind<E> {
+    Captured(E),
     #[cfg(not(feature = "alloc"))]
     Custom,
     #[cfg(feature = "alloc")]
     Custom(Box<str>),
 }
 
-impl SerdeError {
-    pub(super) fn report<C>(self, cx: C) -> Option<C::Error>
-    where
-        C: Context,
-    {
-        match self {
-            SerdeError::Captured => None,
-            #[cfg(not(feature = "alloc"))]
-            SerdeError::Custom => {
-                Some(cx.message("Error in musli::serde (enable alloc for details)"))
-            }
-            #[cfg(feature = "alloc")]
-            SerdeError::Custom(message) => Some(cx.message(message)),
+/// The internal error type for serde operations.
+pub(super) struct SerdeError<E> {
+    kind: SerdeErrorKind<E>,
+}
+
+impl<E> From<E> for SerdeError<E> {
+    #[inline]
+    fn from(value: E) -> Self {
+        SerdeError {
+            kind: SerdeErrorKind::Captured(value),
         }
     }
 }
 
-impl fmt::Display for SerdeError {
+impl<E> fmt::Debug for SerdeError<E> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Error in musli::serde")
+        match &self.kind {
+            SerdeErrorKind::Captured(..) => write!(f, "Captured error in musli::serde"),
+            #[cfg(feature = "alloc")]
+            SerdeErrorKind::Custom(error) => error.fmt(f),
+            #[cfg(not(feature = "alloc"))]
+            SerdeErrorKind::Custom => write!(f, "Custom error in musli::serde"),
+        }
     }
 }
 
-impl serde::ser::Error for SerdeError {
+impl<E> fmt::Display for SerdeError<E> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            SerdeErrorKind::Captured(..) => write!(f, "Captured error in musli::serde"),
+            #[cfg(feature = "alloc")]
+            SerdeErrorKind::Custom(error) => error.fmt(f),
+            #[cfg(not(feature = "alloc"))]
+            SerdeErrorKind::Custom => write!(f, "Custom error in musli::serde"),
+        }
+    }
+}
+
+impl<E> core::error::Error for SerdeError<E> {}
+
+impl<E> serde::ser::Error for SerdeError<E> {
     #[cfg(feature = "alloc")]
+    #[inline]
     fn custom<T>(msg: T) -> Self
     where
         T: fmt::Display,
     {
-        SerdeError::Custom(format!("{}", msg).into())
+        SerdeError {
+            kind: SerdeErrorKind::Custom(format!("{msg}").into()),
+        }
     }
 
     #[cfg(not(feature = "alloc"))]
+    #[inline]
     fn custom<T>(_: T) -> Self
     where
         T: fmt::Display,
     {
-        SerdeError::Custom
+        SerdeError {
+            kind: SerdeErrorKind::Custom,
+        }
     }
 }
 
-impl serde::de::Error for SerdeError {
+impl<E> serde::de::Error for SerdeError<E> {
     #[cfg(feature = "alloc")]
+    #[inline]
     fn custom<T>(msg: T) -> Self
     where
         T: fmt::Display,
     {
-        SerdeError::Custom(format!("{}", msg).into())
+        SerdeError {
+            kind: SerdeErrorKind::Custom(format!("{msg}").into()),
+        }
     }
 
     #[cfg(not(feature = "alloc"))]
+    #[inline]
     fn custom<T>(_: T) -> Self
     where
         T: fmt::Display,
     {
-        SerdeError::Custom
+        SerdeError {
+            kind: SerdeErrorKind::Custom,
+        }
     }
 }
 
-impl serde::de::StdError for SerdeError {}
+#[inline]
+pub(super) fn err<C>(cx: C) -> impl FnOnce(SerdeError<C::Error>) -> C::Error + Copy
+where
+    C: Context,
+{
+    move |e| match e.kind {
+        SerdeErrorKind::Captured(value) => value,
+        #[cfg(not(feature = "alloc"))]
+        SerdeErrorKind::Custom => cx.message("Custom error in musli::serde"),
+        #[cfg(feature = "alloc")]
+        SerdeErrorKind::Custom(value) => cx.message(value),
+    }
+}
