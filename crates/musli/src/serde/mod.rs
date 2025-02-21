@@ -90,14 +90,14 @@
 #![cfg(feature = "serde")]
 #![cfg_attr(doc_cfg, doc(cfg(feature = "serde")))]
 
-mod deserializer;
+mod de;
 mod error;
-mod serializer;
+mod ser;
 
 use serde::{Deserialize, Serialize};
 
-use self::deserializer::Deserializer;
-use self::serializer::Serializer;
+use self::de::Deserializer;
+use self::ser::Serializer;
 
 use crate::{Decoder, Encoder};
 
