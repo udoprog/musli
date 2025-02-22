@@ -93,7 +93,7 @@ where
     }
 }
 
-#[crate::encoder(crate)]
+#[crate::en::encoder(crate)]
 impl<const OPT: Options, W, C, M> Encoder for WireEncoder<OPT, W, C, M>
 where
     W: Writer,

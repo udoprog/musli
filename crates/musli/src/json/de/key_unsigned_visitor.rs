@@ -20,7 +20,7 @@ impl<T> KeyUnsignedVisitor<T> {
     }
 }
 
-#[crate::unsized_visitor(crate)]
+#[crate::de::unsized_visitor(crate)]
 impl<C, T> UnsizedVisitor<'_, C, [u8]> for KeyUnsignedVisitor<T>
 where
     C: Context,

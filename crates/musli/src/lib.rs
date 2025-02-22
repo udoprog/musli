@@ -533,11 +533,15 @@ pub mod en;
 pub use musli_core::hint;
 #[doc(inline)]
 pub use musli_core::mode;
-#[doc(inline)]
-pub use musli_core::{decoder, encoder, unsized_visitor, visitor};
 
 #[doc(inline)]
-pub use musli_core::{Context, Decode, Decoder, Encode, Encoder};
+pub use musli_core::Context;
+
+#[doc(inline)]
+pub use self::de::{Decode, Decoder};
+
+#[doc(inline)]
+pub use self::en::{Encode, Encoder};
 
 #[doc(hidden)]
 pub use musli_core::__priv;

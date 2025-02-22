@@ -474,7 +474,7 @@ where
     {
         struct Visitor;
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::de::unsized_visitor(crate)]
         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
         where
             C: Context,
@@ -505,7 +505,7 @@ impl<'de, M> DecodeUnsized<'de, M> for str {
     {
         struct Visitor<F>(F);
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::de::unsized_visitor(crate)]
         impl<C, F, O> UnsizedVisitor<'_, C, str> for Visitor<F>
         where
             C: Context,
@@ -537,7 +537,7 @@ impl<'de, M> DecodeUnsized<'de, M> for [u8] {
     {
         struct Visitor<F>(F);
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::de::unsized_visitor(crate)]
         impl<C, F, O> UnsizedVisitor<'_, C, [u8]> for Visitor<F>
         where
             C: Context,
@@ -595,7 +595,7 @@ where
     {
         struct Visitor;
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::de::unsized_visitor(crate)]
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
             C: Context,
@@ -626,7 +626,7 @@ impl<'de, M> DecodeUnsizedBytes<'de, M> for [u8] {
     {
         struct Visitor<F>(F);
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::de::unsized_visitor(crate)]
         impl<C, F, O> UnsizedVisitor<'_, C, [u8]> for Visitor<F>
         where
             C: Context,

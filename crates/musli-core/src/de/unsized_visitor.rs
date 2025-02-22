@@ -41,8 +41,8 @@ where
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the
-    /// [`#[musli::unsized_visitor]`][musli::unsized_visitor] attribute macro
-    /// when implementing [`UnsizedVisitor`].
+    /// [`#[musli::de::unsized_visitor]`][musli::de::unsized_visitor] attribute
+    /// macro when implementing [`UnsizedVisitor`].
     #[doc(hidden)]
     type __UseMusliUnsizedVisitorAttributeMacro;
 

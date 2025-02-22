@@ -41,8 +41,8 @@ where
     >;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::visitor]`][musli::visitor] attribute
-    /// macro when implementing [`Visitor`].
+    /// should be using the [`#[musli::de::visitor]`][musli::de::visitor]
+    /// attribute macro when implementing [`Visitor`].
     #[doc(hidden)]
     type __UseMusliVisitorAttributeMacro;
 

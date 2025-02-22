@@ -5,7 +5,7 @@ use musli::Context;
 
 struct AnyVisitor;
 
-#[musli::visitor]
+#[musli::de::visitor]
 impl<'de, C> Visitor<'de, C> for AnyVisitor where C: Context {
     type Ok = ();
 

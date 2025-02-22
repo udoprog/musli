@@ -87,8 +87,8 @@ pub trait Decoder<'de>: Sized {
     >;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::decoder]`][musli::decoder] attribute
-    /// macro when implementing [`Decoder`].
+    /// should be using the [`#[musli::de::decoder]`][musli::de::decoder]
+    /// attribute macro when implementing [`Decoder`].
     #[doc(hidden)]
     type __UseMusliDecoderAttributeMacro;
 
@@ -113,7 +113,7 @@ pub trait Decoder<'de>: Sized {
     ///     _marker: PhantomData<M>,
     /// }
     ///
-    /// #[musli::decoder]
+    /// #[musli::de::decoder]
     /// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
     /// where
     ///     C: Context,
@@ -1120,7 +1120,7 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         struct Visitor;
     ///
-    ///         #[musli::unsized_visitor]
+    ///         #[musli::de::unsized_visitor]
     ///         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
     ///         where
     ///             C: Context
@@ -1191,7 +1191,7 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         struct Visitor;
     ///
-    ///         #[musli::unsized_visitor]
+    ///         #[musli::de::unsized_visitor]
     ///         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
     ///         where
     ///             C: Context,
