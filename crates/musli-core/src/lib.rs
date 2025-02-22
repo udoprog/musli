@@ -31,11 +31,11 @@ pub use self::context::Context;
 
 pub mod de;
 #[doc(inline)]
-pub use self::de::{Decode, Decoder};
+pub use self::de::{decoder, Decode, Decoder};
 
 pub mod en;
 #[doc(inline)]
-pub use self::en::{Encode, Encoder};
+pub use self::en::{encoder, Encode, Encoder};
 
 pub mod hint;
 pub mod mode;

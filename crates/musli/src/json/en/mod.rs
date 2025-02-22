@@ -39,7 +39,7 @@ impl<W, C, M> JsonEncoder<W, C, M> {
     }
 }
 
-#[crate::en::encoder(crate)]
+#[crate::encoder(crate)]
 impl<W, C, M> Encoder for JsonEncoder<W, C, M>
 where
     W: Writer,

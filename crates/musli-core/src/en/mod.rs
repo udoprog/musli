@@ -69,7 +69,7 @@ pub use musli_macros::Encode;
 /// or `M` respectively.
 ///
 /// Note that using this macro directly from `musli_core` requires you to use
-/// the `#[musli_core::en::encoder(crate = musli_core)]` attribute.
+/// the `#[musli_core::encoder(crate = musli_core)]` attribute.
 ///
 /// # Examples
 ///
@@ -86,7 +86,7 @@ pub use musli_macros::Encode;
 ///     _marker: PhantomData<M>,
 /// }
 ///
-/// #[musli_core::en::encoder(crate = musli_core)]
+/// #[musli_core::encoder(crate = musli_core)]
 /// impl<C, M> Encoder for MyEncoder<'_, C, M>
 /// where
 ///     C: Context,
@@ -117,7 +117,7 @@ pub use musli_macros::Encode;
 pub use musli_macros::encoder;
 
 #[doc(inline)]
-pub use self::traits::*;
+pub use self::__traits::*;
 
 mod encode;
 mod encode_bytes;
@@ -131,7 +131,7 @@ mod sequence_encoder;
 mod variant_encoder;
 
 #[doc(hidden)]
-pub mod traits {
+pub mod __traits {
     pub use super::encode::Encode;
     pub use super::encode_bytes::EncodeBytes;
     pub use super::encode_packed::EncodePacked;

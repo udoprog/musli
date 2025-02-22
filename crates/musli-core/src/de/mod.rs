@@ -32,17 +32,6 @@
 /// # Examples
 ///
 /// ```
-/// use musli::Decode;
-///
-/// #[derive(Decode)]
-/// struct MyType {
-///     data: [u8; 128],
-/// }
-/// ```
-///
-/// When using through [`musli_core`][crate], the crate needs to be specified:
-///
-/// ```
 /// use musli_core::Decode;
 ///
 /// #[derive(Decode)]
@@ -51,6 +40,7 @@
 ///     data: [u8; 128],
 /// }
 /// ```
+#[doc(inline)]
 pub use musli_macros::Decode;
 
 /// This is an attribute macro that must be used when implementing a
@@ -68,7 +58,7 @@ pub use musli_macros::Decode;
 /// or `M` respectively.
 ///
 /// Note that using derives directly from `musli_core` requires you to use the
-/// `#[musli_core::de::decoder(crate = musli_core)]` attribute.
+/// `#[musli_core::decoder(crate = musli_core)]` attribute.
 ///
 /// # Examples
 ///
@@ -84,7 +74,7 @@ pub use musli_macros::Decode;
 ///     _marker: PhantomData<M>,
 /// }
 ///
-/// #[musli_core::de::decoder(crate = musli_core)]
+/// #[musli_core::decoder(crate = musli_core)]
 /// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
 /// where
 ///     C: Context,
@@ -191,7 +181,7 @@ pub use musli_macros::visitor;
 pub use musli_macros::unsized_visitor;
 
 #[doc(inline)]
-pub use self::traits::*;
+pub use self::__traits::*;
 
 mod as_decoder;
 mod decode;
@@ -214,7 +204,7 @@ mod variant_decoder;
 mod visitor;
 
 #[doc(hidden)]
-pub mod traits {
+pub mod __traits {
     pub use super::as_decoder::AsDecoder;
     pub use super::decode::Decode;
     pub use super::decode_bytes::DecodeBytes;
