@@ -18,6 +18,8 @@ pub(super) enum Ty {
 pub(super) enum Extra {
     /// `type Type = Never;`
     None,
+    /// `fn cx(&self) -> Self::Cx`.
+    CxFn,
     /// `type Cx = C;`.
     Cx,
     /// `type Error = <Self::Cx as Context>::Error;`
@@ -32,6 +34,7 @@ pub(super) enum Extra {
 
 pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
     ("Cx", Extra::Cx),
+    ("cx", Extra::CxFn),
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
     ("EncodeSome", Extra::None),
@@ -46,6 +49,7 @@ pub(super) const ENCODER_TYPES: &[(&str, Extra)] = &[
 
 pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("Cx", Extra::Cx),
+    ("cx", Extra::CxFn),
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
     ("Allocator", Extra::Allocator),
@@ -81,25 +85,36 @@ pub(super) struct Attr {
 impl Parse for Attr {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut crate_path = None;
+        let mut done = false;
 
         while !input.is_empty() {
             let path = input.parse::<syn::Path>()?;
 
-            if path.is_ident("crate") {
-                if input.parse::<Option<Token![=]>>()?.is_some() {
-                    crate_path = Some(input.parse()?);
-                } else {
-                    crate_path = Some(path);
-                }
-            } else {
+            if !path.is_ident("crate") {
+                return Err(syn::Error::new_spanned(path, "Unexpected attribute"));
+            }
+
+            if let Some(existing) = &crate_path {
                 return Err(syn::Error::new_spanned(
-                    path,
-                    format_args!("Unexpected attribute"),
+                    existing,
+                    "Duplicate crate paths specified",
                 ));
+            }
+
+            if input.parse::<Option<Token![=]>>()?.is_some() {
+                crate_path = Some(input.parse()?);
+            } else {
+                crate_path = Some(path);
+            }
+
+            if done {
+                break;
             }
 
             if !input.is_empty() {
                 input.parse::<Token![,]>()?;
+            } else {
+                done = true;
             }
         }
 
@@ -166,6 +181,9 @@ impl Types {
 
         for item in &self.item_impl.items {
             match item {
+                syn::ImplItem::Fn(impl_fn) => {
+                    missing.remove(&impl_fn.sig.ident);
+                }
                 syn::ImplItem::Type(impl_type) => {
                     let Some(extra) = missing.remove(&impl_type.ident) else {
                         continue;
@@ -221,22 +239,33 @@ impl Types {
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
         }
 
+        let immediate_cx: syn::Path = match &found_cx {
+            Some(p) => syn::parse_quote!(#p),
+            None => syn::parse_quote!(__C),
+        };
+
         let path_cx: syn::Path = match kind {
             Kind::SelfCx => {
                 syn::parse_quote!(Self::Cx)
             }
-            Kind::GenericCx => match &found_cx {
-                Some(p) => syn::parse_quote!(#p),
-                None => syn::parse_quote!(__C),
-            },
+            Kind::GenericCx => syn::parse_quote!(#immediate_cx),
         };
 
         for (ident, extra) in missing {
             let ty;
 
             match extra {
+                Extra::CxFn => {
+                    self.item_impl.items.push(syn::parse_quote! {
+                        fn cx(&self) -> Self::Cx {
+                            self.cx
+                        }
+                    });
+
+                    continue;
+                }
                 Extra::Cx => {
-                    ty = syn::parse_quote!(#path_cx);
+                    ty = syn::parse_quote!(#immediate_cx);
                 }
                 Extra::Mode => {
                     ty = match &found_mode {

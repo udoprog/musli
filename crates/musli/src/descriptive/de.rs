@@ -220,7 +220,7 @@ where
     }
 }
 
-#[crate::decoder(crate)]
+#[crate::de::decoder(crate)]
 impl<'de, const OPT: Options, R, C, M> Decoder<'de> for SelfDecoder<OPT, R, C, M>
 where
     R: Reader<'de>,
@@ -319,7 +319,7 @@ where
     {
         struct Visitor<V>(V);
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::de::unsized_visitor(crate)]
         impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
             C: Context,

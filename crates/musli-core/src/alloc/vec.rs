@@ -820,7 +820,7 @@ where
     {
         struct Visitor;
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::de::unsized_visitor(crate)]
         impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
         where
             C: Context,

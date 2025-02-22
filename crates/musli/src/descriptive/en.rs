@@ -62,7 +62,7 @@ where
     }
 }
 
-#[crate::encoder(crate)]
+#[crate::en::encoder(crate)]
 impl<const OPT: Options, W, C, M> Encoder for SelfEncoder<OPT, W, C, M>
 where
     W: Writer,

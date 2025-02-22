@@ -276,7 +276,7 @@ impl Number {
 
 struct AnyVisitor;
 
-#[crate::visitor(crate)]
+#[crate::de::visitor(crate)]
 impl<'de, C> Visitor<'de, C> for AnyVisitor
 where
     C: Context,
@@ -467,7 +467,7 @@ where
 
 struct BytesVisitor;
 
-#[crate::unsized_visitor(crate)]
+#[crate::de::unsized_visitor(crate)]
 impl<C> UnsizedVisitor<'_, C, [u8]> for BytesVisitor
 where
     C: Context,
@@ -489,7 +489,7 @@ where
 
 struct StringVisitor;
 
-#[crate::unsized_visitor(crate)]
+#[crate::de::unsized_visitor(crate)]
 impl<C> UnsizedVisitor<'_, C, str> for StringVisitor
 where
     C: Context,

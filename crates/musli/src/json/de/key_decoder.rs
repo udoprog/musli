@@ -45,7 +45,7 @@ where
     }
 }
 
-#[crate::decoder(crate)]
+#[crate::de::decoder(crate)]
 impl<'de, P, C, M> Decoder<'de> for JsonKeyDecoder<P, C, M>
 where
     P: Parser<'de>,
