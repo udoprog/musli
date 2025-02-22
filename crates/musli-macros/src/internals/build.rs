@@ -85,7 +85,7 @@ impl Build<'_, '_> {
                     self.cx.error_span(
                         span,
                         format_args!(
-                            "#[{ATTR}(tag)] and #[{ATTR}(content)] are only supported on enums"
+                            "The #[{ATTR}(tag)] and #[{ATTR}(content)] attributes are only supported on enums"
                         ),
                     );
 

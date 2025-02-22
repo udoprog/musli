@@ -98,6 +98,7 @@ pub(crate) mod de;
 pub(crate) mod en;
 mod encoding;
 mod error;
+mod macros;
 
 #[cfg(feature = "test")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
