@@ -15,7 +15,7 @@ use super::Decoder;
 ///
 /// #[derive(Decode)]
 /// struct MyType {
-///     data: [u8; 128],
+///     data: [u32; 8],
 /// }
 /// ```
 ///
@@ -25,19 +25,20 @@ use super::Decoder;
 /// use musli::{Allocator, Decode, Decoder};
 ///
 /// struct MyType {
-///     data: [u8; 128],
+///     data: [u32; 8],
 /// }
 ///
 /// impl<'de, M, A> Decode<'de, M, A> for MyType
 /// where
 ///     A: Allocator,
 /// {
+///     #[inline]
 ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de>,
 ///     {
 ///         Ok(Self {
-///             data: decoder.decode_array()?,
+///             data: decoder.decode()?,
 ///         })
 ///     }
 /// }
@@ -58,7 +59,7 @@ where
     /// not have a `Drop` implementation.
     const IS_BITWISE_DECODE: bool = false;
 
-    /// Decode the given input.
+    /// Decode the current value.
     fn decode<D>(decoder: D) -> Result<Self, D::Error>
     where
         D: Decoder<'de, Mode = M, Allocator = A>;

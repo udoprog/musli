@@ -36,9 +36,9 @@ use crate::{Allocator, Context};
 use super::PlatformTag;
 
 impl<M> Encode<M> for String {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = str;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -395,9 +395,9 @@ impl<M, T> Encode<M> for VecDeque<T>
 where
     T: Encode<M>,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -617,9 +617,9 @@ map!(
 );
 
 impl<M> Encode<M> for CString {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = CStr;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -801,9 +801,9 @@ impl<M> Encode<M> for OsStr
 where
     PlatformTag: Encode<M>,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[cfg(unix)]
     #[inline]
@@ -875,9 +875,9 @@ impl<M> Encode<M> for OsString
 where
     PlatformTag: Encode<M>,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = OsStr;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -971,9 +971,9 @@ impl<M> Encode<M> for Path
 where
     PlatformTag: Encode<M>,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -995,9 +995,9 @@ impl<M> Encode<M> for PathBuf
 where
     PlatformTag: Encode<M>,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>

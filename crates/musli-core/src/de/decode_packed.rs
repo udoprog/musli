@@ -38,6 +38,7 @@ use super::Decoder;
 /// where
 ///     A: Allocator,
 /// {
+///     #[inline]
 ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de>,

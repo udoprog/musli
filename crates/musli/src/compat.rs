@@ -27,9 +27,9 @@ impl<T> Sequence<T> {
 }
 
 impl<M> Encode<M> for Sequence<()> {
-    const IS_BITWISE_ENCODE: bool = true;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = true;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -91,11 +91,12 @@ where
 ///     A: Allocator,
 ///     Bytes<Vec<u8>>: Decode<'de, M, A>
 /// {
+///     #[inline]
 ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de, Mode = M, Allocator = A>,
 ///     {
-///         let Bytes(field) = Decode::decode(decoder)?;
+///         let Bytes(field) = decoder.decode()?;
 ///
 ///         Ok(Struct {
 ///             field,
@@ -158,11 +159,12 @@ where
 ///     A: Allocator,
 ///     Packed<(u8, u32)>: Decode<'de, M, A>
 /// {
+///     #[inline]
 ///     fn decode<D>(decoder: D) -> Result<Self, D::Error>
 ///     where
 ///         D: Decoder<'de, Mode = M, Allocator = A>,
 ///     {
-///         let Packed((field, field2)) = Decode::decode(decoder)?;
+///         let Packed((field, field2)) = decoder.decode()?;
 ///
 ///         Ok(Struct {
 ///             field,
