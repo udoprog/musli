@@ -64,7 +64,13 @@ implement!(
     SliceAlloc<'a, T>
 );
 
-impl<'a, const BUF: usize> Allocator for &'a DefaultAllocator<'_, BUF> {
+unsafe impl<'a, const BUF: usize> Allocator for &'a DefaultAllocator<'_, BUF> {
+    #[cfg(feature = "alloc")]
+    const IS_SYSTEM: bool = true;
+
+    #[cfg(not(feature = "alloc"))]
+    const IS_SYSTEM: bool = false;
+
     type Alloc<T> = DefaultAlloc<'a, T, BUF>;
 
     #[inline]

@@ -220,8 +220,8 @@ where
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = M;
     type Allocator = C::Allocator;
+    type Mode = M;
     type DecodePack = WireDecoder<OPT, Limit<R>, C, M>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingWireDecoder<OPT, R, C, M>;
@@ -289,7 +289,7 @@ where
     #[inline]
     fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error, Allocator = Self::Allocator>,
     {
         let mark = self.cx.mark();
         let len = self.decode_len(&mark)?;
@@ -299,17 +299,17 @@ where
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, str, Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, str, Error = Self::Error, Allocator = Self::Allocator>,
     {
         struct Visitor<V>(V);
 
+        #[crate::unsized_visitor(crate)]
         impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
             C: Context,
-            V: UnsizedVisitor<'de, C, str, Error = C::Error>,
+            V: UnsizedVisitor<'de, C, str, Error = C::Error, Allocator = C::Allocator>,
         {
             type Ok = V::Ok;
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -530,6 +530,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeNext<'this>
         = StorageDecoder<OPT, true, <Limit<R> as Reader<'de>>::Mut<'this>, C, M>
@@ -560,6 +561,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeNext<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>
@@ -607,6 +609,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeTag<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>
@@ -641,6 +644,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntry<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>
@@ -691,6 +695,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeKey<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>
@@ -722,6 +727,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntryKey<'this>
         = WireDecoder<OPT, R::Mut<'this>, C, M>

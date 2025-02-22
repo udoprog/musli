@@ -64,7 +64,11 @@ impl Default for Disabled {
     }
 }
 
-impl Allocator for Disabled {
+unsafe impl Allocator for Disabled {
+    /// We can set this to `true` because the disabled allocator returns
+    /// dangling pointers which are valid in a system allocation.
+    const IS_SYSTEM: bool = true;
+
     type Alloc<T> = EmptyBuf<T>;
 
     #[inline]

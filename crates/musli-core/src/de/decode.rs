@@ -42,9 +42,8 @@ use super::Decoder;
 ///     }
 /// }
 /// ```
-pub trait Decode<'de, M, A>
+pub trait Decode<'de, M, A>: Sized
 where
-    Self: Sized,
     A: Allocator,
 {
     /// Whether the type is packed. Packed types can be bitwise copied if the

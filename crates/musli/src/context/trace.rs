@@ -21,10 +21,7 @@ mod sealed {
 }
 
 /// Trait for marker types indicating the tracing mode to use.
-pub trait TraceMode
-where
-    Self: self::sealed::Sealed,
-{
+pub trait TraceMode: self::sealed::Sealed {
     #[doc(hidden)]
     type Impl<A>: TraceImpl<A>
     where
@@ -39,10 +36,7 @@ where
 /// The trait governing how tracing works in a [`DefaultContext`].
 ///
 /// [`DefaultContext`]: super::DefaultContext
-pub trait TraceImpl<A>
-where
-    Self: self::sealed::Sealed,
-{
+pub trait TraceImpl<A>: self::sealed::Sealed {
     #[doc(hidden)]
     type Mark;
 

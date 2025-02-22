@@ -67,21 +67,16 @@ where
     {
         struct Visitor;
 
-        impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
+        #[crate::unsized_visitor(crate)]
+        impl<C> UnsizedVisitor<'_, C, str> for Visitor
         where
             C: Context,
         {
             type Ok = String;
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "string")
-            }
-
-            #[inline]
-            fn visit_borrowed(self, cx: C, string: &'de str) -> Result<Self::Ok, Self::Error> {
-                self.visit_ref(cx, string)
             }
 
             #[inline]
@@ -171,12 +166,12 @@ macro_rules! cow {
             {
                 struct Visitor;
 
+                #[crate::unsized_visitor(crate)]
                 impl<'de, C> UnsizedVisitor<'de, C, $source> for Visitor
                 where
                     C: Context,
                 {
                     type Ok = Cow<'de, $ty>;
-                    type Error = C::Error;
 
                     #[inline]
                     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -187,7 +182,7 @@ macro_rules! cow {
                     fn visit_owned(
                         self,
                         $cx: C,
-                        $owned: <$source as ToOwned<C::Allocator>>::Owned,
+                        $owned: <$source as ToOwned>::Owned<Self::Allocator>,
                     ) -> Result<Self::Ok, Self::Error> {
                         Ok($owned_expr)
                     }
@@ -653,12 +648,12 @@ where
     {
         struct Visitor;
 
-        impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
+        #[crate::unsized_visitor(crate)]
+        impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
         where
             C: Context,
         {
             type Ok = CString;
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -669,17 +664,12 @@ where
             fn visit_owned(
                 self,
                 cx: C,
-                value: crate::alloc::Vec<u8, C::Allocator>,
+                value: crate::alloc::Vec<u8, Self::Allocator>,
             ) -> Result<Self::Ok, Self::Error> {
                 match value.into_std() {
                     Ok(value) => CString::from_vec_with_nul(value).map_err(cx.map()),
                     Err(value) => self.visit_ref(cx, &value),
                 }
-            }
-
-            #[inline]
-            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, Self::Error> {
-                self.visit_ref(cx, bytes)
             }
 
             #[inline]
@@ -940,12 +930,12 @@ where
 
                     struct Visitor;
 
+                    #[crate::unsized_visitor(crate)]
                     impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
                     where
                         C: Context,
                     {
                         type Ok = OsString;
-                        type Error = C::Error;
 
                         #[inline]
                         fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1092,12 +1082,12 @@ where
     {
         struct Visitor;
 
+        #[crate::unsized_visitor(crate)]
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
             C: Context,
         {
             type Ok = Vec<u8>;
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

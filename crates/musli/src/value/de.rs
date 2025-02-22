@@ -99,8 +99,8 @@ where
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = M;
     type Allocator = C::Allocator;
+    type Mode = M;
     type DecodeBuffer = AsValueDecoder<'de, OPT, C, A, M>;
     type DecodeSome = Self;
     type DecodePack = StorageDecoder<OPT, true, SliceReader<'de>, C, M>;
@@ -229,7 +229,7 @@ where
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error, Allocator = Self::Allocator>,
     {
         ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
             visitor.visit_borrowed(self.cx, bytes)
@@ -239,7 +239,7 @@ where
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, str, Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, str, Error = Self::Error, Allocator = Self::Allocator>,
     {
         ensure!(self, hint, ExpectedString(hint), Value::String(string) => {
             visitor.visit_borrowed(self.cx, string)
@@ -314,7 +314,7 @@ where
     #[inline]
     fn decode_any<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: Visitor<'de, Self::Cx, Error = Self::Error>,
+        V: Visitor<'de, Self::Cx, Error = Self::Error, Allocator = Self::Allocator>,
     {
         match self.value {
             Value::Unit => visitor.visit_empty(self.cx),
@@ -371,6 +371,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type Decoder<'this>
         = ValueDecoder<'this, OPT, C, A, M>
@@ -419,6 +420,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeNext<'this>
         = ValueDecoder<'de, OPT, C, A, M>
@@ -488,6 +490,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntry<'this>
         = IterValuePairDecoder<'de, OPT, C, A, M>
@@ -534,6 +537,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntryKey<'this>
         = ValueDecoder<'de, OPT, C, A, M>
@@ -581,6 +585,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeKey<'this>
         = ValueDecoder<'de, OPT, C, A, M>
@@ -669,6 +674,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeTag<'this>
         = ValueDecoder<'de, OPT, C, A, M>
@@ -696,10 +702,7 @@ where
 }
 
 /// Conversion trait for numbers.
-trait FromNumber
-where
-    Self: Sized,
-{
+trait FromNumber: Sized {
     const NUMBER_HINT: NumberHint;
 
     fn from_number(number: &Number) -> Result<Self, ErrorMessage>;

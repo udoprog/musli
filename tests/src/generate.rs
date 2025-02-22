@@ -91,10 +91,7 @@ impl rand::RngCore for Rng {
     }
 }
 
-pub trait Generate
-where
-    Self: Sized,
-{
+pub trait Generate: Sized {
     /// Generate a value of the given type.
     fn generate<R>(rng: &mut R) -> Self
     where

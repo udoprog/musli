@@ -21,12 +21,12 @@ where
     {
         struct Visitor;
 
+        #[musli::unsized_visitor]
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
             C: Context,
         {
             type Ok = &'de [u8];
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -82,12 +82,12 @@ where
     {
         struct Visitor;
 
+        #[musli::unsized_visitor]
         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
         where
             C: Context,
         {
             type Ok = &'de str;
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

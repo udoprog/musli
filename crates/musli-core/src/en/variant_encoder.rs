@@ -4,7 +4,7 @@ use super::{Encode, Encoder};
 
 /// Trait governing how to encode a variant.
 #[must_use = "Must call end_variant to finish encoding"]
-pub trait VariantEncoder {
+pub trait VariantEncoder: Sized {
     /// Context associated with the encoder.
     type Cx: Context<Error = Self::Error>;
     /// Result type of the encoder.
@@ -50,7 +50,6 @@ pub trait VariantEncoder {
     #[inline]
     fn insert_variant<T, V>(mut self, tag: T, value: V) -> Result<Self::Ok, Self::Error>
     where
-        Self: Sized,
         T: Encode<Self::Mode>,
         V: Encode<Self::Mode>,
     {

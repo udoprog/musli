@@ -1,13 +1,15 @@
-use crate::Context;
+use crate::{Allocator, Context};
 
 use super::{Decode, Decoder, SizeHint};
 
 /// Trait governing how to decode a sequence.
 pub trait SequenceDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: Context<Error = Self::Error>;
+    type Cx: Context<Error = Self::Error, Allocator = Self::Allocator>;
     /// Error associated with decoding.
     type Error;
+    /// The allocator associated with the decoder.
+    type Allocator: Allocator;
     /// The mode of the decoder.
     type Mode: 'static;
     /// The decoder for individual items.
@@ -15,8 +17,8 @@ pub trait SequenceDecoder<'de> {
         'de,
         Cx = Self::Cx,
         Error = Self::Error,
+        Allocator = Self::Allocator,
         Mode = Self::Mode,
-        Allocator = <Self::Cx as Context>::Allocator,
     >
     where
         Self: 'this;
@@ -45,7 +47,7 @@ pub trait SequenceDecoder<'de> {
     #[inline]
     fn next<T>(&mut self) -> Result<T, Self::Error>
     where
-        T: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
+        T: Decode<'de, Self::Mode, Self::Allocator>,
     {
         self.decode_next()?.decode()
     }
@@ -54,7 +56,7 @@ pub trait SequenceDecoder<'de> {
     #[inline]
     fn try_next<T>(&mut self) -> Result<Option<T>, Self::Error>
     where
-        T: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
+        T: Decode<'de, Self::Mode, Self::Allocator>,
     {
         let Some(decoder) = self.try_decode_next()? else {
             return Ok(None);

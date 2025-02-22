@@ -824,12 +824,12 @@ where
     {
         struct Visitor;
 
-        impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
+        #[crate::unsized_visitor(crate)]
+        impl<C> UnsizedVisitor<'_, C, str> for Visitor
         where
             C: Context,
         {
-            type Ok = String<C::Allocator>;
-            type Error = C::Error;
+            type Ok = String<Self::Allocator>;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -837,13 +837,12 @@ where
             }
 
             #[inline]
-            fn visit_owned(self, _: C, value: String<C::Allocator>) -> Result<Self::Ok, C::Error> {
+            fn visit_owned(
+                self,
+                _: C,
+                value: String<Self::Allocator>,
+            ) -> Result<Self::Ok, C::Error> {
                 Ok(value)
-            }
-
-            #[inline]
-            fn visit_borrowed(self, cx: C, string: &'de str) -> Result<Self::Ok, C::Error> {
-                self.visit_ref(cx, string)
             }
 
             #[inline]

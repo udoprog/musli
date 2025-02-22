@@ -57,6 +57,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeTag<'this>
         = JsonKeyDecoder<P::Mut<'this>, C, M>

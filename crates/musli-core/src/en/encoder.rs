@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 use core::fmt;
 
 use crate::expecting::{self, Expecting};
@@ -22,6 +20,7 @@ where
 
 /// Trait governing how the encoder works.
 #[must_use = "Encoders must be consumed through one of its encode_* methods"]
+#[allow(unused_variables)]
 pub trait Encoder: Sized {
     /// Context associated with the encoder.
     type Cx: Context<Error = Self::Error>;
@@ -58,21 +57,21 @@ pub trait Encoder: Sized {
         Error = Self::Error,
         Mode = Self::Mode,
     >;
-    /// Encoder for a struct variant.
+    /// Encoder for a variant.
     type EncodeVariant: VariantEncoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
         Error = Self::Error,
         Mode = Self::Mode,
     >;
-    /// Specialized encoder for a tuple variant.
+    /// Encoder for a sequence variant.
     type EncodeSequenceVariant: SequenceEncoder<
         Cx = Self::Cx,
         Ok = Self::Ok,
         Error = Self::Error,
         Mode = Self::Mode,
     >;
-    /// Specialized encoder for a struct variant.
+    /// Encoder for a map variant.
     type EncodeMapVariant: MapEncoder<
         Cx = Self::Cx,
         Ok = Self::Ok,

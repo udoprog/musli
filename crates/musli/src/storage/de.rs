@@ -68,8 +68,8 @@ where
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = M;
     type Allocator = C::Allocator;
+    type Mode = M;
     type DecodePack = StorageDecoder<OPT, true, R, C, M>;
     type DecodeSome = Self;
     type DecodeSequence = LimitedStorageDecoder<OPT, PACK, R, C, M>;
@@ -139,7 +139,7 @@ where
     #[inline]
     fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error, Allocator = Self::Allocator>,
     {
         let len = crate::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?;
         self.reader.read_bytes(self.cx, len, visitor)
@@ -148,17 +148,17 @@ where
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, str, Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, str, Error = Self::Error, Allocator = Self::Allocator>,
     {
         struct Visitor<V>(V);
 
+        #[crate::unsized_visitor(crate)]
         impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
             C: Context,
-            V: UnsizedVisitor<'de, C, str, Error = C::Error>,
+            V: UnsizedVisitor<'de, C, str, Error = C::Error, Allocator = C::Allocator>,
         {
             type Ok = V::Ok;
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -436,6 +436,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeNext<'this>
         = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
@@ -495,6 +496,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeNext<'this>
         = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
@@ -542,6 +544,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntry<'this>
         = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
@@ -593,6 +596,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeKey<'this>
         = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
@@ -625,6 +629,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntryKey<'this>
         = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>
@@ -676,6 +681,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeTag<'this>
         = StorageDecoder<OPT, PACK, R::Mut<'this>, C, M>

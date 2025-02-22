@@ -3,24 +3,23 @@ use core::borrow::Borrow;
 use crate::alloc::{Allocator, String, Vec};
 
 /// The local `ToOwned`` implementation for Musli's allocation system.
-pub trait ToOwned<A>
-where
-    A: Allocator,
-{
+pub trait ToOwned {
     /// The owned value.
-    type Owned: Borrow<Self>;
+    type Owned<A>: Borrow<Self>
+    where
+        A: Allocator;
 }
 
-impl<T, A> ToOwned<A> for [T]
-where
-    A: Allocator,
-{
-    type Owned = Vec<T, A>;
+impl<T> ToOwned for [T] {
+    type Owned<A>
+        = Vec<T, A>
+    where
+        A: Allocator;
 }
 
-impl<A> ToOwned<A> for str
-where
-    A: Allocator,
-{
-    type Owned = String<A>;
+impl ToOwned for str {
+    type Owned<A>
+        = String<A>
+    where
+        A: Allocator;
 }

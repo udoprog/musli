@@ -59,7 +59,7 @@ where
 pub fn default_sequence_encode_slice<E, T>(
     seq: &mut E,
     slice: impl AsRef<[T]>,
-) -> Result<(), <E::Cx as Context>::Error>
+) -> Result<(), E::Error>
 where
     E: ?Sized + SequenceEncoder,
     T: Encode<E::Mode>,
@@ -83,7 +83,7 @@ where
 pub fn default_sequence_encode_slices<E, T>(
     seq: &mut E,
     slices: impl IntoIterator<Item: AsRef<[T]>>,
-) -> Result<(), <E::Cx as Context>::Error>
+) -> Result<(), E::Error>
 where
     E: ?Sized + SequenceEncoder,
     T: Encode<E::Mode>,

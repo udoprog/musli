@@ -101,6 +101,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeNext<'this>
         = JsonDecoder<P::Mut<'this>, C, M>

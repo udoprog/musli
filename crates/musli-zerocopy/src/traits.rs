@@ -407,10 +407,7 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 42, ignore: () });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub unsafe trait ZeroCopy
-where
-    Self: Sized,
-{
+pub unsafe trait ZeroCopy: Sized {
     /// Indicates if the type can inhabit all possible bit patterns within its
     /// [`size_of::<Self>()`] bytes.
     const ANY_BITS: bool;

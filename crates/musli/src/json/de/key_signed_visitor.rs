@@ -21,13 +21,13 @@ impl<T> KeySignedVisitor<T> {
     }
 }
 
+#[crate::unsized_visitor(crate)]
 impl<C, T> UnsizedVisitor<'_, C, [u8]> for KeySignedVisitor<T>
 where
     C: Context,
     T: Signed,
 {
     type Ok = T;
-    type Error = C::Error;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

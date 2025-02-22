@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 use core::fmt;
 
 use crate::expecting::{self, Expecting};
@@ -22,43 +20,71 @@ pub enum TryFastDecode<T, D> {
 
 /// Trait governing the implementation of a decoder.
 #[must_use = "Decoders must be consumed through one of its decode_* methods"]
-pub trait Decoder<'de>
-where
-    Self: Sized,
-{
+#[allow(unused_variables)]
+pub trait Decoder<'de>: Sized {
     /// Context associated with the decoder.
     type Cx: Context<Error = Self::Error, Allocator = Self::Allocator>;
     /// Error associated with decoding.
     type Error;
-    /// Mode associated with decoding.
-    type Mode: 'static;
     /// The allocator associated with the decoder.
     type Allocator: Allocator;
+    /// Mode associated with decoding.
+    type Mode: 'static;
     /// Decoder returned by [`Decoder::decode_buffer`].
-    type DecodeBuffer: AsDecoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
+    type DecodeBuffer: AsDecoder<
+        Cx = Self::Cx,
+        Error = Self::Error,
+        Allocator = Self::Allocator,
+        Mode = Self::Mode,
+    >;
     /// Decoder returned by [`Decoder::decode_option`].
     type DecodeSome: Decoder<
         'de,
         Cx = Self::Cx,
         Error = Self::Error,
-        Mode = Self::Mode,
         Allocator = Self::Allocator,
+        Mode = Self::Mode,
     >;
     /// Decoder used by [`Decoder::decode_pack`].
-    type DecodePack: SequenceDecoder<'de, Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
+    type DecodePack: SequenceDecoder<
+        'de,
+        Cx = Self::Cx,
+        Error = Self::Error,
+        Allocator = Self::Allocator,
+        Mode = Self::Mode,
+    >;
     /// Decoder returned by [`Decoder::decode_sequence`].
-    type DecodeSequence: SequenceDecoder<'de, Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
+    type DecodeSequence: SequenceDecoder<
+        'de,
+        Cx = Self::Cx,
+        Error = Self::Error,
+        Allocator = Self::Allocator,
+        Mode = Self::Mode,
+    >;
     /// Decoder returned by [`Decoder::decode_map`].
-    type DecodeMap: MapDecoder<'de, Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
+    type DecodeMap: MapDecoder<
+        'de,
+        Cx = Self::Cx,
+        Error = Self::Error,
+        Allocator = Self::Allocator,
+        Mode = Self::Mode,
+    >;
     /// Decoder returned by [`Decoder::decode_map_entries`].
     type DecodeMapEntries: EntriesDecoder<
         'de,
         Cx = Self::Cx,
         Error = Self::Error,
+        Allocator = Self::Allocator,
         Mode = Self::Mode,
     >;
     /// Decoder used by [`Decoder::decode_variant`].
-    type DecodeVariant: VariantDecoder<'de, Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
+    type DecodeVariant: VariantDecoder<
+        'de,
+        Cx = Self::Cx,
+        Error = Self::Error,
+        Allocator = Self::Allocator,
+        Mode = Self::Mode,
+    >;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::decoder]`][musli::decoder] attribute
@@ -1094,12 +1120,12 @@ where
     ///     {
     ///         struct Visitor;
     ///
+    ///         #[musli::unsized_visitor]
     ///         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
     ///         where
     ///             C: Context
     ///         {
     ///             type Ok = &'de [u8];
-    ///             type Error = C::Error;
     ///
     ///             #[inline]
     ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1121,7 +1147,7 @@ where
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, Self::Cx, [u8], Error = Self::Error>,
+        V: UnsizedVisitor<'de, Self::Cx, [u8], Error = Self::Error, Allocator = Self::Allocator>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Bytes,
@@ -1165,12 +1191,12 @@ where
     ///     {
     ///         struct Visitor;
     ///
+    ///         #[musli::unsized_visitor]
     ///         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
     ///         where
     ///             C: Context,
     ///         {
     ///             type Ok = &'de str;
-    ///             type Error = C::Error;
     ///
     ///             #[inline]
     ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1192,7 +1218,7 @@ where
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, Self::Cx, str, Error = Self::Error>,
+        V: UnsizedVisitor<'de, Self::Cx, str, Error = Self::Error, Allocator = Self::Allocator>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::String,
@@ -1634,7 +1660,7 @@ where
     #[inline]
     fn decode_number<V>(self, visitor: V) -> Result<V::Ok, Self::Error>
     where
-        V: Visitor<'de, Self::Cx, Error = Self::Error>,
+        V: Visitor<'de, Self::Cx, Error = Self::Error, Allocator = Self::Allocator>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Number,
@@ -1646,7 +1672,7 @@ where
     #[inline]
     fn decode_any<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: Visitor<'de, Self::Cx, Error = Self::Error>,
+        V: Visitor<'de, Self::Cx, Error = Self::Error, Allocator = Self::Allocator>,
     {
         Err(self.cx().message(format_args!(
             "Any type not supported, expected {}",

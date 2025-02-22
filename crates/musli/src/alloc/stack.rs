@@ -169,7 +169,9 @@ impl<'a> Slice<'a> {
     }
 }
 
-impl<'a> Allocator for &'a Slice<'_> {
+unsafe impl<'a> Allocator for &'a Slice<'_> {
+    const IS_SYSTEM: bool = false;
+
     type Alloc<T> = SliceAlloc<'a, T>;
 
     #[inline]
