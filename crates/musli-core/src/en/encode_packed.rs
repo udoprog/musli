@@ -35,6 +35,7 @@ use crate::en::Encoder;
 /// impl<M> Encode<M> for PackedType {
 ///     type Encode = Self;
 ///
+///     #[inline]
 ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
 ///     where
 ///         E: Encoder,

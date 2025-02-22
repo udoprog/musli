@@ -780,9 +780,9 @@ impl<M, A> Encode<M> for String<A>
 where
     A: Allocator,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = str;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>

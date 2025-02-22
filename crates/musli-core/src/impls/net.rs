@@ -23,11 +23,11 @@ enum SocketAddrTag {
 }
 
 impl Encode<Binary> for Ipv4Addr {
+    type Encode = Self;
+
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_ENCODE: bool = false;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -44,11 +44,11 @@ impl Encode<Binary> for Ipv4Addr {
 }
 
 impl Encode<Text> for Ipv4Addr {
+    type Encode = Self;
+
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_ENCODE: bool = false;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -100,11 +100,11 @@ where
 }
 
 impl Encode<Binary> for Ipv6Addr {
+    type Encode = Self;
+
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_ENCODE: bool = false;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -121,11 +121,11 @@ impl Encode<Binary> for Ipv6Addr {
 }
 
 impl Encode<Text> for Ipv6Addr {
+    type Encode = Self;
+
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_ENCODE: bool = false;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -182,9 +182,9 @@ where
     Ipv4Addr: Encode<M>,
     Ipv6Addr: Encode<M>,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -231,11 +231,11 @@ where
 }
 
 impl Encode<Binary> for SocketAddrV4 {
+    type Encode = Self;
+
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_ENCODE: bool = false;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -256,11 +256,11 @@ impl Encode<Binary> for SocketAddrV4 {
 }
 
 impl Encode<Text> for SocketAddrV4 {
+    type Encode = Self;
+
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_ENCODE: bool = false;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -312,11 +312,11 @@ where
 }
 
 impl Encode<Binary> for SocketAddrV6 {
+    type Encode = Self;
+
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_ENCODE: bool = false;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -339,11 +339,11 @@ impl Encode<Binary> for SocketAddrV6 {
 }
 
 impl Encode<Text> for SocketAddrV6 {
+    type Encode = Self;
+
     // Not packed since it doesn't have a strongly defined memory layout, even
     // though it has a particular size.
     const IS_BITWISE_ENCODE: bool = false;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>

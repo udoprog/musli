@@ -31,10 +31,10 @@ enum PlatformTag {
 }
 
 impl<M> Encode<M> for () {
+    type Encode = Self;
+
     // Unit is always packed, since it is a ZST.
     const IS_BITWISE_ENCODE: bool = true;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -67,10 +67,10 @@ where
 }
 
 impl<T, M> Encode<M> for marker::PhantomData<T> {
+    type Encode = Self;
+
     // PhantomData is always packed, since it is a ZST.
     const IS_BITWISE_ENCODE: bool = true;
-
-    type Encode = Self;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -353,11 +353,11 @@ macro_rules! impl_number {
 }
 
 impl<M> Encode<M> for bool {
-    // A boolean is packed since it's guaranteed to inhabit a valid bit pattern
-    // of one byte without padding.
-    const IS_BITWISE_ENCODE: bool = true;
-
     type Encode = Self;
+
+    // A boolean is bitwise encodeable since it's guaranteed to inhabit a valid
+    // bit pattern of one byte without padding.
+    const IS_BITWISE_ENCODE: bool = true;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -391,11 +391,11 @@ where
 }
 
 impl<M> Encode<M> for char {
-    // A char is packed since it's guaranteed to inhabit a valid bit pattern of
-    // a u32 and can be bitwise copied when encoded.
-    const IS_BITWISE_ENCODE: bool = true;
-
     type Encode = Self;
+
+    // A char bitwise encodeable since it's guaranteed to inhabit a valid bit
+    // pattern of a u32 and can be bitwise copied when encoded.
+    const IS_BITWISE_ENCODE: bool = true;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -564,9 +564,9 @@ impl<M, T> Encode<M> for [T]
 where
     T: Encode<M>,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -653,9 +653,9 @@ impl<T, M> Encode<M> for Option<T>
 where
     T: Encode<M>,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -707,9 +707,9 @@ where
     U: Encode<M>,
     ResultTag: Encode<M>,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
@@ -794,9 +794,9 @@ where
 }
 
 impl<M> Encode<M> for CStr {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>

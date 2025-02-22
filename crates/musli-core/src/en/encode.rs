@@ -13,7 +13,7 @@ use crate::en::Encoder;
 ///
 /// #[derive(Encode)]
 /// struct MyType {
-///     data: [u8; 128],
+///     data: [u32; 8],
 /// }
 /// ```
 ///
@@ -23,17 +23,18 @@ use crate::en::Encoder;
 /// use musli::{Encode, Encoder};
 ///
 /// struct MyType {
-///     data: [u8; 128],
+///     data: [u32; 8],
 /// }
 ///
 /// impl<M> Encode<M> for MyType {
 ///     type Encode = Self;
 ///
+///     #[inline]
 ///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
 ///     where
 ///         E: Encoder<Mode = M>,
 ///     {
-///         encoder.encode_array(&self.data)
+///         encoder.encode(&self.data)
 ///     }
 ///
 ///     #[inline]
@@ -73,6 +74,8 @@ impl<T, M> Encode<M> for &T
 where
     T: ?Sized + Encode<M>,
 {
+    type Encode = T;
+
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
@@ -82,8 +85,6 @@ where
     {
         (**self).encode(encoder)
     }
-
-    type Encode = T;
 
     #[inline]
     fn as_encode(&self) -> &Self::Encode {
@@ -95,6 +96,8 @@ impl<T, M> Encode<M> for &mut T
 where
     T: ?Sized + Encode<M>,
 {
+    type Encode = T;
+
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
@@ -104,8 +107,6 @@ where
     {
         (**self).encode(encoder)
     }
-
-    type Encode = T;
 
     #[inline]
     fn as_encode(&self) -> &Self::Encode {

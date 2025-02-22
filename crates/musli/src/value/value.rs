@@ -220,9 +220,9 @@ from!(f32, F32);
 from!(f64, F64);
 
 impl<M> Encode<M> for Number {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
@@ -513,9 +513,9 @@ impl<M, C> Encode<M> for Value<C>
 where
     C: Allocator,
 {
-    const IS_BITWISE_ENCODE: bool = false;
-
     type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
 
     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
     where
