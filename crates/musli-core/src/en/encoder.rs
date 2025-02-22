@@ -80,7 +80,7 @@ pub trait Encoder: Sized {
     >;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::en::encoder]`][musli::en::encoder]
+    /// should be using the [`#[musli::encoder]`][musli::encoder]
     /// attribute macro when implementing [`Encoder`].
     #[doc(hidden)]
     type __UseMusliEncoderAttributeMacro;

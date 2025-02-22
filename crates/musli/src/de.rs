@@ -64,7 +64,7 @@ pub use musli_core::__macros::Decode;
 ///     _marker: PhantomData<M>,
 /// }
 ///
-/// #[musli::de::decoder]
+/// #[musli::decoder]
 /// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
 /// where
 ///     C: Context,
@@ -165,7 +165,7 @@ pub use musli_core::__macros::visitor;
 pub use musli_core::__macros::unsized_visitor;
 
 #[doc(inline)]
-pub use musli_core::de::traits::{
+pub use musli_core::de::__traits::{
     AsDecoder, Decode, DecodeBytes, DecodeOwned, DecodePacked, DecodeSliceBuilder, DecodeTrace,
     DecodeUnsized, DecodeUnsizedBytes, Decoder, EntriesDecoder, EntryDecoder, MapDecoder,
     SequenceDecoder, SizeHint, Skip, TryFastDecode, UnsizedVisitor, VariantDecoder, Visitor,

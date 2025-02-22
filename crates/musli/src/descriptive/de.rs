@@ -220,7 +220,7 @@ where
     }
 }
 
-#[crate::de::decoder(crate)]
+#[crate::decoder(crate)]
 impl<'de, const OPT: Options, R, C, M> Decoder<'de> for SelfDecoder<OPT, R, C, M>
 where
     R: Reader<'de>,

@@ -58,7 +58,7 @@ where
     _marker: PhantomData<M>,
 }
 
-#[crate::de::decoder(crate)]
+#[crate::decoder(crate)]
 impl<'de, const OPT: Options, const PACK: bool, R, C, M> Decoder<'de>
     for StorageDecoder<OPT, PACK, R, C, M>
 where
