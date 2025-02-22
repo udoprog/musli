@@ -30,7 +30,7 @@ impl<'de, D> de::Deserializer<'de> for Deserializer<D>
 where
     D: Decoder<'de>,
 {
-    type Error = SerdeError<<D::Cx as Context>::Error>;
+    type Error = SerdeError<D::Error>;
 
     #[inline]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -373,7 +373,7 @@ impl<'de, D> de::SeqAccess<'de> for SequenceAccess<'_, D>
 where
     D: SequenceDecoder<'de>,
 {
-    type Error = SerdeError<<D::Cx as Context>::Error>;
+    type Error = SerdeError<D::Error>;
 
     #[inline]
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
@@ -414,7 +414,7 @@ impl<'de, D> de::MapAccess<'de> for StructAccess<'_, D>
 where
     D: ?Sized + EntriesDecoder<'de>,
 {
-    type Error = SerdeError<<D::Cx as Context>::Error>;
+    type Error = SerdeError<D::Error>;
 
     #[inline]
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
@@ -456,13 +456,13 @@ impl<V> BytesVisitor<V> {
     }
 }
 
+#[crate::unsized_visitor(crate)]
 impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for BytesVisitor<V>
 where
     C: Context,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
-    type Error = C::Error;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -510,7 +510,7 @@ impl<'de, D> de::SeqAccess<'de> for SeqAccess<'_, D>
 where
     D: ?Sized + SequenceDecoder<'de>,
 {
-    type Error = SerdeError<<D::Cx as Context>::Error>;
+    type Error = SerdeError<D::Error>;
 
     #[inline]
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
@@ -552,7 +552,7 @@ impl<'de, D> de::MapAccess<'de> for MapAccess<'_, D>
 where
     D: ?Sized + EntriesDecoder<'de>,
 {
-    type Error = SerdeError<<D::Cx as Context>::Error>;
+    type Error = SerdeError<D::Error>;
 
     #[inline]
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
@@ -589,13 +589,13 @@ impl<V> StringVisitor<V> {
     }
 }
 
+#[crate::unsized_visitor(crate)]
 impl<'de, C, V> UnsizedVisitor<'de, C, str> for StringVisitor<V>
 where
     C: Context,
     V: de::Visitor<'de>,
 {
     type Ok = V::Value;
-    type Error = C::Error;
 
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -643,7 +643,7 @@ impl<'de, D> de::VariantAccess<'de> for EnumAccess<'_, D>
 where
     D: ?Sized + VariantDecoder<'de>,
 {
-    type Error = SerdeError<<D::Cx as Context>::Error>;
+    type Error = SerdeError<D::Error>;
 
     #[inline]
     fn unit_variant(self) -> Result<(), Self::Error> {
@@ -699,7 +699,7 @@ impl<'de, D> de::EnumAccess<'de> for EnumAccess<'_, D>
 where
     D: VariantDecoder<'de>,
 {
-    type Error = SerdeError<<D::Cx as Context>::Error>;
+    type Error = SerdeError<D::Error>;
     type Variant = Self;
 
     #[inline]
@@ -845,7 +845,7 @@ where
     #[inline]
     fn visit_some<D>(self, decoder: D) -> Result<Self::Ok, Self::Error>
     where
-        D: Decoder<'de, Cx = C>,
+        D: Decoder<'de, Cx = C, Error = Self::Error>,
     {
         let cx = decoder.cx();
 
@@ -857,7 +857,7 @@ where
     #[inline]
     fn visit_sequence<D>(self, decoder: &mut D) -> Result<Self::Ok, Self::Error>
     where
-        D: ?Sized + SequenceDecoder<'de, Cx = C>,
+        D: ?Sized + SequenceDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = decoder.cx();
 
@@ -869,7 +869,7 @@ where
     #[inline]
     fn visit_map<D>(self, decoder: &mut D) -> Result<Self::Ok, Self::Error>
     where
-        D: ?Sized + MapDecoder<'de, Cx = C, Error = Self::Error>,
+        D: ?Sized + MapDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let mut decoder = decoder.decode_remaining_entries()?;
         let value = self

@@ -11,6 +11,7 @@ use crate::int::continuation as c;
 use crate::options;
 use crate::reader::Limit;
 use crate::storage::de::StorageDecoder;
+use crate::value::{IntoValueDecoder, Value};
 use crate::Context;
 use crate::{Options, Reader};
 
@@ -228,9 +229,9 @@ where
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = M;
     type Allocator = C::Allocator;
-    type DecodeBuffer = crate::value::IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
+    type Mode = M;
+    type DecodeBuffer = IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
     type DecodePack = SelfDecoder<OPT, Limit<R>, C, M>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingSelfDecoder<OPT, R, C, M>;
@@ -262,7 +263,7 @@ where
     #[inline]
     fn decode_buffer(self) -> Result<Self::DecodeBuffer, Self::Error> {
         let cx = self.cx;
-        let value = self.decode::<crate::value::Value<Self::Allocator>>()?;
+        let value = self.decode::<Value<Self::Allocator>>()?;
         Ok(value.into_decoder(cx))
     }
 
@@ -304,7 +305,7 @@ where
     #[inline]
     fn decode_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error, Allocator = Self::Allocator>,
     {
         let pos = self.cx.mark();
         let len = self.decode_prefix(Kind::Bytes, &pos)?;
@@ -314,17 +315,17 @@ where
     #[inline]
     fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, str, Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, str, Error = Self::Error, Allocator = Self::Allocator>,
     {
         struct Visitor<V>(V);
 
+        #[crate::unsized_visitor(crate)]
         impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for Visitor<V>
         where
             C: Context,
-            V: UnsizedVisitor<'de, C, str, Error = C::Error>,
+            V: UnsizedVisitor<'de, C, str, Error = C::Error, Allocator = C::Allocator>,
         {
             type Ok = V::Ok;
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -335,7 +336,7 @@ where
             fn visit_owned(
                 self,
                 cx: C,
-                bytes: Vec<u8, C::Allocator>,
+                bytes: Vec<u8, Self::Allocator>,
             ) -> Result<Self::Ok, Self::Error> {
                 let string = crate::str::from_utf8_owned(bytes).map_err(cx.map())?;
                 self.0.visit_owned(cx, string)
@@ -362,7 +363,7 @@ where
     #[inline]
     fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: Visitor<'de, C, Error = Self::Error>,
+        V: Visitor<'de, C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = self.cx;
         let tag = Tag::from_byte(self.reader.read_byte(cx)?);
@@ -616,7 +617,7 @@ where
     #[inline]
     fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: Visitor<'de, C, Error = Self::Error>,
+        V: Visitor<'de, C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = self.cx;
 
@@ -743,6 +744,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeNext<'this>
         = StorageDecoder<OPT, true, <Limit<R> as Reader<'de>>::Mut<'this>, C, M>
@@ -773,6 +775,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeNext<'this>
         = SelfDecoder<OPT, R::Mut<'this>, C, M>
@@ -819,6 +822,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntry<'this>
         = SelfDecoder<OPT, R::Mut<'this>, C, M>
@@ -869,6 +873,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntryKey<'this>
         = SelfDecoder<OPT, R::Mut<'this>, C, M>
@@ -914,6 +919,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeKey<'this>
         = SelfDecoder<OPT, R::Mut<'this>, C, M>
@@ -945,6 +951,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeTag<'this>
         = SelfDecoder<OPT, R::Mut<'this>, C, M>

@@ -52,7 +52,8 @@ impl<A> Value<A>
 where
     A: Allocator,
 {
-    /// Construct a [IntoValueDecoder] implementation out of the current value.
+    /// Construct a [`IntoValueDecoder`] implementation out of the current
+    /// value.
     #[inline]
     pub fn into_decoder<const OPT: Options, C, M>(self, cx: C) -> IntoValueDecoder<OPT, C, A, M>
     where
@@ -61,7 +62,7 @@ where
         IntoValueDecoder::new(cx, self)
     }
 
-    /// Construct a [AsValueDecoder] implementation out of the current value.
+    /// Construct a [`AsValueDecoder`] implementation out of the current value.
     #[inline]
     pub fn as_decoder<const OPT: Options, C, M>(&self, cx: C) -> AsValueDecoder<'_, OPT, C, A, M>
     where
@@ -281,7 +282,6 @@ where
     C: Context,
 {
     type Ok = Value<C::Allocator>;
-    type Error = C::Error;
     type String = StringVisitor;
     type Bytes = BytesVisitor;
 
@@ -394,7 +394,7 @@ where
     #[inline]
     fn visit_sequence<D>(self, seq: &mut D) -> Result<Self::Ok, Self::Error>
     where
-        D: ?Sized + SequenceDecoder<'de, Cx = C, Error = Self::Error>,
+        D: ?Sized + SequenceDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = seq.cx();
 
@@ -411,9 +411,10 @@ where
     #[inline]
     fn visit_map<D>(self, map: &mut D) -> Result<Self::Ok, D::Error>
     where
-        D: ?Sized + MapDecoder<'de, Cx = C, Error = Self::Error>,
+        D: ?Sized + MapDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = map.cx();
+
         let mut out =
             Vec::with_capacity_in(map.size_hint().or_default(), cx.alloc()).map_err(cx.map())?;
 
@@ -439,7 +440,7 @@ where
     #[inline]
     fn visit_variant<D>(self, variant: &mut D) -> Result<Self::Ok, Self::Error>
     where
-        D: ?Sized + VariantDecoder<'de, Cx = C, Error = C::Error>,
+        D: ?Sized + VariantDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let first = variant.decode_tag()?.decode()?;
         let second = variant.decode_value()?.decode()?;
@@ -466,12 +467,12 @@ where
 
 struct BytesVisitor;
 
+#[crate::unsized_visitor(crate)]
 impl<C> UnsizedVisitor<'_, C, [u8]> for BytesVisitor
 where
     C: Context,
 {
     type Ok = Value<C::Allocator>;
-    type Error = C::Error;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -488,12 +489,12 @@ where
 
 struct StringVisitor;
 
+#[crate::unsized_visitor(crate)]
 impl<C> UnsizedVisitor<'_, C, str> for StringVisitor
 where
     C: Context,
 {
     type Ok = Value<C::Allocator>;
-    type Error = C::Error;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -571,7 +572,7 @@ where
     }
 }
 
-/// Value's [AsDecoder] implementation.
+/// Value's [`AsDecoder`] implementation.
 pub struct IntoValueDecoder<const OPT: Options, C, A, M>
 where
     C: Context,
@@ -608,6 +609,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type Decoder<'this>
         = ValueDecoder<'this, OPT, C, A, M>
@@ -620,7 +622,7 @@ where
     }
 }
 
-/// Value's [AsDecoder] implementation.
+/// Value's [`AsDecoder`] implementation.
 pub struct AsValueDecoder<'de, const OPT: Options, C, A, M>
 where
     C: Context,
@@ -657,6 +659,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type Decoder<'this>
         = ValueDecoder<'this, OPT, C, A, M>

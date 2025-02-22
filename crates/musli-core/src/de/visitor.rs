@@ -2,7 +2,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use crate::expecting::{self, Expecting};
-use crate::Context;
+use crate::{Allocator, Context};
 
 use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder};
 
@@ -11,19 +11,34 @@ use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, Vari
 /// Each callback on this visitor indicates the type that should be decoded from
 /// the passed in decoder. A typical implementation would simply call the
 /// corresponding decoder function for the type being visited.
-pub trait Visitor<'de, C>
+pub trait Visitor<'de, C>: Sized
 where
-    Self: Sized,
-    C: Context<Error = Self::Error>,
+    C: Context<Error = Self::Error, Allocator = Self::Allocator>,
 {
     /// The value produced by the visitor.
     type Ok;
     /// The error produced by the visitor.
     type Error;
+    /// The allocator associated with the visitor.
+    type Allocator: Allocator;
     /// String decoder to use.
-    type String: UnsizedVisitor<'de, C, str, Ok = Self::Ok, Error = Self::Error>;
+    type String: UnsizedVisitor<
+        'de,
+        C,
+        str,
+        Ok = Self::Ok,
+        Error = Self::Error,
+        Allocator = Self::Allocator,
+    >;
     /// Bytes decoder to use.
-    type Bytes: UnsizedVisitor<'de, C, [u8], Ok = Self::Ok, Error = Self::Error>;
+    type Bytes: UnsizedVisitor<
+        'de,
+        C,
+        [u8],
+        Ok = Self::Ok,
+        Error = Self::Error,
+        Allocator = Self::Allocator,
+    >;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the [`#[musli::visitor]`][musli::visitor] attribute
@@ -213,7 +228,7 @@ where
     #[inline]
     fn visit_sequence<D>(self, decoder: &mut D) -> Result<Self::Ok, Self::Error>
     where
-        D: ?Sized + SequenceDecoder<'de, Cx = C, Error = Self::Error>,
+        D: ?Sized + SequenceDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         Err(decoder.cx().message(expecting::unsupported_type(
             &expecting::SequenceWith(decoder.size_hint()),
@@ -225,7 +240,7 @@ where
     #[inline]
     fn visit_map<D>(self, decoder: &mut D) -> Result<Self::Ok, Self::Error>
     where
-        D: ?Sized + MapDecoder<'de, Cx = C, Error = Self::Error>,
+        D: ?Sized + MapDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         Err(decoder.cx().message(expecting::unsupported_type(
             &expecting::MapWith(decoder.size_hint()),
@@ -255,7 +270,7 @@ where
     #[inline]
     fn visit_variant<D>(self, decoder: &mut D) -> Result<Self::Ok, Self::Error>
     where
-        D: ?Sized + VariantDecoder<'de, Cx = C, Error = C::Error>,
+        D: ?Sized + VariantDecoder<'de, Cx = C, Error = C::Error, Allocator = C::Allocator>,
     {
         Err(decoder.cx().message(expecting::unsupported_type(
             &expecting::Variant,
@@ -292,7 +307,7 @@ impl<T, C> ExpectingWrapper<T, C> {
 impl<'de, T, C> Expecting for ExpectingWrapper<T, C>
 where
     C: Context,
-    T: Visitor<'de, C, Error = C::Error>,
+    T: Visitor<'de, C, Error = C::Error, Allocator = C::Allocator>,
 {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

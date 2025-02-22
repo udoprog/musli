@@ -83,8 +83,8 @@ where
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = M;
     type Allocator = C::Allocator;
+    type Mode = M;
     type DecodeBuffer = Self;
     type DecodePack = Self;
     type DecodeSequence = Self;
@@ -138,6 +138,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type Decoder<'this>
         = Self
@@ -157,6 +158,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntryKey<'this>
         = Self
@@ -195,6 +197,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeTag<'this>
         = Self
@@ -228,6 +231,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeEntry<'this>
         = Self
@@ -268,6 +272,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeKey<'this>
         = Self
@@ -298,6 +303,7 @@ where
 {
     type Cx = C;
     type Error = C::Error;
+    type Allocator = C::Allocator;
     type Mode = M;
     type DecodeNext<'this>
         = Self
@@ -362,11 +368,14 @@ where
 impl<O, C, T> UnsizedVisitor<'_, C, T> for Never<(O, T)>
 where
     C: Context,
-    T: ?Sized + ToOwned<C::Allocator>,
+    T: ?Sized + ToOwned,
 {
     type Ok = O;
     type Error = C::Error;
+    type Allocator = C::Allocator;
+    type __UseMusliUnsizedVisitorAttributeMacro = ();
 
+    #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self._never {}
     }

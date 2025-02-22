@@ -53,15 +53,14 @@ macro_rules! __slice_sequence {
                     _marker: core::marker::PhantomData<(M, A, &'de ())>
                 }
 
+                #[allow(unused_variables)]
                 impl<'de, M, A, T> $crate::de::DecodeSliceBuilder<T, A> for Builder<'de, M, A, T>
                 where
                     T: $crate::de::Decode<'de, M, A>,
                     A: $crate::alloc::Allocator,
                 {
                     #[inline]
-                    fn new<C>(
-                        #[allow(unused_variables)] $cx: C
-                    ) -> Result<Self, C::Error>
+                    fn new<C>($cx: C) -> Result<Self, C::Error>
                     where
                         C: $crate::Context<Allocator = A>,
                     {
@@ -72,10 +71,7 @@ macro_rules! __slice_sequence {
                     }
 
                     #[inline]
-                    fn with_capacity<C>(
-                        #[allow(unused_variables)] $cx: C,
-                        $capacity: usize
-                    ) -> Result<Self, C::Error>
+                    fn with_capacity<C>($cx: C, $capacity: usize) -> Result<Self, C::Error>
                     where
                         C: $crate::Context<Allocator = A>,
                     {
@@ -86,11 +82,7 @@ macro_rules! __slice_sequence {
                     }
 
                     #[inline]
-                    fn push<C>(
-                        &mut self,
-                        #[allow(unused_variables)] $cx: C,
-                        $value: T
-                    ) -> Result<(), C::Error>
+                    fn push<C>(&mut self, $cx: C, $value: T) -> Result<(), C::Error>
                     where
                         C: $crate::Context<Allocator = A>,
                     {
@@ -100,11 +92,7 @@ macro_rules! __slice_sequence {
                     }
 
                     #[inline]
-                    fn reserve<C>(
-                        &mut self,
-                        #[allow(unused_variables)] $cx: C,
-                        $reserve_capacity: usize
-                    ) -> Result<(), C::Error>
+                    fn reserve<C>( &mut self, $cx: C, $reserve_capacity: usize) -> Result<(), C::Error>
                     where
                         C: $crate::Context<Allocator = A>,
                     {

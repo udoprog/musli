@@ -73,20 +73,19 @@ where
     /// Coerce into a std vector.
     #[cfg(feature = "alloc")]
     pub fn into_std(self) -> Result<rust_alloc::vec::Vec<T>, Self> {
+        if !A::IS_SYSTEM {
+            return Err(self);
+        }
+
         let mut this = ManuallyDrop::new(self);
 
-        // SAFETY: The implementation of `as_non_null_std` ensures that the
-        // allocation originates from the system allocator.
+        // SAFETY: The implementation requirements of `Allocator` requires that
+        // this is possible.
         unsafe {
-            let Some((ptr, cap)) = this.buf.as_non_null_std() else {
-                return Err(ManuallyDrop::into_inner(this));
-            };
+            let ptr = this.buf.as_mut_ptr();
+            let cap = this.buf.capacity();
 
-            Ok(rust_alloc::vec::Vec::from_raw_parts(
-                ptr.as_ptr().cast(),
-                this.len,
-                cap,
-            ))
+            Ok(rust_alloc::vec::Vec::from_raw_parts(ptr, this.len, cap))
         }
     }
 
@@ -821,12 +820,12 @@ where
     {
         struct Visitor;
 
+        #[crate::unsized_visitor(crate)]
         impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
         where
             C: Context,
         {
-            type Ok = Vec<u8, C::Allocator>;
-            type Error = C::Error;
+            type Ok = Vec<u8, Self::Allocator>;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -837,7 +836,7 @@ where
             fn visit_owned(
                 self,
                 _: C,
-                value: Vec<u8, C::Allocator>,
+                value: Vec<u8, Self::Allocator>,
             ) -> Result<Self::Ok, Self::Error> {
                 Ok(value)
             }

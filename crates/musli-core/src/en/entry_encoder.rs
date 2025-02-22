@@ -3,7 +3,7 @@ use crate::Context;
 use super::{Encode, Encoder};
 
 /// Trait governing how to encode a map entry.
-pub trait EntryEncoder {
+pub trait EntryEncoder: Sized {
     /// Context associated with the encoder.
     type Cx: Context<Error = Self::Error>;
     /// Result type of the encoder.
@@ -49,7 +49,6 @@ pub trait EntryEncoder {
     #[inline]
     fn insert_entry<K, V>(mut self, key: K, value: V) -> Result<Self::Ok, Self::Error>
     where
-        Self: Sized,
         K: Encode<Self::Mode>,
         V: Encode<Self::Mode>,
     {

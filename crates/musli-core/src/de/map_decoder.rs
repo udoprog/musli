@@ -1,13 +1,15 @@
-use crate::Context;
+use crate::{Allocator, Context};
 
 use super::{Decode, Decoder, EntriesDecoder, EntryDecoder, SizeHint};
 
 /// Trait governing how to decode a sequence of pairs.
 pub trait MapDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: Context<Error = Self::Error>;
+    type Cx: Context<Error = Self::Error, Allocator = Self::Allocator>;
     /// Error associated with decoding.
     type Error;
+    /// The allocator associated with the decoder.
+    type Allocator: Allocator;
     /// The mode of the decoder.
     type Mode: 'static;
     /// The decoder to use for a key.
@@ -15,6 +17,7 @@ pub trait MapDecoder<'de> {
         'de,
         Cx = Self::Cx,
         Error = Self::Error,
+        Allocator = Self::Allocator,
         Mode = Self::Mode,
     >
     where
@@ -24,6 +27,7 @@ pub trait MapDecoder<'de> {
         'de,
         Cx = Self::Cx,
         Error = Self::Error,
+        Allocator = Self::Allocator,
         Mode = Self::Mode,
     >
     where
@@ -50,8 +54,8 @@ pub trait MapDecoder<'de> {
     /// Decode the next map entry as a tuple.
     fn entry<K, V>(&mut self) -> Result<Option<(K, V)>, Self::Error>
     where
-        K: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
-        V: Decode<'de, Self::Mode, <Self::Cx as Context>::Allocator>,
+        K: Decode<'de, Self::Mode, Self::Allocator>,
+        V: Decode<'de, Self::Mode, Self::Allocator>,
     {
         let Some(mut entry) = self.decode_entry()? else {
             return Ok(None);

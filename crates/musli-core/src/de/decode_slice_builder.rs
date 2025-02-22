@@ -1,9 +1,8 @@
 use crate::{Allocator, Context};
 
 /// Trait used to decode a slice into a type.
-pub trait DecodeSliceBuilder<T, A>
+pub trait DecodeSliceBuilder<T, A>: Sized
 where
-    Self: Sized,
     A: Allocator,
 {
     /// Construct a new empty container.

@@ -26,7 +26,7 @@ where
     E: Encoder,
 {
     type Ok = E::Ok;
-    type Error = SerdeError<<E::Cx as Context>::Error>;
+    type Error = SerdeError<E::Error>;
 
     type SerializeSeq = SerializeSeq<E::EncodeSequence>;
     type SerializeTuple = SerializeSeq<E::EncodeSequence>;
@@ -306,7 +306,7 @@ where
     E: SequenceEncoder,
 {
     type Ok = E::Ok;
-    type Error = SerdeError<<E::Cx as Context>::Error>;
+    type Error = SerdeError<E::Error>;
 
     #[inline]
     fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -329,7 +329,7 @@ where
     E: SequenceEncoder,
 {
     type Ok = E::Ok;
-    type Error = SerdeError<<E::Cx as Context>::Error>;
+    type Error = SerdeError<E::Error>;
 
     #[inline]
     fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -350,7 +350,7 @@ where
     E: SequenceEncoder,
 {
     type Ok = E::Ok;
-    type Error = SerdeError<<E::Cx as Context>::Error>;
+    type Error = SerdeError<E::Error>;
 
     #[inline]
     fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -371,7 +371,7 @@ where
     E: SequenceEncoder,
 {
     type Ok = E::Ok;
-    type Error = SerdeError<<E::Cx as Context>::Error>;
+    type Error = SerdeError<E::Error>;
 
     #[inline]
     fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -403,7 +403,7 @@ where
     E: EntriesEncoder,
 {
     type Ok = E::Ok;
-    type Error = SerdeError<<E::Cx as Context>::Error>;
+    type Error = SerdeError<E::Error>;
 
     #[inline]
     fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
@@ -447,7 +447,7 @@ where
     E: MapEncoder,
 {
     type Ok = E::Ok;
-    type Error = SerdeError<<E::Cx as Context>::Error>;
+    type Error = SerdeError<E::Error>;
 
     #[inline]
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
@@ -483,7 +483,7 @@ where
     E: MapEncoder,
 {
     type Ok = E::Ok;
-    type Error = SerdeError<<E::Cx as Context>::Error>;
+    type Error = SerdeError<E::Error>;
 
     #[inline]
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>

@@ -50,9 +50,8 @@ use super::Decoder;
 ///     }
 /// }
 /// ```
-pub trait DecodePacked<'de, M, A>
+pub trait DecodePacked<'de, M, A>: Sized
 where
-    Self: Sized,
     A: Allocator,
 {
     /// Decode the given input as bytes.

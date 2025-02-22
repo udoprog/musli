@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 
 use crate::alloc::ToOwned;
 use crate::expecting::{self, Expecting};
-use crate::Context;
+use crate::{Allocator, Context};
 
 /// A visitor for data where we might need to borrow without copying from the
 /// underlying [`Decoder`].
@@ -26,16 +26,25 @@ use crate::Context;
 /// [`Decoder::decode_bytes`]: crate::de::Decoder::decode_bytes
 /// [`Decoder::decode_string`]: crate::de::Decoder::decode_string
 /// [`Decoder::decode_unsized`]: crate::de::Decoder::decode_unsized
-pub trait UnsizedVisitor<'de, C, T>
+#[allow(unused_variables)]
+pub trait UnsizedVisitor<'de, C, T>: Sized
 where
-    Self: Sized,
-    C: Context<Error = Self::Error>,
-    T: ?Sized + ToOwned<C::Allocator>,
+    C: Context<Error = Self::Error, Allocator = Self::Allocator>,
+    T: ?Sized + ToOwned,
 {
     /// The value produced by the visitor.
     type Ok;
     /// The error produced by the visitor.
     type Error;
+    /// The allocator associated with the visitor.
+    type Allocator: Allocator;
+
+    /// This is a type argument used to hint to any future implementor that they
+    /// should be using the
+    /// [`#[musli::unsized_visitor]`][musli::unsized_visitor] attribute macro
+    /// when implementing [`UnsizedVisitor`].
+    #[doc(hidden)]
+    type __UseMusliUnsizedVisitorAttributeMacro;
 
     /// Format an error indicating what was expected by this visitor.
     ///
@@ -43,21 +52,21 @@ where
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 
     /// Visit an owned value.
-    #[inline(always)]
-    fn visit_owned(self, cx: C, value: T::Owned) -> Result<Self::Ok, Self::Error> {
+    #[inline]
+    fn visit_owned(self, cx: C, value: T::Owned<Self::Allocator>) -> Result<Self::Ok, Self::Error> {
         self.visit_ref(cx, value.borrow())
     }
 
     /// Visit a string that is borrowed directly from the source data.
-    #[inline(always)]
+    #[inline]
     fn visit_borrowed(self, cx: C, value: &'de T) -> Result<Self::Ok, Self::Error> {
         self.visit_ref(cx, value)
     }
 
     /// Visit a value reference that is provided from the decoder in any manner
     /// possible. Which might require additional decoding work.
-    #[inline(always)]
-    fn visit_ref(self, cx: C, _: &T) -> Result<Self::Ok, Self::Error> {
+    #[inline]
+    fn visit_ref(self, cx: C, value: &T) -> Result<Self::Ok, Self::Error> {
         Err(cx.message(expecting::bad_visitor_type(
             &expecting::AnyValue,
             ExpectingWrapper::new(&self),
@@ -78,7 +87,7 @@ impl<T, C, U> ExpectingWrapper<'_, T, C, U>
 where
     U: ?Sized,
 {
-    #[inline(always)]
+    #[inline]
     fn new(value: &T) -> &Self {
         // SAFETY: `ExpectingWrapper` is repr(transparent) over `T`.
         unsafe { &*(value as *const T as *const Self) }
@@ -87,11 +96,11 @@ where
 
 impl<'de, T, C, U> Expecting for ExpectingWrapper<'_, T, C, U>
 where
-    T: UnsizedVisitor<'de, C, U, Error = C::Error>,
+    T: UnsizedVisitor<'de, C, U, Error = C::Error, Allocator = C::Allocator>,
     C: Context,
-    U: ?Sized + ToOwned<C::Allocator>,
+    U: ?Sized + ToOwned,
 {
-    #[inline(always)]
+    #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.expecting(f)
     }

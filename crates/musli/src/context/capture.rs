@@ -19,10 +19,7 @@ mod sealed {
 ///
 /// [`DefaultContext::with_capture`]: super::DefaultContext::with_capture
 /// [`DefaultContext::with_error`]: super::DefaultContext::with_error
-pub trait ErrorMode<A>
-where
-    Self: self::sealed::Sealed,
-{
+pub trait ErrorMode<A>: self::sealed::Sealed {
     #[doc(hidden)]
     type Error;
 

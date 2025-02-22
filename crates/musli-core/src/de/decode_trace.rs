@@ -10,9 +10,8 @@ use super::Decoder;
 ///
 /// [`HashMap<K, V>`]: std::collections::HashMap
 /// [`fmt::Display`]: std::fmt::Display
-pub trait DecodeTrace<'de, M, A>
+pub trait DecodeTrace<'de, M, A>: Sized
 where
-    Self: Sized,
     A: Allocator,
 {
     /// Decode the given input.

@@ -22,10 +22,7 @@ mod sealed {
 }
 
 /// Coerce a type into a [`Reader`].
-pub trait IntoReader<'de>
-where
-    Self: self::sealed::Sealed,
-{
+pub trait IntoReader<'de>: self::sealed::Sealed {
     /// The reader type.
     type Reader: Reader<'de>;
 
@@ -37,10 +34,7 @@ where
 ///
 /// This requires the reader to be able to hand out contiguous references to the
 /// byte source through [`Reader::read_bytes`].
-pub trait Reader<'de>
-where
-    Self: self::sealed::Sealed,
-{
+pub trait Reader<'de>: self::sealed::Sealed {
     /// Type borrowed from self.
     ///
     /// Why oh why would we want to do this over having a simple `&'this mut T`?
@@ -76,21 +70,16 @@ where
     {
         struct Visitor<'a>(&'a mut [u8]);
 
-        impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor<'_>
+        #[crate::unsized_visitor(crate)]
+        impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor<'_>
         where
             C: Context,
         {
             type Ok = ();
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "bytes")
-            }
-
-            #[inline]
-            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
-                self.visit_ref(cx, bytes)
             }
 
             #[inline]
@@ -107,7 +96,7 @@ where
     fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>;
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error, Allocator = C::Allocator>;
 
     /// Read into the given buffer which might not have been initialized.
     ///
@@ -142,21 +131,16 @@ where
     {
         struct Visitor<const N: usize>([u8; N]);
 
-        impl<'de, const N: usize, C> UnsizedVisitor<'de, C, [u8]> for Visitor<N>
+        #[crate::unsized_visitor(crate)]
+        impl<const N: usize, C> UnsizedVisitor<'_, C, [u8]> for Visitor<N>
         where
             C: Context,
         {
             type Ok = [u8; N];
-            type Error = C::Error;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "bytes")
-            }
-
-            #[inline]
-            fn visit_borrowed(self, cx: C, bytes: &'de [u8]) -> Result<Self::Ok, C::Error> {
-                self.visit_ref(cx, bytes)
             }
 
             #[inline]
@@ -246,7 +230,7 @@ impl<'de> Reader<'de> for &'de [u8] {
     fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error, Allocator = C::Allocator>,
     {
         if self.len() < n {
             return Err(cx.custom(SliceUnderflow::new(n, self.len())));
@@ -419,7 +403,7 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error, Allocator = C::Allocator>,
     {
         let outcome = bounds_check_add(cx, &self.range, n)?;
 
@@ -559,7 +543,7 @@ where
     fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error, Allocator = C::Allocator>,
     {
         self.bounds_check(cx, n)?;
         self.reader.read_bytes(cx, n, visitor)
@@ -654,7 +638,7 @@ where
     fn read_bytes<C, V>(&mut self, cx: C, n: usize, visitor: V) -> Result<V::Ok, V::Error>
     where
         C: Context,
-        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error, Allocator = C::Allocator>,
     {
         (**self).read_bytes(cx, n, visitor)
     }

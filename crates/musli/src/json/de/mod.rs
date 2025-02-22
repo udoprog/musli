@@ -27,6 +27,7 @@ use crate::alloc::Vec;
 use crate::de::{Decoder, SequenceDecoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 use crate::hint::{MapHint, SequenceHint};
 use crate::options;
+use crate::value::{IntoValueDecoder, Value};
 use crate::Context;
 use crate::Options;
 
@@ -113,9 +114,9 @@ where
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = M;
     type Allocator = C::Allocator;
-    type DecodeBuffer = crate::value::IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
+    type Mode = M;
+    type DecodeBuffer = IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
     type DecodePack = JsonSequenceDecoder<P, C, M>;
     type DecodeSequence = JsonSequenceDecoder<P, C, M>;
     type DecodeMap = JsonObjectDecoder<P, C, M>;
@@ -147,7 +148,7 @@ where
     #[inline]
     fn decode_buffer(self) -> Result<Self::DecodeBuffer, Self::Error> {
         let cx = self.cx;
-        let value = self.decode::<crate::value::Value<C::Allocator>>()?;
+        let value = self.decode::<Value<Self::Allocator>>()?;
         // JSON: Encodes numbers in objects as strings, so we need to permit
         // treating them as such here as well.
         Ok(value.into_decoder(cx))
@@ -299,7 +300,7 @@ where
     #[inline]
     fn decode_bytes<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = self.cx;
 
@@ -319,7 +320,7 @@ where
     #[inline]
     fn decode_string<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, str, Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, str, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let mut scratch = Vec::new_in(self.cx.alloc());
 
@@ -416,7 +417,7 @@ where
     #[inline]
     fn decode_number<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: Visitor<'de, C, Error = Self::Error>,
+        V: Visitor<'de, C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         self.parser.parse_number(self.cx, visitor)
     }
@@ -424,7 +425,7 @@ where
     #[inline]
     fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: Visitor<'de, C, Error = Self::Error>,
+        V: Visitor<'de, C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = self.cx;
 

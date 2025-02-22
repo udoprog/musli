@@ -1,13 +1,15 @@
-use crate::Context;
+use crate::{Allocator, Context};
 
 use super::Decoder;
 
 /// Trait governing how to decode a variant.
 pub trait VariantDecoder<'de> {
     /// Context associated with the decoder.
-    type Cx: Context<Error = Self::Error>;
+    type Cx: Context<Error = Self::Error, Allocator = Self::Allocator>;
     /// Error associated with decoding.
     type Error;
+    /// The allocator associated with the decoder.
+    type Allocator: Allocator;
     /// The mode of the decoder.
     type Mode: 'static;
     /// The decoder to use for the variant tag.
@@ -15,8 +17,8 @@ pub trait VariantDecoder<'de> {
         'de,
         Cx = Self::Cx,
         Error = Self::Error,
+        Allocator = Self::Allocator,
         Mode = Self::Mode,
-        Allocator = <Self::Cx as Context>::Allocator,
     >
     where
         Self: 'this;
@@ -25,8 +27,8 @@ pub trait VariantDecoder<'de> {
         'de,
         Cx = Self::Cx,
         Error = Self::Error,
+        Allocator = Self::Allocator,
         Mode = Self::Mode,
-        Allocator = <Self::Cx as Context>::Allocator,
     >
     where
         Self: 'this;

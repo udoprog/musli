@@ -144,6 +144,25 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
+#[proc_macro_attribute]
+pub fn unsized_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
+    let attr = syn::parse_macro_input!(attr as types::Attr);
+    let input = syn::parse_macro_input!(input as types::Types);
+
+    match input.expand(
+        CRATE_DEFAULT,
+        &attr,
+        "unsized visitor",
+        types::UNSIZED_VISITOR_TYPES,
+        Some("Ok"),
+        "__UseMusliUnsizedVisitorAttributeMacro",
+        types::Kind::GenericCx,
+    ) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
 fn to_compile_errors(errors: Vec<syn::Error>) -> proc_macro2::TokenStream {
     let mut output = proc_macro2::TokenStream::new();
 

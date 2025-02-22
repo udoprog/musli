@@ -1,5 +1,3 @@
-use core::ptr::NonNull;
-
 use super::AllocError;
 
 /// A value allocated through [`Allocator::alloc`].
@@ -54,10 +52,7 @@ use super::AllocError;
 /// });
 /// # Ok::<_, AllocError>(())
 /// ```
-pub trait Alloc<T>
-where
-    Self: Sized,
-{
+pub trait Alloc<T>: Sized {
     /// Get a pointer into the allocation.
     ///
     /// ## Examples
@@ -119,16 +114,4 @@ where
     fn try_merge<B>(&mut self, this_len: usize, other: B, other_len: usize) -> Result<(), B>
     where
         B: Alloc<T>;
-
-    /// Convert an allocation into an `alloc` allocation if it is possible with
-    /// the allocator that constructed the allocation.
-    ///
-    /// # Safety
-    ///
-    /// The implementor must ensure that the returned pointer is valid and
-    /// originates from the system allocator through the `alloc` module.
-    #[inline]
-    unsafe fn as_non_null_std(&mut self) -> Option<(NonNull<u8>, usize)> {
-        None
-    }
 }

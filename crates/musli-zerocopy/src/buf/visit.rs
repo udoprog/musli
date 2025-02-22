@@ -38,12 +38,12 @@ impl<T: ?Sized> Visit for &T {
 
 impl<T, E, O> Visit for Ref<T, E, O>
 where
-    T: ?Sized + Pointee,
     Self: Load,
+    T: ?Sized + Pointee,
     E: ByteOrder,
     O: Size,
 {
-    type Target = <Ref<T, E, O> as Load>::Target;
+    type Target = <Self as Load>::Target;
 
     #[inline]
     fn visit<V, U>(&self, buf: &Buf, visitor: V) -> Result<U, Error>

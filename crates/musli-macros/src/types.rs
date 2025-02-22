@@ -26,6 +26,7 @@ pub(super) enum Extra {
     Mode,
     /// `type Allocator = <Self::Cx as Context>::Allocator;`
     Allocator,
+    /// An associated visitor type.
     Visitor(Ty),
 }
 
@@ -59,9 +60,13 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
 
 pub(super) const VISITOR_TYPES: &[(&str, Extra)] = &[
     ("Error", Extra::Error),
+    ("Allocator", Extra::Allocator),
     ("String", Extra::Visitor(Ty::Str)),
     ("Bytes", Extra::Visitor(Ty::Bytes)),
 ];
+
+pub(super) const UNSIZED_VISITOR_TYPES: &[(&str, Extra)] =
+    &[("Error", Extra::Error), ("Allocator", Extra::Allocator)];
 
 #[derive(Clone, Copy)]
 pub(super) enum Kind {

@@ -278,7 +278,7 @@ where
         Ok(())
     }
 
-    /// Specialized reader implementation from a slice.
+    /// Reader implementation from a slice.
     pub(crate) fn parse_string<'scratch>(
         &mut self,
         validate: bool,
@@ -362,7 +362,7 @@ where
         }
     }
 
-    /// Specialized reader implementation from a slice.
+    /// Reader implementation from a slice.
     pub(crate) fn skip_string(&mut self) -> Result<(), C::Error> {
         loop {
             while let Some(b) = self.slice.get(self.index) {

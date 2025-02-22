@@ -63,7 +63,9 @@ impl Default for System {
     }
 }
 
-impl Allocator for System {
+unsafe impl Allocator for System {
+    const IS_SYSTEM: bool = true;
+
     type Alloc<T> = SystemAlloc<T>;
 
     #[inline]

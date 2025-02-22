@@ -34,7 +34,7 @@ where
     #[inline]
     fn decode_escaped_bytes<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, [u8], Error = C::Error>,
+        V: UnsizedVisitor<'de, C, [u8], Error = C::Error, Allocator = C::Allocator>,
     {
         let mut scratch = Vec::new_in(self.cx.alloc());
 
@@ -54,8 +54,8 @@ where
 {
     type Cx = C;
     type Error = C::Error;
-    type Mode = M;
     type Allocator = C::Allocator;
+    type Mode = M;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -141,7 +141,7 @@ where
     #[inline]
     fn decode_string<V>(self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: UnsizedVisitor<'de, C, str, Error = Self::Error>,
+        V: UnsizedVisitor<'de, C, str, Error = Self::Error, Allocator = Self::Allocator>,
     {
         JsonDecoder::<_, _, M>::new(self.cx, self.parser).decode_string(visitor)
     }
@@ -149,7 +149,7 @@ where
     #[inline]
     fn decode_any<V>(mut self, visitor: V) -> Result<V::Ok, V::Error>
     where
-        V: Visitor<'de, C, Error = Self::Error>,
+        V: Visitor<'de, C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         match self.parser.lex(self.cx) {
             Token::String => {

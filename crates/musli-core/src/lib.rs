@@ -185,12 +185,12 @@ pub use musli_macros::decoder;
 /// ```
 /// use std::fmt;
 ///
-/// use musli_core::Context;
-/// use musli_core::de::Visitor;
+/// use musli::Context;
+/// use musli::de::Visitor;
 ///
 /// struct AnyVisitor;
 ///
-/// #[musli_core::visitor(crate = musli_core)]
+/// #[musli::visitor]
 /// impl<'de, C> Visitor<'de, C> for AnyVisitor
 /// where
 ///     C: Context,
@@ -201,13 +201,57 @@ pub use musli_macros::decoder;
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(
 ///             f,
-///             "value that can be decoded into dynamic container"
+///             "a value that can be decoded into dynamic container"
 ///         )
 ///     }
 /// }
 /// ```
 #[doc(inline)]
 pub use musli_macros::visitor;
+
+/// This is an attribute macro that must be used when implementing a
+/// [`UnsizedVisitor`].
+///
+/// It is required to use because a [`UnsizedVisitor`] implementation might
+/// introduce new associated types in the future, and this is [not yet
+/// supported] on a language level in Rust. So this attribute macro polyfills
+/// any missing types automatically.
+///
+/// Note that using derives directly from `musli_core` requires you to use the
+/// `#[musli_core::visitor(crate = musli_core)]` attribute.
+///
+/// [not yet supported]:
+///     https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+/// [`UnsizedVisitor`]: crate::de::UnsizedVisitor
+///
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::de::UnsizedVisitor;
+///
+/// struct Visitor;
+///
+/// #[musli::unsized_visitor]
+/// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
+/// where
+///     C: Context,
+/// {
+///     type Ok = ();
+///
+///     #[inline]
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(
+///             f,
+///             "a reference of bytes"
+///         )
+///     }
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_macros::unsized_visitor;
 
 /// Internal implementation details of musli.
 ///
