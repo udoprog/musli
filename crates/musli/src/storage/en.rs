@@ -8,19 +8,9 @@ use crate::en::{
     TryFastEncode, VariantEncoder,
 };
 use crate::hint::{MapHint, SequenceHint};
-use crate::options::is_native_fixed;
 use crate::{Context, Options, Writer};
 
-/// Test if the current options and `$t` is suitable for bitwise slice encoding.
-macro_rules! is_bitwise_slice {
-    ($opt:ident, $t:ident) => {
-        const {
-            is_native_fixed::<$opt>()
-                && <$t>::IS_BITWISE_ENCODE
-                && size_of::<$t>() % align_of::<$t>() == 0
-        }
-    };
-}
+use super::macros::is_bitwise_encode;
 
 /// A very simple encoder suitable for storage encoding.
 pub struct StorageEncoder<const OPT: Options, const PACK: bool, W, C, M>
@@ -82,7 +72,7 @@ where
     where
         T: Encode<Self::Mode>,
     {
-        if !const { is_native_fixed::<OPT>() && T::Encode::IS_BITWISE_ENCODE } {
+        if !is_bitwise_encode!(OPT, T::Encode) {
             return Ok(TryFastEncode::Unsupported(value, self));
         }
 
@@ -250,7 +240,7 @@ where
         T: Encode<Self::Mode>,
     {
         // Check that the type is packed inside of the slice.
-        if !is_bitwise_slice!(OPT, T) {
+        if !is_bitwise_encode!(OPT, [T]) {
             return utils::default_encode_slice(self, slice);
         }
 
@@ -269,7 +259,7 @@ where
         T: Encode<Self::Mode>,
     {
         // Check that the type is packed inside of the slice.
-        if !is_bitwise_slice!(OPT, T) {
+        if !is_bitwise_encode!(OPT, [T]) {
             return utils::default_encode_slices(self, len, slices);
         }
 
@@ -362,7 +352,7 @@ where
         T: Encode<Self::Mode>,
     {
         // Check that the type is packed inside of the slice.
-        if !is_bitwise_slice!(OPT, T) {
+        if !is_bitwise_encode!(OPT, [T]) {
             return utils::default_sequence_encode_slice(self, slice);
         }
 
@@ -380,7 +370,7 @@ where
         T: Encode<Self::Mode>,
     {
         // Check that the type is packed inside of the slice.
-        if !is_bitwise_slice!(OPT, T) {
+        if !is_bitwise_encode!(OPT, [T]) {
             return utils::default_sequence_encode_slices(self, slices);
         }
 

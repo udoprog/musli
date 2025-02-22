@@ -7,19 +7,9 @@ use crate::de::{
     utils, DecodeSliceBuilder, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
     SizeHint, TryFastDecode, UnsizedVisitor, VariantDecoder,
 };
-use crate::options::is_native_fixed;
 use crate::{Context, Decode, Options, Reader};
 
-/// Test if the current options and `$t` is suitable for bitwise slice decoding.
-macro_rules! is_bitwise_slice {
-    ($opt:ident, $t:ident) => {
-        const {
-            is_native_fixed::<$opt>()
-                && <$t>::IS_BITWISE_DECODE
-                && size_of::<$t>() % align_of::<$t>() == 0
-        }
-    };
-}
+use super::macros::is_bitwise_decode;
 
 /// A very simple decoder suitable for storage decoding.
 pub struct StorageDecoder<const OPT: Options, const PACK: bool, R, C, M>
@@ -92,7 +82,7 @@ where
     where
         T: Decode<'de, Self::Mode, Self::Allocator>,
     {
-        if !const { is_native_fixed::<OPT>() && T::IS_BITWISE_DECODE } {
+        if !is_bitwise_decode!(OPT, T) {
             return Ok(TryFastDecode::Unsupported(self));
         }
 
@@ -312,7 +302,7 @@ where
         T: Decode<'de, Self::Mode, Self::Allocator>,
     {
         // Check that the type is packed inside of the slice.
-        if !is_bitwise_slice!(OPT, T) {
+        if !is_bitwise_decode!(OPT, [T]) {
             return utils::default_decode_slice(self);
         }
 

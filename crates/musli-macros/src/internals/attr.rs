@@ -370,7 +370,7 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             // #[musli(tag = <expr>)]
             if meta.path.is_ident("tag") {
-                let ty = TypeConfig::parse("name", meta.input, true, true)?;
+                let ty = TypeConfig::parse("tag", meta.input, true, true)?;
                 new.tag_value.extend(ty.value);
                 new.tag_type.extend(ty.ty);
                 new.tag_method.extend(ty.method);
