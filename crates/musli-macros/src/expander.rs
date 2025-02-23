@@ -393,10 +393,10 @@ pub(crate) fn expand_name(
     mode: &Mode<'_>,
     name_all: NameAll,
     ident: Option<&syn::Ident>,
-) -> syn::Expr {
+) -> (syn::Expr, Option<Span>) {
     let lit = 'out: {
-        if let Some((_, rename)) = taggable.name(mode) {
-            return rename.clone();
+        if let Some((span, rename)) = taggable.name(mode) {
+            return (rename.clone(), Some(*span));
         }
 
         if let (Some(ident), name_all) = (ident, name_all) {
@@ -408,10 +408,12 @@ pub(crate) fn expand_name(
         usize_suffixed(taggable.index(), taggable.span()).into()
     };
 
-    syn::Expr::Lit(syn::ExprLit {
+    let expr = syn::Expr::Lit(syn::ExprLit {
         attrs: Vec::new(),
         lit,
-    })
+    });
+
+    (expr, None)
 }
 
 /// Ensure that the given integer is usize-suffixed so that it is treated as the

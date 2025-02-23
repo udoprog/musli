@@ -44,17 +44,15 @@ impl Build<'_, '_> {
     pub(crate) fn encode_transparent_enum_diagnostics(&self, span: Span) {
         self.cx.error_span(
             span,
-            format_args!("#[{ATTR}(transparent)] cannot be used to encode enums",),
+            format_args!("An enum cannot be #[{ATTR}(transparent)]"),
         );
     }
 
     /// Emit diagnostics indicating that we tried to implement decode for a
     /// packed enum.
     pub(crate) fn decode_packed_enum_diagnostics(&self, span: Span) {
-        self.cx.error_span(
-            span,
-            format_args!("#[{ATTR}(packed)] cannot be used to decode enums"),
-        );
+        self.cx
+            .error_span(span, format_args!("An enum cannot be #[{ATTR}(packed)]"));
     }
 
     /// Emit diagnostics indicating that we tried to use a `#[musli(default)]`
@@ -308,10 +306,15 @@ fn setup_enum<'a>(
         match packing_span {
             Some((_, Packing::Tagged)) => (),
             Some(&(span, Packing::Packed)) => {
-                e.cx.error_span(span, format_args!("#[{ATTR}(packed)] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
+                e.cx.error_span(
+                    span,
+                    format_args!(
+                        "A #[{ATTR}(packed)] type cannot use #[{ATTR}(tag)] or #[{ATTR}(content)]"
+                    ),
+                );
             }
             Some(&(span, Packing::Transparent)) => {
-                e.cx.error_span(span, format_args!("#[{ATTR}(transparent)] cannot be combined with #[{ATTR}(tag)] or #[{ATTR}(content)]"));
+                e.cx.error_span(span, format_args!("A #[{ATTR}(transparent)] type cannot use #[{ATTR}(tag)] or #[{ATTR}(content)]"));
             }
             _ => (),
         }
@@ -387,7 +390,7 @@ fn setup_variant<'a>(
         e.type_attr.name_method(mode),
     );
 
-    let name = expander::expand_name(data, mode, type_name_all, Some(data.ident));
+    let (name, _) = expander::expand_name(data, mode, type_name_all, Some(data.ident));
 
     let pattern = data.attr.pattern(mode).map(|(_, p)| p);
 
@@ -472,8 +475,8 @@ fn setup_field<'a>(
         .decode_path_expanded(mode, data.span, allocator_ident);
     let size_hint_path = data.attr.size_hint_path_expanded(mode, data.span);
 
-    let name = expander::expand_name(data, mode, name_all, data.ident);
-    let pattern = data.attr.pattern(mode).map(|(_, p)| p);
+    let (name, name_span) = expander::expand_name(data, mode, name_all, data.ident);
+    let pattern = data.attr.pattern(mode);
 
     let skip = data.attr.skip(mode).map(|&(s, ())| s);
     let skip_encoding_if = data.attr.skip_encoding_if(mode);
@@ -521,23 +524,22 @@ fn setup_field<'a>(
             }
             None => {
                 let pat;
+                let path;
 
                 if skip.is_none() {
                     let var = quote::format_ident!("v{}", data.index);
                     pat = syn::parse_quote!(ref #var);
-                    self_access = syn::Expr::Path(syn::ExprPath {
-                        attrs: Vec::new(),
-                        qself: None,
-                        path: var.into(),
-                    });
+                    path = var.into();
                 } else {
                     pat = syn::parse_quote!(_);
-                    self_access = syn::Expr::Path(syn::ExprPath {
-                        attrs: Vec::new(),
-                        qself: None,
-                        path: syn::Path::from(quote::format_ident!("skipped_{}", data.index)),
-                    });
+                    path = syn::Path::from(quote::format_ident!("skipped_{}", data.index));
                 };
+
+                self_access = syn::Expr::Path(syn::ExprPath {
+                    attrs: Vec::new(),
+                    qself: None,
+                    path,
+                });
 
                 patterns.push(syn::FieldPat {
                     attrs: Vec::new(),
@@ -558,6 +560,35 @@ fn setup_field<'a>(
         }
     };
 
+    if matches!(packing, Packing::Transparent | Packing::Packed) {
+        if let Some(span) = name_span {
+            e.cx.error_span(
+                span,
+                format_args!(
+                    "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] type cannot have named fields"
+                ),
+            );
+        }
+
+        if let Some((span, _)) = pattern {
+            e.cx.error_span(
+                *span,
+                format_args!(
+                    "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] type cannot have patterned fields"
+                ),
+            );
+        }
+    }
+
+    if matches!(packing, Packing::Transparent) {
+        if let Some((span, _)) = skip_encoding_if {
+            e.cx.error_span(
+                *span,
+                format_args!("A #[{ATTR}(transparent)] type cannot have an optional field"),
+            );
+        }
+    }
+
     Field {
         span: data.span,
         index: data.index,
@@ -565,7 +596,7 @@ fn setup_field<'a>(
         decode_path,
         size_hint_path,
         name,
-        pattern,
+        pattern: pattern.map(|(_, p)| p),
         skip,
         skip_encoding_if,
         default_attr,

@@ -1,4 +1,4 @@
-error: #[musli(transparent)] can only be used on types which have a single field
+error: A #[musli(transparent)] attribute can only be used on types which have a single field
  --> tests/ui/transparent_error.rs:3:10
   |
 3 | #[derive(Encode, Decode)]
@@ -6,7 +6,7 @@ error: #[musli(transparent)] can only be used on types which have a single field
   |
   = note: this error originates in the derive macro `Encode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: #[musli(transparent)] can only be used on types which have a single field
+error: A #[musli(transparent)] attribute can only be used on types which have a single field
  --> tests/ui/transparent_error.rs:3:18
   |
 3 | #[derive(Encode, Decode)]
@@ -14,7 +14,7 @@ error: #[musli(transparent)] can only be used on types which have a single field
   |
   = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: #[musli(transparent)] can only be used on types which have a single field
+error: A #[musli(transparent)] attribute can only be used on types which have a single field
   --> tests/ui/transparent_error.rs:10:10
    |
 10 | #[derive(Encode, Decode)]
@@ -22,7 +22,7 @@ error: #[musli(transparent)] can only be used on types which have a single field
    |
    = note: this error originates in the derive macro `Encode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: #[musli(transparent)] can only be used on types which have a single field
+error: A #[musli(transparent)] attribute can only be used on types which have a single field
   --> tests/ui/transparent_error.rs:10:18
    |
 10 | #[derive(Encode, Decode)]
@@ -30,7 +30,7 @@ error: #[musli(transparent)] can only be used on types which have a single field
    |
    = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: #[musli(transparent)] types must have a single unskipped field
+error: A #[musli(transparent)] type must have a single unskipped field
   --> tests/ui/transparent_error.rs:14:10
    |
 14 | #[derive(Encode, Decode)]
@@ -38,7 +38,7 @@ error: #[musli(transparent)] types must have a single unskipped field
    |
    = note: this error originates in the derive macro `Encode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: #[musli(transparent)] types must have a single unskipped field
+error: A #[musli(transparent)] type must have a single unskipped field
   --> tests/ui/transparent_error.rs:14:18
    |
 14 | #[derive(Encode, Decode)]
@@ -46,7 +46,7 @@ error: #[musli(transparent)] types must have a single unskipped field
    |
    = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: #[musli(transparent)] types must have a single unskipped field
+error: A #[musli(transparent)] type must have a single unskipped field
   --> tests/ui/transparent_error.rs:18:10
    |
 18 | #[derive(Encode, Decode)]
@@ -54,7 +54,7 @@ error: #[musli(transparent)] types must have a single unskipped field
    |
    = note: this error originates in the derive macro `Encode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: #[musli(transparent)] types must have a single unskipped field
+error: A #[musli(transparent)] type must have a single unskipped field
   --> tests/ui/transparent_error.rs:18:18
    |
 18 | #[derive(Encode, Decode)]
@@ -62,26 +62,62 @@ error: #[musli(transparent)] types must have a single unskipped field
    |
    = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: #[musli(transparent)] can only be used on types which have a single field
+error: A #[musli(transparent)] attribute can only be used on types which have a single field
   --> tests/ui/transparent_error.rs:24:5
    |
 24 |     #[musli(transparent)]
    |     ^
 
-error: #[musli(transparent)] can only be used on types which have a single field
+error: A #[musli(transparent)] attribute can only be used on types which have a single field
   --> tests/ui/transparent_error.rs:29:5
    |
 29 |     #[musli(transparent)]
    |     ^
 
-error: #[musli(transparent)] types must have a single unskipped field
+error: A #[musli(transparent)] type must have a single unskipped field
   --> tests/ui/transparent_error.rs:31:5
    |
 31 |     #[musli(transparent)]
    |     ^
 
-error: #[musli(transparent)] types must have a single unskipped field
+error: A #[musli(transparent)] type must have a single unskipped field
   --> tests/ui/transparent_error.rs:33:5
    |
 33 |     #[musli(transparent)]
    |     ^
+
+error: A #[musli(transparent)] or #[musli(packed)] type cannot have named fields
+  --> tests/ui/transparent_error.rs:40:13
+   |
+40 |     #[musli(name = "test")]
+   |             ^^^^
+
+error: A #[musli(transparent)] or #[musli(packed)] type cannot have named fields
+  --> tests/ui/transparent_error.rs:48:21
+   |
+48 |     Variant(#[musli(name = "test")] String),
+   |                     ^^^^
+
+error: A #[musli(transparent)] or #[musli(packed)] type cannot have named fields
+  --> tests/ui/transparent_error.rs:54:13
+   |
+54 |     #[musli(name = "test")]
+   |             ^^^^
+
+error: A #[musli(transparent)] or #[musli(packed)] type cannot have named fields
+  --> tests/ui/transparent_error.rs:62:21
+   |
+62 |     Variant(#[musli(name = "test")] String),
+   |                     ^^^^
+
+error: A #[musli(transparent)] type cannot have an optional field
+  --> tests/ui/transparent_error.rs:68:13
+   |
+68 |     #[musli(skip_encoding_if = String::is_empty)]
+   |             ^^^^^^^^^^^^^^^^
+
+error: A #[musli(transparent)] type cannot have an optional field
+  --> tests/ui/transparent_error.rs:76:17
+   |
+76 |         #[musli(skip_encoding_if = String::is_empty)]
+   |                 ^^^^^^^^^^^^^^^^
