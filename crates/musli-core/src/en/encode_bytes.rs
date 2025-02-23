@@ -66,6 +66,12 @@ pub trait EncodeBytes<M> {
     where
         E: Encoder<Mode = M>;
 
+    /// The number of fields in the type.
+    #[inline]
+    fn size_hint(&self) -> Option<usize> {
+        None
+    }
+
     /// Coerce into the underlying value being encoded.
     fn as_encode_bytes(&self) -> &Self::EncodeBytes;
 }

@@ -733,6 +733,21 @@ impl Field {
         }
     }
 
+    /// Expand encode of the given field.
+    pub(crate) fn size_hint_path_expanded<'a>(
+        &self,
+        mode: &Mode<'a>,
+        span: Span,
+    ) -> Option<(Span, DefaultOrCustom<'a>)> {
+        if self.encode_path(mode).is_some() {
+            return None;
+        }
+
+        let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
+        let encode_path = mode.encode_t_size_hint(field_encoding)?;
+        Some((span, DefaultOrCustom::Default(encode_path)))
+    }
+
     /// Expand decode of the given field.
     pub(crate) fn decode_path_expanded<'a>(
         &self,

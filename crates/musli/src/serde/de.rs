@@ -9,7 +9,6 @@ use crate::de::{
     Decoder, EntriesDecoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
     Visitor,
 };
-use crate::hint::SequenceHint;
 use crate::mode::Text;
 use crate::Context;
 
@@ -259,9 +258,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let hint = SequenceHint::with_size(len);
-
-        let ok = self.decoder.decode_sequence_hint(&hint, |d| {
+        let ok = self.decoder.decode_sequence_hint(len, |d| {
             visitor
                 .visit_seq(SequenceAccess::new(d))
                 .map_err(err(d.cx()))
@@ -663,12 +660,10 @@ where
     where
         V: de::Visitor<'de>,
     {
-        let hint = SequenceHint::with_size(len);
-
         let ok = self
             .decoder
             .decode_value()?
-            .decode_sequence_hint(&hint, |d| {
+            .decode_sequence_hint(len, |d| {
                 visitor
                     .visit_seq(SequenceAccess::new(d))
                     .map_err(err(d.cx()))

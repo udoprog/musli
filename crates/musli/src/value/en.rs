@@ -291,17 +291,17 @@ where
     }
 
     #[inline]
-    fn encode_sequence(self, _: &SequenceHint) -> Result<Self::EncodeSequence, Self::Error> {
+    fn encode_sequence(self, _: impl SequenceHint) -> Result<Self::EncodeSequence, Self::Error> {
         Ok(SequenceValueEncoder::new(self.cx, self.output))
     }
 
     #[inline]
-    fn encode_map(self, _: &MapHint) -> Result<Self::EncodeMap, Self::Error> {
+    fn encode_map(self, _: impl MapHint) -> Result<Self::EncodeMap, Self::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
 
     #[inline]
-    fn encode_map_entries(self, _: &MapHint) -> Result<Self::EncodeMapEntries, Self::Error> {
+    fn encode_map_entries(self, _: impl MapHint) -> Result<Self::EncodeMapEntries, Self::Error> {
         Ok(MapValueEncoder::new(self.cx, self.output))
     }
 
@@ -326,28 +326,30 @@ where
     fn encode_sequence_variant<T>(
         self,
         tag: &T,
-        hint: &SequenceHint,
+        hint: impl SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,
     {
+        let size = hint.require(self.cx)?;
         let mut variant = Value::Unit;
         ValueEncoder::<OPT, _, _, Self::Mode>::new(self.cx, &mut variant).encode(tag)?;
-        VariantSequenceEncoder::new(self.cx, self.output, variant, hint.size)
+        VariantSequenceEncoder::new(self.cx, self.output, variant, size)
     }
 
     #[inline]
     fn encode_map_variant<T>(
         self,
         tag: &T,
-        hint: &MapHint,
+        hint: impl MapHint,
     ) -> Result<Self::EncodeMapVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,
     {
+        let size = hint.require(self.cx)?;
         let mut variant = Value::Unit;
         ValueEncoder::<OPT, _, _, Self::Mode>::new(self.cx, &mut variant).encode(tag)?;
-        VariantStructEncoder::new(self.cx, self.output, variant, hint.size)
+        VariantStructEncoder::new(self.cx, self.output, variant, size)
     }
 }
 

@@ -57,6 +57,12 @@ pub trait EncodePacked<M> {
     fn encode_packed<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>;
+
+    /// The number of fields in the type.
+    #[inline]
+    fn size_hint(&self) -> Option<usize> {
+        None
+    }
 }
 
 impl<T, M> EncodePacked<M> for &T

@@ -174,7 +174,6 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
         skip,
         map_decoder_t,
         struct_field_decoder_t,
-        map_hint,
         variant_decoder_t,
         messages,
         collect_string,
@@ -725,11 +724,11 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                 #output_enum
                 #outcome_enum
 
-                static #struct_hint_static: #map_hint = #map_hint::with_size(2);
+                static #struct_hint_static: usize = 2;
 
                 #enter
 
-                #decoder_t::decode_map_hint(#decoder_var, &#struct_hint_static, move |#struct_decoder_var| {
+                #decoder_t::decode_map_hint(#decoder_var, #struct_hint_static, move |#struct_decoder_var| {
                     let mut #name_var = #option::None;
 
                     let #output_var = loop {
@@ -783,7 +782,6 @@ fn decode_empty(cx: &Ctxt, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStre
         context_t,
         decoder_t,
         result,
-        map_hint,
         ..
     } = b.tokens;
 
@@ -806,8 +804,8 @@ fn decode_empty(cx: &Ctxt, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStre
 
     Ok(quote! {{
         #enter
-        static #struct_hint_static: #map_hint = #map_hint::with_size(0);
-        let #output_var = #decoder_t::decode_map_hint(#decoder_var, &#struct_hint_static, |_| #result::Ok(()))?;
+        static #struct_hint_static: usize = 0;
+        let #output_var = #decoder_t::decode_map_hint(#decoder_var, #struct_hint_static, |_| #result::Ok(()))?;
         #leave
         #path
     }})
@@ -840,7 +838,6 @@ fn decode_tagged(
         skip_field,
         map_decoder_t,
         struct_field_decoder_t,
-        map_hint,
         messages,
         ..
     } = b.tokens;
@@ -1087,9 +1084,9 @@ fn decode_tagged(
 
         #enter
 
-        static #struct_hint_static: #map_hint = #map_hint::with_size(#fields_len);
+        static #struct_hint_static: usize = #fields_len;
 
-        #decoder_t::decode_map_hint(#decoder_var, &#struct_hint_static, move |#type_decoder_var| {
+        #decoder_t::decode_map_hint(#decoder_var, #struct_hint_static, move |#type_decoder_var| {
             while let #option::Some(mut #struct_decoder_var) = #map_decoder_t::decode_entry(#type_decoder_var)? {
                 let #name_var: #name_type = {
                     let #struct_decoder_var = #struct_field_decoder_t::decode_key(&mut #struct_decoder_var)?;

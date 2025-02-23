@@ -2,7 +2,6 @@
 
 use crate::de::{Decode, DecodePacked, Decoder, SequenceDecoder};
 use crate::en::{Encode, EncodePacked, Encoder, SequenceEncoder};
-use crate::hint::SequenceHint;
 use crate::Allocator;
 
 macro_rules! count {
@@ -55,9 +54,7 @@ macro_rules! declare {
             where
                 E: Encoder<Mode = M>,
             {
-                static HINT: SequenceHint = SequenceHint::with_size(count!($ident0 $($ident)*));
-
-                encoder.encode_sequence_fn(&HINT, |tuple| {
+                encoder.encode_sequence_fn(count!($ident0 $($ident)*), |tuple| {
                     let ($ident0, $($ident),*) = self;
                     tuple.encode_next()?.encode($ident0)?;
                     $(tuple.encode_next()?.encode($ident)?;)*
@@ -88,9 +85,7 @@ macro_rules! declare {
             where
                 D: Decoder<'de, Mode = M, Allocator = A>,
             {
-                static HINT: SequenceHint = SequenceHint::with_size(count!($ident0 $($ident)*));
-
-                decoder.decode_sequence_hint(&HINT, |tuple| {
+                decoder.decode_sequence_hint(count!($ident0 $($ident)*), |tuple| {
                     let $ident0 = tuple.next()?;
                     $(let $ident = tuple.next()?;)*
                     Ok(($ident0, $($ident),*))

@@ -274,7 +274,7 @@ where
     }
 
     #[inline]
-    fn decode_sequence_hint<F, O>(self, _: &SequenceHint, f: F) -> Result<O, Self::Error>
+    fn decode_sequence_hint<F, O>(self, _: impl SequenceHint, f: F) -> Result<O, Self::Error>
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {

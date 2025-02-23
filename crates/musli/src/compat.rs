@@ -6,7 +6,6 @@
 
 use crate::de::{Decode, DecodeBytes, DecodePacked, Decoder};
 use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder};
-use crate::hint::SequenceHint;
 use crate::mode::{Binary, Text};
 use crate::Allocator;
 
@@ -36,9 +35,7 @@ impl<M> Encode<M> for Sequence<()> {
     where
         E: Encoder<Mode = M>,
     {
-        static HINT: SequenceHint = SequenceHint::with_size(0);
-
-        encoder.encode_sequence_fn(&HINT, |_| Ok(()))
+        encoder.encode_sequence_fn(0, |_| Ok(()))
     }
 
     #[inline]

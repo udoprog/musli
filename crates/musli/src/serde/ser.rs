@@ -2,7 +2,6 @@ use core::any::TypeId;
 use core::fmt;
 
 use crate::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
-use crate::hint::{MapHint, SequenceHint};
 use crate::mode::Text;
 use crate::{Context, Encoder};
 
@@ -181,21 +180,13 @@ where
 
     #[inline]
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        let Some(len) = len else {
-            return Err(ser::Error::custom(
-                "Can only encode sequences with known lengths",
-            ));
-        };
-
-        let hint = SequenceHint::with_size(len);
-        let encoder = self.encoder.encode_sequence(&hint)?;
+        let encoder = self.encoder.encode_sequence(len)?;
         Ok(SerializeSeq::new(encoder))
     }
 
     #[inline]
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        let hint = SequenceHint::with_size(len);
-        let encoder = self.encoder.encode_sequence(&hint)?;
+        let encoder = self.encoder.encode_sequence(len)?;
         Ok(SerializeSeq::new(encoder))
     }
 
@@ -205,8 +196,7 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-        let hint = SequenceHint::with_size(len);
-        let encoder = self.encoder.encode_sequence(&hint)?;
+        let encoder = self.encoder.encode_sequence(len)?;
         Ok(SerializeSeq::new(encoder))
     }
 
@@ -218,8 +208,7 @@ where
         variant_name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        let hint = SequenceHint::with_size(len);
-        let encoder = self.encoder.encode_sequence_variant(variant_name, &hint)?;
+        let encoder = self.encoder.encode_sequence_variant(variant_name, len)?;
         Ok(SerializeSeq::new(encoder))
     }
 
@@ -233,8 +222,7 @@ where
             ));
         };
 
-        let hint = MapHint::with_size(len);
-        let encoder = self.encoder.encode_map_entries(&hint)?;
+        let encoder = self.encoder.encode_map_entries(len)?;
         Ok(SerializeMap::new(encoder))
     }
 
@@ -244,8 +232,7 @@ where
         _: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        let hint = MapHint::with_size(len);
-        let encoder = self.encoder.encode_map(&hint)?;
+        let encoder = self.encoder.encode_map(len)?;
         Ok(SerializeStruct::new(encoder))
     }
 
@@ -257,8 +244,7 @@ where
         variant_name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        let hint = MapHint::with_size(len);
-        let encoder = self.encoder.encode_map_variant(variant_name, &hint)?;
+        let encoder = self.encoder.encode_map_variant(variant_name, len)?;
         Ok(SerializeStructVariant::new(encoder))
     }
 

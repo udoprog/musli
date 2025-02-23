@@ -363,11 +363,12 @@ where
     }
 
     #[inline]
-    fn decode_sequence_hint<F, O>(self, hint: &SequenceHint, f: F) -> Result<O, Self::Error>
+    fn decode_sequence_hint<F, O>(self, hint: impl SequenceHint, f: F) -> Result<O, Self::Error>
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
-        let mut decoder = JsonSequenceDecoder::new(self.cx, Some(hint.size), self.parser)?;
+        let size = hint.get();
+        let mut decoder = JsonSequenceDecoder::new(self.cx, size, self.parser)?;
         let output = f(&mut decoder)?;
         decoder.skip_sequence_remaining()?;
         Ok(output)
@@ -385,11 +386,11 @@ where
     }
 
     #[inline]
-    fn decode_map_hint<F, O>(self, hint: &MapHint, f: F) -> Result<O, Self::Error>
+    fn decode_map_hint<F, O>(self, hint: impl MapHint, f: F) -> Result<O, Self::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
-        let mut decoder = JsonObjectDecoder::new(self.cx, Some(hint.size), self.parser)?;
+        let mut decoder = JsonObjectDecoder::new(self.cx, hint.get(), self.parser)?;
         let output = f(&mut decoder)?;
         decoder.skip_object_remaining()?;
         Ok(output)

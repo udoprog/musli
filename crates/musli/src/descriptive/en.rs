@@ -250,20 +250,29 @@ where
     }
 
     #[inline]
-    fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, Self::Error> {
-        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Sequence, hint.size)?;
+    fn encode_sequence(
+        mut self,
+        hint: impl SequenceHint,
+    ) -> Result<Self::EncodeSequence, Self::Error> {
+        let size = hint.require(self.cx)?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Sequence, size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, Self::Error> {
-        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Map, hint.size)?;
+    fn encode_map(mut self, hint: impl MapHint) -> Result<Self::EncodeMap, Self::Error> {
+        let size = hint.require(self.cx)?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Map, size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_map_entries(mut self, hint: &MapHint) -> Result<Self::EncodeMapEntries, Self::Error> {
-        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Map, hint.size)?;
+    fn encode_map_entries(
+        mut self,
+        hint: impl MapHint,
+    ) -> Result<Self::EncodeMapEntries, Self::Error> {
+        let size = hint.require(self.cx)?;
+        encode_prefix::<OPT, _, _>(self.cx, self.writer.borrow_mut(), Kind::Map, size)?;
         Ok(self)
     }
 
@@ -289,7 +298,7 @@ where
     fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
-        hint: &SequenceHint,
+        hint: impl SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,
@@ -303,7 +312,7 @@ where
     fn encode_map_variant<T>(
         mut self,
         tag: &T,
-        hint: &MapHint,
+        hint: impl MapHint,
     ) -> Result<Self::EncodeMapVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,

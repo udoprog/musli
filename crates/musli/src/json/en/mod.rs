@@ -259,17 +259,17 @@ where
     }
 
     #[inline]
-    fn encode_sequence(self, _: &SequenceHint) -> Result<Self::EncodeSequence, Self::Error> {
+    fn encode_sequence(self, _: impl SequenceHint) -> Result<Self::EncodeSequence, Self::Error> {
         JsonArrayEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_map(self, _: &MapHint) -> Result<Self::EncodeMap, Self::Error> {
+    fn encode_map(self, _: impl MapHint) -> Result<Self::EncodeMap, Self::Error> {
         JsonObjectEncoder::new(self.cx, self.writer)
     }
 
     #[inline]
-    fn encode_map_entries(self, _: &MapHint) -> Result<Self::EncodeMapEntries, Self::Error> {
+    fn encode_map_entries(self, _: impl MapHint) -> Result<Self::EncodeMapEntries, Self::Error> {
         JsonObjectEncoder::new(self.cx, self.writer)
     }
 
@@ -282,7 +282,7 @@ where
     fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
-        _: &SequenceHint,
+        _: impl SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,
@@ -297,7 +297,7 @@ where
     fn encode_map_variant<T>(
         mut self,
         tag: &T,
-        _: &MapHint,
+        _: impl MapHint,
     ) -> Result<Self::EncodeMapVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,

@@ -1,32 +1,46 @@
 use crate::de::SizeHint;
+use crate::Context;
 
-/// A hint passed in when encoding a map.
-#[non_exhaustive]
-pub struct MapHint {
-    /// The size for the map being encoded.
-    pub size: usize,
-}
+/// A size hint passed in when encoding or decoding a map.
+pub trait MapHint: Sized {
+    /// Get the map hint.
+    fn get(self) -> Option<usize>;
 
-impl MapHint {
-    /// Create a new struct hint with the specified size.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::hint::MapHint;
-    ///
-    /// static HINT: MapHint = MapHint::with_size(16);
-    ///
-    /// assert_eq!(HINT.size, 16);
-    /// ```
+    /// Require the size of the map.
     #[inline]
-    pub const fn with_size(size: usize) -> Self {
-        Self { size }
+    fn require<C>(self, cx: C) -> Result<usize, C::Error>
+    where
+        C: Context,
+    {
+        let Some(size) = self.get() else {
+            return Err(
+                cx.message("Format cannot handle map types with an unknown number of entries")
+            );
+        };
+
+        Ok(size)
     }
 
-    /// Return the size hint that corresponds to this overall hint.
+    /// The size hint for the map hint.
     #[inline]
-    pub fn size_hint(&self) -> SizeHint {
-        SizeHint::exact(self.size)
+    fn size_hint(self) -> SizeHint {
+        match self.get() {
+            Some(size) => SizeHint::exact(size),
+            None => SizeHint::any(),
+        }
+    }
+}
+
+impl MapHint for usize {
+    #[inline]
+    fn get(self) -> Option<usize> {
+        Some(self)
+    }
+}
+
+impl MapHint for Option<usize> {
+    #[inline]
+    fn get(self) -> Option<usize> {
+        self
     }
 }
