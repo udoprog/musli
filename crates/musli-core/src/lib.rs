@@ -48,6 +48,8 @@ pub use musli_macros as __macros;
 /// Using these directly is not supported.
 #[doc(hidden)]
 pub mod __priv {
+    use core::marker::PhantomData;
+
     pub use crate::alloc::Allocator;
     use crate::alloc::String;
     pub use crate::context::Context;
@@ -111,33 +113,32 @@ pub mod __priv {
     }
 
     /// Construct a map hint from an `Encode` implementation.
+    #[inline]
     pub fn map_hint<M>(encode: &(impl Encode<M> + ?Sized)) -> impl MapHint + '_
     where
         M: 'static,
     {
-        use core::marker::PhantomData;
-
-        struct EncodeMapHint<'a, T, M>
-        where
-            T: ?Sized,
-        {
-            encode: &'a T,
-            _marker: PhantomData<M>,
-        }
-
-        impl<T, M> MapHint for EncodeMapHint<'_, T, M>
-        where
-            T: ?Sized + Encode<M>,
-        {
-            #[inline]
-            fn get(self) -> Option<usize> {
-                self.encode.size_hint()
-            }
-        }
-
         EncodeMapHint {
             encode,
             _marker: PhantomData,
+        }
+    }
+
+    pub(crate) struct EncodeMapHint<'a, T, M>
+    where
+        T: ?Sized,
+    {
+        encode: &'a T,
+        _marker: PhantomData<M>,
+    }
+
+    impl<T, M> MapHint for EncodeMapHint<'_, T, M>
+    where
+        T: ?Sized + Encode<M>,
+    {
+        #[inline]
+        fn get(self) -> Option<usize> {
+            self.encode.size_hint()
         }
     }
 

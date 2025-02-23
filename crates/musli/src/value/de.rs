@@ -61,18 +61,22 @@ where
 }
 
 macro_rules! ensure_number {
-    ($self:expr, $opt:expr, $hint:ident, $ident:ident $tt:tt, Value::$variant:ident($block:ident) => $ty:ty) => {
+    ($self:expr, $opt:expr, $hint_type:ident, $value:ident::$variant:ident($v:ident) => $ty:ty) => {
         match $self.value {
-            Value::$variant($block) => <$ty>::from_number($block).map_err(|e| $self.cx.message(e)),
-            Value::String(string) if crate::options::is_map_keys_as_numbers::<$opt>() && $self.map_key => {
+            $value::$variant($v) => <$ty>::from_number($v).map_err(|e| $self.cx.message(e)),
+            Value::String(string)
+                if crate::options::is_map_keys_as_numbers::<$opt>() && $self.map_key =>
+            {
                 match <$ty>::parse_number(string) {
                     Some(value) => Ok(value),
                     None => Err($self.cx.message(ErrorMessage::ExpectedStringAsNumber)),
                 }
             }
             value => {
-                let $hint = value.type_hint();
-                return Err($self.cx.message(ErrorMessage::$ident $tt));
+                let hint = value.type_hint();
+                return Err($self
+                    .cx
+                    .message(ErrorMessage::ExpectedNumber(NumberHint::$hint_type, hint)));
             }
         }
     };
@@ -151,52 +155,52 @@ where
 
     #[inline]
     fn decode_u8(self) -> Result<u8, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U8, hint), Value::Number(n) => u8)
+        ensure_number!(self, OPT, U8, Value::Number(n) => u8)
     }
 
     #[inline]
     fn decode_u16(self) -> Result<u16, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U16, hint), Value::Number(n) => u16)
+        ensure_number!(self, OPT, U16, Value::Number(n) => u16)
     }
 
     #[inline]
     fn decode_u32(self) -> Result<u32, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U32, hint), Value::Number(n) => u32)
+        ensure_number!(self, OPT, U32, Value::Number(n) => u32)
     }
 
     #[inline]
     fn decode_u64(self) -> Result<u64, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U64, hint), Value::Number(n) => u64)
+        ensure_number!(self, OPT, U64, Value::Number(n) => u64)
     }
 
     #[inline]
     fn decode_u128(self) -> Result<u128, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::U128, hint), Value::Number(n) => u128)
+        ensure_number!(self, OPT, U128, Value::Number(n) => u128)
     }
 
     #[inline]
     fn decode_i8(self) -> Result<i8, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I8, hint), Value::Number(n) => i8)
+        ensure_number!(self, OPT, I8, Value::Number(n) => i8)
     }
 
     #[inline]
     fn decode_i16(self) -> Result<i16, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I16, hint), Value::Number(n) => i16)
+        ensure_number!(self, OPT, I16, Value::Number(n) => i16)
     }
 
     #[inline]
     fn decode_i32(self) -> Result<i32, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I32, hint), Value::Number(n) => i32)
+        ensure_number!(self, OPT, I32, Value::Number(n) => i32)
     }
 
     #[inline]
     fn decode_i64(self) -> Result<i64, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I64, hint), Value::Number(n) => i64)
+        ensure_number!(self, OPT, I64, Value::Number(n) => i64)
     }
 
     #[inline]
     fn decode_i128(self) -> Result<i128, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::I128, hint), Value::Number(n) => i128)
+        ensure_number!(self, OPT, I128, Value::Number(n) => i128)
     }
 
     #[inline]
@@ -211,12 +215,12 @@ where
 
     #[inline]
     fn decode_usize(self) -> Result<usize, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::Usize, hint), Value::Number(n) => usize)
+        ensure_number!(self, OPT, Usize, Value::Number(n) => usize)
     }
 
     #[inline]
     fn decode_isize(self) -> Result<isize, Self::Error> {
-        ensure_number!(self, OPT, hint, ExpectedNumber(NumberHint::Isize, hint), Value::Number(n) => isize)
+        ensure_number!(self, OPT, Isize, Value::Number(n) => isize)
     }
 
     #[inline]
