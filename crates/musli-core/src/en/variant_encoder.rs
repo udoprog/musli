@@ -7,28 +7,16 @@ use super::{Encode, Encoder};
 pub trait VariantEncoder: Sized {
     /// Context associated with the encoder.
     type Cx: Context<Error = Self::Error>;
-    /// Result type of the encoder.
-    type Ok;
     /// Error associated with encoding.
     type Error;
     /// The mode of the encoder.
     type Mode: 'static;
     /// The encoder returned when advancing the map encoder to encode the key.
-    type EncodeTag<'this>: Encoder<
-        Cx = Self::Cx,
-        Ok = Self::Ok,
-        Error = Self::Error,
-        Mode = Self::Mode,
-    >
+    type EncodeTag<'this>: Encoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>
     where
         Self: 'this;
     /// The encoder returned when advancing the map encoder to encode the value.
-    type EncodeData<'this>: Encoder<
-        Cx = Self::Cx,
-        Ok = Self::Ok,
-        Error = Self::Error,
-        Mode = Self::Mode,
-    >
+    type EncodeData<'this>: Encoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>
     where
         Self: 'this;
 
@@ -44,11 +32,11 @@ pub trait VariantEncoder: Sized {
     fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, Self::Error>;
 
     /// End the variant encoder.
-    fn finish_variant(self) -> Result<Self::Ok, Self::Error>;
+    fn finish_variant(self) -> Result<(), Self::Error>;
 
     /// Insert the variant immediately.
     #[inline]
-    fn insert_variant<T, V>(mut self, tag: T, value: V) -> Result<Self::Ok, Self::Error>
+    fn insert_variant<T, V>(mut self, tag: T, value: V) -> Result<(), Self::Error>
     where
         T: Encode<Self::Mode>,
         V: Encode<Self::Mode>,

@@ -6,28 +6,16 @@ use super::{Encode, Encoder};
 pub trait EntryEncoder: Sized {
     /// Context associated with the encoder.
     type Cx: Context<Error = Self::Error>;
-    /// Result type of the encoder.
-    type Ok;
     /// Error associated with encoding.
     type Error;
     /// The mode of the encoder.
     type Mode: 'static;
     /// The encoder returned when advancing the map encoder to encode the key.
-    type EncodeKey<'this>: Encoder<
-        Cx = Self::Cx,
-        Ok = Self::Ok,
-        Error = Self::Error,
-        Mode = Self::Mode,
-    >
+    type EncodeKey<'this>: Encoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>
     where
         Self: 'this;
     /// The encoder returned when advancing the map encoder to encode the value.
-    type EncodeValue<'this>: Encoder<
-        Cx = Self::Cx,
-        Ok = Self::Ok,
-        Error = Self::Error,
-        Mode = Self::Mode,
-    >
+    type EncodeValue<'this>: Encoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>
     where
         Self: 'this;
 
@@ -43,11 +31,11 @@ pub trait EntryEncoder: Sized {
     fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, Self::Error>;
 
     /// Stop encoding this pair.
-    fn finish_entry(self) -> Result<Self::Ok, Self::Error>;
+    fn finish_entry(self) -> Result<(), Self::Error>;
 
     /// Insert the pair immediately.
     #[inline]
-    fn insert_entry<K, V>(mut self, key: K, value: V) -> Result<Self::Ok, Self::Error>
+    fn insert_entry<K, V>(mut self, key: K, value: V) -> Result<(), Self::Error>
     where
         K: Encode<Self::Mode>,
         V: Encode<Self::Mode>,

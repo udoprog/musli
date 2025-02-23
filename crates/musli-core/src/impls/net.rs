@@ -30,7 +30,7 @@ impl Encode<Binary> for Ipv4Addr {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
@@ -51,7 +51,7 @@ impl Encode<Text> for Ipv4Addr {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
@@ -107,7 +107,7 @@ impl Encode<Binary> for Ipv6Addr {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = Binary>,
     {
@@ -128,7 +128,7 @@ impl Encode<Text> for Ipv6Addr {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = Text>,
     {
@@ -187,7 +187,7 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -238,7 +238,7 @@ impl Encode<Binary> for SocketAddrV4 {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = Binary>,
     {
@@ -263,7 +263,7 @@ impl Encode<Text> for SocketAddrV4 {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = Text>,
     {
@@ -319,7 +319,7 @@ impl Encode<Binary> for SocketAddrV6 {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = Binary>,
     {
@@ -346,7 +346,7 @@ impl Encode<Text> for SocketAddrV6 {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = Text>,
     {
@@ -403,7 +403,7 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {

@@ -25,7 +25,7 @@ impl<E> ser::Serializer for Serializer<E>
 where
     E: Encoder,
 {
-    type Ok = E::Ok;
+    type Ok = ();
     type Error = SerdeError<E::Error>;
 
     type SerializeSeq = SerializeSeq<E::EncodeSequence>;
@@ -305,7 +305,7 @@ impl<E> ser::SerializeSeq for SerializeSeq<E>
 where
     E: SequenceEncoder,
 {
-    type Ok = E::Ok;
+    type Ok = ();
     type Error = SerdeError<E::Error>;
 
     #[inline]
@@ -328,7 +328,7 @@ impl<E> ser::SerializeTupleStruct for SerializeSeq<E>
 where
     E: SequenceEncoder,
 {
-    type Ok = E::Ok;
+    type Ok = ();
     type Error = SerdeError<E::Error>;
 
     #[inline]
@@ -349,7 +349,7 @@ impl<E> ser::SerializeTuple for SerializeSeq<E>
 where
     E: SequenceEncoder,
 {
-    type Ok = E::Ok;
+    type Ok = ();
     type Error = SerdeError<E::Error>;
 
     #[inline]
@@ -370,7 +370,7 @@ impl<E> ser::SerializeTupleVariant for SerializeSeq<E>
 where
     E: SequenceEncoder,
 {
-    type Ok = E::Ok;
+    type Ok = ();
     type Error = SerdeError<E::Error>;
 
     #[inline]
@@ -402,7 +402,7 @@ impl<E> ser::SerializeMap for SerializeMap<E>
 where
     E: EntriesEncoder,
 {
-    type Ok = E::Ok;
+    type Ok = ();
     type Error = SerdeError<E::Error>;
 
     #[inline]
@@ -446,7 +446,7 @@ impl<E> ser::SerializeStruct for SerializeStruct<E>
 where
     E: MapEncoder,
 {
-    type Ok = E::Ok;
+    type Ok = ();
     type Error = SerdeError<E::Error>;
 
     #[inline]
@@ -482,7 +482,7 @@ impl<E> ser::SerializeStructVariant for SerializeStructVariant<E>
 where
     E: MapEncoder,
 {
-    type Ok = E::Ok;
+    type Ok = ();
     type Error = SerdeError<E::Error>;
 
     #[inline]

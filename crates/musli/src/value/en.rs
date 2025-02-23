@@ -98,7 +98,6 @@ where
 {
     type Cx = C;
     type Error = C::Error;
-    type Ok = ();
     type Mode = M;
     type EncodeSome = ValueEncoder<OPT, SomeValueWriter<O>, C, M>;
     type EncodePack = PackValueEncoder<OPT, O, C, M>;
@@ -120,7 +119,7 @@ where
     }
 
     #[inline]
-    fn encode<T>(self, value: T) -> Result<Self::Ok, Self::Error>
+    fn encode<T>(self, value: T) -> Result<(), Self::Error>
     where
         T: Encode<Self::Mode>,
     {
@@ -128,110 +127,110 @@ where
     }
 
     #[inline]
-    fn encode_empty(self) -> Result<Self::Ok, Self::Error> {
+    fn encode_empty(self) -> Result<(), Self::Error> {
         Ok(())
     }
 
     #[inline]
-    fn encode_bool(self, b: bool) -> Result<Self::Ok, Self::Error> {
+    fn encode_bool(self, b: bool) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Bool(b))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_char(self, c: char) -> Result<Self::Ok, Self::Error> {
+    fn encode_char(self, c: char) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Char(c))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_u8(self, n: u8) -> Result<Self::Ok, Self::Error> {
+    fn encode_u8(self, n: u8) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::U8(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_u16(self, n: u16) -> Result<Self::Ok, Self::Error> {
+    fn encode_u16(self, n: u16) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::U16(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_u32(self, n: u32) -> Result<Self::Ok, Self::Error> {
+    fn encode_u32(self, n: u32) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::U32(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_u64(self, n: u64) -> Result<Self::Ok, Self::Error> {
+    fn encode_u64(self, n: u64) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::U64(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_u128(self, n: u128) -> Result<Self::Ok, Self::Error> {
+    fn encode_u128(self, n: u128) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::U128(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_i8(self, n: i8) -> Result<Self::Ok, Self::Error> {
+    fn encode_i8(self, n: i8) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::I8(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_i16(self, n: i16) -> Result<Self::Ok, Self::Error> {
+    fn encode_i16(self, n: i16) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::I16(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_i32(self, n: i32) -> Result<Self::Ok, Self::Error> {
+    fn encode_i32(self, n: i32) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::I32(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_i64(self, n: i64) -> Result<Self::Ok, Self::Error> {
+    fn encode_i64(self, n: i64) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::I64(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_i128(self, n: i128) -> Result<Self::Ok, Self::Error> {
+    fn encode_i128(self, n: i128) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::I128(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_f32(self, n: f32) -> Result<Self::Ok, Self::Error> {
+    fn encode_f32(self, n: f32) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::F32(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_f64(self, n: f64) -> Result<Self::Ok, Self::Error> {
+    fn encode_f64(self, n: f64) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Number(Number::F64(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_usize(self, n: usize) -> Result<Self::Ok, Self::Error> {
+    fn encode_usize(self, n: usize) -> Result<(), Self::Error> {
         self.output
             .write(self.cx, Value::Number(Number::Usize(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_isize(self, n: isize) -> Result<Self::Ok, Self::Error> {
+    fn encode_isize(self, n: isize) -> Result<(), Self::Error> {
         self.output
             .write(self.cx, Value::Number(Number::Isize(n)))?;
         Ok(())
     }
 
     #[inline]
-    fn encode_array<const N: usize>(self, array: &[u8; N]) -> Result<Self::Ok, Self::Error> {
+    fn encode_array<const N: usize>(self, array: &[u8; N]) -> Result<(), Self::Error> {
         let mut bytes =
             Vec::with_capacity_in(array.len(), self.cx.alloc()).map_err(self.cx.map())?;
         bytes.extend_from_slice(array).map_err(self.cx.map())?;
@@ -240,7 +239,7 @@ where
     }
 
     #[inline]
-    fn encode_bytes(self, b: &[u8]) -> Result<Self::Ok, Self::Error> {
+    fn encode_bytes(self, b: &[u8]) -> Result<(), Self::Error> {
         let mut bytes = Vec::with_capacity_in(b.len(), self.cx.alloc()).map_err(self.cx.map())?;
         bytes.extend_from_slice(b).map_err(self.cx.map())?;
         self.output.write(self.cx, Value::Bytes(bytes))?;
@@ -248,7 +247,7 @@ where
     }
 
     #[inline]
-    fn encode_bytes_vectored<I>(self, len: usize, vectors: I) -> Result<Self::Ok, Self::Error>
+    fn encode_bytes_vectored<I>(self, len: usize, vectors: I) -> Result<(), Self::Error>
     where
         I: IntoIterator<Item: AsRef<[u8]>>,
     {
@@ -263,7 +262,7 @@ where
     }
 
     #[inline]
-    fn encode_string(self, s: &str) -> Result<Self::Ok, Self::Error> {
+    fn encode_string(self, s: &str) -> Result<(), Self::Error> {
         let mut string = String::new_in(self.cx.alloc());
         string.push_str(s).map_err(self.cx.map())?;
         self.output.write(self.cx, Value::String(string))?;
@@ -281,7 +280,7 @@ where
     }
 
     #[inline]
-    fn encode_none(self) -> Result<Self::Ok, Self::Error> {
+    fn encode_none(self) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Option(None))?;
         Ok(())
     }
@@ -389,7 +388,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
@@ -408,7 +406,7 @@ where
     }
 
     #[inline]
-    fn finish_sequence(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_sequence(self) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Sequence(self.values))?;
         Ok(())
     }
@@ -449,7 +447,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
@@ -468,7 +465,7 @@ where
     }
 
     #[inline]
-    fn finish_sequence(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_sequence(self) -> Result<(), Self::Error> {
         let buf = self.writer.into_inner();
         self.output.write(self.cx, Value::Bytes(buf))?;
         Ok(())
@@ -512,7 +509,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeEntry<'this>
@@ -531,7 +527,7 @@ where
     }
 
     #[inline]
-    fn finish_map(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_map(self) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Map(self.values))?;
         Ok(())
     }
@@ -544,7 +540,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeEntryKey<'this>
@@ -584,7 +579,7 @@ where
     }
 
     #[inline]
-    fn finish_entries(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_entries(self) -> Result<(), Self::Error> {
         self.output.write(self.cx, Value::Map(self.values))?;
         Ok(())
     }
@@ -627,7 +622,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeKey<'this>
@@ -655,7 +649,7 @@ where
     }
 
     #[inline]
-    fn finish_entry(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_entry(self) -> Result<(), Self::Error> {
         self.output.push(self.pair).map_err(self.cx.map())?;
         Ok(())
     }
@@ -696,7 +690,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeTag<'this>
@@ -724,7 +717,7 @@ where
     }
 
     #[inline]
-    fn finish_variant(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_variant(self) -> Result<(), Self::Error> {
         let value = Box::new_in(self.pair, self.cx.alloc()).map_err(self.cx.map())?;
         self.output.write(self.cx, Value::Variant(value))?;
         Ok(())
@@ -770,7 +763,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
@@ -789,7 +781,7 @@ where
     }
 
     #[inline]
-    fn finish_sequence(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_sequence(self) -> Result<(), Self::Error> {
         let value = (self.variant, Value::Sequence(self.values));
         let value = Box::new_in(value, self.cx.alloc()).map_err(self.cx.map())?;
         self.output.write(self.cx, Value::Variant(value))?;
@@ -836,7 +828,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeEntry<'this>
@@ -855,7 +846,7 @@ where
     }
 
     #[inline]
-    fn finish_map(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_map(self) -> Result<(), Self::Error> {
         let value = (self.variant, Value::Map(self.fields));
         let value = Box::new_in(value, self.cx.alloc()).map_err(self.cx.map())?;
         self.output.write(self.cx, Value::Variant(value))?;

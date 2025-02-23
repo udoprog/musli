@@ -326,14 +326,13 @@ where
     }
 }
 
-impl<C, O, M> Encoder for Never<(C, O, M)>
+impl<C, M> Encoder for Never<(C, M)>
 where
     C: Context,
     M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
-    type Ok = O;
     type Mode = M;
     type EncodePack = Self;
     type EncodeSome = Self;
@@ -356,7 +355,7 @@ where
     }
 
     #[inline]
-    fn encode<T>(self, _: T) -> Result<Self::Ok, Self::Error>
+    fn encode<T>(self, _: T) -> Result<(), Self::Error>
     where
         T: Encode<Self::Mode>,
     {
@@ -364,7 +363,7 @@ where
     }
 }
 
-impl<O, C, T> UnsizedVisitor<'_, C, T> for Never<(O, T)>
+impl<C, O, T> UnsizedVisitor<'_, C, T> for Never<(O, T)>
 where
     C: Context,
     T: ?Sized + ToOwned,
@@ -380,13 +379,12 @@ where
     }
 }
 
-impl<C, O, M> SequenceEncoder for Never<(C, O, M)>
+impl<C, M> SequenceEncoder for Never<(C, M)>
 where
     C: Context,
     M: 'static,
 {
     type Cx = C;
-    type Ok = O;
     type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
@@ -405,18 +403,17 @@ where
     }
 
     #[inline]
-    fn finish_sequence(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_sequence(self) -> Result<(), Self::Error> {
         match self._never {}
     }
 }
 
-impl<C, O, M> MapEncoder for Never<(C, O, M)>
+impl<C, M> MapEncoder for Never<(C, M)>
 where
     C: Context,
     M: 'static,
 {
     type Cx = C;
-    type Ok = O;
     type Error = C::Error;
     type Mode = M;
     type EncodeEntry<'this>
@@ -434,18 +431,17 @@ where
         match self._never {}
     }
 
-    fn finish_map(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_map(self) -> Result<(), Self::Error> {
         match self._never {}
     }
 }
 
-impl<C, O, M> EntryEncoder for Never<(C, O, M)>
+impl<C, M> EntryEncoder for Never<(C, M)>
 where
     C: Context,
     M: 'static,
 {
     type Cx = C;
-    type Ok = O;
     type Error = C::Error;
     type Mode = M;
     type EncodeKey<'this>
@@ -473,18 +469,17 @@ where
     }
 
     #[inline]
-    fn finish_entry(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_entry(self) -> Result<(), Self::Error> {
         match self._never {}
     }
 }
 
-impl<C, O, M> EntriesEncoder for Never<(C, O, M)>
+impl<C, M> EntriesEncoder for Never<(C, M)>
 where
     C: Context,
     M: 'static,
 {
     type Cx = C;
-    type Ok = O;
     type Error = C::Error;
     type Mode = M;
     type EncodeEntryKey<'this>
@@ -512,18 +507,17 @@ where
     }
 
     #[inline]
-    fn finish_entries(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_entries(self) -> Result<(), Self::Error> {
         match self._never {}
     }
 }
 
-impl<C, O, M> VariantEncoder for Never<(C, O, M)>
+impl<C, M> VariantEncoder for Never<(C, M)>
 where
     C: Context,
     M: 'static,
 {
     type Cx = C;
-    type Ok = O;
     type Error = C::Error;
     type Mode = M;
     type EncodeTag<'this>
@@ -551,7 +545,7 @@ where
     }
 
     #[inline]
-    fn finish_variant(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_variant(self) -> Result<(), Self::Error> {
         match self._never {}
     }
 }

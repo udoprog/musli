@@ -129,7 +129,7 @@ use crate::{Decoder, Encoder};
 /// }
 /// ```
 #[inline]
-pub fn encode<E, T>(value: &T, encoder: E) -> Result<E::Ok, E::Error>
+pub fn encode<E, T>(value: &T, encoder: E) -> Result<(), E::Error>
 where
     E: Encoder,
     T: Serialize,

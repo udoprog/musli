@@ -41,7 +41,7 @@ impl<M> Encode<M> for String {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -140,7 +140,7 @@ macro_rules! cow {
             type $encode = $ty;
 
             #[inline]
-            fn $encode_fn<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn $encode_fn<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -291,7 +291,7 @@ macro_rules! sequence {
             type Encode = Self;
 
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -359,7 +359,7 @@ macro_rules! sequence {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode_packed<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -400,7 +400,7 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -435,7 +435,7 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_packed<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -492,7 +492,7 @@ macro_rules! map {
             type Encode = Self;
 
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -521,7 +521,7 @@ macro_rules! map {
             $($extra: $extra_bound0 $(+ $extra_bound)*),*
         {
             #[inline]
-            fn trace_encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn trace_encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -622,7 +622,7 @@ impl<M> Encode<M> for CString {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
@@ -695,7 +695,7 @@ macro_rules! smart_pointer {
                 type Encode = T;
 
                 #[inline]
-                fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+                fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
                 where
                     E: Encoder<Mode = M>,
                 {
@@ -807,7 +807,7 @@ where
 
     #[cfg(unix)]
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -824,7 +824,7 @@ where
 
     #[cfg(windows)]
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -880,7 +880,7 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -976,7 +976,7 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -1000,7 +1000,7 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -1037,7 +1037,7 @@ impl<M> EncodeBytes<M> for Vec<u8> {
     type EncodeBytes = [u8];
 
     #[inline]
-    fn encode_bytes<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -1056,7 +1056,7 @@ impl<M> EncodeBytes<M> for Box<[u8]> {
     type EncodeBytes = [u8];
 
     #[inline]
-    fn encode_bytes<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -1115,7 +1115,7 @@ impl<M> EncodeBytes<M> for VecDeque<u8> {
     type EncodeBytes = VecDeque<u8>;
 
     #[inline]
-    fn encode_bytes<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {

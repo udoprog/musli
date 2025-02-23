@@ -143,7 +143,6 @@ impl Types {
         attr: &Attr,
         what: &str,
         types: &[(&str, Extra)],
-        argument: Option<syn::Ident>,
         hint: &str,
         kind: Kind,
     ) -> syn::Result<TokenStream> {
@@ -233,7 +232,7 @@ impl Types {
 
             impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: self.never_type(crate_path, argument.as_ref(), extra, kind)?,
+                path: self.never_type(crate_path, extra, kind)?,
             });
 
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
@@ -257,6 +256,7 @@ impl Types {
             match extra {
                 Extra::CxFn => {
                     self.item_impl.items.push(syn::parse_quote! {
+                        #[inline]
                         fn cx(&self) -> Self::Cx {
                             self.cx
                         }
@@ -282,7 +282,7 @@ impl Types {
                 _ => {
                     ty = syn::Type::Path(syn::TypePath {
                         qself: None,
-                        path: self.never_type(crate_path, argument.as_ref(), extra, kind)?,
+                        path: self.never_type(crate_path, extra, kind)?,
                     });
                 }
             };
@@ -325,7 +325,6 @@ impl Types {
     fn never_type(
         &self,
         crate_path: &syn::Path,
-        argument: Option<&syn::Ident>,
         extra: Extra,
         kind: Kind,
     ) -> syn::Result<syn::Path> {
@@ -343,9 +342,7 @@ impl Types {
 
             match extra {
                 Extra::Visitor(ty) => {
-                    if let Some(arg) = argument {
-                        args.push(syn::parse_quote!(Self::#arg));
-                    }
+                    args.push(syn::parse_quote!(Self::Ok));
 
                     match ty {
                         Ty::Str => {
@@ -359,11 +356,6 @@ impl Types {
                 Extra::None => match kind {
                     Kind::SelfCx => {
                         args.push(syn::parse_quote!(Self::Cx));
-
-                        if let Some(arg) = argument {
-                            args.push(syn::parse_quote!(Self::#arg));
-                        }
-
                         args.push(syn::parse_quote!(Self::Mode));
                     }
                     Kind::GenericCx => {}

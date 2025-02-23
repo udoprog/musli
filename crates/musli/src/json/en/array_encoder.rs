@@ -47,7 +47,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
@@ -70,7 +69,7 @@ where
     }
 
     #[inline]
-    fn finish_sequence(mut self) -> Result<Self::Ok, C::Error> {
+    fn finish_sequence(mut self) -> Result<(), C::Error> {
         self.writer.write_bytes(self.cx, self.end)
     }
 }

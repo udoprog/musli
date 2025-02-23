@@ -36,7 +36,7 @@ use crate::en::Encoder;
 ///     type Encode = Self;
 ///
 ///     #[inline]
-///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+///     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
 ///     where
 ///         E: Encoder,
 ///     {
@@ -54,7 +54,7 @@ use crate::en::Encoder;
 /// ```
 pub trait EncodePacked<M> {
     /// Encode the given output as bytes.
-    fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_packed<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>;
 }
@@ -64,7 +64,7 @@ where
     T: ?Sized + EncodePacked<M>,
 {
     #[inline]
-    fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_packed<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -77,7 +77,7 @@ where
     T: ?Sized + EncodePacked<M>,
 {
     #[inline]
-    fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_packed<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {

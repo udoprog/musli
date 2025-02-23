@@ -1120,7 +1120,7 @@ mod example {
 
         use super::Field;
 
-        pub fn encode<E>(field: &Field, encoder: E) -> Result<E::Ok, E::Error>
+        pub fn encode<E>(field: &Field, encoder: E) -> Result<(), E::Error>
         where
             E: Encoder,
         {
@@ -1160,7 +1160,7 @@ mod example {
 
         use super::Field;
 
-        pub fn encode<E, T>(field: &Field<T>, encoder: E) -> Result<E::Ok, E::Error>
+        pub fn encode<E, T>(field: &Field<T>, encoder: E) -> Result<(), E::Error>
         where
             E: Encoder,
         {
@@ -1201,7 +1201,7 @@ mod example {
 
         use super::CustomUuid;
 
-        pub fn encode<E>(uuid: &CustomUuid, encoder: E) -> Result<E::Ok, E::Error>
+        pub fn encode<E>(uuid: &CustomUuid, encoder: E) -> Result<(), E::Error>
         where
             E: Encoder,
         {
@@ -1222,7 +1222,7 @@ mod example {
 
         use musli::{Context, Decode, Decoder, Encode, Encoder};
 
-        pub fn encode<E, T>(set: &HashSet<T>, encoder: E) -> Result<E::Ok, E::Error>
+        pub fn encode<E, T>(set: &HashSet<T>, encoder: E) -> Result<(), E::Error>
         where
             E: Encoder,
             T: Encode<E::Mode> + Eq + Hash,

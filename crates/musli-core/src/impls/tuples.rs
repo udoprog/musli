@@ -51,7 +51,7 @@ macro_rules! declare {
             const IS_BITWISE_ENCODE: bool = false;
 
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -104,7 +104,7 @@ macro_rules! declare {
             $($ty: Encode<M>),*
         {
             #[inline]
-            fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode_packed<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder<Mode = M>,
             {

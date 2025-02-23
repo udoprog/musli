@@ -5,7 +5,7 @@ use super::{Encode, Encoder, SequenceEncoder};
 
 /// The default implementation of [`Encoder::encode_slice`].
 #[inline]
-pub fn default_encode_slice<E, T>(encoder: E, slice: impl AsRef<[T]>) -> Result<E::Ok, E::Error>
+pub fn default_encode_slice<E, T>(encoder: E, slice: impl AsRef<[T]>) -> Result<(), E::Error>
 where
     E: Encoder,
     T: Encode<E::Mode>,
@@ -30,7 +30,7 @@ pub fn default_encode_slices<E, T>(
     encoder: E,
     len: usize,
     slices: impl IntoIterator<Item: AsRef<[T]>>,
-) -> Result<E::Ok, E::Error>
+) -> Result<(), E::Error>
 where
     E: Encoder,
     T: Encode<E::Mode>,

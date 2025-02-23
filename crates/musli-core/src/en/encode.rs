@@ -30,7 +30,7 @@ use crate::en::Encoder;
 ///     type Encode = Self;
 ///
 ///     #[inline]
-///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+///     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
 ///     where
 ///         E: Encoder<Mode = M>,
 ///     {
@@ -62,9 +62,15 @@ pub trait Encode<M> {
     type Encode: ?Sized + Encode<M>;
 
     /// Encode the given output.
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>;
+
+    /// The number of fields in the type.
+    #[inline]
+    fn size_hint(&self) -> Option<usize> {
+        None
+    }
 
     /// Coerce into the underlying value being encoded.
     fn as_encode(&self) -> &Self::Encode;
@@ -79,11 +85,16 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
         (**self).encode(encoder)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> Option<usize> {
+        (**self).size_hint()
     }
 
     #[inline]
@@ -101,11 +112,16 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
         (**self).encode(encoder)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> Option<usize> {
+        (**self).size_hint()
     }
 
     #[inline]
