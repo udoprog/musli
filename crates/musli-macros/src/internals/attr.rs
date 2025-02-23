@@ -492,7 +492,9 @@ fn parse_name_all(meta: &syn::meta::ParseNestedMeta<'_>) -> Result<NameAll, syn:
 
         return Err(syn::Error::new_spanned(
             string,
-            format_args!("#[{ATTR}(name_all = {s:?})]: Bad value, expected one of {options}"),
+            format_args!(
+                "The #[{ATTR}(name_all = {s:?})] has a bad value, expected one of {options}"
+            ),
         ));
     };
 

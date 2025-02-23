@@ -45,13 +45,13 @@ impl Ctxt {
         if fields.is_empty() {
             self.error_span(
                 span,
-                format_args!("#[{ATTR}(transparent)] types must have a single unskipped field"),
+                format_args!("A #[{ATTR}(transparent)] type must have a single unskipped field"),
             );
         } else {
             self.error_span(
                 span,
                 format_args!(
-                    "#[{ATTR}(transparent)] can only be used on types which have a single field",
+                    "A #[{ATTR}(transparent)] attribute can only be used on types which have a single field",
                 ),
             );
         }

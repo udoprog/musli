@@ -34,5 +34,49 @@ enum Enum1 {
     TransparentEmptyTuple,
 }
 
+#[derive(Encode, Decode)]
+#[musli(transparent)]
+struct DenyNamedTransparentStruct {
+    #[musli(name = "test")]
+    field: String,
+}
+
+#[derive(Encode, Decode)]
+#[musli(tag = "type")]
+enum DenyNamedTransparentEnum {
+    #[musli(transparent)]
+    Variant(#[musli(name = "test")] String),
+}
+
+#[derive(Encode, Decode)]
+#[musli(packed)]
+struct DenyNamedPackedStruct {
+    #[musli(name = "test")]
+    field: String,
+}
+
+#[derive(Encode, Decode)]
+#[musli(tag = "type")]
+enum DenyNamedPackedEnum {
+    #[musli(packed)]
+    Variant(#[musli(name = "test")] String),
+}
+
+#[derive(Encode, Decode)]
+#[musli(transparent)]
+struct DenyOptionalTransparentStruct {
+    #[musli(skip_encoding_if = String::is_empty)]
+    field: String,
+}
+
+#[derive(Encode, Decode)]
+enum DenyOptionalTransparentEnum {
+    #[musli(transparent)]
+    Variant {
+        #[musli(skip_encoding_if = String::is_empty)]
+        field: String,
+    }
+}
+
 fn main() {
 }

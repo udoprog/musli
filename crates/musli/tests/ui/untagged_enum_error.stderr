@@ -1,4 +1,4 @@
-error: #[musli(packed)] cannot be used to decode enums
+error: An enum cannot be #[musli(packed)]
  --> tests/ui/untagged_enum_error.rs:4:9
   |
 4 | #[musli(packed)]
