@@ -25,7 +25,6 @@ mod internals;
 mod types;
 
 use proc_macro::TokenStream;
-use proc_macro2::Span;
 
 const CRATE_DEFAULT: &str = "musli";
 
@@ -72,7 +71,6 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
         &attr,
         "decoder",
         types::DECODER_TYPES,
-        None,
         "__UseMusliDecoderAttributeMacro",
         types::Kind::SelfCx,
     ) {
@@ -92,7 +90,6 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
         &attr,
         "encoder",
         types::ENCODER_TYPES,
-        Some(syn::Ident::new("Ok", Span::call_site())),
         "__UseMusliEncoderAttributeMacro",
         types::Kind::SelfCx,
     ) {
@@ -112,7 +109,6 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
         &attr,
         "visitor",
         types::VISITOR_TYPES,
-        Some(syn::Ident::new("Ok", Span::call_site())),
         "__UseMusliVisitorAttributeMacro",
         types::Kind::GenericCx,
     ) {
@@ -132,7 +128,6 @@ pub fn unsized_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
         &attr,
         "unsized visitor",
         types::UNSIZED_VISITOR_TYPES,
-        Some(syn::Ident::new("Ok", Span::call_site())),
         "__UseMusliUnsizedVisitorAttributeMacro",
         types::Kind::GenericCx,
     ) {

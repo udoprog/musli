@@ -224,7 +224,7 @@ impl<M> Encode<M> for Number {
 
     const IS_BITWISE_ENCODE: bool = false;
 
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -517,7 +517,7 @@ where
 
     const IS_BITWISE_ENCODE: bool = false;
 
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {

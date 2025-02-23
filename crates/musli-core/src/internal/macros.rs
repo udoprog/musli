@@ -19,7 +19,7 @@ macro_rules! __slice_sequence {
             type Encode = Self;
 
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: $crate::en::Encoder<Mode = M>,
             {
@@ -124,7 +124,7 @@ macro_rules! __slice_sequence {
             $($alloc: $crate::alloc::Allocator,)*
         {
             #[inline]
-            fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode_packed<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: $crate::en::Encoder<Mode = M>,
             {

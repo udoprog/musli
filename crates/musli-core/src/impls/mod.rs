@@ -37,7 +37,7 @@ impl<M> Encode<M> for () {
     const IS_BITWISE_ENCODE: bool = true;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
@@ -73,7 +73,7 @@ impl<T, M> Encode<M> for marker::PhantomData<T> {
     const IS_BITWISE_ENCODE: bool = true;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
@@ -138,7 +138,7 @@ macro_rules! non_zero {
             type Encode = Self;
 
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder,
             {
@@ -219,7 +219,7 @@ where
     type Encode = [T; N];
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -275,7 +275,7 @@ where
     T: Encode<M>,
 {
     #[inline]
-    fn encode_packed<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_packed<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -320,7 +320,7 @@ macro_rules! impl_number {
             const IS_BITWISE_ENCODE: bool = true;
 
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder,
             {
@@ -360,7 +360,7 @@ impl<M> Encode<M> for bool {
     const IS_BITWISE_ENCODE: bool = true;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
@@ -398,7 +398,7 @@ impl<M> Encode<M> for char {
     const IS_BITWISE_ENCODE: bool = true;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
@@ -446,7 +446,7 @@ impl_number!(f64, decode_f64, encode_f64);
 impl<M> Encode<M> for str {
     const IS_BITWISE_ENCODE: bool = false;
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
@@ -569,7 +569,7 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -658,7 +658,7 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -712,7 +712,7 @@ where
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -764,7 +764,7 @@ where
     type Encode = Self;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -799,7 +799,7 @@ impl<M> Encode<M> for CStr {
     const IS_BITWISE_ENCODE: bool = false;
 
     #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder,
     {
@@ -851,7 +851,7 @@ impl<M> EncodeBytes<M> for [u8] {
     type EncodeBytes = [u8];
 
     #[inline]
-    fn encode_bytes<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -870,7 +870,7 @@ impl<const N: usize, M> EncodeBytes<M> for [u8; N] {
     type EncodeBytes = [u8; N];
 
     #[inline]
-    fn encode_bytes<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {

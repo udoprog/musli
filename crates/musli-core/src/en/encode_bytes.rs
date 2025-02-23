@@ -33,7 +33,7 @@ use crate::en::Encoder;
 ///     type Encode = Self;
 ///
 ///     #[inline]
-///     fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+///     fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
 ///     where
 ///         E: Encoder,
 ///     {
@@ -62,7 +62,7 @@ pub trait EncodeBytes<M> {
     type EncodeBytes: ?Sized + EncodeBytes<M>;
 
     /// Encode the given output as bytes.
-    fn encode_bytes<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>;
 
@@ -79,7 +79,7 @@ where
     type EncodeBytes = T;
 
     #[inline]
-    fn encode_bytes<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {
@@ -101,7 +101,7 @@ where
     type EncodeBytes = T;
 
     #[inline]
-    fn encode_bytes<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+    fn encode_bytes<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>,
     {

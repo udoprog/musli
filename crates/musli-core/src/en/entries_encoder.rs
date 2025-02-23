@@ -12,28 +12,16 @@ use super::{Encode, Encoder};
 pub trait EntriesEncoder {
     /// Context associated with the encoder.
     type Cx: Context<Error = Self::Error>;
-    /// Result type of the encoder.
-    type Ok;
     /// Error associated with encoding.
     type Error;
     /// The mode of the encoder.
     type Mode: 'static;
     /// The encoder returned when advancing the map encoder to encode the key.
-    type EncodeEntryKey<'this>: Encoder<
-        Cx = Self::Cx,
-        Ok = Self::Ok,
-        Error = Self::Error,
-        Mode = Self::Mode,
-    >
+    type EncodeEntryKey<'this>: Encoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>
     where
         Self: 'this;
     /// The encoder returned when advancing the map encoder to encode the value.
-    type EncodeEntryValue<'this>: Encoder<
-        Cx = Self::Cx,
-        Ok = Self::Ok,
-        Error = Self::Error,
-        Mode = Self::Mode,
-    >
+    type EncodeEntryValue<'this>: Encoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>
     where
         Self: 'this;
 
@@ -49,7 +37,7 @@ pub trait EntriesEncoder {
     fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, Self::Error>;
 
     /// Complete encoding map entries.
-    fn finish_entries(self) -> Result<Self::Ok, Self::Error>;
+    fn finish_entries(self) -> Result<(), Self::Error>;
 
     /// Insert the pair immediately.
     #[inline]

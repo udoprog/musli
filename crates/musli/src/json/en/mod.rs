@@ -48,7 +48,6 @@ where
 {
     type Cx = C;
     type Error = C::Error;
-    type Ok = ();
     type Mode = M;
     type EncodePack = JsonArrayEncoder<W, C, M>;
     type EncodeSome = Self;
@@ -70,7 +69,7 @@ where
     }
 
     #[inline]
-    fn encode<T>(self, value: T) -> Result<Self::Ok, Self::Error>
+    fn encode<T>(self, value: T) -> Result<(), Self::Error>
     where
         T: Encode<Self::Mode>,
     {
@@ -78,18 +77,18 @@ where
     }
 
     #[inline]
-    fn encode_empty(mut self) -> Result<Self::Ok, Self::Error> {
+    fn encode_empty(mut self) -> Result<(), Self::Error> {
         self.writer.write_bytes(self.cx, b"null")
     }
 
     #[inline]
-    fn encode_bool(mut self, value: bool) -> Result<Self::Ok, Self::Error> {
+    fn encode_bool(mut self, value: bool) -> Result<(), Self::Error> {
         self.writer
             .write_bytes(self.cx, if value { b"true" } else { b"false" })
     }
 
     #[inline]
-    fn encode_char(mut self, value: char) -> Result<Self::Ok, Self::Error> {
+    fn encode_char(mut self, value: char) -> Result<(), Self::Error> {
         encode_string(
             self.cx,
             self.writer.borrow_mut(),
@@ -98,110 +97,110 @@ where
     }
 
     #[inline]
-    fn encode_u8(mut self, value: u8) -> Result<Self::Ok, Self::Error> {
+    fn encode_u8(mut self, value: u8) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u16(mut self, value: u16) -> Result<Self::Ok, Self::Error> {
+    fn encode_u16(mut self, value: u16) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u32(mut self, value: u32) -> Result<Self::Ok, Self::Error> {
+    fn encode_u32(mut self, value: u32) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u64(mut self, value: u64) -> Result<Self::Ok, Self::Error> {
+    fn encode_u64(mut self, value: u64) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_u128(mut self, value: u128) -> Result<Self::Ok, Self::Error> {
+    fn encode_u128(mut self, value: u128) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i8(mut self, value: i8) -> Result<Self::Ok, Self::Error> {
+    fn encode_i8(mut self, value: i8) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i16(mut self, value: i16) -> Result<Self::Ok, Self::Error> {
+    fn encode_i16(mut self, value: i16) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i32(mut self, value: i32) -> Result<Self::Ok, Self::Error> {
+    fn encode_i32(mut self, value: i32) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i64(mut self, value: i64) -> Result<Self::Ok, Self::Error> {
+    fn encode_i64(mut self, value: i64) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_i128(mut self, value: i128) -> Result<Self::Ok, Self::Error> {
+    fn encode_i128(mut self, value: i128) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_usize(mut self, value: usize) -> Result<Self::Ok, Self::Error> {
+    fn encode_usize(mut self, value: usize) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_isize(mut self, value: isize) -> Result<Self::Ok, Self::Error> {
+    fn encode_isize(mut self, value: isize) -> Result<(), Self::Error> {
         let mut buffer = itoa::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_f32(mut self, value: f32) -> Result<Self::Ok, Self::Error> {
+    fn encode_f32(mut self, value: f32) -> Result<(), Self::Error> {
         let mut buffer = ryu::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_f64(mut self, value: f64) -> Result<Self::Ok, Self::Error> {
+    fn encode_f64(mut self, value: f64) -> Result<(), Self::Error> {
         let mut buffer = ryu::Buffer::new();
         self.writer
             .write_bytes(self.cx, buffer.format(value).as_bytes())
     }
 
     #[inline]
-    fn encode_array<const N: usize>(self, bytes: &[u8; N]) -> Result<Self::Ok, Self::Error> {
+    fn encode_array<const N: usize>(self, bytes: &[u8; N]) -> Result<(), Self::Error> {
         self.encode_bytes(bytes)
     }
 
     #[inline]
-    fn encode_bytes(mut self, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
+    fn encode_bytes(mut self, bytes: &[u8]) -> Result<(), Self::Error> {
         let mut buf = itoa::Buffer::new();
         let mut it = bytes.iter();
         let last = it.next_back();
@@ -224,7 +223,7 @@ where
     }
 
     #[inline]
-    fn encode_bytes_vectored<I>(self, _: usize, vectors: I) -> Result<Self::Ok, Self::Error>
+    fn encode_bytes_vectored<I>(self, _: usize, vectors: I) -> Result<(), Self::Error>
     where
         I: IntoIterator<Item: AsRef<[u8]>>,
     {
@@ -240,7 +239,7 @@ where
     }
 
     #[inline]
-    fn encode_string(mut self, string: &str) -> Result<Self::Ok, Self::Error> {
+    fn encode_string(mut self, string: &str) -> Result<(), Self::Error> {
         encode_string(self.cx, self.writer.borrow_mut(), string.as_bytes())
     }
 
@@ -250,7 +249,7 @@ where
     }
 
     #[inline]
-    fn encode_none(self) -> Result<Self::Ok, Self::Error> {
+    fn encode_none(self) -> Result<(), Self::Error> {
         self.encode_empty()
     }
 

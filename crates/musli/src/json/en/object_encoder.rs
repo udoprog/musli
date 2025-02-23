@@ -46,7 +46,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeEntry<'this>
@@ -71,7 +70,7 @@ where
     }
 
     #[inline]
-    fn finish_map(mut self) -> Result<Self::Ok, Self::Error> {
+    fn finish_map(mut self) -> Result<(), Self::Error> {
         self.writer.write_bytes(self.cx, self.end)
     }
 }
@@ -83,7 +82,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeEntryKey<'this>
@@ -117,7 +115,7 @@ where
     }
 
     #[inline]
-    fn finish_entries(mut self) -> Result<Self::Ok, Self::Error> {
+    fn finish_entries(mut self) -> Result<(), Self::Error> {
         self.writer.write_byte(self.cx, b'}')
     }
 }

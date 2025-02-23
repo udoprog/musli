@@ -6,19 +6,12 @@ use super::{utils, Encode, Encoder};
 pub trait SequenceEncoder {
     /// Context associated with the encoder.
     type Cx: Context<Error = Self::Error>;
-    /// Result type of the encoder.
-    type Ok;
     /// Error associated with encoding.
     type Error;
     /// The mode of the encoder.
     type Mode: 'static;
     /// The encoder returned when advancing the sequence encoder.
-    type EncodeNext<'this>: Encoder<
-        Cx = Self::Cx,
-        Ok = Self::Ok,
-        Error = Self::Error,
-        Mode = Self::Mode,
-    >
+    type EncodeNext<'this>: Encoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>
     where
         Self: 'this;
 
@@ -67,5 +60,5 @@ pub trait SequenceEncoder {
     }
 
     /// Finish encoding the sequence.
-    fn finish_sequence(self) -> Result<Self::Ok, Self::Error>;
+    fn finish_sequence(self) -> Result<(), Self::Error>;
 }

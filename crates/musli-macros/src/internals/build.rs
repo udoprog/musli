@@ -488,39 +488,26 @@ fn setup_field<'a>(
         }),
     };
 
-    let self_access = if let Some(patterns) = patterns {
+    let self_access;
+
+    if let Some(patterns) = patterns {
         match data.ident {
             Some(ident) => {
                 let colon_token;
-                let pat;
+                let pat: syn::Pat;
 
-                let expr = if skip.is_none() {
+                if skip.is_none() {
                     colon_token = None;
-
-                    pat = syn::Pat::Path(syn::PatPath {
-                        attrs: Vec::new(),
-                        qself: None,
-                        path: syn::Path::from(ident.clone()),
-                    });
-
-                    syn::Expr::Path(syn::ExprPath {
-                        attrs: Vec::new(),
-                        qself: None,
-                        path: ident.clone().into(),
-                    })
+                    pat = syn::parse_quote!(ref #ident);
+                    self_access = syn::parse_quote!(#ident);
                 } else {
                     colon_token = Some(<Token![:]>::default());
-
-                    pat = syn::Pat::Wild(syn::PatWild {
-                        attrs: Vec::new(),
-                        underscore_token: <Token![_]>::default(),
-                    });
-
-                    syn::Expr::Path(syn::ExprPath {
+                    pat = syn::parse_quote!(_);
+                    self_access = syn::Expr::Path(syn::ExprPath {
                         attrs: Vec::new(),
                         qself: None,
-                        path: syn::Path::from(quote::format_ident!("skipped_{}", ident)),
-                    })
+                        path: syn::Path::from(quote::format_ident!("skipped_{ident}")),
+                    });
                 };
 
                 patterns.push(syn::FieldPat {
@@ -529,34 +516,21 @@ fn setup_field<'a>(
                     colon_token,
                     pat: Box::new(pat),
                 });
-
-                expr
             }
             None => {
                 let pat;
-                let expr;
 
                 if skip.is_none() {
                     let var = quote::format_ident!("v{}", data.index);
-
-                    pat = syn::Pat::Path(syn::PatPath {
-                        attrs: Vec::new(),
-                        qself: None,
-                        path: syn::Path::from(var.clone()),
-                    });
-
-                    expr = syn::Expr::Path(syn::ExprPath {
+                    pat = syn::parse_quote!(ref #var);
+                    self_access = syn::Expr::Path(syn::ExprPath {
                         attrs: Vec::new(),
                         qself: None,
                         path: var.into(),
                     });
                 } else {
-                    pat = syn::Pat::Wild(syn::PatWild {
-                        attrs: Vec::new(),
-                        underscore_token: <Token![_]>::default(),
-                    });
-
-                    expr = syn::Expr::Path(syn::ExprPath {
+                    pat = syn::parse_quote!(_);
+                    self_access = syn::Expr::Path(syn::ExprPath {
                         attrs: Vec::new(),
                         qself: None,
                         path: syn::Path::from(quote::format_ident!("skipped_{}", data.index)),
@@ -569,28 +543,10 @@ fn setup_field<'a>(
                     colon_token: Some(<Token![:]>::default()),
                     pat: Box::new(pat),
                 });
-
-                expr
             }
         }
     } else {
-        let expr = syn::Expr::Field(syn::ExprField {
-            attrs: Vec::new(),
-            base: Box::new(syn::Expr::Path(syn::ExprPath {
-                attrs: Vec::new(),
-                qself: None,
-                path: <Token![self]>::default().into(),
-            })),
-            dot_token: <Token![.]>::default(),
-            member: member.clone(),
-        });
-
-        syn::Expr::Reference(syn::ExprReference {
-            attrs: Vec::new(),
-            and_token: <Token![&]>::default(),
-            mutability: None,
-            expr: Box::new(expr),
-        })
+        self_access = syn::parse_quote!(&self.#member);
     };
 
     let var = match &member {

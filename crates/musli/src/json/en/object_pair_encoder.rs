@@ -32,7 +32,6 @@ where
     M: 'static,
 {
     type Cx = C;
-    type Ok = ();
     type Error = C::Error;
     type Mode = M;
     type EncodeKey<'this>
@@ -65,7 +64,7 @@ where
     }
 
     #[inline]
-    fn finish_entry(self) -> Result<Self::Ok, Self::Error> {
+    fn finish_entry(self) -> Result<(), Self::Error> {
         Ok(())
     }
 }

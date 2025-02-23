@@ -86,21 +86,20 @@ pub use musli_core::__macros::Encode;
 ///     C: Context,
 ///     M: 'static,
 /// {
-///     type Ok = ();
-///
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
 ///     }
 ///
 ///     #[inline]
-///     fn encode<T>(self, value: T) -> Result<Self::Ok, C::Error>
+///     fn encode<T>(self, value: T) -> Result<(), C::Error>
 ///     where
 ///         T: Encode<Self::Mode>,
 ///     {
 ///         value.encode(self)
 ///     }
 ///
+///     #[inline]
 ///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
 ///         *self.value = Some(value);
 ///         Ok(())

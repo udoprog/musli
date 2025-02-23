@@ -14,7 +14,7 @@ macro_rules! implement {
 
             #[inline]
             #[allow(unused)]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder<Mode = M>,
             {
@@ -62,7 +62,7 @@ macro_rules! implement_new {
             const IS_BITWISE_ENCODE: bool = false;
 
             #[inline]
-            fn encode<E>(&self, encoder: E) -> Result<E::Ok, E::Error>
+            fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
             where
                 E: Encoder<Mode = M>,
             {
