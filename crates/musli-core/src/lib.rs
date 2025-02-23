@@ -110,6 +110,37 @@ pub mod __priv {
         }
     }
 
+    /// Construct a map hint from an `Encode` implementation.
+    pub fn map_hint<M>(encode: &(impl Encode<M> + ?Sized)) -> impl MapHint + '_
+    where
+        M: 'static,
+    {
+        use core::marker::PhantomData;
+
+        struct EncodeMapHint<'a, T, M>
+        where
+            T: ?Sized,
+        {
+            encode: &'a T,
+            _marker: PhantomData<M>,
+        }
+
+        impl<T, M> MapHint for EncodeMapHint<'_, T, M>
+        where
+            T: ?Sized + Encode<M>,
+        {
+            #[inline]
+            fn get(self) -> Option<usize> {
+                self.encode.size_hint()
+            }
+        }
+
+        EncodeMapHint {
+            encode,
+            _marker: PhantomData,
+        }
+    }
+
     /// Helper methods to report errors.
     pub mod m {
         use core::fmt;

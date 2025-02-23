@@ -12,6 +12,7 @@ enum SizeHintKind {
 /// A length hint.
 #[derive(Default, Debug, Clone, Copy)]
 #[non_exhaustive]
+#[doc(hidden)]
 pub struct SizeHint {
     kind: SizeHintKind,
 }

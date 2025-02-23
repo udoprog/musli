@@ -103,6 +103,23 @@ impl<'a> Mode<'a> {
         }
     }
 
+    /// Construct a typed encode call.
+    pub(crate) fn encode_t_size_hint(&self, encoding: FieldEncoding) -> Option<ImportedMethod<'a>> {
+        let (encode_t, name) = match encoding {
+            FieldEncoding::Default => (self.encode_t, "size_hint"),
+            _ => return None,
+        };
+
+        Some(ImportedMethod {
+            trait_t: Trait {
+                import: encode_t,
+                mode: self.mode_path,
+                allocator_ident: None,
+            },
+            method: name,
+        })
+    }
+
     /// Get the fully expanded trait.
     pub(crate) fn as_trait_t(&self, allocator_ident: &syn::Ident) -> Trait<'a> {
         match self.only {

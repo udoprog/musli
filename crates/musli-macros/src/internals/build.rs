@@ -149,6 +149,7 @@ pub(crate) struct Field<'a> {
     pub(crate) index: usize,
     pub(crate) encode_path: (Span, DefaultOrCustom<'a>),
     pub(crate) decode_path: (Span, DefaultOrCustom<'a>),
+    pub(crate) size_hint_path: Option<(Span, DefaultOrCustom<'a>)>,
     pub(crate) name: syn::Expr,
     pub(crate) pattern: Option<&'a syn::Pat>,
     /// Skip field entirely and always initialize with the specified expresion,
@@ -469,6 +470,7 @@ fn setup_field<'a>(
     let decode_path = data
         .attr
         .decode_path_expanded(mode, data.span, allocator_ident);
+    let size_hint_path = data.attr.size_hint_path_expanded(mode, data.span);
 
     let name = expander::expand_name(data, mode, name_all, data.ident);
     let pattern = data.attr.pattern(mode).map(|(_, p)| p);
@@ -561,6 +563,7 @@ fn setup_field<'a>(
         index: data.index,
         encode_path,
         decode_path,
+        size_hint_path,
         name,
         pattern,
         skip,

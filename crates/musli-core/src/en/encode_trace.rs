@@ -13,4 +13,10 @@ pub trait EncodeTrace<M> {
     fn trace_encode<E>(&self, encoder: E) -> Result<(), E::Error>
     where
         E: Encoder<Mode = M>;
+
+    /// The number of fields in the type.
+    #[inline]
+    fn size_hint(&self) -> Option<usize> {
+        None
+    }
 }

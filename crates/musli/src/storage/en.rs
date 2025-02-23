@@ -90,8 +90,7 @@ where
 
     #[inline]
     fn encode_empty(self) -> Result<(), Self::Error> {
-        static HINT: SequenceHint = SequenceHint::with_size(0);
-        self.encode_sequence_fn(&HINT, |_| Ok(()))
+        self.encode_sequence_fn(0, |_| Ok(()))
     }
 
     #[inline]
@@ -268,20 +267,29 @@ where
     }
 
     #[inline]
-    fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, Self::Error> {
-        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+    fn encode_sequence(
+        mut self,
+        hint: impl SequenceHint,
+    ) -> Result<Self::EncodeSequence, Self::Error> {
+        let size = hint.require(self.cx)?;
+        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, Self::Error> {
-        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+    fn encode_map(mut self, hint: impl MapHint) -> Result<Self::EncodeMap, Self::Error> {
+        let size = hint.require(self.cx)?;
+        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_map_entries(mut self, hint: &MapHint) -> Result<Self::EncodeMapEntries, Self::Error> {
-        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+    fn encode_map_entries(
+        mut self,
+        hint: impl MapHint,
+    ) -> Result<Self::EncodeMapEntries, Self::Error> {
+        let size = hint.require(self.cx)?;
+        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), size)?;
         Ok(self)
     }
 
@@ -294,13 +302,14 @@ where
     fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
-        hint: &SequenceHint,
+        hint: impl SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,
     {
+        let size = hint.require(self.cx)?;
         StorageEncoder::<OPT, PACK, _, _, M>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), size)?;
         Ok(self)
     }
 
@@ -308,13 +317,14 @@ where
     fn encode_map_variant<T>(
         mut self,
         tag: &T,
-        hint: &MapHint,
+        hint: impl MapHint,
     ) -> Result<Self::EncodeMapVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,
     {
+        let size = hint.require(self.cx)?;
         StorageEncoder::<OPT, PACK, _, _, M>::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
-        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), hint.size)?;
+        crate::int::encode_usize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), size)?;
         Ok(self)
     }
 }

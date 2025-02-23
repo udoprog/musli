@@ -1,4 +1,3 @@
-use crate::hint::SequenceHint;
 use crate::Context;
 
 use super::{Encode, Encoder, SequenceEncoder};
@@ -12,8 +11,7 @@ where
 {
     let cx = encoder.cx();
     let slice = slice.as_ref();
-    let hint = SequenceHint::with_size(slice.len());
-    let mut seq = encoder.encode_sequence(&hint)?;
+    let mut seq = encoder.encode_sequence(slice.len())?;
 
     for (index, item) in slice.iter().enumerate() {
         cx.enter_sequence_index(index);
@@ -37,8 +35,7 @@ where
 {
     let cx = encoder.cx();
 
-    let hint = SequenceHint::with_size(len);
-    let mut seq = encoder.encode_sequence(&hint)?;
+    let mut seq = encoder.encode_sequence(len)?;
 
     let mut index = 0;
 

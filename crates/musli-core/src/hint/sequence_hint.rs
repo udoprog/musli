@@ -1,32 +1,46 @@
 use crate::de::SizeHint;
+use crate::Context;
 
-/// A hint passed in when encoding a sequence.
-#[non_exhaustive]
-pub struct SequenceHint {
-    /// The size for the sequence being encoded.
-    pub size: usize,
-}
+/// A size hint passed in when encoding or decoding a sequence.
+pub trait SequenceHint: Sized {
+    /// Get the sequence hint.
+    fn get(self) -> Option<usize>;
 
-impl SequenceHint {
-    /// Create a new sequence hint with the specified size.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli::hint::SequenceHint;
-    ///
-    /// static HINT: SequenceHint = SequenceHint::with_size(16);
-    ///
-    /// assert_eq!(HINT.size, 16);
-    /// ```
+    /// Require the size of the sequence.
     #[inline]
-    pub const fn with_size(size: usize) -> Self {
-        Self { size }
+    fn require<C>(self, cx: C) -> Result<usize, C::Error>
+    where
+        C: Context,
+    {
+        let Some(size) = self.get() else {
+            return Err(
+                cx.message("Format cannot handle sequence types with an unknown number of items")
+            );
+        };
+
+        Ok(size)
     }
 
-    /// Return the size hint that corresponds to this overall hint.
+    /// The size hint for the sequence hint.
     #[inline]
-    pub fn size_hint(&self) -> SizeHint {
-        SizeHint::exact(self.size)
+    fn size_hint(self) -> SizeHint {
+        match self.get() {
+            Some(size) => SizeHint::exact(size),
+            None => SizeHint::any(),
+        }
+    }
+}
+
+impl SequenceHint for usize {
+    #[inline]
+    fn get(self) -> Option<usize> {
+        Some(self)
+    }
+}
+
+impl SequenceHint for Option<usize> {
+    #[inline]
+    fn get(self) -> Option<usize> {
+        self
     }
 }

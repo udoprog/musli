@@ -28,7 +28,6 @@ use crate::en::{
     Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntryEncoder, MapEncoder,
     SequenceEncoder,
 };
-use crate::hint::{MapHint, SequenceHint};
 use crate::internal::size_hint;
 use crate::{Allocator, Context};
 
@@ -295,11 +294,9 @@ macro_rules! sequence {
             where
                 E: Encoder<Mode = M>,
             {
-                let hint = SequenceHint::with_size(self.len());
-
                 let $cx = encoder.cx();
 
-                encoder.encode_sequence_fn(&hint, |seq| {
+                encoder.encode_sequence_fn(self.len(), |seq| {
                     let mut index = 0;
 
                     for value in self {
@@ -496,9 +493,9 @@ macro_rules! map {
             where
                 E: Encoder<Mode = M>,
             {
-                let hint = MapHint::with_size(self.len());
+                let hint = self.len();
 
-                encoder.encode_map_fn(&hint, |map| {
+                encoder.encode_map_fn(hint, |map| {
                     for (k, v) in self {
                         map.insert_entry(k, v)?;
                     }
@@ -525,11 +522,11 @@ macro_rules! map {
             where
                 E: Encoder<Mode = M>,
             {
-                let hint = MapHint::with_size(self.len());
+                let hint = self.len();
 
                 let $cx = encoder.cx();
 
-                encoder.encode_map_fn(&hint, |map| {
+                encoder.encode_map_fn(hint, |map| {
                     for (k, v) in self {
                         $cx.enter_map_key(k);
                         map.encode_entry_fn(|entry| {

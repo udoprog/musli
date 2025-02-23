@@ -90,7 +90,7 @@ where
     }
 
     #[inline]
-    fn encode_map(self, _: &MapHint) -> Result<Self::EncodeMap, Self::Error> {
+    fn encode_map(self, _: impl MapHint) -> Result<Self::EncodeMap, Self::Error> {
         Ok(AsEncoderEncodeMap {
             encoder: self.encoder,
         })

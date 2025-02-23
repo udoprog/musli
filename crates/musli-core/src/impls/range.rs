@@ -1,7 +1,6 @@
 use core::ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive};
 
 use crate::en::SequenceEncoder;
-use crate::hint::SequenceHint;
 use crate::{Allocator, Decode, Decoder, Encode, Encoder};
 
 macro_rules! implement {
@@ -18,9 +17,7 @@ macro_rules! implement {
             where
                 E: Encoder<Mode = M>,
             {
-                static HINT: SequenceHint = SequenceHint::with_size($count);
-
-                encoder.encode_sequence_fn(&HINT, |tuple| {
+                encoder.encode_sequence_fn($count, |tuple| {
                     $(tuple.encode_next()?.encode(&self.$field)?;)*
                     Ok(())
                 })
@@ -66,9 +63,7 @@ macro_rules! implement_new {
             where
                 E: Encoder<Mode = M>,
             {
-                static HINT: SequenceHint = SequenceHint::with_size($count);
-
-                encoder.encode_sequence_fn(&HINT, |tuple| {
+                encoder.encode_sequence_fn($count, |tuple| {
                     $(tuple.encode_next()?.encode(self.$field())?;)*
                     Ok(())
                 })

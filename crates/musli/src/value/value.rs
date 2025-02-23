@@ -528,25 +528,17 @@ where
             Value::Number(n) => encoder.encode(n),
             Value::Bytes(bytes) => encoder.encode_bytes(bytes),
             Value::String(string) => encoder.encode_string(string),
-            Value::Sequence(values) => {
-                use crate::hint::SequenceHint;
+            Value::Sequence(values) => encoder.encode_sequence_fn(values.len(), |sequence| {
+                for value in values.iter() {
+                    sequence.encode_next()?.encode(value)?;
+                }
 
-                let hint = SequenceHint::with_size(values.len());
-
-                encoder.encode_sequence_fn(&hint, |sequence| {
-                    for value in values.iter() {
-                        sequence.encode_next()?.encode(value)?;
-                    }
-
-                    Ok(())
-                })
-            }
+                Ok(())
+            }),
             Value::Map(values) => {
-                use crate::hint::MapHint;
+                let hint = values.len();
 
-                let hint = MapHint::with_size(values.len());
-
-                encoder.encode_map_fn(&hint, |map| {
+                encoder.encode_map_fn(hint, |map| {
                     for (first, second) in values.iter() {
                         map.insert_entry(first, second)?;
                     }

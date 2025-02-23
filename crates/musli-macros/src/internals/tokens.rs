@@ -78,7 +78,7 @@ impl<'a> Tokens<'a> {
             map_decoder_t: Import(prefix, "MapDecoder"),
             map_encoder_t: Import(prefix, "MapEncoder"),
             map_entry_encoder_t: Import(prefix, "EntryEncoder"),
-            map_hint: Import(prefix, "MapHint"),
+            map_hint: Import(prefix, "map_hint"),
             messages: Import(prefix, "m"),
             needs_drop: Import(prefix, "needs_drop"),
             offset_of: Import(prefix, "offset_of"),

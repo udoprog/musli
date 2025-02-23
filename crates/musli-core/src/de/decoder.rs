@@ -1402,7 +1402,6 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use musli::{Allocator, Context, Decode, Decoder};
     /// use musli::de::SequenceDecoder;
-    /// use musli::hint::SequenceHint;
     /// # struct TupleStruct(String, u32);
     ///
     /// impl<'de, M, A> Decode<'de, M, A> for TupleStruct
@@ -1414,9 +1413,7 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         static HINT: SequenceHint = SequenceHint::with_size(2);
-    ///
-    ///         decoder.decode_sequence_hint(&HINT, |tuple| {
+    ///         decoder.decode_sequence_hint(2, |tuple| {
     ///             Ok(Self(tuple.next()?, tuple.next()?))
     ///         })
     ///     }
@@ -1440,7 +1437,6 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use musli::{Allocator, Context, Decode, Decoder};
     /// use musli::de::SequenceDecoder;
-    /// use musli::hint::SequenceHint;
     /// # struct TupleStruct(String, u32);
     ///
     /// impl<'de, M, A> Decode<'de, M, A> for TupleStruct
@@ -1452,16 +1448,14 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         static HINT: SequenceHint = SequenceHint::with_size(2);
-    ///
-    ///         decoder.decode_sequence_hint(&HINT, |tuple| {
+    ///         decoder.decode_sequence_hint(2, |tuple| {
     ///             Ok(Self(tuple.next()?, tuple.next()?))
     ///         })
     ///     }
     /// }
     /// ```
     #[inline]
-    fn decode_sequence_hint<F, O>(self, hint: &SequenceHint, f: F) -> Result<O, Self::Error>
+    fn decode_sequence_hint<F, O>(self, hint: impl SequenceHint, f: F) -> Result<O, Self::Error>
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
@@ -1536,7 +1530,6 @@ pub trait Decoder<'de>: Sized {
     /// ```
     /// use musli::{Allocator, Context, Decode, Decoder};
     /// use musli::de::{MapDecoder, EntryDecoder};
-    /// use musli::hint::MapHint;
     ///
     /// struct Struct {
     ///     string: String,
@@ -1552,11 +1545,11 @@ pub trait Decoder<'de>: Sized {
     ///     where
     ///         D: Decoder<'de>,
     ///     {
-    ///         static HINT: MapHint = MapHint::with_size(2);
+    ///         static HINT: usize = 2;
     ///
     ///         let cx = decoder.cx();
     ///
-    ///         decoder.decode_map_hint(&HINT, |st| {
+    ///         decoder.decode_map_hint(HINT, |st| {
     ///             let mut string = None;
     ///             let mut integer = None;
     ///
@@ -1586,7 +1579,7 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_map_hint<F, O>(self, _: &MapHint, f: F) -> Result<O, Self::Error>
+    fn decode_map_hint<F, O>(self, _: impl MapHint, f: F) -> Result<O, Self::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {

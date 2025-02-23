@@ -1,10 +1,12 @@
+use std::rc::Rc;
+
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::Token;
 
 use crate::internals::attr::{EnumTagging, Packing};
-use crate::internals::build::{Body, Build, BuildData, Enum, Variant};
+use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
 use crate::internals::{Result, Tokens};
 
 struct Ctxt<'a> {
@@ -41,7 +43,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_, '_>) -> Result<TokenStream> {
 
     let packed;
 
-    let body = match &e.data {
+    let (body, size_hint) = match &e.data {
         BuildData::Struct(st) => {
             packed = crate::internals::packed(&e, st);
             encode_map(&cx, &e, st)?
@@ -106,7 +108,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_, '_>) -> Result<TokenStream> {
 
                 #[inline]
                 fn size_hint(&self) -> #option<usize> {
-                    #option::None
+                    #size_hint
                 }
 
                 #[inline]
@@ -119,7 +121,11 @@ pub(crate) fn expand_insert_entry(e: Build<'_, '_>) -> Result<TokenStream> {
 }
 
 /// Encode a struct.
-fn encode_map(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
+fn encode_map(
+    cx: &Ctxt<'_>,
+    b: &Build<'_, '_>,
+    st: &Body<'_>,
+) -> Result<(TokenStream, TokenStream)> {
     let Ctxt {
         ctx_var,
         encoder_var,
@@ -129,6 +135,7 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenSt
     let Tokens {
         context_t,
         encoder_t,
+        option,
         result,
         ..
     } = b.tokens;
@@ -136,7 +143,8 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenSt
     let pack_var = b.cx.ident("pack");
     let output_var = b.cx.ident("output");
 
-    let (encoders, tests) = insert_fields(cx, b, st, &pack_var)?;
+    let encoders = make_encoders(cx, b, st, &pack_var);
+    let decls = make_field_tests(st);
 
     let type_name = &st.name;
 
@@ -148,6 +156,7 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenSt
         .then(|| quote!(#context_t::leave_struct(#ctx_var);));
 
     let encode;
+    let size_hint;
 
     match st.packing {
         Packing::Transparent => {
@@ -162,17 +171,22 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenSt
                 #leave
                 #output_var
             }};
+
+            size_hint = match &f.size_hint_path {
+                Some((_, path)) => quote!(#path(#access)),
+                None => quote!(#option::None),
+            };
         }
         Packing::Tagged => {
-            let decls = tests.iter().map(|t| &t.decl);
-            let (build_hint, hint) = length_test(st.unskipped_fields.len(), &tests).build(b);
+            let len = length_test(&st.unskipped_fields);
+            let (build_hint, hint) = len.build_hint(b);
 
             encode = quote! {{
                 #enter
                 #(#decls)*
                 #build_hint
 
-                let #output_var = #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
+                let #output_var = #encoder_t::encode_map_fn(#encoder_var, #hint, move |#encoder_var| {
                     #(#encoders)*
                     #result::Ok(())
                 })?;
@@ -180,10 +194,15 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenSt
                 #leave
                 #output_var
             }};
+
+            let len = &len.expressions;
+
+            size_hint = quote! {{
+                #(#decls)*
+                #option::Some(#len)
+            }};
         }
         Packing::Packed => {
-            let decls = tests.iter().map(|t| &t.decl);
-
             encode = quote! {{
                 #enter
                 let #output_var = #encoder_t::encode_pack_fn(#encoder_var, move |#pack_var| {
@@ -194,23 +213,21 @@ fn encode_map(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenSt
                 #leave
                 #output_var
             }};
+
+            size_hint = quote!(#option::None);
         }
     }
 
-    Ok(quote!(#result::Ok(#encode)))
+    let encode = quote!(#result::Ok(#encode));
+    Ok((encode, size_hint))
 }
 
-struct FieldTest<'st> {
-    decl: syn::Stmt,
-    var: &'st syn::Ident,
-}
-
-fn insert_fields<'st>(
+fn make_encoders(
     cx: &Ctxt<'_>,
     b: &Build<'_, '_>,
-    st: &'st Body<'_>,
+    st: &Body<'_>,
     pack_var: &syn::Ident,
-) -> Result<(Vec<TokenStream>, Vec<FieldTest<'st>>)> {
+) -> Vec<TokenStream> {
     let Ctxt {
         ctx_var,
         encoder_var,
@@ -237,7 +254,6 @@ fn insert_fields<'st>(
     let field_name_expr = st.name_type.expr(field_name_static.clone());
 
     let mut encoders = Vec::with_capacity(st.all_fields.len());
-    let mut tests = Vec::with_capacity(st.all_fields.len());
 
     for f in &st.unskipped_fields {
         let encode_path = &f.encode_path.1;
@@ -308,30 +324,45 @@ fn insert_fields<'st>(
             }
         };
 
-        if let Some((_, skip_encoding_if_path)) = f.skip_encoding_if.as_ref() {
+        if f.skip_encoding_if.is_some() {
             let var = &f.var;
-
-            let decl = syn::parse_quote! {
-                let #var = !#skip_encoding_if_path(#access);
-            };
 
             encode = quote! {
                 if #var {
                     #encode
                 }
             };
-
-            tests.push(FieldTest { decl, var })
         }
 
         encoders.push(encode);
     }
 
-    Ok((encoders, tests))
+    encoders
+}
+
+fn make_field_tests(st: &Body<'_>) -> Vec<TokenStream> {
+    let mut decls = Vec::with_capacity(st.unskipped_fields.len());
+
+    for f in &st.unskipped_fields {
+        if let Some((_, skip_encoding_if_path)) = f.skip_encoding_if.as_ref() {
+            let access = &f.self_access;
+            let var = &f.var;
+
+            decls.push(quote! {
+                let #var = !#skip_encoding_if_path(#access);
+            });
+        }
+    }
+
+    decls
 }
 
 /// Encode an internally tagged enum.
-fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum<'_>) -> Result<TokenStream> {
+fn encode_enum(
+    cx: &Ctxt<'_>,
+    b: &Build<'_, '_>,
+    en: &Enum<'_>,
+) -> Result<(TokenStream, TokenStream)> {
     let Ctxt { .. } = *cx;
 
     let Tokens { result, .. } = b.tokens;
@@ -341,23 +372,35 @@ fn encode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum<'_>) -> Result<TokenS
         return Err(());
     }
 
-    let mut variants = Vec::with_capacity(en.variants.len());
+    let mut encode_variants = Vec::with_capacity(en.variants.len());
+    let mut size_hint_variants = Vec::with_capacity(en.variants.len());
 
     for v in &en.variants {
-        let Ok((pattern, encode)) = encode_variant(cx, b, en, v) else {
+        let Ok((pattern, encode, size_hint)) = encode_variant(cx, b, en, v) else {
             continue;
         };
 
-        variants.push(quote!(#pattern => #encode));
+        encode_variants.push(quote!(#pattern => #encode));
+        size_hint_variants.push(quote!(#pattern => #size_hint));
     }
 
-    if variants.is_empty() {
-        return Ok(quote!(match *self {}));
+    let encode;
+    let size_hint;
+
+    if encode_variants.is_empty() {
+        encode = quote!(match *self {});
+        size_hint = quote!(match *self {});
+    } else {
+        encode = quote! {
+            #result::Ok(match *self { #(#encode_variants),* })
+        };
+
+        size_hint = quote! {
+            match *self { #(#size_hint_variants),* }
+        };
     }
 
-    Ok(quote! {
-        #result::Ok(match *self { #(#variants),* })
-    })
+    Ok((encode, size_hint))
 }
 
 /// Setup encoding for a single variant. that is externally tagged.
@@ -366,7 +409,7 @@ fn encode_variant(
     b: &Build<'_, '_>,
     en: &Enum<'_>,
     v: &Variant<'_>,
-) -> Result<(syn::PatStruct, TokenStream)> {
+) -> Result<(syn::PatStruct, TokenStream, TokenStream)> {
     let Ctxt {
         ctx_var,
         encoder_var,
@@ -375,11 +418,9 @@ fn encode_variant(
 
     let Tokens {
         context_t,
-        encode_t,
         encoder_t,
         map_encoder_t,
         map_entry_encoder_t,
-        map_hint,
         option,
         result,
         variant_encoder_t,
@@ -395,11 +436,8 @@ fn encode_variant(
     let tag_static = b.cx.ident("TAG");
     let variant_encoder = b.cx.ident("variant_encoder");
 
-    let (encoders, tests) = insert_fields(cx, b, &v.st, &pack_var)?;
-
-    let type_name = v.st.name;
-
     let mut encode;
+    let size_hint;
 
     match &en.enum_tagging {
         EnumTagging::Empty => {
@@ -411,6 +449,8 @@ fn encode_variant(
                 static #name_static: #name_type = #name;
                 #encode_t_encode(#name_expr, #encoder_var)?
             }};
+
+            size_hint = quote!(#option::Some(1));
         }
         EnumTagging::Default => {
             match v.st.packing {
@@ -418,11 +458,18 @@ fn encode_variant(
                     let f = &v.st.unskipped_fields[0];
 
                     let encode_path = &f.encode_path.1;
-                    let var = &f.self_access;
-                    encode = quote!(#encode_path(#var, #encoder_var)?);
+                    let access = &f.self_access;
+
+                    encode = quote!(#encode_path(#access, #encoder_var)?);
+
+                    size_hint = match &f.size_hint_path {
+                        Some((_, path)) => quote!(#path(#access)),
+                        None => quote!(#option::None),
+                    };
                 }
                 Packing::Packed => {
-                    let decls = tests.iter().map(|t| &t.decl);
+                    let encoders = make_encoders(cx, b, &v.st, &pack_var);
+                    let decls = make_field_tests(&v.st);
 
                     encode = quote! {{
                         #encoder_t::encode_pack_fn(#encoder_var, move |#pack_var| {
@@ -431,20 +478,31 @@ fn encode_variant(
                             #result::Ok(())
                         })?
                     }};
+
+                    size_hint = quote!(#option::None);
                 }
                 Packing::Tagged => {
-                    let decls = tests.iter().map(|t| &t.decl);
-                    let (build_hint, hint) =
-                        length_test(v.st.unskipped_fields.len(), &tests).build(b);
+                    let encoders = make_encoders(cx, b, &v.st, &pack_var);
+                    let decls = make_field_tests(&v.st);
+
+                    let len = length_test(&v.st.unskipped_fields);
+                    let (build_hint, hint) = len.build_hint(b);
 
                     encode = quote! {{
                         #build_hint
 
-                        #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
+                        #encoder_t::encode_map_fn(#encoder_var, #hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result::Ok(())
                         })?
+                    }};
+
+                    let len = &len.expressions;
+
+                    size_hint = quote! {{
+                        #(#decls)*
+                        #option::Some(#len)
                     }};
                 }
             }
@@ -472,74 +530,83 @@ fn encode_variant(
             tag_value,
             tag_type,
         } => {
-            let name = &v.name;
+            'done: {
+                let name = &v.name;
+                let name_type = en.name_type.ty();
 
-            let name_type = en.name_type.ty();
+                let mut len;
+                let inner_encode;
+                let decls;
 
-            let mut len;
+                match v.st.packing {
+                    Packing::Transparent => {
+                        let f = &v.st.unskipped_fields[0];
+                        let access = &f.self_access;
 
-            let tag_type = tag_type.ty();
-
-            let inner_encode;
-
-            match v.st.packing {
-                Packing::Transparent => {
-                    len = LengthTest::default();
-
-                    let f = &v.st.unskipped_fields[0];
-
-                    let mode = &b.mode.mode_path;
-                    let access = &f.self_access;
-                    let ty = f.ty;
-
-                    len.expressions.push(quote! {
-                        match <#ty as #encode_t<#mode>>::size_hint(#access) {
-                            #option::Some(v) => v,
-                            #option::None => {
+                        let Some((_, path)) = &f.size_hint_path else {
+                            encode = quote! {
                                 return #result::Err(#context_t::message(
                                     #ctx_var,
-                                    "Size hint not available for transparent field",
-                                ))
-                            }
-                        }
-                    });
+                                    "Cannot encode transparent field with custom encoding",
+                                ));
+                            };
 
-                    let access = &f.self_access;
-                    let encode_path = &f.encode_path.1;
+                            size_hint = quote!(#option::None);
+                            break 'done;
+                        };
 
-                    inner_encode = quote! {
-                        let #encoder_var = #map_encoder_t::as_encoder(#encoder_var);
-                        #encode_path(#access, #encoder_var)?;
-                    };
+                        decls = make_field_tests(&v.st);
+
+                        len = LengthTest::default();
+                        len.expressions.push(quote!(#path(#access)?));
+
+                        let access = &f.self_access;
+                        let encode_path = &f.encode_path.1;
+
+                        inner_encode = quote! {
+                            let #encoder_var = #map_encoder_t::as_encoder(#encoder_var);
+                            #encode_path(#access, #encoder_var)?;
+                        };
+                    }
+                    _ => {
+                        decls = make_field_tests(&v.st);
+                        len = length_test(&v.st.unskipped_fields);
+
+                        let encoders = make_encoders(cx, b, &v.st, &pack_var);
+
+                        inner_encode = quote! {
+                            #(#decls)*
+                            #(#encoders)*
+                        };
+                    }
                 }
-                _ => {
-                    len = length_test(v.st.unskipped_fields.len(), &tests);
 
-                    let decls = tests.iter().map(|t| &t.decl);
+                // Add one for the tag field.
+                len.expressions.push(quote!(1));
 
-                    inner_encode = quote! {
-                        #(#decls)*
-                        #(#encoders)*
-                    };
-                }
-            }
+                let (build_hint, hint) = len.build_hint(b);
 
-            // Add one for the tag field.
-            len.expressions.push(quote!(1));
+                let tag_type = tag_type.ty();
 
-            let (build_hint, hint) = len.build(b);
+                encode = quote! {{
+                    #build_hint
 
-            encode = quote! {{
-                #build_hint
+                    #encoder_t::encode_map_fn(#encoder_var, #hint, move |#encoder_var| {
+                        static #tag_static: #tag_type = #tag_value;
+                        static #name_static: #name_type = #name;
+                        #map_encoder_t::insert_entry(#encoder_var, #tag_static, #name_static)?;
+                        #inner_encode
+                        #result::Ok(())
+                    })?
+                }};
 
-                #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#encoder_var| {
-                    static #tag_static: #tag_type = #tag_value;
-                    static #name_static: #name_type = #name;
-                    #map_encoder_t::insert_entry(#encoder_var, #tag_static, #name_static)?;
-                    #inner_encode
-                    #result::Ok(())
-                })?
-            }};
+                let len = &len.expressions;
+
+                size_hint = quote! {{
+                    #(#decls)*
+                    #option::Some(#len)
+                }};
+            };
         }
         EnumTagging::Adjacent {
             tag_value,
@@ -547,15 +614,15 @@ fn encode_variant(
             content_value,
             content_type,
         } => {
+            let encoders = make_encoders(cx, b, &v.st, &pack_var);
+            let decls = make_field_tests(&v.st);
+
             let encode_t_encode = &b.encode_t_encode;
 
             let name = &v.name;
             let name_type = en.name_type.ty();
 
-            let decls = tests.iter().map(|t| &t.decl);
-
-            let (build_hint, inner_hint) =
-                length_test(v.st.unskipped_fields.len(), &tests).build(b);
+            let (build_hint, inner_hint) = length_test(&v.st.unskipped_fields).build_hint(b);
             let struct_encoder = b.cx.ident("struct_encoder");
             let content_struct = b.cx.ident("content_struct");
             let pair = b.cx.ident("pair");
@@ -566,10 +633,10 @@ fn encode_variant(
             let content_type = content_type.ty();
 
             encode = quote! {{
-                static #hint: #map_hint = #map_hint::with_size(2);
+                static #hint: usize = 2;
                 #build_hint
 
-                #encoder_t::encode_map_fn(#encoder_var, &#hint, move |#struct_encoder| {
+                #encoder_t::encode_map_fn(#encoder_var, #hint, move |#struct_encoder| {
                     static #tag_static: #tag_type = #tag_value;
                     static #content_static: #content_type = #content_value;
                     static #name_static: #name_type = #name;
@@ -582,7 +649,7 @@ fn encode_variant(
 
                         let #content_struct = #map_entry_encoder_t::encode_value(#pair)?;
 
-                        #encoder_t::encode_map_fn(#content_struct, &#inner_hint, move |#encoder_var| {
+                        #encoder_t::encode_map_fn(#content_struct, #inner_hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result::Ok(())
@@ -594,6 +661,8 @@ fn encode_variant(
                     #result::Ok(())
                 })?
             }};
+
+            size_hint = quote!(#option::Some(2));
         }
     }
 
@@ -612,6 +681,7 @@ fn encode_variant(
         let formatted_tag = en.name_type.name_format(&name_static);
         let name_type = en.name_type.ty();
         let name_value = &v.name;
+        let type_name = v.st.name;
 
         encode = quote! {{
             static #name_static: #name_type = #name_value;
@@ -622,7 +692,7 @@ fn encode_variant(
         }};
     }
 
-    Ok((pattern, encode))
+    Ok((pattern, encode, size_hint))
 }
 
 #[derive(Default)]
@@ -632,7 +702,7 @@ struct LengthTest {
 }
 
 impl LengthTest {
-    fn build(&self, b: &Build<'_, '_>) -> (syn::Stmt, syn::Ident) {
+    fn build_hint(&self, b: &Build<'_, '_>) -> (TokenStream, syn::Ident) {
         let Tokens { map_hint, .. } = b.tokens;
 
         let len = &self.expressions;
@@ -640,12 +710,19 @@ impl LengthTest {
         match self.kind {
             LengthTestKind::Static => {
                 let hint = b.cx.ident("HINT");
-                let item = syn::parse_quote!(static #hint: #map_hint = #map_hint::with_size(#len););
+                let item = quote! {
+                    static #hint: usize = #len;
+                };
+
                 (item, hint)
             }
             LengthTestKind::Dynamic => {
+                let mode = &b.mode.mode_path;
                 let hint = b.cx.ident("hint");
-                let item = syn::parse_quote!(let #hint: #map_hint = #map_hint::with_size(#len););
+                let item = quote! {
+                    let #hint = #map_hint::<#mode>(self);
+                };
+
                 (item, hint)
             }
         }
@@ -659,17 +736,23 @@ enum LengthTestKind {
     Dynamic,
 }
 
-fn length_test(count: usize, tests: &[FieldTest<'_>]) -> LengthTest {
+fn length_test(fields: &[Rc<Field<'_>>]) -> LengthTest {
     let mut kind = LengthTestKind::Static;
 
     let mut expressions = Punctuated::<_, Token![+]>::new();
-    let count = count.saturating_sub(tests.len());
-    expressions.push(quote!(#count));
+    let mut count = 0usize;
 
-    for FieldTest { var, .. } in tests {
-        kind = LengthTestKind::Dynamic;
-        expressions.push(quote!(if #var { 1 } else { 0 }))
+    for f in fields {
+        if f.skip_encoding_if.is_some() {
+            let var = &f.var;
+            kind = LengthTestKind::Dynamic;
+            expressions.push(quote!(if #var { 1 } else { 0 }))
+        } else {
+            count += 1;
+        }
     }
+
+    expressions.push(quote!(#count));
 
     LengthTest { kind, expressions }
 }

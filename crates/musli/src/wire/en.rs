@@ -275,19 +275,24 @@ where
     }
 
     #[inline]
-    fn encode_sequence(mut self, hint: &SequenceHint) -> Result<Self::EncodeSequence, Self::Error> {
-        self.encode_sequence_len(hint.size)?;
+    fn encode_sequence(
+        mut self,
+        hint: impl SequenceHint,
+    ) -> Result<Self::EncodeSequence, Self::Error> {
+        let size = hint.require(self.cx)?;
+        self.encode_sequence_len(size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_map(mut self, hint: &MapHint) -> Result<Self::EncodeMap, Self::Error> {
-        self.encode_map_len(hint.size)?;
+    fn encode_map(mut self, hint: impl MapHint) -> Result<Self::EncodeMap, Self::Error> {
+        let size = hint.require(self.cx)?;
+        self.encode_map_len(size)?;
         Ok(self)
     }
 
     #[inline]
-    fn encode_map_entries(self, hint: &MapHint) -> Result<Self::EncodeMapEntries, Self::Error> {
+    fn encode_map_entries(self, hint: impl MapHint) -> Result<Self::EncodeMapEntries, Self::Error> {
         self.encode_map(hint)
     }
 
@@ -302,7 +307,7 @@ where
     fn encode_sequence_variant<T>(
         mut self,
         tag: &T,
-        hint: &SequenceHint,
+        hint: impl SequenceHint,
     ) -> Result<Self::EncodeSequenceVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,
@@ -317,7 +322,7 @@ where
     fn encode_map_variant<T>(
         mut self,
         tag: &T,
-        hint: &MapHint,
+        hint: impl MapHint,
     ) -> Result<Self::EncodeSequenceVariant, Self::Error>
     where
         T: ?Sized + Encode<Self::Mode>,
