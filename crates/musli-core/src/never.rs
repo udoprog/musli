@@ -326,9 +326,8 @@ where
     }
 }
 
-impl<O, C, M> Encoder for Never<(O, C, M)>
+impl<C, O, M> Encoder for Never<(C, O, M)>
 where
-    O: 'static,
     C: Context,
     M: 'static,
 {
@@ -381,9 +380,8 @@ where
     }
 }
 
-impl<O, C, M> SequenceEncoder for Never<(O, C, M)>
+impl<C, O, M> SequenceEncoder for Never<(C, O, M)>
 where
-    O: 'static,
     C: Context,
     M: 'static,
 {
@@ -412,9 +410,8 @@ where
     }
 }
 
-impl<O, C, M> MapEncoder for Never<(O, C, M)>
+impl<C, O, M> MapEncoder for Never<(C, O, M)>
 where
-    O: 'static,
     C: Context,
     M: 'static,
 {
@@ -442,9 +439,8 @@ where
     }
 }
 
-impl<O, C, M> EntryEncoder for Never<(O, C, M)>
+impl<C, O, M> EntryEncoder for Never<(C, O, M)>
 where
-    O: 'static,
     C: Context,
     M: 'static,
 {
@@ -482,9 +478,8 @@ where
     }
 }
 
-impl<O, C, M> EntriesEncoder for Never<(O, C, M)>
+impl<C, O, M> EntriesEncoder for Never<(C, O, M)>
 where
-    O: 'static,
     C: Context,
     M: 'static,
 {
@@ -522,9 +517,8 @@ where
     }
 }
 
-impl<O, C, M> VariantEncoder for Never<(O, C, M)>
+impl<C, O, M> VariantEncoder for Never<(C, O, M)>
 where
-    O: 'static,
     C: Context,
     M: 'static,
 {

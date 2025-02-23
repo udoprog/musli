@@ -143,7 +143,7 @@ impl Types {
         attr: &Attr,
         what: &str,
         types: &[(&str, Extra)],
-        argument: Option<&str>,
+        argument: Option<syn::Ident>,
         hint: &str,
         kind: Kind,
     ) -> syn::Result<TokenStream> {
@@ -233,7 +233,7 @@ impl Types {
 
             impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: self.never_type(crate_path, argument, extra, kind)?,
+                path: self.never_type(crate_path, argument.as_ref(), extra, kind)?,
             });
 
             self.item_impl.items.push(syn::ImplItem::Type(impl_type));
@@ -282,7 +282,7 @@ impl Types {
                 _ => {
                     ty = syn::Type::Path(syn::TypePath {
                         qself: None,
-                        path: self.never_type(crate_path, argument, extra, kind)?,
+                        path: self.never_type(crate_path, argument.as_ref(), extra, kind)?,
                     });
                 }
             };
@@ -325,7 +325,7 @@ impl Types {
     fn never_type(
         &self,
         crate_path: &syn::Path,
-        argument: Option<&str>,
+        argument: Option<&syn::Ident>,
         extra: Extra,
         kind: Kind,
     ) -> syn::Result<syn::Path> {
@@ -341,25 +341,29 @@ impl Types {
 
             let mut args = Vec::<syn::GenericArgument>::new();
 
-            if let Some(arg) = argument {
-                args.push(syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
-                    qself: None,
-                    path: self_type(arg),
-                })));
-            }
-
             match extra {
-                Extra::Visitor(ty) => match ty {
-                    Ty::Str => {
-                        args.push(syn::parse_quote!(str));
+                Extra::Visitor(ty) => {
+                    if let Some(arg) = argument {
+                        args.push(syn::parse_quote!(Self::#arg));
                     }
-                    Ty::Bytes => {
-                        args.push(syn::parse_quote!([u8]));
+
+                    match ty {
+                        Ty::Str => {
+                            args.push(syn::parse_quote!(str));
+                        }
+                        Ty::Bytes => {
+                            args.push(syn::parse_quote!([u8]));
+                        }
                     }
-                },
+                }
                 Extra::None => match kind {
                     Kind::SelfCx => {
                         args.push(syn::parse_quote!(Self::Cx));
+
+                        if let Some(arg) = argument {
+                            args.push(syn::parse_quote!(Self::#arg));
+                        }
+
                         args.push(syn::parse_quote!(Self::Mode));
                     }
                     Kind::GenericCx => {}
@@ -379,35 +383,11 @@ impl Types {
 }
 
 fn ident_path(ident: syn::Ident) -> syn::Path {
-    let mut not_path = syn::Path {
+    let mut path = syn::Path {
         leading_colon: None,
         segments: Punctuated::default(),
     };
 
-    not_path.segments.push(syn::PathSegment::from(ident));
-
-    not_path
-}
-
-fn self_type(what: &str) -> syn::Path {
-    let mut self_error = syn::Path {
-        leading_colon: None,
-        segments: Punctuated::default(),
-    };
-
-    self_error
-        .segments
-        .push(syn::PathSegment::from(syn::Ident::new(
-            "Self",
-            Span::call_site(),
-        )));
-
-    self_error
-        .segments
-        .push(syn::PathSegment::from(syn::Ident::new(
-            what,
-            Span::call_site(),
-        )));
-
-    self_error
+    path.segments.push(syn::PathSegment::from(ident));
+    path
 }
