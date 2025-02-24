@@ -180,11 +180,6 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
         ..
     } = b.tokens;
 
-    if let Some(&(span, Packing::Packed)) = en.packing_span {
-        b.decode_packed_enum_diagnostics(span);
-        return Err(());
-    }
-
     let type_name = en.name;
 
     // Trying to decode an uninhabitable type.
@@ -1146,7 +1141,7 @@ fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result
 }
 
 /// Decode something packed.
-fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st_: &Body<'_>) -> Result<TokenStream> {
+fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         decoder_var,
         ctx_var,
@@ -1162,21 +1157,21 @@ fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st_: &Body<'_>) -> Result<Tok
         ..
     } = b.tokens;
 
-    let type_name = &st_.name;
+    let type_name = &st.name;
     let output_var = b.cx.ident("output");
     let field_decoder = b.cx.ident("field_decoder");
 
-    let mut last = None;
+    let mut last_default = None;
 
     let mut assign = Vec::new();
 
-    for f in &st_.unskipped_fields {
+    for f in &st.unskipped_fields {
         let mut is_default = false;
 
         if let Some((span, _)) = f.default_attr {
             is_default = true;
-            last = Some(span);
-        } else if let Some(span) = last {
+            last_default = Some(span);
+        } else if let Some(span) = last_default {
             b.packed_default_diagnostics(span);
         }
 
@@ -1232,7 +1227,7 @@ fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st_: &Body<'_>) -> Result<Tok
 
     let pack = b.cx.ident("pack");
     let assign = apply::iter(assign, &pack);
-    let path = &st_.path;
+    let path = &st.path;
 
     Ok(quote! {{
         #enter
