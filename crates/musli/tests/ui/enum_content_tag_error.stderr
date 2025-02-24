@@ -4,6 +4,12 @@ error: A #[musli(packed)] type cannot use #[musli(tag)] or #[musli(content)]
 4 | #[musli(packed, tag = "type")]
   |         ^^^^^^
 
+error: A #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
+ --> tests/ui/enum_content_tag_error.rs:4:9
+  |
+4 | #[musli(packed, tag = "type")]
+  |         ^^^^^^
+
 error: An enum cannot be #[musli(packed)] when decoding
  --> tests/ui/enum_content_tag_error.rs:4:9
   |

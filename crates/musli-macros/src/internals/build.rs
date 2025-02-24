@@ -122,6 +122,17 @@ impl BuildData<'_> {
 
                 for v in &en.variants {
                     v.st.validate(cx);
+
+                    if matches!(en.enum_tagging, EnumTagging::Internal { .. }) {
+                        if let (span, Packing::Packed) = v.st.packing {
+                            cx.error_span(
+                                span,
+                                format_args!(
+                                    "A #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
+                                ),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -134,19 +145,21 @@ pub(crate) struct Body<'a> {
     pub(crate) unskipped_fields: Vec<Rc<Field<'a>>>,
     pub(crate) all_fields: Vec<Rc<Field<'a>>>,
     pub(crate) name_type: NameType<'a>,
-    pub(crate) packing: Packing,
+    pub(crate) packing: (Span, Packing),
     pub(crate) kind: StructKind,
     pub(crate) path: syn::Path,
 }
 
 impl Body<'_> {
     pub(crate) fn validate(&self, cx: &Ctxt) {
-        if self.packing == Packing::Transparent && !matches!(&self.unskipped_fields[..], [_]) {
+        if matches!(self.packing, (_, Packing::Transparent))
+            && !matches!(&self.unskipped_fields[..], [_])
+        {
             cx.transparent_diagnostics(self.span, &self.unskipped_fields);
         }
 
         for f in &self.all_fields {
-            if matches!(self.packing, Packing::Transparent | Packing::Packed) {
+            if matches!(self.packing, (_, Packing::Transparent | Packing::Packed)) {
                 if let Some(span) = f.name_span {
                     cx.error_span(
                         span,
@@ -166,7 +179,7 @@ impl Body<'_> {
                 }
             }
 
-            if matches!(self.packing, Packing::Transparent) {
+            if matches!(self.packing, (_, Packing::Transparent)) {
                 if let Some((span, _)) = f.skip_encoding_if {
                     cx.error_span(
                         *span,
@@ -277,8 +290,8 @@ fn setup_struct<'a>(
     let packing = e
         .type_attr
         .packing(mode)
-        .map(|&(_, p)| p)
-        .unwrap_or_default();
+        .map(|&(span, p)| (span, p))
+        .unwrap_or_else(|| (Span::call_site(), Packing::default()));
 
     let (name_all, name_type, name_method) = match data.kind {
         StructKind::Indexed(..) if e.type_attr.is_name_type_ambiguous(mode) => {
@@ -394,8 +407,8 @@ fn setup_variant<'a>(
         .attr
         .packing(mode)
         .or_else(|| e.type_attr.packing(mode))
-        .map(|&(_, v)| v)
-        .unwrap_or_default();
+        .map(|&(span, v)| (span, v))
+        .unwrap_or_else(|| (Span::call_site(), Packing::default()));
 
     let (name_all, name_type, name_method) = match data.kind {
         StructKind::Indexed(..) if data.attr.is_name_type_ambiguous(mode) => {

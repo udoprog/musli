@@ -78,5 +78,12 @@ enum DenyOptionalTransparentEnum {
     }
 }
 
+#[derive(Encode, Decode)]
+#[musli(tag = "type")]
+pub enum PackedVariant {
+    #[musli(packed)]
+    Variant(u32),
+}
+
 fn main() {
 }
