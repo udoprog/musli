@@ -13,8 +13,7 @@ use crate::expander::{
 use super::attr::{DefaultOrCustom, EnumTagging, FieldEncoding, ModeKind, Packing};
 use super::mode::ImportedMethod;
 use super::name::NameAll;
-use super::ATTR;
-use super::{Ctxt, Expansion, Mode, Result, Tokens};
+use super::{Ctxt, Expansion, Mode, Only, Result, Tokens, ATTR};
 
 pub(crate) struct Parameters {
     pub(crate) lt: syn::Lifetime,
@@ -39,22 +38,6 @@ pub(crate) struct Build<'tok, 'a> {
 }
 
 impl Build<'_, '_> {
-    /// Emit diagnostics for when we try to implement `Decode` for an enum which
-    /// is marked as `#[musli(transparent)]`.
-    pub(crate) fn encode_transparent_enum_diagnostics(&self, span: Span) {
-        self.cx.error_span(
-            span,
-            format_args!("An enum cannot be #[{ATTR}(transparent)]"),
-        );
-    }
-
-    /// Emit diagnostics indicating that we tried to implement decode for a
-    /// packed enum.
-    pub(crate) fn decode_packed_enum_diagnostics(&self, span: Span) {
-        self.cx
-            .error_span(span, format_args!("An enum cannot be #[{ATTR}(packed)]"));
-    }
-
     /// Emit diagnostics indicating that we tried to use a `#[musli(default)]`
     /// annotation on a packed container.
     pub(crate) fn packed_default_diagnostics(&self, span: Span) {
@@ -68,31 +51,16 @@ impl Build<'_, '_> {
 
     /// Validate encode attributes.
     pub(crate) fn validate_encode(&self) -> Result<()> {
-        self.validate()
+        self.validate(Only::Encode)
     }
 
     /// Validate set of legal attributes.
     pub(crate) fn validate_decode(&self) -> Result<()> {
-        self.validate()
+        self.validate(Only::Decode)
     }
 
-    fn validate(&self) -> Result<()> {
-        match &self.data {
-            BuildData::Struct(..) => {
-                if let Some(span) = self.enum_tagging_span {
-                    self.cx.error_span(
-                        span,
-                        format_args!(
-                            "The #[{ATTR}(tag)] and #[{ATTR}(content)] attributes are only supported on enums"
-                        ),
-                    );
-
-                    return Err(());
-                }
-            }
-            BuildData::Enum(..) => (),
-        }
-
+    fn validate(&self, only: Only) -> Result<()> {
+        self.data.validate(only, self.cx, self.enum_tagging_span);
         Ok(())
     }
 }
@@ -101,6 +69,63 @@ impl Build<'_, '_> {
 pub(crate) enum BuildData<'a> {
     Struct(Body<'a>),
     Enum(Enum<'a>),
+}
+
+impl BuildData<'_> {
+    fn validate(&self, only: Only, cx: &Ctxt, enum_tagging_span: Option<Span>) {
+        match self {
+            BuildData::Struct(body) => {
+                if let Some(span) = enum_tagging_span {
+                    cx.error_span(
+                        span,
+                        format_args!(
+                            "The #[{ATTR}(tag)] and #[{ATTR}(content)] attributes are only supported on enums"
+                        ),
+                    );
+                }
+
+                body.validate(cx);
+            }
+            BuildData::Enum(en) => {
+                match en.packing_span {
+                    Some(&(span, Packing::Transparent)) => {
+                        cx.error_span(
+                            span,
+                            format_args!("An enum cannot be #[{ATTR}(transparent)]"),
+                        );
+                    }
+                    Some(&(span, Packing::Packed)) if only == Only::Decode => {
+                        cx.error_span(
+                            span,
+                            format_args!("An enum cannot be #[{ATTR}(packed)] when decoding"),
+                        );
+                    }
+                    _ => (),
+                }
+
+                if !matches!(en.enum_tagging, EnumTagging::Default | EnumTagging::Empty) {
+                    match en.packing_span {
+                        Some(&(span, Packing::Packed)) => {
+                            cx.error_span(
+                                span,
+                                format_args!(
+                                    "A #[{ATTR}(packed)] type cannot use #[{ATTR}(tag)] or #[{ATTR}(content)]"
+                                ),
+                            );
+                        }
+                        Some(&(span, Packing::Transparent)) => {
+                            cx.error_span(span, format_args!("A #[{ATTR}(transparent)] type cannot use #[{ATTR}(tag)] or #[{ATTR}(content)]"));
+                        }
+                        _ => (),
+                    }
+                }
+
+                for v in &en.variants {
+                    v.st.validate(cx);
+                }
+            }
+        }
+    }
 }
 
 pub(crate) struct Body<'a> {
@@ -118,6 +143,37 @@ impl Body<'_> {
     pub(crate) fn validate(&self, cx: &Ctxt) {
         if self.packing == Packing::Transparent && !matches!(&self.unskipped_fields[..], [_]) {
             cx.transparent_diagnostics(self.span, &self.unskipped_fields);
+        }
+
+        for f in &self.all_fields {
+            if matches!(self.packing, Packing::Transparent | Packing::Packed) {
+                if let Some(span) = f.name_span {
+                    cx.error_span(
+                        span,
+                        format_args!(
+                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] type cannot have named fields"
+                        ),
+                    );
+                }
+
+                if let Some(span) = f.pattern {
+                    cx.error_span(
+                        span.span(),
+                        format_args!(
+                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] type cannot have field patterns"
+                        ),
+                    );
+                }
+            }
+
+            if matches!(self.packing, Packing::Transparent) {
+                if let Some((span, _)) = f.skip_encoding_if {
+                    cx.error_span(
+                        *span,
+                        format_args!("A #[{ATTR}(transparent)] type cannot have an optional field"),
+                    );
+                }
+            }
         }
     }
 }
@@ -149,6 +205,7 @@ pub(crate) struct Field<'a> {
     pub(crate) decode_path: (Span, DefaultOrCustom<'a>),
     pub(crate) size_hint_path: Option<(Span, DefaultOrCustom<'a>)>,
     pub(crate) name: syn::Expr,
+    pub(crate) name_span: Option<Span>,
     pub(crate) pattern: Option<&'a syn::Pat>,
     /// Skip field entirely and always initialize with the specified expresion,
     /// or default value through `default_attr`.
@@ -158,7 +215,6 @@ pub(crate) struct Field<'a> {
     pub(crate) default_attr: Option<(Span, Option<&'a syn::Path>)>,
     pub(crate) self_access: syn::Expr,
     pub(crate) member: syn::Member,
-    pub(crate) packing: Packing,
     pub(crate) var: syn::Ident,
     pub(crate) ty: &'a syn::Type,
 }
@@ -240,15 +296,7 @@ fn setup_struct<'a>(
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
 
     for f in &data.fields {
-        let field = Rc::new(setup_field(
-            e,
-            mode,
-            f,
-            name_all,
-            packing,
-            None,
-            allocator_ident,
-        ));
+        let field = Rc::new(setup_field(e, mode, f, name_all, None, allocator_ident));
 
         if field.skip.is_none() {
             unskipped_fields.push(field.clone());
@@ -257,7 +305,7 @@ fn setup_struct<'a>(
         all_fields.push(field);
     }
 
-    let body = Body {
+    Body {
         span: data.span,
         name: &data.name,
         unskipped_fields,
@@ -270,10 +318,7 @@ fn setup_struct<'a>(
         packing,
         kind: data.kind,
         path,
-    };
-
-    body.validate(&e.cx);
-    body
+    }
 }
 
 fn setup_enum<'a>(
@@ -301,24 +346,6 @@ fn setup_enum<'a>(
             }
         }
     };
-
-    if !matches!(enum_tagging, EnumTagging::Default | EnumTagging::Empty) {
-        match packing_span {
-            Some((_, Packing::Tagged)) => (),
-            Some(&(span, Packing::Packed)) => {
-                e.cx.error_span(
-                    span,
-                    format_args!(
-                        "A #[{ATTR}(packed)] type cannot use #[{ATTR}(tag)] or #[{ATTR}(content)]"
-                    ),
-                );
-            }
-            Some(&(span, Packing::Transparent)) => {
-                e.cx.error_span(span, format_args!("A #[{ATTR}(transparent)] type cannot use #[{ATTR}(tag)] or #[{ATTR}(content)]"));
-            }
-            _ => (),
-        }
-    }
 
     let enum_packing = e
         .type_attr
@@ -401,12 +428,12 @@ fn setup_variant<'a>(
         if !data.fields.is_empty() {
             e.cx.error_span(
                 *span,
-                format_args!("#[{ATTR}(default)] variant must be empty"),
+                format_args!("The #[{ATTR}(default)] variant must be empty"),
             );
         } else if fallback.is_some() {
             e.cx.error_span(
                 *span,
-                format_args!("#[{ATTR}(default)] only one fallback variant is supported",),
+                format_args!("Only one #[{ATTR}(default)] variant is supported",),
             );
         } else {
             *fallback = Some(data.ident);
@@ -421,7 +448,6 @@ fn setup_variant<'a>(
             mode,
             f,
             name_all,
-            variant_packing,
             Some(&mut patterns),
             allocator_ident,
         ));
@@ -448,8 +474,6 @@ fn setup_variant<'a>(
         path,
     };
 
-    st.validate(&e.cx);
-
     Variant {
         span: data.span,
         index: data.index,
@@ -465,7 +489,6 @@ fn setup_field<'a>(
     mode: &Mode<'a>,
     data: &'a FieldData<'a>,
     name_all: NameAll,
-    packing: Packing,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
     allocator_ident: &syn::Ident,
 ) -> Field<'a> {
@@ -560,35 +583,6 @@ fn setup_field<'a>(
         }
     };
 
-    if matches!(packing, Packing::Transparent | Packing::Packed) {
-        if let Some(span) = name_span {
-            e.cx.error_span(
-                span,
-                format_args!(
-                    "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] type cannot have named fields"
-                ),
-            );
-        }
-
-        if let Some((span, _)) = pattern {
-            e.cx.error_span(
-                *span,
-                format_args!(
-                    "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] type cannot have patterned fields"
-                ),
-            );
-        }
-    }
-
-    if matches!(packing, Packing::Transparent) {
-        if let Some((span, _)) = skip_encoding_if {
-            e.cx.error_span(
-                *span,
-                format_args!("A #[{ATTR}(transparent)] type cannot have an optional field"),
-            );
-        }
-    }
-
     Field {
         span: data.span,
         index: data.index,
@@ -596,13 +590,13 @@ fn setup_field<'a>(
         decode_path,
         size_hint_path,
         name,
+        name_span,
         pattern: pattern.map(|(_, p)| p),
         skip,
         skip_encoding_if,
         default_attr,
         self_access,
         member,
-        packing,
         var,
         ty: data.ty,
     }

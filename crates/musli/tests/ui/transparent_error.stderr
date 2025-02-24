@@ -30,61 +30,53 @@ error: A #[musli(transparent)] attribute can only be used on types which have a 
    |
    = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
-error: A #[musli(transparent)] type must have a single unskipped field
+error: proc-macro derive panicked
   --> tests/ui/transparent_error.rs:14:10
    |
 14 | #[derive(Encode, Decode)]
    |          ^^^^^^
    |
-   = note: this error originates in the derive macro `Encode` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = help: message: index out of bounds: the len is 0 but the index is 0
 
-error: A #[musli(transparent)] type must have a single unskipped field
+error: proc-macro derive panicked
   --> tests/ui/transparent_error.rs:14:18
    |
 14 | #[derive(Encode, Decode)]
    |                  ^^^^^^
    |
-   = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = help: message: index out of bounds: the len is 0 but the index is 0
 
-error: A #[musli(transparent)] type must have a single unskipped field
+error: proc-macro derive panicked
   --> tests/ui/transparent_error.rs:18:10
    |
 18 | #[derive(Encode, Decode)]
    |          ^^^^^^
    |
-   = note: this error originates in the derive macro `Encode` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = help: message: index out of bounds: the len is 0 but the index is 0
 
-error: A #[musli(transparent)] type must have a single unskipped field
+error: proc-macro derive panicked
   --> tests/ui/transparent_error.rs:18:18
    |
 18 | #[derive(Encode, Decode)]
    |                  ^^^^^^
    |
-   = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
+   = help: message: index out of bounds: the len is 0 but the index is 0
 
-error: A #[musli(transparent)] attribute can only be used on types which have a single field
-  --> tests/ui/transparent_error.rs:24:5
+error: proc-macro derive panicked
+  --> tests/ui/transparent_error.rs:22:10
    |
-24 |     #[musli(transparent)]
-   |     ^
+22 | #[derive(Encode, Decode)]
+   |          ^^^^^^
+   |
+   = help: message: index out of bounds: the len is 0 but the index is 0
 
-error: A #[musli(transparent)] attribute can only be used on types which have a single field
-  --> tests/ui/transparent_error.rs:29:5
+error: proc-macro derive panicked
+  --> tests/ui/transparent_error.rs:22:18
    |
-29 |     #[musli(transparent)]
-   |     ^
-
-error: A #[musli(transparent)] type must have a single unskipped field
-  --> tests/ui/transparent_error.rs:31:5
+22 | #[derive(Encode, Decode)]
+   |                  ^^^^^^
    |
-31 |     #[musli(transparent)]
-   |     ^
-
-error: A #[musli(transparent)] type must have a single unskipped field
-  --> tests/ui/transparent_error.rs:33:5
-   |
-33 |     #[musli(transparent)]
-   |     ^
+   = help: message: index out of bounds: the len is 0 but the index is 0
 
 error: A #[musli(transparent)] or #[musli(packed)] type cannot have named fields
   --> tests/ui/transparent_error.rs:40:13

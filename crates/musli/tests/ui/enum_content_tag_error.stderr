@@ -4,7 +4,13 @@ error: A #[musli(packed)] type cannot use #[musli(tag)] or #[musli(content)]
 4 | #[musli(packed, tag = "type")]
   |         ^^^^^^
 
-error: An enum cannot be #[musli(packed)]
+error: An enum cannot be #[musli(packed)] when decoding
+ --> tests/ui/enum_content_tag_error.rs:4:9
+  |
+4 | #[musli(packed, tag = "type")]
+  |         ^^^^^^
+
+error: An enum cannot be #[musli(packed)] when decoding
   --> tests/ui/enum_content_tag_error.rs:10:9
    |
 10 | #[musli(packed, content = "content")]
@@ -16,6 +22,18 @@ error: A #[musli(packed)] type cannot use #[musli(tag)] or #[musli(content)]
 16 | #[musli(packed, tag = "type", content = "content")]
    |         ^^^^^^
 
+error: An enum cannot be #[musli(packed)] when decoding
+  --> tests/ui/enum_content_tag_error.rs:16:9
+   |
+16 | #[musli(packed, tag = "type", content = "content")]
+   |         ^^^^^^
+
+error: An enum cannot be #[musli(transparent)]
+  --> tests/ui/enum_content_tag_error.rs:22:9
+   |
+22 | #[musli(transparent, tag = "type")]
+   |         ^^^^^^^^^^^
+
 error: A #[musli(transparent)] type cannot use #[musli(tag)] or #[musli(content)]
   --> tests/ui/enum_content_tag_error.rs:22:9
    |
@@ -26,6 +44,12 @@ error: An enum cannot be #[musli(transparent)]
   --> tests/ui/enum_content_tag_error.rs:28:9
    |
 28 | #[musli(transparent, content = "content")]
+   |         ^^^^^^^^^^^
+
+error: An enum cannot be #[musli(transparent)]
+  --> tests/ui/enum_content_tag_error.rs:34:9
+   |
+34 | #[musli(transparent, tag = "type", content = "content")]
    |         ^^^^^^^^^^^
 
 error: A #[musli(transparent)] type cannot use #[musli(tag)] or #[musli(content)]

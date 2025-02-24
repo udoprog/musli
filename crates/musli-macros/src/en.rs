@@ -289,7 +289,7 @@ fn make_encoders(
 
         let leave = cx.trace.then(|| quote!(#context_t::leave_field(#ctx_var);));
 
-        match f.packing {
+        match st.packing {
             Packing::Tagged | Packing::Transparent => {
                 encode = quote! {{
                     static #field_name_static: #name_type = #name;
@@ -364,13 +364,7 @@ fn encode_enum(
     en: &Enum<'_>,
 ) -> Result<(TokenStream, TokenStream)> {
     let Ctxt { .. } = *cx;
-
     let Tokens { result, .. } = b.tokens;
-
-    if let Some(&(span, Packing::Transparent)) = en.packing_span {
-        b.encode_transparent_enum_diagnostics(span);
-        return Err(());
-    }
 
     let mut encode_variants = Vec::with_capacity(en.variants.len());
     let mut size_hint_variants = Vec::with_capacity(en.variants.len());
