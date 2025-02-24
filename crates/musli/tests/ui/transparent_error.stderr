@@ -1,127 +1,83 @@
-error: A #[musli(transparent)] attribute can only be used on types which have a single field
- --> tests/ui/transparent_error.rs:3:10
+error: A #[musli(transparent)] attribute can only be used on structs which have a single field
+ --> tests/ui/transparent_error.rs:4:9
   |
-3 | #[derive(Encode, Decode)]
-  |          ^^^^^^
-  |
-  = note: this error originates in the derive macro `Encode` (in Nightly builds, run with -Z macro-backtrace for more info)
+4 | #[musli(transparent)]
+  |         ^^^^^^^^^^^
 
-error: A #[musli(transparent)] attribute can only be used on types which have a single field
- --> tests/ui/transparent_error.rs:3:18
-  |
-3 | #[derive(Encode, Decode)]
-  |                  ^^^^^^
-  |
-  = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
+error: A #[musli(transparent)] attribute can only be used on structs which have a single field
+  --> tests/ui/transparent_error.rs:11:9
+   |
+11 | #[musli(transparent)]
+   |         ^^^^^^^^^^^
 
-error: A #[musli(transparent)] attribute can only be used on types which have a single field
-  --> tests/ui/transparent_error.rs:10:10
+error: A #[musli(transparent)] struct must have a single field
+  --> tests/ui/transparent_error.rs:15:9
    |
-10 | #[derive(Encode, Decode)]
-   |          ^^^^^^
-   |
-   = note: this error originates in the derive macro `Encode` (in Nightly builds, run with -Z macro-backtrace for more info)
+15 | #[musli(transparent)]
+   |         ^^^^^^^^^^^
 
-error: A #[musli(transparent)] attribute can only be used on types which have a single field
-  --> tests/ui/transparent_error.rs:10:18
+error: A #[musli(transparent)] struct must have a single field
+  --> tests/ui/transparent_error.rs:19:9
    |
-10 | #[derive(Encode, Decode)]
-   |                  ^^^^^^
-   |
-   = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
+19 | #[musli(transparent)]
+   |         ^^^^^^^^^^^
 
-error: proc-macro derive panicked
-  --> tests/ui/transparent_error.rs:14:10
+error: A #[musli(transparent)] attribute can only be used on variants which have a single field
+  --> tests/ui/transparent_error.rs:24:13
    |
-14 | #[derive(Encode, Decode)]
-   |          ^^^^^^
-   |
-   = help: message: index out of bounds: the len is 0 but the index is 0
+24 |     #[musli(transparent)]
+   |             ^^^^^^^^^^^
 
-error: proc-macro derive panicked
-  --> tests/ui/transparent_error.rs:14:18
+error: A #[musli(transparent)] attribute can only be used on variants which have a single field
+  --> tests/ui/transparent_error.rs:29:13
    |
-14 | #[derive(Encode, Decode)]
-   |                  ^^^^^^
-   |
-   = help: message: index out of bounds: the len is 0 but the index is 0
+29 |     #[musli(transparent)]
+   |             ^^^^^^^^^^^
 
-error: proc-macro derive panicked
-  --> tests/ui/transparent_error.rs:18:10
+error: A #[musli(transparent)] variant must have a single field
+  --> tests/ui/transparent_error.rs:31:13
    |
-18 | #[derive(Encode, Decode)]
-   |          ^^^^^^
-   |
-   = help: message: index out of bounds: the len is 0 but the index is 0
+31 |     #[musli(transparent)]
+   |             ^^^^^^^^^^^
 
-error: proc-macro derive panicked
-  --> tests/ui/transparent_error.rs:18:18
+error: A #[musli(transparent)] variant must have a single field
+  --> tests/ui/transparent_error.rs:33:13
    |
-18 | #[derive(Encode, Decode)]
-   |                  ^^^^^^
-   |
-   = help: message: index out of bounds: the len is 0 but the index is 0
+33 |     #[musli(transparent)]
+   |             ^^^^^^^^^^^
 
-error: proc-macro derive panicked
-  --> tests/ui/transparent_error.rs:22:10
-   |
-22 | #[derive(Encode, Decode)]
-   |          ^^^^^^
-   |
-   = help: message: index out of bounds: the len is 0 but the index is 0
-
-error: proc-macro derive panicked
-  --> tests/ui/transparent_error.rs:22:18
-   |
-22 | #[derive(Encode, Decode)]
-   |                  ^^^^^^
-   |
-   = help: message: index out of bounds: the len is 0 but the index is 0
-
-error: A #[musli(transparent)] or #[musli(packed)] type cannot have named fields
+error: A #[musli(transparent)] or #[musli(packed)] struct cannot have named fields
   --> tests/ui/transparent_error.rs:40:13
    |
 40 |     #[musli(name = "test")]
    |             ^^^^
 
-error: A #[musli(transparent)] or #[musli(packed)] type cannot have named fields
+error: A #[musli(transparent)] or #[musli(packed)] variant cannot have named fields
   --> tests/ui/transparent_error.rs:48:21
    |
 48 |     Variant(#[musli(name = "test")] String),
    |                     ^^^^
 
-error: A #[musli(transparent)] or #[musli(packed)] type cannot have named fields
+error: A #[musli(transparent)] struct cannot have an optional field
   --> tests/ui/transparent_error.rs:54:13
    |
-54 |     #[musli(name = "test")]
-   |             ^^^^
-
-error: A #[musli(transparent)] or #[musli(packed)] type cannot have named fields
-  --> tests/ui/transparent_error.rs:62:21
-   |
-62 |     Variant(#[musli(name = "test")] String),
-   |                     ^^^^
-
-error: A #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
-  --> tests/ui/transparent_error.rs:61:13
-   |
-61 |     #[musli(packed)]
-   |             ^^^^^^
-
-error: A #[musli(transparent)] type cannot have an optional field
-  --> tests/ui/transparent_error.rs:68:13
-   |
-68 |     #[musli(skip_encoding_if = String::is_empty)]
+54 |     #[musli(skip_encoding_if = String::is_empty)]
    |             ^^^^^^^^^^^^^^^^
 
-error: A #[musli(transparent)] type cannot have an optional field
-  --> tests/ui/transparent_error.rs:76:17
+error: A #[musli(transparent)] variant cannot have an optional field
+  --> tests/ui/transparent_error.rs:62:17
    |
-76 |         #[musli(skip_encoding_if = String::is_empty)]
+62 |         #[musli(skip_encoding_if = String::is_empty)]
    |                 ^^^^^^^^^^^^^^^^
 
-error: A #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
-  --> tests/ui/transparent_error.rs:84:13
+error: A #[musli(transparent)] attribute can only be used on structs which have a single field
+  --> tests/ui/transparent_error.rs:73:9
    |
-84 |     #[musli(packed)]
-   |             ^^^^^^
+73 | #[musli(transparent)]
+   |         ^^^^^^^^^^^
+
+error: A #[musli(transparent)] attribute can only be used on variants which have a single field
+  --> tests/ui/transparent_error.rs:83:13
+   |
+83 |     #[musli(transparent)]
+   |             ^^^^^^^^^^^

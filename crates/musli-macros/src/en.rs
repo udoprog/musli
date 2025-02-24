@@ -15,15 +15,15 @@ struct Ctxt<'a> {
     trace: bool,
 }
 
-pub(crate) fn expand_insert_entry(e: Build<'_, '_>) -> Result<TokenStream> {
-    e.validate_encode()?;
-    e.cx.reset();
+pub(crate) fn expand_encode_entry(b: &Build<'_, '_>) -> Result<TokenStream> {
+    b.validate_encode()?;
+    b.cx.reset();
 
-    let type_ident = &e.input.ident;
+    let type_ident = &b.input.ident;
 
-    let encoder_var = e.cx.ident("encoder");
-    let ctx_var = e.cx.ident("ctx");
-    let e_param = e.cx.type_with_span("E", Span::call_site());
+    let encoder_var = b.cx.ident("encoder");
+    let ctx_var = b.cx.ident("ctx");
+    let e_param = b.cx.type_with_span("E", Span::call_site());
 
     let cx = Ctxt {
         ctx_var: &ctx_var,
@@ -39,37 +39,37 @@ pub(crate) fn expand_insert_entry(e: Build<'_, '_>) -> Result<TokenStream> {
         result,
         try_fast_encode,
         ..
-    } = e.tokens;
+    } = b.tokens;
 
     let packed;
 
-    let (body, size_hint) = match &e.data {
+    let (body, size_hint) = match &b.data {
         BuildData::Struct(st) => {
-            packed = crate::internals::packed(&e, st);
-            encode_map(&cx, &e, st)?
+            packed = crate::internals::packed(b, st);
+            encode_map(&cx, b, st)?
         }
         BuildData::Enum(en) => {
             packed = syn::parse_quote!(false);
-            encode_enum(&cx, &e, en)?
+            encode_enum(&cx, b, en)?
         }
     };
 
-    if e.cx.has_errors() {
+    if b.cx.has_errors() {
         return Err(());
     }
 
-    let mut impl_generics = e.input.generics.clone();
+    let mut impl_generics = b.input.generics.clone();
 
-    if !e.bounds.is_empty() {
+    if !b.bounds.is_empty() {
         let where_clause = impl_generics.make_where_clause();
 
         where_clause
             .predicates
-            .extend(e.bounds.iter().map(|(_, v)| v.clone()));
+            .extend(b.bounds.iter().map(|(_, v)| v.clone()));
     }
 
     let (impl_generics, _, where_clause) = impl_generics.split_for_impl();
-    let (_, type_generics, _) = e.input.generics.split_for_impl();
+    let (_, type_generics, _) = b.input.generics.split_for_impl();
 
     let mut attributes = Vec::<syn::Attribute>::new();
 
@@ -77,7 +77,7 @@ pub(crate) fn expand_insert_entry(e: Build<'_, '_>) -> Result<TokenStream> {
         attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
     }
 
-    let mode_ident = e.expansion.mode_path(e.tokens);
+    let mode_ident = b.expansion.mode_path(b.tokens);
 
     Ok(quote! {
         const _: () = {
@@ -142,7 +142,7 @@ fn encode_map(
 
     let output_var = b.cx.ident("output");
 
-    let type_name = &st.name;
+    let type_name = st.name_type.value;
 
     let enter = cx
         .trace
@@ -156,7 +156,7 @@ fn encode_map(
 
     match st.packing {
         (_, Packing::Transparent) => {
-            let f = &st.unskipped_fields[0];
+            let f = st.transparent_field()?;
 
             let access = &f.self_access;
             let encode_path = &f.encode_path.1;
@@ -448,7 +448,7 @@ fn encode_variant(
         EnumTagging::Default => {
             match v.st.packing {
                 (_, Packing::Transparent) => {
-                    let f = &v.st.unskipped_fields[0];
+                    let f = v.st.transparent_field()?;
 
                     let encode_path = &f.encode_path.1;
                     let access = &f.self_access;
@@ -519,10 +519,7 @@ fn encode_variant(
                 }};
             }
         }
-        EnumTagging::Internal {
-            tag_value,
-            tag_type,
-        } => {
+        EnumTagging::Internal { tag } => {
             'done: {
                 let name = &v.name;
                 let name_type = en.name_type.ty();
@@ -533,7 +530,8 @@ fn encode_variant(
 
                 match v.st.packing {
                     (_, Packing::Transparent) => {
-                        let f = &v.st.unskipped_fields[0];
+                        let f = v.st.transparent_field()?;
+
                         let access = &f.self_access;
 
                         let Some((_, path)) = &f.size_hint_path else {
@@ -582,7 +580,8 @@ fn encode_variant(
 
                 let (build_hint, hint) = len.build_hint(b);
 
-                let tag_type = tag_type.ty();
+                let tag_value = tag.value;
+                let tag_type = tag.ty();
 
                 encode = quote! {{
                     #build_hint
@@ -604,12 +603,7 @@ fn encode_variant(
                 }};
             };
         }
-        EnumTagging::Adjacent {
-            tag_value,
-            tag_type,
-            content_value,
-            content_type,
-        } => {
+        EnumTagging::Adjacent { tag, content } => {
             let encode_t_encode = &b.encode_t_encode;
 
             let name = &v.name;
@@ -621,15 +615,17 @@ fn encode_variant(
             let pair = b.cx.ident("pair");
             let content_tag = b.cx.ident("content_tag");
 
-            let tag_type = tag_type.ty();
-            let content_static_expr = content_type.expr(content_static.clone());
-            let content_type = content_type.ty();
+            let tag_value = tag.value;
+            let tag_type = tag.ty();
+            let content_value = content.value;
+            let content_static_expr = content.expr(content_static.clone());
+            let content_type = content.ty();
 
             let inner_encode;
 
             match v.st.packing {
                 (_, Packing::Transparent) => {
-                    let f = &v.st.unskipped_fields[0];
+                    let f = v.st.transparent_field()?;
                     let encode_path = &f.encode_path.1;
                     let access = &f.self_access;
 
@@ -706,7 +702,7 @@ fn encode_variant(
         let formatted_tag = en.name_type.name_format(&name_static);
         let name_type = en.name_type.ty();
         let name_value = &v.name;
-        let type_name = v.st.name;
+        let type_name = v.st.name_type.value;
 
         encode = quote! {{
             static #name_static: #name_type = #name_value;

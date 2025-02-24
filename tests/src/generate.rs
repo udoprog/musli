@@ -12,8 +12,7 @@ use alloc::string::String;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use rand::distributions::Distribution;
-use rand::distributions::Standard;
+use rand::distr::{Distribution, StandardUniform};
 
 pub use tests_macros::Generate;
 
@@ -84,11 +83,6 @@ impl rand::RngCore for Rng {
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         self.rng.fill_bytes(dest);
     }
-
-    #[inline]
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-        self.rng.try_fill_bytes(dest)
-    }
 }
 
 pub trait Generate: Sized {
@@ -145,7 +139,7 @@ where
     where
         R: rand::Rng,
     {
-        let cap = rng.gen_range(range);
+        let cap = rng.random_range(range);
         let mut vec = Vec::with_capacity(cap);
 
         for _ in 0..cap {
@@ -175,7 +169,7 @@ where
     where
         T: rand::Rng,
     {
-        let cap = rng.gen_range(range);
+        let cap = rng.random_range(range);
         let mut map = HashMap::with_capacity(cap);
 
         for _ in 0..cap {
@@ -206,7 +200,7 @@ where
     {
         let mut map = HashSet::new();
 
-        for _ in 0..rng.gen_range(range) {
+        for _ in 0..rng.random_range(range) {
             map.insert(K::generate(rng));
         }
 
@@ -235,7 +229,7 @@ where
     {
         let mut map = BTreeMap::new();
 
-        for _ in 0..rng.gen_range(range) {
+        for _ in 0..rng.random_range(range) {
             map.insert(K::generate(rng), V::generate(rng));
         }
 
@@ -263,7 +257,7 @@ where
     {
         let mut map = BTreeSet::new();
 
-        for _ in 0..rng.gen_range(range) {
+        for _ in 0..rng.random_range(range) {
             map.insert(K::generate(rng));
         }
 
@@ -279,8 +273,8 @@ impl Generate for String {
     {
         let mut string = String::new();
 
-        for _ in 0..rng.gen_range(STRING_RANGE) {
-            string.push(rng.gen());
+        for _ in 0..rng.random_range(STRING_RANGE) {
+            string.push(rng.random());
         }
 
         string
@@ -295,8 +289,8 @@ impl Generate for CString {
     {
         let mut string = Vec::new();
 
-        for _ in 0..rng.gen_range(STRING_RANGE) {
-            string.push(rng.gen_range(1..=u8::MAX));
+        for _ in 0..rng.random_range(STRING_RANGE) {
+            string.push(rng.random_range(1..=u8::MAX));
         }
 
         string.push(0);
@@ -333,62 +327,87 @@ tuple!(A, B, C, D, E, F);
 tuple!(A, B, C, D, E, F, G);
 
 macro_rules! unsigned {
-    ($ty:ty) => {
-        impl Generate for $ty
-        where
-            Standard: Distribution<$ty>,
-        {
-            #[inline]
-            #[cfg(feature = "no-u64")]
-            fn generate<T>(rng: &mut T) -> Self
+    ($($ty:ty),* $(,)?) => {
+        $(
+            impl Generate for $ty
             where
-                T: rand::Rng,
+                StandardUniform: Distribution<$ty>,
             {
-                rng.gen_range(0..(i64::MAX as $ty))
-            }
+                #[inline]
+                #[cfg(feature = "no-u64")]
+                fn generate<T>(rng: &mut T) -> Self
+                where
+                    T: rand::Rng,
+                {
+                    rng.random_range(0..(i64::MAX as $ty))
+                }
 
-            #[inline]
-            #[cfg(not(feature = "no-u64"))]
-            fn generate<T>(rng: &mut T) -> Self
-            where
-                T: rand::Rng,
-            {
-                rng.gen()
+                #[inline]
+                #[cfg(not(feature = "no-u64"))]
+                fn generate<T>(rng: &mut T) -> Self
+                where
+                    T: rand::Rng,
+                {
+                    rng.random()
+                }
             }
-        }
+        )*
     };
 }
 
 macro_rules! primitive {
-    ($ty:ty) => {
-        impl Generate for $ty
-        where
-            Standard: Distribution<$ty>,
-        {
-            #[inline]
-            fn generate<T>(rng: &mut T) -> Self
+    ($($ty:ty),* $(,)?) => {
+        $(
+            impl Generate for $ty
             where
-                T: rand::Rng,
+                StandardUniform: Distribution<$ty>,
             {
-                rng.gen()
+                #[inline]
+                fn generate<T>(rng: &mut T) -> Self
+                where
+                    T: rand::Rng,
+                {
+                    rng.random()
+                }
             }
-        }
+        )*
     };
 }
 
-primitive!(u8);
-primitive!(u16);
-primitive!(u32);
-unsigned!(u64);
-unsigned!(u128);
-unsigned!(usize);
+primitive!(u8, u16, u32, i8, i16, i32, i64, i128);
+unsigned!(u64, u128);
 
-primitive!(i8);
-primitive!(i16);
-primitive!(i32);
-primitive!(i64);
-primitive!(i128);
-primitive!(isize);
+impl Generate for usize {
+    #[inline]
+    #[cfg(feature = "no-u64")]
+    fn generate<T>(rng: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
+        rng.random_range(0..(i64::MAX as usize))
+    }
+
+    #[inline]
+    #[cfg(not(feature = "no-u64"))]
+    fn generate<T>(rng: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
+        let mut bytes = usize::to_ne_bytes(0);
+        rng.fill_bytes(&mut bytes);
+        usize::from_ne_bytes(bytes)
+    }
+}
+
+impl Generate for isize {
+    #[inline]
+    fn generate<T>(rng: &mut T) -> Self
+    where
+        T: rand::Rng,
+    {
+        rng.random::<i64>() as isize
+    }
+}
 
 primitive!(f32);
 primitive!(f64);

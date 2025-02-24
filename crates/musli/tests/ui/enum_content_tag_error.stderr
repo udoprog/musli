@@ -1,64 +1,70 @@
-error: A #[musli(packed)] type cannot use #[musli(tag)] or #[musli(content)]
+error: In #[musli(Binary, ..)] a #[musli(packed)] type cannot use #[musli(tag)]
+ --> tests/ui/enum_content_tag_error.rs:4:17
+  |
+4 | #[musli(packed, tag = "type")]
+  |                 ^^^
+
+error: In #[musli(Binary, ..)] a #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
+ --> tests/ui/enum_content_tag_error.rs:4:17
+  |
+4 | #[musli(packed, tag = "type")]
+  |                 ^^^
+
+error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)] when decoding
  --> tests/ui/enum_content_tag_error.rs:4:9
   |
 4 | #[musli(packed, tag = "type")]
   |         ^^^^^^
 
-error: A #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
- --> tests/ui/enum_content_tag_error.rs:4:9
-  |
-4 | #[musli(packed, tag = "type")]
-  |         ^^^^^^
+error: In #[musli(Binary, ..)] a #[musli(packed)] type cannot use #[musli(content)]
+  --> tests/ui/enum_content_tag_error.rs:10:17
+   |
+10 | #[musli(packed, content = "content")]
+   |                 ^^^^^^^
 
-error: An enum cannot be #[musli(packed)] when decoding
- --> tests/ui/enum_content_tag_error.rs:4:9
-  |
-4 | #[musli(packed, tag = "type")]
-  |         ^^^^^^
-
-error: An enum cannot be #[musli(packed)] when decoding
+error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)] when decoding
   --> tests/ui/enum_content_tag_error.rs:10:9
    |
 10 | #[musli(packed, content = "content")]
    |         ^^^^^^
 
-error: A #[musli(packed)] type cannot use #[musli(tag)] or #[musli(content)]
+error: In #[musli(Binary, ..)] a #[musli(packed)] type cannot use #[musli(tag)]
+  --> tests/ui/enum_content_tag_error.rs:16:17
+   |
+16 | #[musli(packed, tag = "type", content = "content")]
+   |                 ^^^
+
+error: In #[musli(Binary, ..)] a #[musli(packed)] type cannot use #[musli(content)]
+  --> tests/ui/enum_content_tag_error.rs:16:31
+   |
+16 | #[musli(packed, tag = "type", content = "content")]
+   |                               ^^^^^^^
+
+error: In #[musli(Binary, ..)] a #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
+  --> tests/ui/enum_content_tag_error.rs:16:17
+   |
+16 | #[musli(packed, tag = "type", content = "content")]
+   |                 ^^^
+
+error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)] when decoding
   --> tests/ui/enum_content_tag_error.rs:16:9
    |
 16 | #[musli(packed, tag = "type", content = "content")]
    |         ^^^^^^
 
-error: An enum cannot be #[musli(packed)] when decoding
-  --> tests/ui/enum_content_tag_error.rs:16:9
-   |
-16 | #[musli(packed, tag = "type", content = "content")]
-   |         ^^^^^^
-
-error: An enum cannot be #[musli(transparent)]
+error: In #[musli(Binary, ..)] an enum cannot be #[musli(transparent)]
   --> tests/ui/enum_content_tag_error.rs:22:9
    |
 22 | #[musli(transparent, tag = "type")]
    |         ^^^^^^^^^^^
 
-error: A #[musli(transparent)] type cannot use #[musli(tag)] or #[musli(content)]
-  --> tests/ui/enum_content_tag_error.rs:22:9
-   |
-22 | #[musli(transparent, tag = "type")]
-   |         ^^^^^^^^^^^
-
-error: An enum cannot be #[musli(transparent)]
+error: In #[musli(Binary, ..)] an enum cannot be #[musli(transparent)]
   --> tests/ui/enum_content_tag_error.rs:28:9
    |
 28 | #[musli(transparent, content = "content")]
    |         ^^^^^^^^^^^
 
-error: An enum cannot be #[musli(transparent)]
-  --> tests/ui/enum_content_tag_error.rs:34:9
-   |
-34 | #[musli(transparent, tag = "type", content = "content")]
-   |         ^^^^^^^^^^^
-
-error: A #[musli(transparent)] type cannot use #[musli(tag)] or #[musli(content)]
+error: In #[musli(Binary, ..)] an enum cannot be #[musli(transparent)]
   --> tests/ui/enum_content_tag_error.rs:34:9
    |
 34 | #[musli(transparent, tag = "type", content = "content")]

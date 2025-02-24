@@ -8,7 +8,7 @@ use crate::{Allocator, Context};
 
 #[derive(Encode, Decode)]
 #[musli(crate)]
-#[musli(mode = Text, name_all = "kebab-case")]
+#[musli(Text, name_all = "kebab-case")]
 enum IpAddrTag {
     Ipv4,
     Ipv6,
@@ -16,7 +16,7 @@ enum IpAddrTag {
 
 #[derive(Encode, Decode)]
 #[musli(crate)]
-#[musli(mode = Text, name_all = "kebab-case")]
+#[musli(Text, name_all = "kebab-case")]
 enum SocketAddrTag {
     V4,
     V6,

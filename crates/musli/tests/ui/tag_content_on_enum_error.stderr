@@ -1,11 +1,11 @@
-error: The #[musli(tag)] and #[musli(content)] attributes are only supported on enums
- --> tests/ui/tag_content_on_enum_error.rs:4:15
+error: In #[musli(Binary, ..)] the #[musli(tag)] attribute is only supported on enums
+ --> tests/ui/tag_content_on_enum_error.rs:4:9
   |
 4 | #[musli(tag = "type")]
-  |               ^^^^^^
+  |         ^^^
 
-error: The #[musli(tag)] and #[musli(content)] attributes are only supported on enums
- --> tests/ui/tag_content_on_enum_error.rs:8:19
+error: In #[musli(Binary, ..)] the #[musli(content)] attribute is only supported on enums
+ --> tests/ui/tag_content_on_enum_error.rs:8:9
   |
 8 | #[musli(content = "type")]
-  |                   ^^^^^^
+  |         ^^^^^^^

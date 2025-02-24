@@ -3,37 +3,91 @@ use musli::{Decode, Encode};
 #[test]
 fn named() {
     #[derive(Debug, PartialEq, Encode, Decode)]
-    #[musli(tag = "type", name_all = "name")]
-    pub enum Named {
-        #[musli(name_all = "name")]
-        Variant1 { string: String, number: u32 },
-        #[musli(name = "variant2", name_all = "name")]
-        Variant2 { string: String },
+    #[musli(tag = "type", name_all = "snake_case")]
+    pub enum Enum {
+        #[musli(name_all = "snake_case")]
+        OneField { string: String, number: u32 },
+        #[musli(name_all = "snake_case")]
+        TwoFields { string: String },
     }
 
     musli::macros::assert_roundtrip_eq! {
         descriptive,
-        Named::Variant1 {
+        Enum::OneField {
             string: String::from("Hello"),
             number: 42,
         },
-        json = r#"{"type":"Variant1","string":"Hello","number":42}"#
+        json = r#"{"type":"one_field","string":"Hello","number":42}"#
     };
 
     musli::macros::assert_roundtrip_eq! {
         descriptive,
-        Named::Variant2 {
+        Enum::TwoFields {
             string: String::from("Hello")
         },
-        json = r#"{"type":"variant2","string":"Hello"}"#
+        json = r#"{"type":"two_fields","string":"Hello"}"#
     };
 
     musli::macros::assert_roundtrip_eq! {
         descriptive,
-        Named::Variant2 {
+        Enum::TwoFields {
             string: String::from("\"\u{0000}")
         },
-        json = r#"{"type":"variant2","string":"\"\u0000"}"#
+        json = r#"{"type":"two_fields","string":"\"\u0000"}"#
+    };
+}
+
+#[test]
+fn transparent() {
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    #[musli(name_all = "snake_case")]
+    pub struct Struct {
+        string: String,
+    }
+
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    #[musli(tag = "type", name_all = "snake_case")]
+    pub enum Enum {
+        #[musli(transparent, name_all = "snake_case")]
+        Tuple(Struct),
+        #[musli(transparent, name_all = "snake_case")]
+        Struct { st: Struct },
+    }
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::Tuple(Struct {
+            string: String::from("Hello")
+        }),
+        json = r#"{"type":"tuple","string":"Hello"}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::Tuple(Struct {
+            string: String::from("\"\u{0000}")
+        }),
+        json = r#"{"type":"tuple","string":"\"\u0000"}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::Struct {
+            st: Struct {
+                string: String::from("Hello")
+            }
+        },
+        json = r#"{"type":"struct","string":"Hello"}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::Struct {
+            st: Struct {
+                string: String::from("\"\u{0000}")
+            }
+        },
+        json = r#"{"type":"struct","string":"\"\u0000"}"#
     };
 }
 

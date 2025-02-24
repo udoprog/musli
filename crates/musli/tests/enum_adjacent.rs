@@ -38,6 +38,91 @@ fn named() {
 }
 
 #[test]
+fn transparent() {
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    pub struct Struct {
+        string: String,
+    }
+
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    #[musli(tag = "type", content = "data")]
+    pub enum Enum {
+        #[musli(transparent)]
+        Tuple(Struct),
+        #[musli(transparent)]
+        Struct { st: Struct },
+        #[musli(transparent)]
+        StructSkip {
+            #[musli(skip)]
+            a: u32,
+            st: Struct,
+            #[musli(skip)]
+            b: u32,
+        },
+    }
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::Tuple(Struct {
+            string: String::from("Hello")
+        }),
+        json = r#"{"type":"Tuple","data":{"string":"Hello"}}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::Tuple(Struct {
+            string: String::from("\"\u{0000}")
+        }),
+        json = r#"{"type":"Tuple","data":{"string":"\"\u0000"}}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::Struct {
+            st: Struct {
+                string: String::from("Hello")
+            }
+        },
+        json = r#"{"type":"Struct","data":{"string":"Hello"}}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::Struct {
+            st: Struct {
+                string: String::from("\"\u{0000}")
+            }
+        },
+        json = r#"{"type":"Struct","data":{"string":"\"\u0000"}}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::StructSkip {
+            a: 0,
+            st: Struct {
+                string: String::from("Hello")
+            },
+            b: 0,
+        },
+        json = r#"{"type":"StructSkip","data":{"string":"Hello"}}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Enum::StructSkip {
+            a: 0,
+            st: Struct {
+                string: String::from("\"\u{0000}")
+            },
+            b: 0,
+        },
+        json = r#"{"type":"StructSkip","data":{"string":"\"\u0000"}}"#
+    };
+}
+
+#[test]
 fn indexed() {
     macro_rules! test_case {
         ($ty:ty) => {{

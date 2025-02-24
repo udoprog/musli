@@ -28,8 +28,8 @@ pub enum OtherEnum {
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(mode = Binary, bound = {M: Encode<Binary>}, decode_bound<'de, A> = {M: Decode<'de, Binary, A>})]
-#[musli(mode = Text, bound = {M: Encode<Text>}, decode_bound<'de, A> = {M: Decode<'de, Text, A>})]
+#[musli(Binary, bound = {M: Encode<Binary>}, decode_bound<'de, A> = {M: Decode<'de, Binary, A>})]
+#[musli(Text, bound = {M: Encode<Text>}, decode_bound<'de, A> = {M: Decode<'de, Text, A>})]
 pub struct SimpleStructFrom<M>
 where
     M: Generate,
@@ -39,8 +39,8 @@ where
     pub middle: M,
     pub option: Option<u32>,
     pub other: OtherStruct,
-    #[musli(mode = Binary, name = 5)]
-    #[musli(mode = Text, name = "field4")]
+    #[musli(Binary, name = 5)]
+    #[musli(Text, name = "field4")]
     pub other_enum: OtherEnum,
 }
 
@@ -51,7 +51,7 @@ pub struct SimpleStructTo {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct SimpleStructEnum {
-    #[musli(mode = Binary, name = 5)]
+    #[musli(Binary, name = 5)]
     pub field4: OtherEnum,
 }
 

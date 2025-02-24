@@ -103,8 +103,8 @@ where
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
 #[musli(crate, transparent)]
-#[musli(mode = Binary, bound = {T: EncodeBytes<Binary>}, decode_bound<'de, A> = {T: DecodeBytes<'de, Binary, A>})]
-#[musli(mode = Text, bound = {T: EncodeBytes<Text>}, decode_bound<'de, A> = {T: DecodeBytes<'de, Text, A>})]
+#[musli(Binary, bound = {T: EncodeBytes<Binary>}, decode_bound<'de, A> = {T: DecodeBytes<'de, Binary, A>})]
+#[musli(Text, bound = {T: EncodeBytes<Text>}, decode_bound<'de, A> = {T: DecodeBytes<'de, Text, A>})]
 #[repr(transparent)]
 pub struct Bytes<T>(#[musli(bytes)] pub T);
 
@@ -172,7 +172,7 @@ where
 /// ```
 #[derive(Encode, Decode)]
 #[musli(crate, transparent)]
-#[musli(mode = Binary, bound = {T: EncodePacked<Binary>}, decode_bound<'de, A> = {T: DecodePacked<'de, Binary, A>})]
-#[musli(mode = Text, bound = {T: EncodePacked<Text>}, decode_bound<'de, A> = {T: DecodePacked<'de, Text, A>})]
+#[musli(Binary, bound = {T: EncodePacked<Binary>}, decode_bound<'de, A> = {T: DecodePacked<'de, Binary, A>})]
+#[musli(Text, bound = {T: EncodePacked<Text>}, decode_bound<'de, A> = {T: DecodePacked<'de, Text, A>})]
 #[repr(transparent)]
 pub struct Packed<T>(#[musli(packed)] pub T);

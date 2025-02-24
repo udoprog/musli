@@ -76,7 +76,7 @@ fn test_continuation_encoding() {
             let mut rng = StdRng::seed_from_u64(0xfd80fd80fd80fd80);
 
             for _ in 0..ITER {
-                let value = rng.gen::<usize>();
+                let value = rng.random::<u64>() as usize;
                 rt(value);
             }
         }};

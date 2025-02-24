@@ -223,15 +223,15 @@
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Version1 {
-//!     #[musli(mode = Binary, name = 0)]
+//!     #[musli(Binary, name = 0)]
 //!     name: String,
 //! }
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Version2 {
-//!     #[musli(mode = Binary, name = 0)]
+//!     #[musli(Binary, name = 0)]
 //!     name: String,
-//!     #[musli(mode = Binary, name = 1)]
+//!     #[musli(Binary, name = 1)]
 //!     #[musli(default)]
 //!     age: Option<u32>,
 //! }
@@ -302,25 +302,25 @@
 //! enum Alt {}
 //!
 //! #[derive(Decode, Encode)]
+//! #[musli(Text, name_all = "name")]
 //! #[musli(mode = Alt, packed)]
-//! #[musli(name_all = "name")]
 //! struct Word<'a> {
 //!     text: &'a str,
 //!     teineigo: bool,
 //! }
 //!
-//! const CONFIG: Encoding = Encoding::new();
-//! const ALT_CONFIG: Encoding<Alt> = Encoding::new().with_mode();
+//! const TEXT: Encoding = Encoding::new();
+//! const ALT: Encoding<Alt> = Encoding::new().with_mode();
 //!
 //! let word = Word {
 //!     text: "あります",
 //!     teineigo: true,
 //! };
 //!
-//! let out = CONFIG.to_string(&word)?;
+//! let out = TEXT.to_string(&word)?;
 //! assert_eq!(out, r#"{"text":"あります","teineigo":true}"#);
 //!
-//! let out = ALT_CONFIG.to_string(&word)?;
+//! let out = ALT.to_string(&word)?;
 //! assert_eq!(out, r#"["あります",true]"#);
 //! # Ok::<_, musli::json::Error>(())
 //! ```
@@ -462,20 +462,20 @@
 //!
 //! [`Binary`]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
 //! [`bincode`]: <https://docs.rs/bincode>
-//! [`data_model`]: <https://docs.rs/musli/latest/musli/_help/data_model/index.html>
+//! [`data_model`]: <https://docs.rs/musli/latest/musli/_help/data_model/>
 //! [`decode_any`]: https://docs.rs/musli/latest/musli/trait.Decoder.html#method.decode_any
 //! [`Decode`]: <https://docs.rs/musli/latest/musli/de/trait.Decode.html>
 //! [`Decoder`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html>
-//! [`derives`]: <https://docs.rs/musli/latest/musli/_help/derives/index.html>
+//! [`derives`]: <https://docs.rs/musli/latest/musli/_help/derives/>
 //! [`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
 //! [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
-//! [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/index.html>
-//! [`musli::json`]: <https://docs.rs/musli/latest/musli/json/index.html>
-//! [`musli::packed`]: <https://docs.rs/musli/latest/musli/packed/index.html>
-//! [`musli::serde`]: <https://docs.rs/musli/latest/musli/serde/index.html>
-//! [`musli::storage`]: <https://docs.rs/musli/latest/musli/storage/index.html>
-//! [`musli::value`]: <https://docs.rs/musli/latest/musli/value/index.html>
-//! [`musli::wire`]: <https://docs.rs/musli/latest/musli/wire/index.html>
+//! [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/>
+//! [`musli::json`]: <https://docs.rs/musli/latest/musli/json/>
+//! [`musli::packed`]: <https://docs.rs/musli/latest/musli/packed/>
+//! [`musli::serde`]: <https://docs.rs/musli/latest/musli/serde/>
+//! [`musli::storage`]: <https://docs.rs/musli/latest/musli/storage/>
+//! [`musli::value`]: <https://docs.rs/musli/latest/musli/value/>
+//! [`musli::wire`]: <https://docs.rs/musli/latest/musli/wire/>
 //! [`protobuf`]: <https://developers.google.com/protocol-buffers>
 //! [`serde`]: <https://serde.rs>
 //! [`simdutf8`]: <https://docs.rs/simdutf8>
@@ -488,7 +488,7 @@
 //! [completely uses visitors]: https://docs.rs/serde/latest/serde/trait.Deserializer.html#tymethod.deserialize_u32
 //! [default context]: <https://docs.rs/musli/latest/musli/context/new_in.html>
 //! [detailed tracing]: <https://udoprog.github.io/rust/2023-05-22/abductive-diagnostics-for-musli.html>
-//! [musli-name-type]: <https://docs.rs/musli/latest/musli/_help/derives/index.html#musliname_type-->
+//! [musli-name-type]: <https://docs.rs/musli/latest/musli/_help/derives/#muslinametype--type>
 //! [no-std and no-alloc]: <https://github.com/udoprog/musli/blob/main/no-std/examples/>
 //! [scoped allocations]: <https://docs.rs/musli/latest/musli/trait.Context.html#tymethod.alloc>
 //! [size comparisons]: <https://udoprog.github.io/musli/benchmarks/#size-comparisons>
