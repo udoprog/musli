@@ -29,7 +29,7 @@ alloc = []
 
 [dependencies]
 musli-zerocopy-macros = { version = "=0.0.126", path = "../musli-zerocopy-macros" }
-rand = { version = "0.8.5", default-features = false, features = ["small_rng"] }
+rand = { version = "0.9.0", default-features = false, features = ["small_rng"] }
 
 [dev-dependencies]
 anyhow = "1.0.81"

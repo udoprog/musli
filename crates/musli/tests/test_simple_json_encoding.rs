@@ -23,7 +23,7 @@ fn test_simple_json_encoding() {
     let expected = vec![SimpleJsonStruct {
         name: "Aristotle",
         age: 61.1415,
-        c: rng.gen(),
+        c: rng.random(),
     }];
 
     let out = CONFIG.to_string(&expected).unwrap();

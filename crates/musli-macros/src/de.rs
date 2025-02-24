@@ -17,14 +17,14 @@ struct Ctxt<'a> {
     trace_body: bool,
 }
 
-pub(crate) fn expand_decode_entry(e: Build<'_, '_>) -> Result<TokenStream> {
-    e.validate_decode()?;
-    e.cx.reset();
+pub(crate) fn expand_decode_entry(b: &Build<'_, '_>) -> Result<TokenStream> {
+    b.validate_decode()?;
+    b.cx.reset();
 
-    let ctx_var = e.cx.ident("ctx");
-    let decoder_var = e.cx.ident("decoder");
-    let tag_var = e.cx.ident("tag");
-    let d_param = e.cx.type_with_span("D", Span::call_site());
+    let ctx_var = b.cx.ident("ctx");
+    let decoder_var = b.cx.ident("decoder");
+    let tag_var = b.cx.ident("tag");
+    let d_param = b.cx.type_with_span("D", Span::call_site());
 
     let cx = Ctxt {
         ctx_var: &ctx_var,
@@ -36,26 +36,26 @@ pub(crate) fn expand_decode_entry(e: Build<'_, '_>) -> Result<TokenStream> {
 
     let packed;
 
-    let body = match &e.data {
+    let body = match &b.data {
         BuildData::Struct(st) => {
-            packed = crate::internals::packed(&e, st);
-            decode_struct(&cx, &e, st)?
+            packed = crate::internals::packed(b, st);
+            decode_struct(&cx, b, st)?
         }
         BuildData::Enum(en) => {
             packed = syn::parse_quote!(false);
-            decode_enum(&cx, &e, en)?
+            decode_enum(&cx, b, en)?
         }
     };
 
-    if e.cx.has_errors() {
+    if b.cx.has_errors() {
         return Err(());
     }
 
     // Figure out which lifetime to use for what. We use the first lifetime in
     // the type (if any is available) as the decoder lifetime. Else we generate
     // a new anonymous lifetime `'de` to use for the `Decode` impl.
-    let mut generics = e.input.generics.clone();
-    let type_ident = &e.input.ident;
+    let mut generics = b.input.generics.clone();
+    let type_ident = &b.input.ident;
 
     let Tokens {
         allocator_t,
@@ -65,11 +65,11 @@ pub(crate) fn expand_decode_entry(e: Build<'_, '_>) -> Result<TokenStream> {
         decoder_t,
         try_fast_decode,
         ..
-    } = e.tokens;
+    } = b.tokens;
 
-    let lt = &e.p.lt;
+    let lt = &b.p.lt;
 
-    if !e.p.lt_exists {
+    if !b.p.lt_exists {
         generics
             .params
             .push(syn::GenericParam::Lifetime(syn::LifetimeParam {
@@ -80,9 +80,9 @@ pub(crate) fn expand_decode_entry(e: Build<'_, '_>) -> Result<TokenStream> {
             }));
     }
 
-    let allocator_ident = &e.p.allocator_ident;
+    let allocator_ident = &b.p.allocator_ident;
 
-    if !e.p.allocator_exists {
+    if !b.p.allocator_exists {
         generics
             .params
             .push(syn::GenericParam::Type(allocator_ident.clone().into()));
@@ -93,17 +93,17 @@ pub(crate) fn expand_decode_entry(e: Build<'_, '_>) -> Result<TokenStream> {
             .push(syn::parse_quote!(#allocator_ident: #allocator_t));
     }
 
-    if !e.bounds.is_empty() && !e.decode_bounds.is_empty() {
+    if !b.bounds.is_empty() && !b.decode_bounds.is_empty() {
         generics.make_where_clause().predicates.extend(
-            e.bounds
+            b.bounds
                 .iter()
-                .chain(e.decode_bounds.iter())
+                .chain(b.decode_bounds.iter())
                 .map(|(_, v)| v.clone()),
         );
     }
 
     let (impl_generics, _, where_clause) = generics.split_for_impl();
-    let (_, type_generics, _) = e.input.generics.split_for_impl();
+    let (_, type_generics, _) = b.input.generics.split_for_impl();
 
     let mut attributes = Vec::<syn::Attribute>::new();
 
@@ -111,7 +111,7 @@ pub(crate) fn expand_decode_entry(e: Build<'_, '_>) -> Result<TokenStream> {
         attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
     }
 
-    let mode_ident = e.expansion.mode_path(e.tokens);
+    let mode_ident = b.expansion.mode_path(b.tokens);
 
     Ok(quote! {
         const _: () = {
@@ -180,7 +180,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
         ..
     } = b.tokens;
 
-    let type_name = en.name;
+    let type_name = en.name_type.value;
 
     // Trying to decode an uninhabitable type.
     if en.variants.is_empty() {
@@ -245,7 +245,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
         }
         NameMethod::Unsized(method) => {
             let mut variants = Vec::new();
-            let output_type = b.cx.type_with_span("VariantTag", en.span);
+            let output_type = b.cx.type_with_span("VariantTag", b.input.ident.span());
 
             for v in &en.variants {
                 let (pat, variant) =
@@ -350,7 +350,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
         }
         EnumTagging::Default => {
             let arms = output_arms.iter().flat_map(|(v, pat, tag_value)| {
-                let name = &v.st.name;
+                let name = v.st.name_type.value;
 
                 let decode = decode_variant(cx, b, v, &body_decoder_var, &variant_tag_var).ok()?;
 
@@ -415,12 +415,11 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                 Ok(#output_var)
             }})
         }
-        EnumTagging::Internal {
-            tag_value,
-            tag_type,
-        } => {
+        EnumTagging::Internal { tag } => {
+            let tag_value = tag.value;
+
             let arms = output_arms.iter().flat_map(|(v, pat, tag_value)| {
-                let name = &v.st.name;
+                let name = v.st.name_type.value;
 
                 let decode =
                     decode_variant(cx, b, v, &buffer_decoder_var, &variant_tag_var).ok()?;
@@ -457,13 +456,13 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
             let outcome_enum;
             let decode_match;
 
-            match tag_type.method {
+            match tag.method {
                 NameMethod::Sized => {
                     let decode_t_decode = &b.decode_t_decode;
 
                     outcome_enum = None;
 
-                    let tag_type = &tag_type.ty;
+                    let tag_type = &tag.ty;
                     let tag_arm = output_arm(None, tag_value, &binding_var);
 
                     decode_match = quote! {
@@ -486,12 +485,10 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                         enum #outcome_type<#buf_type> { Tag, Skip(#buf_type) }
                     });
 
-                    let visit_type = &tag_type.ty;
+                    let visit_type = &tag.ty;
                     let method = method.as_method_name();
-
+                    let format_value_var = tag.name_format(&value_var);
                     let tag_arm = output_arm(None, tag_value, &binding_var);
-
-                    let format_value_var = tag_type.name_format(&value_var);
 
                     let decode_outcome = quote! {
                         #decoder_t::#method(#field_name_var, |#value_var: &#visit_type| {
@@ -533,8 +530,8 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                 }
             });
 
-            let tag_static_value = tag_type.expr(tag_static.clone());
-            let tag_type = tag_type.ty();
+            let tag_static_value = tag.expr(tag_static.clone());
+            let tag_type = tag.ty();
 
             Ok(quote! {{
                 static #tag_static: #tag_type = #tag_value;
@@ -569,14 +566,12 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                 #result::Ok(#output_var)
             }})
         }
-        EnumTagging::Adjacent {
-            tag_value,
-            tag_type,
-            content_value,
-            content_type,
-        } => {
+        EnumTagging::Adjacent { tag, content } => {
+            let tag_value = tag.value;
+            let content_value = content.value;
+
             let arms = output_arms.iter().flat_map(|(v, pat, tag_value)| {
-                let name = &v.st.name;
+                let name = v.st.name_type.value;
 
                 let decode = decode_variant(cx, b, v, &body_decoder_var, &variant_tag_var).ok()?;
 
@@ -611,13 +606,13 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
             let outcome_enum;
             let decode_match;
 
-            match tag_type.method {
+            match tag.method {
                 NameMethod::Sized => {
-                    outcome_enum = None;
-
-                    let value_type = &tag_type.ty;
+                    let value_type = &tag.ty;
                     let tag_arm = output_arm(None, tag_value, &binding_var);
                     let content_arm = output_arm(None, content_value, &binding_var);
+
+                    outcome_enum = None;
 
                     decode_match = quote! {
                         let #value_var: #value_type = #decode_t_decode(#field_name_var)?;
@@ -649,15 +644,15 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                     };
                 }
                 NameMethod::Unsized(method) => {
-                    outcome_enum = Some(quote! {
-                        enum #outcome_type<#buf_type> { Tag, Content, Skip(#buf_type) }
-                    });
-
-                    let visit_type = &tag_type.ty;
-                    let format_value_var = tag_type.name_format(&value_var);
+                    let visit_type = &tag.ty;
+                    let format_value_var = tag.name_format(&value_var);
                     let method = method.as_method_name();
                     let tag_arm = output_arm(None, tag_value, &binding_var);
                     let content_arm = output_arm(None, content_value, &binding_var);
+
+                    outcome_enum = Some(quote! {
+                        enum #outcome_type<#buf_type> { Tag, Content, Skip(#buf_type) }
+                    });
 
                     decode_match = quote! {
                         let #outcome_var = #decoder_t::#method(#field_name_var, |#value_var: &#visit_type| {
@@ -709,8 +704,8 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                 }
             });
 
-            let tag_value_type = tag_type.ty();
-            let content_value_type = content_type.ty();
+            let tag_value_type = tag.ty();
+            let content_value_type = content.ty();
 
             Ok(quote! {{
                 static #tag_static: #tag_value_type = #tag_value;
@@ -780,7 +775,11 @@ fn decode_empty(cx: &Ctxt, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStre
         ..
     } = b.tokens;
 
-    let Body { path, name, .. } = st;
+    let Body {
+        path, name_type, ..
+    } = st;
+
+    let name = name_type.value;
 
     let output_var = b.cx.ident("output");
     let struct_hint_static = b.cx.ident("STRUCT_HINT");
@@ -845,7 +844,7 @@ fn decode_tagged(
     let static_name_var = b.cx.ident("FIELD_NAME");
     let static_name_type = st.name_type.ty();
 
-    let type_name = &st.name;
+    let type_name = st.name_type.value;
 
     let mut assigns = Punctuated::<_, Token![,]>::new();
 
@@ -856,15 +855,8 @@ fn decode_tagged(
         let var = &f.var;
         let decode_path = &f.decode_path.1;
 
-        let expr = match &f.skip {
-            Some(span) => {
-                let ty = f.ty;
-
-                match &f.default_attr {
-                    Some((_, Some(path))) => syn::Expr::Verbatim(quote_spanned!(*span => #path())),
-                    _ => syn::Expr::Verbatim(quote_spanned!(*span => #default_function::<#ty>())),
-                }
-            }
+        let expr = match f.init_default(b) {
+            Some(init) => syn::Expr::Verbatim(init),
             None => {
                 let formatted_tag = st.name_type.name_format(&static_name_var);
 
@@ -1109,12 +1101,8 @@ fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result
 
     let Tokens { context_t, .. } = b.tokens;
 
-    let f = &st.unskipped_fields[0];
-
-    let type_name = &st.name;
+    let type_name = st.name_type.value;
     let path = &st.path;
-    let decode_path = &f.decode_path.1;
-    let member = &f.member;
 
     let enter = (cx.trace && cx.trace_body).then(|| {
         quote! {
@@ -1128,11 +1116,24 @@ fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result
         }
     });
 
+    let fields = st.all_fields.iter().map(|f| {
+        let init = if let Some(init) = f.init_default(b) {
+            init
+        } else {
+            // If this is not a skipped field, then it is the one transparent field.
+            let decode_path = &f.decode_path.1;
+            quote!(#decode_path(#decoder_var)?)
+        };
+
+        let member = &f.member;
+        quote!(#member: #init)
+    });
+
     Ok(quote! {{
         #enter
 
         let #output_var = #path {
-            #member: #decode_path(#decoder_var)?
+            #(#fields),*
         };
 
         #leave
@@ -1153,35 +1154,21 @@ fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Toke
         decoder_t,
         pack_decoder_t,
         option,
-        default_function,
         ..
     } = b.tokens;
 
-    let type_name = &st.name;
+    let type_name = st.name_type.value;
     let output_var = b.cx.ident("output");
     let field_decoder = b.cx.ident("field_decoder");
-
-    let mut last_default = None;
 
     let mut assign = Vec::new();
 
     for f in &st.unskipped_fields {
-        let mut is_default = false;
-
-        if let Some((span, _)) = f.default_attr {
-            is_default = true;
-            last_default = Some(span);
-        } else if let Some(span) = last_default {
-            b.packed_default_diagnostics(span);
-        }
-
         let (_, decode_path) = &f.decode_path;
         let member = &f.member;
         let field_decoder = &field_decoder;
 
-        if is_default {
-            let ty = f.ty;
-
+        if let Some(init) = f.init_default(b) {
             let value: Box<dyn Fn(&syn::Ident, &mut TokenStream)> =
                 Box::new(move |ident: &syn::Ident, tokens: &mut TokenStream| {
                     tokens.extend(quote! {
@@ -1190,7 +1177,7 @@ fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Toke
 
                             match #decoder_t::decode_option(#field_decoder)? {
                                 #option::Some(#field_decoder) => #decode_path(#field_decoder)?,
-                                #option::None => #default_function::<#ty>(),
+                                #option::None => #init,
                             }
                         }
                     })
@@ -1286,7 +1273,7 @@ fn unsized_arm<'a>(
     pattern: Option<&'a syn::Pat>,
     output: &Ident,
 ) -> (syn::Pat, NameVariant<'a>) {
-    let variant = b.cx.type_with_span(format_args!("Variant{}", index), span);
+    let variant = b.cx.type_with_span(format_args!("Variant{index}"), span);
 
     let mut path = syn::Path::from(output.clone());
     path.segments.push(syn::PathSegment::from(variant.clone()));

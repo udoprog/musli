@@ -9,7 +9,7 @@ use crate::phf::hashing::{displace, hash, HashKey, Hashes};
 use crate::phf::Entry;
 use crate::{ByteOrder, Ref, Size, ZeroCopy};
 
-use rand::distributions::Standard;
+use rand::distr::StandardUniform;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 
@@ -41,7 +41,7 @@ where
     E: ByteOrder,
     O: Size,
 {
-    for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(Standard) {
+    for key in SmallRng::seed_from_u64(FIXED_SEED).sample_iter(StandardUniform) {
         if let Some(hash) = try_generate_hash(buf, entries, displacements, map, key, &access)? {
             return Ok(hash);
         }

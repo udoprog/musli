@@ -4,11 +4,11 @@ use std::mem;
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::meta::ParseNestedMeta;
-use syn::parse::{Parse, ParseStream};
+use syn::parse::Parse;
 use syn::spanned::Spanned;
 use syn::Token;
 
-use crate::expander::{NameMethod, NameType};
+use crate::expander::{Name, NameMethod};
 
 use super::build;
 use super::ATTR;
@@ -18,7 +18,7 @@ use super::{Ctxt, ImportedMethod, Mode, NameAll};
 pub(crate) enum ModeKind {
     Binary,
     Text,
-    Custom(Box<str>),
+    Custom,
 }
 
 impl ModeKind {
@@ -26,7 +26,7 @@ impl ModeKind {
         match self {
             ModeKind::Binary => Some(NameAll::Index),
             ModeKind::Text => Some(NameAll::Name),
-            ModeKind::Custom(_) => None,
+            ModeKind::Custom => None,
         }
     }
 }
@@ -57,16 +57,11 @@ pub(crate) enum EnumTagging<'a> {
     /// Only the tag is encoded.
     Empty,
     /// The type is internally tagged by the field given by the expression.
-    Internal {
-        tag_value: &'a syn::Expr,
-        tag_type: NameType<'a>,
-    },
+    Internal { tag: Name<'a, syn::Expr> },
     /// An enumerator is adjacently tagged.
     Adjacent {
-        tag_value: &'a syn::Expr,
-        tag_type: NameType<'a>,
-        content_value: &'a syn::Expr,
-        content_type: NameType<'a>,
+        tag: Name<'a, syn::Expr>,
+        content: Name<'a, syn::Expr>,
     },
 }
 
@@ -274,34 +269,30 @@ impl TypeAttr {
             && self.name_method(mode).is_none()
     }
 
-    pub(crate) fn enum_tagging_span(&self, mode: &Mode<'_>) -> Option<Span> {
-        let tag = self.tag_value(mode);
-        let content = self.content_value(mode);
-        Some(tag.or(content)?.0)
-    }
-
     /// Indicates the state of enum tagging.
     pub(crate) fn enum_tagging(&self, mode: &Mode<'_>) -> Option<EnumTagging<'_>> {
         let (_, tag_value) = self.tag_value(mode)?;
 
         let default_tag_type = build::determine_type(tag_value);
-        let (_, ty, method) = build::split_name(
+        let (_, ty, method, name_span) = build::split_name(
             mode.kind,
             self.tag_type(mode).or(default_tag_type.as_ref()),
             None,
             self.tag_method(mode),
         );
 
-        let tag_type = NameType {
+        let tag = Name {
+            span: name_span,
+            value: tag_value,
             ty,
             method,
             format_with: self.tag_format_with(mode),
         };
 
-        Some(match self.content_value(mode) {
+        let enum_tagging = match self.content_value(mode) {
             Some((_, content_value)) => {
                 let default_content_type = build::determine_type(content_value);
-                let (_, ty, method) = build::split_name(
+                let (_, ty, method, name_span) = build::split_name(
                     mode.kind,
                     self.content_type(mode).or(default_content_type.as_ref()),
                     None,
@@ -309,21 +300,20 @@ impl TypeAttr {
                 );
 
                 EnumTagging::Adjacent {
-                    tag_value,
-                    tag_type,
-                    content_value,
-                    content_type: NameType {
+                    tag,
+                    content: Name {
+                        span: name_span,
+                        value: content_value,
                         ty,
                         method,
                         format_with: self.content_format_with(mode),
                     },
                 }
             }
-            _ => EnumTagging::Internal {
-                tag_value,
-                tag_type,
-            },
-        })
+            _ => EnumTagging::Internal { tag },
+        };
+
+        Some(enum_tagging)
     }
 
     /// Get the configured crate, or fallback to default.
@@ -351,7 +341,6 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
         let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
-            // #[musli(mode = <path>)]
             if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(parse_mode(&meta)?);
@@ -368,9 +357,8 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // #[musli(tag = <expr>)]
             if meta.path.is_ident("tag") {
-                let ty = TypeConfig::parse("tag", meta.input, true, true)?;
+                let ty = TypeConfig::parse("tag", meta, true, true)?;
                 new.tag_value.extend(ty.value);
                 new.tag_type.extend(ty.ty);
                 new.tag_method.extend(ty.method);
@@ -378,9 +366,8 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // #[musli(content = <expr>)]
             if meta.path.is_ident("content") {
-                let ty = TypeConfig::parse("content", meta.input, true, true)?;
+                let ty = TypeConfig::parse("content", meta, true, true)?;
                 new.content_value.extend(ty.value);
                 new.content_type.extend(ty.ty);
                 new.content_method.extend(ty.method);
@@ -388,7 +375,6 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // #[musli(crate = <path>)]
             if meta.path.is_ident("crate") {
                 let path = if meta.input.parse::<Option<Token![=]>>()?.is_some() {
                     meta.input.parse()?
@@ -400,23 +386,20 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // #[musli(name)]
             if meta.path.is_ident("name") {
-                let ty = TypeConfig::parse("name", meta.input, false, true)?;
+                let ty = TypeConfig::parse("name", meta, false, true)?;
                 new.name_type.extend(ty.ty);
                 new.name_method.extend(ty.method);
                 new.name_format_with.extend(ty.format_with);
                 return Ok(());
             }
 
-            // #[musli(bound = {..})]
             if meta.path.is_ident("bound") {
                 meta.input.parse::<Token![=]>()?;
                 parse_bounds(&meta, &mut new.bounds)?;
                 return Ok(());
             }
 
-            // #[musli(decode_bound = {..})]
             if meta.path.is_ident("decode_bound") {
                 if meta.input.parse::<Option<Token![<]>>()?.is_some() {
                     parse_bound_types(
@@ -431,22 +414,24 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            // #[musli(packed)]
             if meta.path.is_ident("packed") {
                 new.packing.push((meta.path.span(), Packing::Packed));
                 return Ok(());
             }
 
-            // #[musli(transparent)]
             if meta.path.is_ident("transparent") {
                 new.packing.push((meta.path.span(), Packing::Transparent));
                 return Ok(());
             }
 
-            // #[musli(name_all = "..")]
             if meta.path.is_ident("name_all") {
                 new.name_all
                     .push((meta.path.span(), parse_name_all(&meta)?));
+                return Ok(());
+            }
+
+            if let Some(m) = parse_path_mode(&meta) {
+                mode = Some(m);
                 return Ok(());
             }
 
@@ -597,7 +582,6 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
         let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
-            // #[musli(mode = <path>)]
             if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(parse_mode(&meta)?);
@@ -621,7 +605,6 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 ));
             }
 
-            // #[musli(pattern = <expr>)]
             if meta.path.is_ident("pattern") {
                 meta.input.parse::<Token![=]>()?;
                 new.pattern
@@ -629,38 +612,38 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
-            // #[musli(default)]
             if meta.path.is_ident("default") {
                 new.default_variant.push((meta.path.span(), ()));
                 return Ok(());
             }
 
-            // #[musli(packed)]
             if meta.path.is_ident("packed") {
                 new.packing.push((meta.path.span(), Packing::Packed));
                 return Ok(());
             }
 
-            // #[musli(transparent)]
             if meta.path.is_ident("transparent") {
                 new.packing.push((meta.path.span(), Packing::Transparent));
                 return Ok(());
             }
 
-            // #[musli(name_all = "..")]
             if meta.path.is_ident("name_all") {
                 new.name_all
                     .push((meta.path.span(), parse_name_all(&meta)?));
                 return Ok(());
             }
 
-            // #[musli(name)]
             if meta.path.is_ident("name") {
-                let ty = TypeConfig::parse("name", meta.input, true, true)?;
+                let ty = TypeConfig::parse("name", meta, true, true)?;
                 new.name_expr.extend(ty.value);
                 new.name_type.extend(ty.ty);
                 new.name_method.extend(ty.method);
                 new.name_format_with.extend(ty.format_with);
+                return Ok(());
+            }
+
+            if let Some(m) = parse_path_mode(&meta) {
+                mode = Some(m);
                 return Ok(());
             }
 
@@ -726,8 +709,8 @@ impl Field {
         mode: &Mode<'a>,
         span: Span,
     ) -> (Span, DefaultOrCustom<'a>) {
-        if let Some((span, encode_path)) = self.encode_path(mode) {
-            (*span, DefaultOrCustom::Custom(encode_path.clone()))
+        if let Some(&(span, ref encode_path)) = self.encode_path(mode) {
+            (span, DefaultOrCustom::Custom(encode_path.clone()))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
             let encode_path = mode.encode_t_encode(field_encoding);
@@ -757,8 +740,8 @@ impl Field {
         span: Span,
         allocator_ident: &syn::Ident,
     ) -> (Span, DefaultOrCustom<'a>) {
-        if let Some((span, decode_path)) = self.decode_path(mode) {
-            (*span, DefaultOrCustom::Custom(decode_path.clone()))
+        if let Some(&(span, ref decode_path)) = self.decode_path(mode) {
+            (span, DefaultOrCustom::Custom(decode_path.clone()))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
             let decode_path = mode.decode_t_decode(field_encoding, allocator_ident);
@@ -781,7 +764,6 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
         let mut only = None;
 
         let result = a.parse_nested_meta(|meta| {
-            // #[musli(mode = <path>)]
             if meta.path.is_ident("mode") {
                 meta.input.parse::<Token![=]>()?;
                 mode = Some(parse_mode(&meta)?);
@@ -798,7 +780,6 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // parse #[musli(with = <path>)]
             if meta.path.is_ident("with") {
                 meta.input.parse::<Token![=]>()?;
                 let mut path = meta.input.parse::<syn::Path>()?;
@@ -832,7 +813,6 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // #[musli(skip_encoding_if = <path>)]
             if meta.path.is_ident("skip_encoding_if") {
                 meta.input.parse::<Token![=]>()?;
                 new.skip_encoding_if
@@ -847,14 +827,12 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 ));
             }
 
-            // #[musli(name = <expr>)]
             if meta.path.is_ident("name") {
                 meta.input.parse::<Token![=]>()?;
                 new.name.push((meta.path.span(), meta.input.parse()?));
                 return Ok(());
             }
 
-            // #[musli(pattern = <expr>)]
             if meta.path.is_ident("pattern") {
                 meta.input.parse::<Token![=]>()?;
                 new.pattern
@@ -862,7 +840,6 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // #[musli(default)]
             if meta.path.is_ident("default") {
                 if meta.input.parse::<Option<Token![=]>>()?.is_some() {
                     new.is_default
@@ -874,27 +851,28 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            // #[musli(skip)]
             if meta.path.is_ident("skip") {
                 new.skip.push((meta.path.span(), ()));
                 return Ok(());
             }
 
-            // #[musli(trace)]
             if meta.path.is_ident("trace") {
                 new.encoding.push((meta.path.span(), FieldEncoding::Trace));
                 return Ok(());
             }
 
-            // #[musli(bytes)]
             if meta.path.is_ident("bytes") {
                 new.encoding.push((meta.path.span(), FieldEncoding::Bytes));
                 return Ok(());
             }
 
-            // #[musli(packed)]
             if meta.path.is_ident("packed") {
                 new.encoding.push((meta.path.span(), FieldEncoding::Packed));
+                return Ok(());
+            }
+
+            if let Some(m) = parse_path_mode(&meta) {
+                mode = Some(m);
                 return Ok(());
             }
 
@@ -930,10 +908,31 @@ fn parse_mode(meta: &ParseNestedMeta<'_>) -> syn::Result<ModeIdent> {
     let kind = match s.as_str() {
         "Binary" => ModeKind::Binary,
         "Text" => ModeKind::Text,
-        other => ModeKind::Custom(other.into()),
+        _ => ModeKind::Custom,
     };
 
     Ok(ModeIdent { ident, kind })
+}
+
+fn parse_path_mode(meta: &ParseNestedMeta<'_>) -> Option<ModeIdent> {
+    let ident = meta.path.get_ident()?;
+
+    let kind = 'kind: {
+        if ident == "Binary" {
+            break 'kind ModeKind::Binary;
+        }
+
+        if ident == "Text" {
+            break 'kind ModeKind::Text;
+        }
+
+        return None;
+    };
+
+    Some(ModeIdent {
+        ident: ident.clone(),
+        kind,
+    })
 }
 
 #[derive(Clone, Default)]
@@ -951,14 +950,14 @@ struct TypeConfig {
 impl TypeConfig {
     fn parse(
         name: &str,
-        input: ParseStream,
+        meta: ParseNestedMeta<'_>,
         as_expr: bool,
         format_with: bool,
     ) -> syn::Result<Self> {
         let mut this = Self::default();
 
-        if as_expr && input.parse::<Option<Token![=]>>()?.is_some() {
-            if let Some((s, _)) = this.value.replace((input.span(), input.parse()?)) {
+        if as_expr && meta.input.parse::<Option<Token![=]>>()?.is_some() {
+            if let Some((s, _)) = this.value.replace((meta.path.span(), meta.input.parse()?)) {
                 return Err(syn::Error::new(
                     s,
                     format_args!("#[musli({name} = ..)]: Duplicate value for attribute"),
@@ -969,7 +968,7 @@ impl TypeConfig {
         }
 
         let content;
-        _ = syn::parenthesized!(content in input);
+        _ = syn::parenthesized!(content in meta.input);
 
         while !content.is_empty() {
             'ok: {

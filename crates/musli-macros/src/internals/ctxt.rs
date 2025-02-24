@@ -1,13 +1,10 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{self, Write};
-use std::rc::Rc;
 
 use proc_macro2::Span;
 
 use super::attr::{ModeIdent, ModeKind};
-use super::build::Field;
-use super::ATTR;
 
 struct Inner {
     b1: String,
@@ -36,24 +33,6 @@ impl Ctxt {
                 #[cfg(not(feature = "verbose"))]
                 types: 0,
             }),
-        }
-    }
-
-    /// Emit diagnostics for a transparent encode / decode that failed because
-    /// the wrong number of fields existed.
-    pub(crate) fn transparent_diagnostics(&self, span: Span, fields: &[Rc<Field>]) {
-        if fields.is_empty() {
-            self.error_span(
-                span,
-                format_args!("A #[{ATTR}(transparent)] type must have a single unskipped field"),
-            );
-        } else {
-            self.error_span(
-                span,
-                format_args!(
-                    "A #[{ATTR}(transparent)] attribute can only be used on types which have a single field",
-                ),
-            );
         }
     }
 

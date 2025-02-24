@@ -53,7 +53,7 @@ musli = { path = ".", features = ["test"] }
 tests = { path = "../../tests" }
 
 anyhow = "1.0.81"
-rand = "0.8.5"
+rand = "0.9.0"
 serde = { version = "1.0.198", features = ["derive"] }
 url = { version = "2.5.0", features = ["serde"] }
 trybuild = "1.0.90"

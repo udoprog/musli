@@ -17,7 +17,7 @@ struct TransparentEmptyStruct;
 
 #[derive(Encode, Decode)]
 #[musli(transparent)]
-struct TransparentEmptyTuple;
+struct TransparentEmptyTuple();
 
 #[derive(Encode, Decode)]
 enum Enum1 {
@@ -49,20 +49,6 @@ enum DenyNamedTransparentEnum {
 }
 
 #[derive(Encode, Decode)]
-#[musli(packed)]
-struct DenyNamedPackedStruct {
-    #[musli(name = "test")]
-    field: String,
-}
-
-#[derive(Encode, Decode)]
-#[musli(tag = "type")]
-enum DenyNamedPackedEnum {
-    #[musli(packed)]
-    Variant(#[musli(name = "test")] String),
-}
-
-#[derive(Encode, Decode)]
 #[musli(transparent)]
 struct DenyOptionalTransparentStruct {
     #[musli(skip_encoding_if = String::is_empty)]
@@ -78,11 +64,29 @@ enum DenyOptionalTransparentEnum {
     }
 }
 
-#[derive(Encode, Decode)]
-#[musli(tag = "type")]
-pub enum PackedVariant {
-    #[musli(packed)]
-    Variant(u32),
+#[derive(Debug, PartialEq, Encode, Decode)]
+pub struct Struct {
+    string: String,
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(transparent)]
+pub struct StructBadSkip {
+    #[musli(skip)]
+    a: u32,
+    st: Struct,
+    b: u32,
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+pub enum EnumBadSkip {
+    #[musli(transparent)]
+    StructSkip {
+        #[musli(skip)]
+        a: u32,
+        st: Struct,
+        b: u32,
+    },
 }
 
 fn main() {

@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
+use quote::quote_spanned;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
 
 use crate::expander::{
-    self, Data, EnumData, Expander, FieldData, NameMethod, NameType, StructData, StructKind,
+    self, Data, EnumData, Expander, FieldData, Name, NameMethod, StructData, StructKind,
     UnsizedMethod, VariantData,
 };
 
@@ -32,35 +33,26 @@ pub(crate) struct Build<'tok, 'a> {
     pub(crate) data: BuildData<'a>,
     pub(crate) decode_t_decode: ImportedMethod<'a>,
     pub(crate) encode_t_encode: ImportedMethod<'a>,
-    pub(crate) enum_tagging_span: Option<Span>,
+    pub(crate) enum_tag: Option<Span>,
+    pub(crate) enum_content: Option<Span>,
     pub(crate) tokens: &'tok Tokens<'a>,
     pub(crate) p: Parameters,
 }
 
 impl Build<'_, '_> {
-    /// Emit diagnostics indicating that we tried to use a `#[musli(default)]`
-    /// annotation on a packed container.
-    pub(crate) fn packed_default_diagnostics(&self, span: Span) {
-        self.cx.error_span(
-            span,
-            format_args!(
-                "#[{ATTR}(default)] fields can only be used in the end of packed containers"
-            ),
-        );
-    }
-
     /// Validate encode attributes.
     pub(crate) fn validate_encode(&self) -> Result<()> {
         self.validate(Only::Encode)
     }
 
-    /// Validate set of legal attributes.
+    /// Validate decode attribute.
     pub(crate) fn validate_decode(&self) -> Result<()> {
         self.validate(Only::Decode)
     }
 
     fn validate(&self, only: Only) -> Result<()> {
-        self.data.validate(only, self.cx, self.enum_tagging_span);
+        self.data
+            .validate(only, self.cx, &self.mode, self.enum_tag, self.enum_content);
         Ok(())
     }
 }
@@ -72,66 +64,80 @@ pub(crate) enum BuildData<'a> {
 }
 
 impl BuildData<'_> {
-    fn validate(&self, only: Only, cx: &Ctxt, enum_tagging_span: Option<Span>) {
+    fn validate(
+        &self,
+        only: Only,
+        cx: &Ctxt,
+        mode: &Mode<'_>,
+        enum_tag: Option<Span>,
+        enum_content: Option<Span>,
+    ) {
         match self {
             BuildData::Struct(body) => {
-                if let Some(span) = enum_tagging_span {
+                if let Some(span) = enum_tag {
                     cx.error_span(
                         span,
                         format_args!(
-                            "The #[{ATTR}(tag)] and #[{ATTR}(content)] attributes are only supported on enums"
+                            "In {mode} the #[{ATTR}(tag)] attribute is only supported on enums"
                         ),
                     );
                 }
 
-                body.validate(cx);
+                if let Some(span) = enum_content {
+                    cx.error_span(
+                        span,
+                        format_args!(
+                            "In {mode} the #[{ATTR}(content)] attribute is only supported on enums"
+                        ),
+                    );
+                }
+
+                body.validate(cx, mode, "struct", "structs");
             }
             BuildData::Enum(en) => {
                 match en.packing_span {
                     Some(&(span, Packing::Transparent)) => {
                         cx.error_span(
                             span,
-                            format_args!("An enum cannot be #[{ATTR}(transparent)]"),
+                            format_args!("In {mode} an enum cannot be #[{ATTR}(transparent)]"),
                         );
                     }
-                    Some(&(span, Packing::Packed)) if only == Only::Decode => {
-                        cx.error_span(
-                            span,
-                            format_args!("An enum cannot be #[{ATTR}(packed)] when decoding"),
-                        );
+                    Some(&(span, Packing::Packed)) => {
+                        if only == Only::Decode {
+                            cx.error_span(
+                                span,
+                                format_args!(
+                                    "In {mode} an enum cannot be #[{ATTR}(packed)] when decoding"
+                                ),
+                            );
+                        }
+
+                        if let Some(span) = enum_tag {
+                            cx.error_span(
+                                span,
+                                format_args!(
+                                    "In {mode} a #[{ATTR}(packed)] type cannot use #[{ATTR}(tag)]"
+                                ),
+                            );
+                        }
+
+                        if let Some(span) = enum_content {
+                            cx.error_span(span, format_args!("In {mode} a #[{ATTR}(packed)] type cannot use #[{ATTR}(content)]"));
+                        }
                     }
                     _ => (),
                 }
 
-                if !matches!(en.enum_tagging, EnumTagging::Default | EnumTagging::Empty) {
-                    match en.packing_span {
-                        Some(&(span, Packing::Packed)) => {
-                            cx.error_span(
-                                span,
-                                format_args!(
-                                    "A #[{ATTR}(packed)] type cannot use #[{ATTR}(tag)] or #[{ATTR}(content)]"
-                                ),
-                            );
-                        }
-                        Some(&(span, Packing::Transparent)) => {
-                            cx.error_span(span, format_args!("A #[{ATTR}(transparent)] type cannot use #[{ATTR}(tag)] or #[{ATTR}(content)]"));
-                        }
-                        _ => (),
-                    }
-                }
-
                 for v in &en.variants {
-                    v.st.validate(cx);
+                    v.st.validate(cx, mode, "variant", "variants");
 
-                    if matches!(en.enum_tagging, EnumTagging::Internal { .. }) {
-                        if let (span, Packing::Packed) = v.st.packing {
-                            cx.error_span(
-                                span,
-                                format_args!(
-                                    "A #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
-                                ),
-                            );
-                        }
+                    if let ((_, Packing::Packed), Some(span)) = (v.st.packing, enum_tag) {
+                        cx.error_span(
+                            span,
+                            format_args!(
+                                "In {mode} a #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
+                            ),
+                        );
                     }
                 }
             }
@@ -140,22 +146,90 @@ impl BuildData<'_> {
 }
 
 pub(crate) struct Body<'a> {
-    pub(crate) span: Span,
-    pub(crate) name: &'a syn::LitStr,
+    pub(crate) name_type: Name<'a, syn::LitStr>,
     pub(crate) unskipped_fields: Vec<Rc<Field<'a>>>,
     pub(crate) all_fields: Vec<Rc<Field<'a>>>,
-    pub(crate) name_type: NameType<'a>,
     pub(crate) packing: (Span, Packing),
     pub(crate) kind: StructKind,
     pub(crate) path: syn::Path,
 }
 
-impl Body<'_> {
-    pub(crate) fn validate(&self, cx: &Ctxt) {
-        if matches!(self.packing, (_, Packing::Transparent))
-            && !matches!(&self.unskipped_fields[..], [_])
-        {
-            cx.transparent_diagnostics(self.span, &self.unskipped_fields);
+impl<'a> Body<'a> {
+    /// Access the single transparent field in the body.
+    pub(crate) fn transparent_field(&self) -> Result<&Field<'a>, ()> {
+        let [f] = &self.unskipped_fields[..] else {
+            return Err(());
+        };
+
+        Ok(f)
+    }
+
+    pub(crate) fn validate(
+        &self,
+        cx: &Ctxt,
+        mode: &Mode<'_>,
+        singular: &'static str,
+        plural: &'static str,
+    ) {
+        match self.packing {
+            (_, Packing::Packed) => {
+                let mut last_default = None;
+
+                for f in &self.unskipped_fields {
+                    if let Some((span, _)) = f.default_attr {
+                        last_default = Some(span);
+                    } else if let Some(span) = last_default {
+                        cx.error_span(
+                            span,
+                            format_args!(
+                                "Only #[{ATTR}(default)] fields can be used at the end of packed containers"
+                            ),
+                        );
+                    }
+                }
+
+                if let Some(span) = self.name_type.span {
+                    cx.error_span(
+                        span,
+                        format_args!(
+                            "In {mode} a #[{ATTR}(packed)] {singular} cannot have named fields"
+                        ),
+                    );
+                }
+            }
+            (_, Packing::Transparent) if !matches!(&self.unskipped_fields[..], [_]) => {
+                'done: {
+                    if self.all_fields.is_empty() {
+                        cx.error_span(
+                            self.packing.0,
+                            format_args!(
+                                "A #[{ATTR}(transparent)] {singular} must have a single field"
+                            ),
+                        );
+
+                        break 'done;
+                    }
+
+                    if self.unskipped_fields.is_empty() {
+                        cx.error_span(
+                            self.packing.0,
+                            format_args!(
+                                "A #[{ATTR}(transparent)] {singular} must have a single unskipped field"
+                            ),
+                        );
+
+                        break 'done;
+                    }
+
+                    cx.error_span(
+                        self.packing.0,
+                        format_args!(
+                            "A #[{ATTR}(transparent)] attribute can only be used on {plural} which have a single field",
+                        ),
+                    );
+                };
+            }
+            _ => {}
         }
 
         for f in &self.all_fields {
@@ -164,7 +238,7 @@ impl Body<'_> {
                     cx.error_span(
                         span,
                         format_args!(
-                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] type cannot have named fields"
+                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] {singular} cannot have named fields"
                         ),
                     );
                 }
@@ -173,17 +247,19 @@ impl Body<'_> {
                     cx.error_span(
                         span.span(),
                         format_args!(
-                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] type cannot have field patterns"
+                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] {singular} cannot have field patterns"
                         ),
                     );
                 }
             }
 
             if matches!(self.packing, (_, Packing::Transparent)) {
-                if let Some((span, _)) = f.skip_encoding_if {
+                if let Some(&(span, _)) = f.skip_encoding_if {
                     cx.error_span(
-                        *span,
-                        format_args!("A #[{ATTR}(transparent)] type cannot have an optional field"),
+                        span,
+                        format_args!(
+                            "A #[{ATTR}(transparent)] {singular} cannot have an optional field"
+                        ),
                     );
                 }
             }
@@ -192,13 +268,11 @@ impl Body<'_> {
 }
 
 pub(crate) struct Enum<'a> {
-    pub(crate) span: Span,
-    pub(crate) name: &'a syn::LitStr,
+    pub(crate) name_type: Name<'a, syn::LitStr>,
     pub(crate) enum_tagging: EnumTagging<'a>,
     pub(crate) enum_packing: Packing,
     pub(crate) variants: Vec<Variant<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
-    pub(crate) name_type: NameType<'a>,
     pub(crate) packing_span: Option<&'a (Span, Packing)>,
 }
 
@@ -232,6 +306,25 @@ pub(crate) struct Field<'a> {
     pub(crate) ty: &'a syn::Type,
 }
 
+impl Field<'_> {
+    /// If the field is skipped, set up the expression which initializes the
+    /// field to its default value.
+    pub(crate) fn init_default(&self, b: &Build<'_, '_>) -> Option<TokenStream> {
+        let span = *self.skip.as_ref()?;
+
+        let Tokens {
+            default_function, ..
+        } = b.tokens;
+
+        let ty = self.ty;
+
+        Some(match &self.default_attr {
+            Some((_, Some(path))) => quote_spanned!(span => #path()),
+            _ => quote_spanned!(span => #default_function::<#ty>()),
+        })
+    }
+}
+
 /// Setup a build.
 ///
 /// Handles mode decoding, and construction of parameters which might give rise to errors.
@@ -260,7 +353,8 @@ pub(crate) fn setup<'tok, 'a>(
 
     let bounds = e.type_attr.bounds(&mode);
     let decode_bounds = e.type_attr.decode_bounds(&mode);
-    let enum_tagging_span = e.type_attr.enum_tagging_span(&mode);
+    let enum_tag = e.type_attr.tag_value(&mode).map(|(s, _)| *s);
+    let enum_content = e.type_attr.content_value(&mode).map(|(s, _)| *s);
 
     Ok(Build {
         mode,
@@ -272,7 +366,8 @@ pub(crate) fn setup<'tok, 'a>(
         data,
         decode_t_decode,
         encode_t_encode,
-        enum_tagging_span,
+        enum_tag,
+        enum_content,
         tokens,
         p,
     })
@@ -284,7 +379,7 @@ fn setup_struct<'a>(
     data: &'a StructData<'a>,
     allocator_ident: &syn::Ident,
 ) -> Body<'a> {
-    let mut unskipped_fields = Vec::with_capacity(data.fields.len());
+    let mut unskipped_fields = Vec::new();
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
     let packing = e
@@ -293,10 +388,10 @@ fn setup_struct<'a>(
         .map(|&(span, p)| (span, p))
         .unwrap_or_else(|| (Span::call_site(), Packing::default()));
 
-    let (name_all, name_type, name_method) = match data.kind {
+    let (name_all, name_type, name_method, name_span) = match data.kind {
         StructKind::Indexed(..) if e.type_attr.is_name_type_ambiguous(mode) => {
             let name_all = NameAll::Index;
-            (name_all, name_all.ty(), NameMethod::Sized)
+            (name_all, name_all.ty(), NameMethod::Sized, None)
         }
         _ => split_name(
             mode.kind,
@@ -319,15 +414,15 @@ fn setup_struct<'a>(
     }
 
     Body {
-        span: data.span,
-        name: &data.name,
-        unskipped_fields,
-        all_fields,
-        name_type: NameType {
+        name_type: Name {
+            span: name_span,
+            value: &data.name,
             ty: name_type,
             method: name_method,
             format_with: e.type_attr.name_format_with(mode),
         },
+        unskipped_fields,
+        all_fields,
         packing,
         kind: data.kind,
         path,
@@ -366,7 +461,7 @@ fn setup_enum<'a>(
         .map(|&(_, p)| p)
         .unwrap_or_default();
 
-    let (_, name_type, name_method) = split_name(
+    let (_, name_type, name_method, name_span) = split_name(
         mode.kind,
         e.type_attr.name_type(mode),
         e.type_attr.name_all(mode),
@@ -378,17 +473,17 @@ fn setup_enum<'a>(
     }
 
     Enum {
-        span: data.span,
-        name: &data.name,
-        enum_tagging,
-        enum_packing,
-        variants,
-        fallback,
-        name_type: NameType {
+        name_type: Name {
+            span: name_span,
+            value: &data.name,
             ty: name_type,
             method: name_method,
             format_with: e.type_attr.name_format_with(mode),
         },
+        enum_tagging,
+        enum_packing,
+        variants,
+        fallback,
         packing_span,
     }
 }
@@ -400,20 +495,20 @@ fn setup_variant<'a>(
     fallback: &mut Option<&'a syn::Ident>,
     allocator_ident: &syn::Ident,
 ) -> Variant<'a> {
-    let mut unskipped_fields = Vec::with_capacity(data.fields.len());
+    let mut unskipped_fields = Vec::new();
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
-    let variant_packing = data
+    let packing = data
         .attr
         .packing(mode)
         .or_else(|| e.type_attr.packing(mode))
         .map(|&(span, v)| (span, v))
         .unwrap_or_else(|| (Span::call_site(), Packing::default()));
 
-    let (name_all, name_type, name_method) = match data.kind {
+    let (name_all, name_type, name_method, name_span) = match data.kind {
         StructKind::Indexed(..) if data.attr.is_name_type_ambiguous(mode) => {
             let name_all = NameAll::Index;
-            (name_all, name_all.ty(), NameMethod::Sized)
+            (name_all, name_all.ty(), NameMethod::Sized, None)
         }
         _ => split_name(
             mode.kind,
@@ -423,7 +518,7 @@ fn setup_variant<'a>(
         ),
     };
 
-    let (type_name_all, _, _) = split_name(
+    let (type_name_all, _, _, _) = split_name(
         mode.kind,
         e.type_attr.name_type(mode),
         e.type_attr.name_all(mode),
@@ -437,16 +532,16 @@ fn setup_variant<'a>(
     let mut path = syn::Path::from(syn::Ident::new("Self", data.span));
     path.segments.push(data.ident.clone().into());
 
-    if let Some((span, _)) = data.attr.default_variant(mode) {
+    if let Some(&(span, _)) = data.attr.default_variant(mode) {
         if !data.fields.is_empty() {
             e.cx.error_span(
-                *span,
-                format_args!("The #[{ATTR}(default)] variant must be empty"),
+                span,
+                format_args!("In {mode} the #[{ATTR}(default)] variant must be empty"),
             );
         } else if fallback.is_some() {
             e.cx.error_span(
-                *span,
-                format_args!("Only one #[{ATTR}(default)] variant is supported",),
+                span,
+                format_args!("In {mode} only one #[{ATTR}(default)] variant is supported"),
             );
         } else {
             *fallback = Some(data.ident);
@@ -473,17 +568,17 @@ fn setup_variant<'a>(
     }
 
     let st = Body {
-        span: data.span,
-        name: &data.name,
-        unskipped_fields,
-        all_fields,
-        packing: variant_packing,
-        kind: data.kind,
-        name_type: NameType {
+        name_type: Name {
+            span: name_span,
+            value: &data.name,
             ty: name_type,
             method: name_method,
             format_with: data.attr.name_format_with(mode),
         },
+        unskipped_fields,
+        all_fields,
+        packing,
+        kind: data.kind,
         path,
     };
 
@@ -620,8 +715,13 @@ pub(crate) fn split_name(
     ty: Option<&(Span, syn::Type)>,
     all: Option<&(Span, NameAll)>,
     method: Option<&(Span, NameMethod)>,
-) -> (NameAll, syn::Type, NameMethod) {
+) -> (NameAll, syn::Type, NameMethod, Option<Span>) {
     let kind_name_all = kind.and_then(ModeKind::default_name_all);
+
+    let span = ty
+        .map(|&(span, _)| span)
+        .or(all.map(|&(span, _)| span))
+        .or(method.map(|&(span, _)| span));
 
     let all = all.map(|&(_, v)| v);
     let method = method.map(|&(_, v)| v);
@@ -629,7 +729,7 @@ pub(crate) fn split_name(
     let Some((_, ty)) = ty else {
         let all = all.or(kind_name_all).unwrap_or_default();
         let method = method.unwrap_or_else(|| all.name_method());
-        return (all, all.ty(), method);
+        return (all, all.ty(), method, span);
     };
 
     let (method, default_all) = match method {
@@ -638,7 +738,7 @@ pub(crate) fn split_name(
     };
 
     let all = all.or(default_all).unwrap_or_default();
-    (all, ty.clone(), method)
+    (all, ty.clone(), method, span)
 }
 
 pub(crate) fn determine_type(expr: &syn::Expr) -> Option<(Span, syn::Type)> {

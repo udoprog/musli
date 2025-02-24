@@ -27,9 +27,9 @@ struct PackedCompat<const N: usize, const L: usize> {
 #[musli(crate)]
 struct IgnoreLarge<const N: usize> {
     prefix: u32,
-    #[musli(mode = Binary, name = 1)]
+    #[musli(Binary, name = 1)]
     small: Packed<N>,
-    #[musli(mode = Binary, name = 3)]
+    #[musli(Binary, name = 3)]
     suffix: u32,
 }
 
@@ -37,9 +37,9 @@ struct IgnoreLarge<const N: usize> {
 #[musli(crate)]
 struct IgnoreSmall<const L: usize> {
     prefix: u32,
-    #[musli(mode = Binary, name = 2)]
+    #[musli(Binary, name = 2)]
     large: Packed<L>,
-    #[musli(mode = Binary, name = 3)]
+    #[musli(Binary, name = 3)]
     suffix: u32,
 }
 
@@ -47,7 +47,7 @@ struct IgnoreSmall<const L: usize> {
 #[musli(crate)]
 struct IgnoreBoth {
     prefix: u32,
-    #[musli(mode = Binary, name = 3)]
+    #[musli(Binary, name = 3)]
     suffix: u32,
 }
 

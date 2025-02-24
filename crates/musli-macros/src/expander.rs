@@ -24,13 +24,15 @@ impl UnsizedMethod {
     }
 }
 
-pub(crate) struct NameType<'a> {
+pub(crate) struct Name<'a, T> {
+    pub(crate) span: Option<Span>,
+    pub(crate) value: &'a T,
     pub(crate) ty: syn::Type,
     pub(crate) method: NameMethod,
     pub(crate) format_with: Option<&'a (Span, syn::Path)>,
 }
 
-impl NameType<'_> {
+impl<T> Name<'_, T> {
     pub(crate) fn expr(&self, ident: syn::Ident) -> syn::Expr {
         match self.method {
             NameMethod::Unsized(..) => syn::parse_quote!(#ident),
@@ -100,7 +102,6 @@ pub(crate) struct FieldData<'a> {
 }
 
 pub(crate) struct StructData<'a> {
-    pub(crate) span: Span,
     pub(crate) name: syn::LitStr,
     pub(crate) fields: Vec<FieldData<'a>>,
     pub(crate) kind: StructKind,
@@ -124,7 +125,6 @@ pub(crate) enum StructKind {
 }
 
 pub(crate) struct EnumData<'a> {
-    pub(crate) span: Span,
     pub(crate) name: syn::LitStr,
     pub(crate) variants: Vec<VariantData<'a>>,
 }
@@ -165,7 +165,6 @@ impl<'a> Expander<'a> {
 
         let data = match &input.data {
             syn::Data::Struct(st) => Data::Struct(StructData {
-                span: Span::call_site(),
                 name: syn::LitStr::new(&input.ident.to_string(), input.ident.span()),
                 fields: fields(&cx, &st.fields),
                 kind: match &st.fields {
@@ -194,7 +193,6 @@ impl<'a> Expander<'a> {
                     });
 
                 Data::Enum(EnumData {
-                    span: Span::call_site(),
                     name: syn::LitStr::new(&input.ident.to_string(), input.ident.span()),
                     variants: variants.collect(),
                 })
@@ -308,9 +306,9 @@ impl<'a> Expander<'a> {
             let list = self.type_attr.decode_bounds_lifetimes(mode);
 
             if let [_, rest @ ..] = list {
-                for (span, _) in rest {
+                for &(span, _) in rest {
                     self.cx
-                        .error_span(*span, "More than one decoder lifetime bound is specified");
+                        .error_span(span, "More than one decoder lifetime bound is specified");
                 }
             }
 
@@ -325,9 +323,9 @@ impl<'a> Expander<'a> {
             let list = self.type_attr.decode_bounds_types(mode);
 
             if let [_, rest @ ..] = list {
-                for (span, _) in rest {
+                for &(span, _) in rest {
                     self.cx
-                        .error_span(*span, "More than one decoder allocator bound is specified");
+                        .error_span(span, "More than one decoder allocator bound is specified");
                 }
             }
 
@@ -355,7 +353,7 @@ impl<'a> Expander<'a> {
         let mut out = TokenStream::new();
 
         for build in builds {
-            out.extend(crate::en::expand_insert_entry(build)?);
+            out.extend(crate::en::expand_encode_entry(&build)?);
         }
 
         Ok(out)
@@ -370,7 +368,7 @@ impl<'a> Expander<'a> {
         let mut out = TokenStream::new();
 
         for build in builds {
-            out.extend(crate::de::expand_decode_entry(build)?);
+            out.extend(crate::de::expand_decode_entry(&build)?);
         }
 
         Ok(out)
@@ -395,8 +393,8 @@ pub(crate) fn expand_name(
     ident: Option<&syn::Ident>,
 ) -> (syn::Expr, Option<Span>) {
     let lit = 'out: {
-        if let Some((span, rename)) = taggable.name(mode) {
-            return (rename.clone(), Some(*span));
+        if let Some(&(span, ref rename)) = taggable.name(mode) {
+            return (rename.clone(), Some(span));
         }
 
         if let (Some(ident), name_all) = (ident, name_all) {

@@ -1,5 +1,7 @@
 //! Helper for determining the mode we're currently in.
 
+use core::fmt;
+
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use syn::Token;
@@ -7,6 +9,7 @@ use syn::Token;
 use super::attr::{FieldEncoding, ModeKind};
 use super::tokens::Import;
 use super::Only;
+use super::ATTR;
 
 #[derive(Clone, Copy)]
 pub(crate) enum ModePath<'a> {
@@ -156,6 +159,16 @@ impl<'a> Mode<'a> {
                 allocator_ident: Some(allocator_ident.clone()),
             },
             method: name,
+        }
+    }
+}
+
+impl fmt::Display for Mode<'_> {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.mode_path {
+            ModePath::Ident(ident) => write!(f, "#[{ATTR}(mode = {ident}, ..)]"),
+            ModePath::Musli(_, ident) => write!(f, "#[{ATTR}({ident}, ..)]"),
         }
     }
 }

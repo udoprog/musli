@@ -10,11 +10,11 @@ pub struct StructFrom {
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 pub struct StructTo {
-    #[musli(mode = Binary, name = 1)]
-    #[musli(mode = Text, name = "number")]
+    #[musli(Binary, name = 1)]
+    #[musli(Text, name = "number")]
     string: u32,
-    #[musli(mode = Binary, name = 0)]
-    #[musli(mode = Text, name = "string")]
+    #[musli(Binary, name = 0)]
+    #[musli(Text, name = "string")]
     number: String,
 }
 
