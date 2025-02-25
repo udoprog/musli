@@ -103,27 +103,10 @@ impl BuildData<'_> {
                         );
                     }
                     (span, Packing::Packed) => {
-                        if only == Only::Decode {
-                            cx.error_span(
-                                span,
-                                format_args!(
-                                    "In {mode} an enum cannot be #[{ATTR}(packed)] when decoding"
-                                ),
-                            );
-                        }
-
-                        if let Some(span) = enum_tag {
-                            cx.error_span(
-                                span,
-                                format_args!(
-                                    "In {mode} a #[{ATTR}(packed)] enum cannot use #[{ATTR}(tag)]"
-                                ),
-                            );
-                        }
-
-                        if let Some(span) = enum_content {
-                            cx.error_span(span, format_args!("In {mode} a #[{ATTR}(packed)] enum cannot use #[{ATTR}(content)]"));
-                        }
+                        cx.error_span(
+                            span,
+                            format_args!("In {mode} an enum cannot be #[{ATTR}(packed)]"),
+                        );
                     }
                     (span, Packing::Untagged) => {
                         if let Some(span) = enum_tag {
@@ -139,12 +122,14 @@ impl BuildData<'_> {
                             cx.error_span(span, format_args!("In {mode} a #[{ATTR}(untagged)] enum cannot use #[{ATTR}(content)]"));
                         }
 
-                        cx.error_span(
-                            span,
-                            format_args!(
-                                "In {mode} a #[{ATTR}(untagged)] enum is not supported yet"
-                            ),
-                        );
+                        if only == Only::Decode {
+                            cx.error_span(
+                                span,
+                                format_args!(
+                                    "In {mode} a #[{ATTR}(untagged)] enum is not supported yet"
+                                ),
+                            );
+                        }
                     }
                     _ => (),
                 }
@@ -152,22 +137,13 @@ impl BuildData<'_> {
                 for v in &en.variants {
                     v.st.validate(cx, mode, "variant", "variants");
 
-                    match (v.st.packing, enum_tag) {
-                        ((_, Packing::Packed), Some(span)) => {
-                            cx.error_span(
-                                span,
-                                format_args!(
-                                    "In {mode} a #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
-                                ),
-                            );
-                        }
-                        ((span, Packing::Untagged), _) => {
-                            cx.error_span(
-                                span,
-                                format_args!("In {mode} a variant cannot be #[{ATTR}(untagged)]"),
-                            );
-                        }
-                        _ => {}
+                    if let ((_, Packing::Packed), Some(span)) = (v.st.packing, enum_tag) {
+                        cx.error_span(
+                            span,
+                            format_args!(
+                                "In {mode} a #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
+                            ),
+                        );
                     }
                 }
             }
@@ -282,28 +258,26 @@ impl<'a> Body<'a> {
             _ => {}
         }
 
-        for f in &self.all_fields {
-            if matches!(self.packing, (_, Packing::Transparent | Packing::Packed)) {
+        if let (_, packing @ (Packing::Transparent | Packing::Packed)) = self.packing {
+            for f in &self.all_fields {
                 if let Some(span) = f.name_span {
                     cx.error_span(
                         span,
-                        format_args!(
-                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] {singular} cannot have named fields"
-                        ),
+                        format_args!("A #[{ATTR}({packing})]{singular} cannot have named fields"),
                     );
                 }
 
                 if let Some(span) = f.pattern {
                     cx.error_span(
                         span.span(),
-                        format_args!(
-                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] {singular} cannot have field patterns"
-                        ),
+                        format_args!("A #[{ATTR}({packing})]{singular} cannot have field patterns"),
                     );
                 }
             }
+        }
 
-            if matches!(self.packing, (_, Packing::Transparent)) {
+        if matches!(self.packing, (_, Packing::Transparent)) {
+            for f in &self.all_fields {
                 if let Some(&(span, _)) = f.skip_encoding_if {
                     cx.error_span(
                         span,
@@ -547,7 +521,6 @@ fn setup_variant<'a>(
     let packing = data
         .attr
         .packing(mode)
-        .or_else(|| e.type_attr.packing(mode))
         .map(|&(span, v)| (span, v))
         .unwrap_or_else(|| (Span::call_site(), Packing::default()));
 

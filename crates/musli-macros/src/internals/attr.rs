@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::mem;
 
 use proc_macro2::Span;
@@ -73,6 +74,37 @@ pub(crate) enum Packing {
     Packed,
     Transparent,
     Untagged,
+}
+
+impl Packing {
+    #[inline]
+    fn try_parse(path: &syn::Path) -> Option<Self> {
+        if path.is_ident("packed") {
+            return Some(Packing::Packed);
+        }
+
+        if path.is_ident("transparent") {
+            return Some(Packing::Transparent);
+        }
+
+        if path.is_ident("untagged") {
+            return Some(Packing::Untagged);
+        }
+
+        None
+    }
+}
+
+impl fmt::Display for Packing {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Packing::Tagged => write!(f, "tagged"),
+            Packing::Packed => write!(f, "packed"),
+            Packing::Transparent => write!(f, "transparent"),
+            Packing::Untagged => write!(f, "untagged"),
+        }
+    }
 }
 
 macro_rules! first {
@@ -415,18 +447,8 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
-            if meta.path.is_ident("packed") {
-                new.packing.push((meta.path.span(), Packing::Packed));
-                return Ok(());
-            }
-
-            if meta.path.is_ident("transparent") {
-                new.packing.push((meta.path.span(), Packing::Transparent));
-                return Ok(());
-            }
-
-            if meta.path.is_ident("untagged") {
-                new.packing.push((meta.path.span(), Packing::Untagged));
+            if let Some(packing) = Packing::try_parse(&meta.path) {
+                new.packing.push((meta.path.span(), packing));
                 return Ok(());
             }
 
@@ -632,18 +654,8 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
-            if meta.path.is_ident("packed") {
-                new.packing.push((meta.path.span(), Packing::Packed));
-                return Ok(());
-            }
-
-            if meta.path.is_ident("transparent") {
-                new.packing.push((meta.path.span(), Packing::Transparent));
-                return Ok(());
-            }
-
-            if meta.path.is_ident("untagged") {
-                new.packing.push((meta.path.span(), Packing::Untagged));
+            if let Some(packing) = Packing::try_parse(&meta.path) {
+                new.packing.push((meta.path.span(), packing));
                 return Ok(());
             }
 

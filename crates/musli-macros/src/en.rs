@@ -437,10 +437,11 @@ fn encode_variant(
 
             size_hint = quote!(#option::Some(1));
         }
-        EnumTagging::Default => {
-            encode = default_encode(cx, b, &v.st, Some(&mut size_hint))?;
+        EnumTagging::Default => match en.packing {
+            (_, Packing::Tagged) => {
+                encode = default_encode(cx, b, &v.st, None)?;
+                size_hint = quote!(#option::Some(1));
 
-            if let (_, Packing::Tagged) = en.packing {
                 let encode_t_encode = &b.encode_t_encode;
                 let name = &v.name;
                 let name_type = en.name.ty();
@@ -458,7 +459,13 @@ fn encode_variant(
                     })?
                 }};
             }
-        }
+            (_, Packing::Untagged) => {
+                encode = default_encode(cx, b, &v.st, Some(&mut size_hint))?;
+            }
+            _ => {
+                return Err(());
+            }
+        },
         EnumTagging::Internal { tag } => {
             'done: {
                 let inner_encode;

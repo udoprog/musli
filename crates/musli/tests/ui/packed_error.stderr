@@ -10,13 +10,13 @@ error: Only #[musli(default)] fields can be used at the end of packed containers
 17 |         #[musli(default)]
    |                 ^^^^^^^
 
-error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)] when decoding
+error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)]
   --> tests/ui/packed_error.rs:24:9
    |
 24 | #[musli(packed)]
    |         ^^^^^^
 
-error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)] when decoding
+error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)]
   --> tests/ui/packed_error.rs:28:9
    |
 28 | #[musli(packed)]
