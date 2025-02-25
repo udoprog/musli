@@ -649,7 +649,7 @@ If the type of the tag is ambiguous it can be explicitly specified through the
 
 <br>
 
-#### `#[musli(pattern = ..)]`
+#### `#[musli(pattern = ..)]` or `#[musli(pattern = (<pat> | <pat2> | ..))]`
 
 A pattern to match for decoding a variant.
 
@@ -667,6 +667,20 @@ enum Enum {
     Variant1,
     Variant2,
     #[musli(Binary, pattern = 2..=4)]
+    Deprecated,
+}
+```
+
+Multiple patterns are supported with parenthesis:
+
+```rust
+use musli::{Encode, Decode};
+
+#[derive(Encode, Decode)]
+enum Enum {
+    Variant1,
+    Variant2,
+    #[musli(Binary, pattern = (2..=4 | 10..=20))]
     Deprecated,
 }
 ```
@@ -989,7 +1003,7 @@ If the type of the tag is ambiguous it can be explicitly specified through the
 
 <br>
 
-#### `#[musli(pattern = ..)]`
+#### `#[musli(pattern = ..)]` or `#[musli(pattern = (<pat> | <pat2> | ..))]`
 
 A pattern to match for decoding the given field.
 
@@ -1007,6 +1021,20 @@ struct Struct {
     field1: u32,
     field2: u32,
     #[musli(Binary, pattern = 2..=4)]
+    other: u32,
+}
+```
+
+Multiple patterns are supported with parenthesis:
+
+```rust
+use musli::{Encode, Decode};
+
+#[derive(Encode, Decode)]
+struct Struct {
+    field1: u32,
+    field2: u32,
+    #[musli(Binary, pattern = (2..=4 | 10..=20))]
     other: u32,
 }
 ```

@@ -380,9 +380,12 @@ pub use __test_extra;
 macro_rules! __test_matrix {
     (full, $call:path) => {
         $call!(storage, Binary);
+        $call!(storage, Text);
         $call!(packed, Binary);
         $call!(wire, Binary);
+        $call!(wire, Text);
         $call!(descriptive, Binary);
+        $call!(descriptive, Text);
         $call!(json, Text);
     };
 

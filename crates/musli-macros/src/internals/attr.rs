@@ -607,8 +607,17 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
             if meta.path.is_ident("pattern") {
                 meta.input.parse::<Token![=]>()?;
-                new.pattern
-                    .push((meta.path.span(), meta.input.call(syn::Pat::parse_single)?));
+
+                if meta.input.peek(syn::token::Paren) {
+                    let content;
+                    syn::parenthesized!(content in meta.input);
+                    new.pattern
+                        .push((meta.path.span(), content.call(syn::Pat::parse_multi)?));
+                } else {
+                    new.pattern
+                        .push((meta.path.span(), meta.input.call(syn::Pat::parse_single)?));
+                }
+
                 return Ok(());
             }
 
@@ -835,8 +844,17 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 
             if meta.path.is_ident("pattern") {
                 meta.input.parse::<Token![=]>()?;
-                new.pattern
-                    .push((meta.path.span(), meta.input.call(syn::Pat::parse_single)?));
+
+                if meta.input.peek(syn::token::Paren) {
+                    let content;
+                    syn::parenthesized!(content in meta.input);
+                    new.pattern
+                        .push((meta.path.span(), content.call(syn::Pat::parse_multi)?));
+                } else {
+                    new.pattern
+                        .push((meta.path.span(), meta.input.call(syn::Pat::parse_single)?));
+                }
+
                 return Ok(());
             }
 
