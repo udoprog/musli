@@ -25,6 +25,7 @@ use super::error::Error;
 /// [`variable length`]: https://en.wikipedia.org/wiki/Variable-length_quantity
 pub const OPTIONS: Options = options::new().build();
 
+#[cfg(any(feature = "alloc", feature = "std"))]
 const DEFAULT: Encoding = Encoding::new();
 
 crate::macros::bare_encoding!(Binary, DEFAULT, storage, IntoReader, IntoWriter);

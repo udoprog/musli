@@ -25,9 +25,7 @@ use super::error::Error;
 /// [`variable length`]: https://en.wikipedia.org/wiki/Variable-length_quantity
 pub const OPTIONS: options::Options = options::new().build();
 
-const DEFAULT: Encoding = Encoding::new();
-
-crate::macros::bare_encoding!(Binary, DEFAULT, descriptive, IntoReader, IntoWriter);
+crate::macros::bare_encoding!(Binary, Encoding, descriptive, IntoReader, IntoWriter);
 
 /// Setting up encoding with parameters.
 pub struct Encoding<const OPT: Options = OPTIONS, M = Binary>
