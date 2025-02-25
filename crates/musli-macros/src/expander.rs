@@ -398,7 +398,10 @@ pub(crate) fn expand_name(
         }
 
         if let (Some(ident), name_all) = (ident, name_all) {
-            if let Some(name) = name_all.apply(&ident.to_string()) {
+            let ident = ident.to_string();
+            let ident = ident.trim_start_matches("r#");
+
+            if let Some(name) = name_all.apply(ident) {
                 break 'out syn::LitStr::new(&name, ident.span()).into();
             }
         }

@@ -97,6 +97,7 @@ impl Ctxt {
 
     /// Build an identifier with the given name, escaped so it's harder to conflict with.
     pub(crate) fn ident_with_span(&self, name: &str, span: Span, extra: &str) -> syn::Ident {
+        let name = name.trim_start_matches("r#");
         self.with_string("", name, extra, |s| syn::Ident::new(s, span))
     }
 
