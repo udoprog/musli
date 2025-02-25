@@ -287,8 +287,9 @@
 //!
 //! If a mode is not specified, an implementation will apply to all modes (`M`),
 //! if at least one mode is specified it will be implemented for all modes which
-//! are present in a model and [`Binary`]. This way, an encoding which uses
-//! `Binary` which is the default mode should always work.
+//! are present in a model and [`Binary`] and [`Text`]. This way, an encoding
+//! which uses [`Binary`] or [`Text`] which are the default modes should always
+//! work.
 //!
 //! For more information on how to configure modes, see [`derives`].
 //!

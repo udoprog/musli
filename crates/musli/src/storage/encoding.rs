@@ -14,10 +14,7 @@ use super::en::StorageEncoder;
 #[cfg(feature = "alloc")]
 use super::error::Error;
 
-/// Default options to use with [`Encoding`].
-pub const OPTIONS: Options = options::new().build();
-
-/// The default encoding instance using the default [`OPTIONS`].
+/// The default options for the storage encoding.
 ///
 /// Uses variable-encoded numerical fields and variable-encoded prefix lengths.
 ///
@@ -26,7 +23,9 @@ pub const OPTIONS: Options = options::new().build();
 ///
 /// [`zigzag`]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
 /// [`variable length`]: https://en.wikipedia.org/wiki/Variable-length_quantity
-pub const DEFAULT: Encoding = Encoding::new();
+pub const OPTIONS: Options = options::new().build();
+
+const DEFAULT: Encoding = Encoding::new();
 
 crate::macros::bare_encoding!(Binary, DEFAULT, storage, IntoReader, IntoWriter);
 

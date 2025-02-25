@@ -122,6 +122,6 @@ pub use self::encoding::to_writer;
 #[doc(inline)]
 pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, to_slice};
 #[doc(inline)]
-pub use self::encoding::{Encoding, DEFAULT, OPTIONS};
+pub use self::encoding::{Encoding, OPTIONS};
 #[doc(inline)]
 pub use self::error::Error;

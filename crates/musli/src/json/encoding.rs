@@ -19,8 +19,8 @@ use super::en::JsonEncoder;
 use super::error::Error;
 use super::parser::IntoParser;
 
-/// The default configuration.
-pub const DEFAULT: Encoding = Encoding::new();
+/// The default encoding instance using the default [`OPTIONS`].
+const DEFAULT: Encoding = Encoding::new();
 
 crate::macros::bare_encoding!(Text, DEFAULT, json, IntoParser, IntoWriter);
 

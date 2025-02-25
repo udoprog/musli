@@ -17,8 +17,7 @@ use crate::storage::en::StorageEncoder;
 /// Default options to use with [`Encoding`].
 pub const OPTIONS: Options = options::new().fixed().native_byte_order().build();
 
-/// The default encoding instance using the default [`OPTIONS`].
-pub const DEFAULT: Encoding = Encoding::new();
+const DEFAULT: Encoding = Encoding::new();
 
 crate::macros::bare_encoding!(Binary, DEFAULT, packed, IntoReader, IntoWriter);
 

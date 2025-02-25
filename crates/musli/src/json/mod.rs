@@ -60,6 +60,8 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
 #[doc(inline)]
 pub use self::encoding::to_writer;
+#[doc(inline)]
+pub use self::encoding::Encoding;
 #[cfg(feature = "alloc")]
 #[doc(inline)]
 pub use self::encoding::{decode, encode, from_slice, from_str, to_fixed_bytes, to_slice};
@@ -67,8 +69,6 @@ pub use self::encoding::{decode, encode, from_slice, from_str, to_fixed_bytes, t
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]
 pub use self::encoding::{to_string, to_vec};
-#[doc(inline)]
-pub use self::encoding::{Encoding, DEFAULT};
 #[doc(inline)]
 pub use self::error::Error;
 pub use self::parser::Parser;
