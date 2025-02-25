@@ -1,4 +1,4 @@
-use musli::{Encode, Decode};
+use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
 pub struct Container<'a> {
@@ -24,5 +24,4 @@ mod bytes {
     }
 }
 
-fn main() {
-}
+fn main() {}

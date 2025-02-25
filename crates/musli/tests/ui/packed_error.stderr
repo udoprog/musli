@@ -17,54 +17,54 @@ error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)] when decoding
    |         ^^^^^^
 
 error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)] when decoding
-  --> tests/ui/packed_error.rs:29:9
+  --> tests/ui/packed_error.rs:28:9
    |
-29 | #[musli(packed)]
+28 | #[musli(packed)]
    |         ^^^^^^
 
 error: A #[musli(transparent)] or #[musli(packed)] struct cannot have named fields
-  --> tests/ui/packed_error.rs:37:13
+  --> tests/ui/packed_error.rs:36:13
    |
-37 |     #[musli(name = "test")]
+36 |     #[musli(name = "test")]
    |             ^^^^
 
 error: A #[musli(transparent)] or #[musli(packed)] struct cannot have named fields
-  --> tests/ui/packed_error.rs:43:38
+  --> tests/ui/packed_error.rs:42:38
    |
-43 | struct DenyNamedPackedStruct(#[musli(name = "test")] String);
+42 | struct DenyNamedPackedStruct(#[musli(name = "test")] String);
    |                                      ^^^^
 
 error[E0428]: the name `DenyNamedPackedStruct` is defined multiple times
-  --> tests/ui/packed_error.rs:43:1
+  --> tests/ui/packed_error.rs:42:1
    |
-36 | struct DenyNamedPackedStruct {
+35 | struct DenyNamedPackedStruct {
    | ---------------------------- previous definition of the type `DenyNamedPackedStruct` here
 ...
-43 | struct DenyNamedPackedStruct(#[musli(name = "test")] String);
+42 | struct DenyNamedPackedStruct(#[musli(name = "test")] String);
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `DenyNamedPackedStruct` redefined here
    |
    = note: `DenyNamedPackedStruct` must be defined only once in the type namespace of this module
 
 error: A #[musli(transparent)] or #[musli(packed)] variant cannot have named fields
-  --> tests/ui/packed_error.rs:50:17
+  --> tests/ui/packed_error.rs:49:17
    |
-50 |         #[musli(name = "test")]
+49 |         #[musli(name = "test")]
    |                 ^^^^
 
 error: In #[musli(Binary, ..)] a #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
-  --> tests/ui/packed_error.rs:46:9
+  --> tests/ui/packed_error.rs:45:9
    |
-46 | #[musli(tag = "type")]
+45 | #[musli(tag = "type")]
    |         ^^^
 
 error: A #[musli(transparent)] or #[musli(packed)] variant cannot have named fields
-  --> tests/ui/packed_error.rs:54:19
+  --> tests/ui/packed_error.rs:53:19
    |
-54 |     Tuple(#[musli(name = "test")] String),
+53 |     Tuple(#[musli(name = "test")] String),
    |                   ^^^^
 
 error: In #[musli(Binary, ..)] a #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
-  --> tests/ui/packed_error.rs:58:9
+  --> tests/ui/packed_error.rs:57:9
    |
-58 | #[musli(tag = "type")]
+57 | #[musli(tag = "type")]
    |         ^^^

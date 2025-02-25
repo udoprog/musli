@@ -150,6 +150,7 @@ fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Toke
         (_, (_, Packing::Packed)) => decode_packed(cx, b, st)?,
         (StructKind::Empty, _) => decode_empty(cx, b, st)?,
         (_, (_, Packing::Tagged)) => decode_tagged(cx, b, st, None)?,
+        (_, (_, Packing::Untagged)) => return Err(()),
     };
 
     Ok(quote!(#result::Ok({ #body })))
@@ -752,12 +753,13 @@ fn decode_variant(
         ..*cx
     };
 
-    Ok(match (v.st.kind, v.st.packing) {
-        (_, (_, Packing::Transparent)) => decode_transparent(&cx, b, &v.st)?,
-        (_, (_, Packing::Packed)) => decode_packed(&cx, b, &v.st)?,
-        (StructKind::Empty, _) => decode_empty(&cx, b, &v.st)?,
-        (_, (_, Packing::Tagged)) => decode_tagged(&cx, b, &v.st, Some(variant_tag))?,
-    })
+    match (v.st.kind, v.st.packing) {
+        (_, (_, Packing::Transparent)) => decode_transparent(&cx, b, &v.st),
+        (_, (_, Packing::Packed)) => decode_packed(&cx, b, &v.st),
+        (StructKind::Empty, _) => decode_empty(&cx, b, &v.st),
+        (_, (_, Packing::Tagged)) => decode_tagged(&cx, b, &v.st, Some(variant_tag)),
+        (_, (_, Packing::Untagged)) => Err(()),
+    }
 }
 
 /// Decode something empty.

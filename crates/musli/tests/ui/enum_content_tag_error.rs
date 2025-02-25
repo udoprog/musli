@@ -1,4 +1,4 @@
-use musli::{Encode, Decode};
+use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
 #[musli(packed, tag = "type")]
@@ -36,5 +36,4 @@ enum TransparentAndTagContent {
     Variant1(String),
 }
 
-fn main() {
-}
+fn main() {}

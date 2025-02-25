@@ -1,4 +1,4 @@
-use musli::{Encode, Decode};
+use musli::{Decode, Encode};
 
 #[derive(Decode, Encode)]
 struct Struct {
@@ -7,7 +7,7 @@ struct Struct {
 }
 
 mod array {
-    use musli::{Encoder, Decoder};
+    use musli::{Decoder, Encoder};
 
     #[inline]
     fn encode<E, T, const N: usize>(_this: &[T; N], __encoder: E) -> Result<(), E::Error>
@@ -26,5 +26,4 @@ mod array {
     }
 }
 
-fn main() {
-}
+fn main() {}

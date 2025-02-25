@@ -72,6 +72,7 @@ pub(crate) enum Packing {
     Tagged,
     Packed,
     Transparent,
+    Untagged,
 }
 
 macro_rules! first {
@@ -424,6 +425,11 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 return Ok(());
             }
 
+            if meta.path.is_ident("untagged") {
+                new.packing.push((meta.path.span(), Packing::Untagged));
+                return Ok(());
+            }
+
             if meta.path.is_ident("name_all") {
                 new.name_all
                     .push((meta.path.span(), parse_name_all(&meta)?));
@@ -636,6 +642,11 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
                 return Ok(());
             }
 
+            if meta.path.is_ident("untagged") {
+                new.packing.push((meta.path.span(), Packing::Untagged));
+                return Ok(());
+            }
+
             if meta.path.is_ident("name_all") {
                 new.name_all
                     .push((meta.path.span(), parse_name_all(&meta)?));
@@ -658,7 +669,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
 
             Err(syn::Error::new_spanned(
                 meta.path,
-                format_args!("#[{ATTR}] Unsupported type attribute"),
+                format_args!("#[{ATTR}] Unsupported variant attribute"),
             ))
         });
 

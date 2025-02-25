@@ -1,4 +1,4 @@
-error: In #[musli(Binary, ..)] a #[musli(packed)] type cannot use #[musli(tag)]
+error: In #[musli(Binary, ..)] a #[musli(packed)] enum cannot use #[musli(tag)]
  --> tests/ui/enum_content_tag_error.rs:4:17
   |
 4 | #[musli(packed, tag = "type")]
@@ -16,7 +16,7 @@ error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)] when decoding
 4 | #[musli(packed, tag = "type")]
   |         ^^^^^^
 
-error: In #[musli(Binary, ..)] a #[musli(packed)] type cannot use #[musli(content)]
+error: In #[musli(Binary, ..)] a #[musli(packed)] enum cannot use #[musli(content)]
   --> tests/ui/enum_content_tag_error.rs:10:17
    |
 10 | #[musli(packed, content = "content")]
@@ -28,13 +28,13 @@ error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)] when decoding
 10 | #[musli(packed, content = "content")]
    |         ^^^^^^
 
-error: In #[musli(Binary, ..)] a #[musli(packed)] type cannot use #[musli(tag)]
+error: In #[musli(Binary, ..)] a #[musli(packed)] enum cannot use #[musli(tag)]
   --> tests/ui/enum_content_tag_error.rs:16:17
    |
 16 | #[musli(packed, tag = "type", content = "content")]
    |                 ^^^
 
-error: In #[musli(Binary, ..)] a #[musli(packed)] type cannot use #[musli(content)]
+error: In #[musli(Binary, ..)] a #[musli(packed)] enum cannot use #[musli(content)]
   --> tests/ui/enum_content_tag_error.rs:16:31
    |
 16 | #[musli(packed, tag = "type", content = "content")]

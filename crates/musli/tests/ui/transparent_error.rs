@@ -1,4 +1,4 @@
-use musli::{Encode, Decode};
+use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
 #[musli(transparent)]
@@ -22,10 +22,7 @@ struct TransparentEmptyTuple();
 #[derive(Encode, Decode)]
 enum Enum1 {
     #[musli(transparent)]
-    Variant {
-        first: u32,
-        second: u32,
-    },
+    Variant { first: u32, second: u32 },
     #[musli(transparent)]
     TransparentTuple(u32, u32),
     #[musli(transparent)]
@@ -61,7 +58,7 @@ enum DenyOptionalTransparentEnum {
     Variant {
         #[musli(skip_encoding_if = String::is_empty)]
         field: String,
-    }
+    },
 }
 
 #[derive(Debug, PartialEq, Encode, Decode)]
@@ -89,5 +86,4 @@ pub enum EnumBadSkip {
     },
 }
 
-fn main() {
-}
+fn main() {}
