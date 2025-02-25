@@ -26,6 +26,3 @@ verbose = []
 proc-macro2 = "1.0.79"
 quote = "1.0.35"
 syn = { version = "2.0.55", features = ["full", "extra-traits"] }
-
-[dev-dependencies]
-musli = { version = "=0.0.127", path = "../musli" }

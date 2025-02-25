@@ -14,7 +14,7 @@ use super::error::Error;
 use crate::storage::de::StorageDecoder;
 use crate::storage::en::StorageEncoder;
 
-/// Default options to use with [`Encoding`].
+/// The default options for the packed encoding.
 pub const OPTIONS: Options = options::new().fixed().native_byte_order().build();
 
 const DEFAULT: Encoding = Encoding::new();
