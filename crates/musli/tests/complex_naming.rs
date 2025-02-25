@@ -208,3 +208,42 @@ fn bytes_tag_in_enum() {
         }
     );
 }
+
+#[test]
+fn decode_from_multiple() {
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    pub struct StructDecodeFrom {
+        #[musli(Text, name = "secondary")]
+        primary: u32,
+        other: u32,
+    }
+
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    pub struct StructDecodeTo {
+        #[musli(Text, name = "primary", pattern = ("primary" | "secondary"))]
+        primary: u32,
+        other: u32,
+    }
+
+    musli::macros::assert_decode_eq!(
+        text_mode,
+        StructDecodeFrom {
+            primary: 10,
+            other: 20,
+        },
+        StructDecodeTo {
+            primary: 10,
+            other: 20,
+        },
+        json = r#"{"secondary":10,"other":20}"#,
+    );
+
+    musli::macros::assert_roundtrip_eq!(
+        full,
+        StructDecodeTo {
+            primary: 10,
+            other: 20,
+        },
+        json = r#"{"primary":10,"other":20}"#,
+    );
+}
