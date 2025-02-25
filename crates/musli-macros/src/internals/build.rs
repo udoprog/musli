@@ -139,12 +139,14 @@ impl BuildData<'_> {
                             cx.error_span(span, format_args!("In {mode} a #[{ATTR}(untagged)] enum cannot use #[{ATTR}(content)]"));
                         }
 
-                        cx.error_span(
-                            span,
-                            format_args!(
-                                "In {mode} a #[{ATTR}(untagged)] enum is not supported yet"
-                            ),
-                        );
+                        if only == Only::Decode {
+                            cx.error_span(
+                                span,
+                                format_args!(
+                                    "In {mode} a #[{ATTR}(untagged)] enum is not supported yet"
+                                ),
+                            );
+                        }
                     }
                     _ => (),
                 }
@@ -159,12 +161,6 @@ impl BuildData<'_> {
                                 format_args!(
                                     "In {mode} a #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
                                 ),
-                            );
-                        }
-                        ((span, Packing::Untagged), _) => {
-                            cx.error_span(
-                                span,
-                                format_args!("In {mode} a variant cannot be #[{ATTR}(untagged)]"),
                             );
                         }
                         _ => {}
@@ -547,7 +543,6 @@ fn setup_variant<'a>(
     let packing = data
         .attr
         .packing(mode)
-        .or_else(|| e.type_attr.packing(mode))
         .map(|&(span, v)| (span, v))
         .unwrap_or_else(|| (Span::call_site(), Packing::default()));
 
