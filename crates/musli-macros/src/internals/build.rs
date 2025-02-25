@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use proc_macro2::{Span, TokenStream};
-use quote::quote_spanned;
+use quote::{quote, quote_spanned, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Token;
@@ -146,7 +146,7 @@ impl BuildData<'_> {
 }
 
 pub(crate) struct Body<'a> {
-    pub(crate) name_type: Name<'a, syn::LitStr>,
+    pub(crate) name: Name<'a, syn::LitStr>,
     pub(crate) unskipped_fields: Vec<Rc<Field<'a>>>,
     pub(crate) all_fields: Vec<Rc<Field<'a>>>,
     pub(crate) packing: (Span, Packing),
@@ -155,6 +155,20 @@ pub(crate) struct Body<'a> {
 }
 
 impl<'a> Body<'a> {
+    /// Declare variables.
+    pub(crate) fn field_tests(&self) -> impl Iterator<Item = impl ToTokens> + '_ {
+        self.unskipped_fields.iter().flat_map(|f| {
+            let (_, path) = f.skip_encoding_if.as_ref()?;
+
+            let access = &f.self_access;
+            let var = &f.var;
+
+            Some(quote! {
+                let #var = !#path(#access);
+            })
+        })
+    }
+
     /// Access the single transparent field in the body.
     pub(crate) fn transparent_field(&self) -> Result<&Field<'a>, ()> {
         let [f] = &self.unskipped_fields[..] else {
@@ -188,7 +202,7 @@ impl<'a> Body<'a> {
                     }
                 }
 
-                if let Some(span) = self.name_type.span {
+                if let Some(span) = self.name.span {
                     cx.error_span(
                         span,
                         format_args!(
@@ -268,7 +282,7 @@ impl<'a> Body<'a> {
 }
 
 pub(crate) struct Enum<'a> {
-    pub(crate) name_type: Name<'a, syn::LitStr>,
+    pub(crate) name: Name<'a, syn::LitStr>,
     pub(crate) enum_tagging: EnumTagging<'a>,
     pub(crate) enum_packing: Packing,
     pub(crate) variants: Vec<Variant<'a>>,
@@ -414,7 +428,7 @@ fn setup_struct<'a>(
     }
 
     Body {
-        name_type: Name {
+        name: Name {
             span: name_span,
             value: &data.name,
             ty: name_type,
@@ -473,7 +487,7 @@ fn setup_enum<'a>(
     }
 
     Enum {
-        name_type: Name {
+        name: Name {
             span: name_span,
             value: &data.name,
             ty: name_type,
@@ -568,7 +582,7 @@ fn setup_variant<'a>(
     }
 
     let st = Body {
-        name_type: Name {
+        name: Name {
             span: name_span,
             value: &data.name,
             ty: name_type,

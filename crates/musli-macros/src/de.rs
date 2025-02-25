@@ -180,7 +180,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
         ..
     } = b.tokens;
 
-    let type_name = en.name_type.value;
+    let type_name = en.name.value;
 
     // Trying to decode an uninhabitable type.
     if en.variants.is_empty() {
@@ -229,7 +229,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
     let output_enum;
     let name_type;
 
-    match en.name_type.method {
+    match en.name.method {
         NameMethod::Sized => {
             for v in &en.variants {
                 let arm = output_arm(v.pattern, &v.name, &binding_var);
@@ -241,7 +241,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
             decode_name = quote!(#decode_t_decode(#variant_decoder_var));
             output_enum = None;
             fallback = quote!(_ => #fallback);
-            name_type = en.name_type.ty.clone();
+            name_type = en.name.ty.clone();
         }
         NameMethod::Unsized(method) => {
             let mut variants = Vec::new();
@@ -257,7 +257,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
 
             let arms = variants.iter().map(|o| o.as_arm(&binding_var, option));
 
-            let visit_type = &en.name_type.ty;
+            let visit_type = &en.name.ty;
             let method = method.as_method_name();
 
             decode_name = quote! {
@@ -325,10 +325,10 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                 }
             }
 
-            match en.name_type.method {
+            match en.name.method {
                 NameMethod::Sized => {
                     let decode_t_decode = &b.decode_t_decode;
-                    let name_type = &en.name_type.ty;
+                    let name_type = &en.name.ty;
 
                     Ok(quote! {{
                         let #value_var: #name_type = #decode_t_decode(#decoder_var)?;
@@ -338,7 +338,7 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                 }
                 NameMethod::Unsized(method) => {
                     let method = method.as_method_name();
-                    let visit_type = &en.name_type.ty;
+                    let visit_type = &en.name.ty;
 
                     Ok(quote! {
                         #decoder_t::#method(#decoder_var, |#value_var: &#visit_type| {
@@ -350,13 +350,13 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
         }
         EnumTagging::Default => {
             let arms = output_arms.iter().flat_map(|(v, pat, tag_value)| {
-                let name = v.st.name_type.value;
+                let name = v.st.name.value;
 
                 let decode = decode_variant(cx, b, v, &body_decoder_var, &variant_tag_var).ok()?;
 
                 let enter = cx.trace.then(|| {
-                    let formatted_tag = en.name_type.name_format(&tag_static);
-                    let tag_type = en.name_type.ty();
+                    let formatted_tag = en.name.name_format(&tag_static);
+                    let tag_type = en.name.ty();
 
                     quote! {
                         static #tag_static: #tag_type = #tag_value;
@@ -419,14 +419,14 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
             let tag_value = tag.value;
 
             let arms = output_arms.iter().flat_map(|(v, pat, tag_value)| {
-                let name = v.st.name_type.value;
+                let name = v.st.name.value;
 
                 let decode =
                     decode_variant(cx, b, v, &buffer_decoder_var, &variant_tag_var).ok()?;
 
                 let enter = cx.trace.then(|| {
-                    let formatted_tag = en.name_type.name_format(&tag_static);
-                    let tag_type = en.name_type.ty();
+                    let formatted_tag = en.name.name_format(&tag_static);
+                    let tag_type = en.name.ty();
 
                     quote! {
                         static #tag_static: #tag_type = #tag_value;
@@ -571,13 +571,13 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
             let content_value = content.value;
 
             let arms = output_arms.iter().flat_map(|(v, pat, tag_value)| {
-                let name = v.st.name_type.value;
+                let name = v.st.name.value;
 
                 let decode = decode_variant(cx, b, v, &body_decoder_var, &variant_tag_var).ok()?;
 
                 let enter = cx.trace.then(|| {
-                    let formatted_tag = en.name_type.name_format(&tag_static);
-                    let tag_type = en.name_type.ty();
+                    let formatted_tag = en.name.name_format(&tag_static);
+                    let tag_type = en.name.ty();
 
                     quote! {
                         static #tag_static: #tag_type = #tag_value;
@@ -776,7 +776,9 @@ fn decode_empty(cx: &Ctxt, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStre
     } = b.tokens;
 
     let Body {
-        path, name_type, ..
+        path,
+        name: name_type,
+        ..
     } = st;
 
     let name = name_type.value;
@@ -842,9 +844,9 @@ fn decode_tagged(
     let value_var = b.cx.ident("value");
     let binding_var = b.cx.ident("binding");
     let static_name_var = b.cx.ident("FIELD_NAME");
-    let static_name_type = st.name_type.ty();
+    let static_name_type = st.name.ty();
 
-    let type_name = st.name_type.value;
+    let type_name = st.name.value;
 
     let mut assigns = Punctuated::<_, Token![,]>::new();
 
@@ -858,7 +860,7 @@ fn decode_tagged(
         let expr = match f.init_default(b) {
             Some(init) => syn::Expr::Verbatim(init),
             None => {
-                let formatted_tag = st.name_type.name_format(&static_name_var);
+                let formatted_tag = st.name.name_format(&static_name_var);
 
                 let enter = cx.trace.then(|| {
                     let (name, enter) = match &f.member {
@@ -938,7 +940,7 @@ fn decode_tagged(
     let body;
     let name_type: syn::Type;
 
-    match st.name_type.method {
+    match st.name.method {
         NameMethod::Sized => {
             let mut arms = Vec::with_capacity(fields_with.len());
 
@@ -964,7 +966,7 @@ fn decode_tagged(
                 #decode_t_decode(#struct_decoder_var)?
             };
 
-            name_type = st.name_type.ty.clone();
+            name_type = st.name.ty.clone();
         }
         NameMethod::Unsized(method) => {
             let output_type =
@@ -1005,7 +1007,7 @@ fn decode_tagged(
 
             let arms = outputs.iter().map(|o| o.as_arm(&binding_var, option));
 
-            let visit_type = &st.name_type.ty;
+            let visit_type = &st.name.ty;
             let method = method.as_method_name();
 
             decode_tag = quote! {
@@ -1101,7 +1103,7 @@ fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result
 
     let Tokens { context_t, .. } = b.tokens;
 
-    let type_name = st.name_type.value;
+    let type_name = st.name.value;
     let path = &st.path;
 
     let enter = (cx.trace && cx.trace_body).then(|| {
@@ -1157,7 +1159,7 @@ fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Toke
         ..
     } = b.tokens;
 
-    let type_name = st.name_type.value;
+    let type_name = st.name.value;
     let output_var = b.cx.ident("output");
     let field_decoder = b.cx.ident("field_decoder");
 
