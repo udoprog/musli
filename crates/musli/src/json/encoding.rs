@@ -1,6 +1,3 @@
-//! Module that defines [`Encoding`] whith allows for customization of the
-//! encoding format, and the [`DEFAULT`] encoding configuration.
-
 use core::marker;
 
 #[cfg(feature = "alloc")]
@@ -19,12 +16,12 @@ use super::en::JsonEncoder;
 use super::error::Error;
 use super::parser::IntoParser;
 
-/// The default encoding instance using the default [`OPTIONS`].
+#[allow(unused)]
 const DEFAULT: Encoding = Encoding::new();
 
 crate::macros::bare_encoding!(Text, DEFAULT, json, IntoParser, IntoWriter);
 
-/// Encode the given value to a [`String`] using the [`DEFAULT`] [`Encoding`].
+/// Encode the given value to a [`String`] using the default [`Encoding`].
 ///
 /// # Examples
 ///
@@ -59,7 +56,7 @@ where
     DEFAULT.to_string(value)
 }
 
-/// Decode the given type `T` from the given string using the [`DEFAULT`]
+/// Decode the given type `T` from the given string using the default
 /// [`Encoding`].
 ///
 /// # Examples

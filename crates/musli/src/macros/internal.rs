@@ -2,7 +2,7 @@
 
 macro_rules! bare_encoding {
     ($mode:ident, $default:ident, $what:ident, $reader_trait:ident, $writer_trait:ident) => {
-        /// Encode the given value to the given [`Writer`] using the [`DEFAULT`]
+        /// Encode the given value to the given [`Writer`] using the default
         /// [`Encoding`].
         ///
         /// [`Writer`]: crate::Writer
@@ -43,7 +43,7 @@ macro_rules! bare_encoding {
             $default.encode(writer, value)
         }
 
-        /// Encode the given value to the given slice using the [`DEFAULT`]
+        /// Encode the given value to the given slice using the default
         /// [`Encoding`] and return the number of bytes encoded.
         ///
         /// # Examples
@@ -84,8 +84,7 @@ macro_rules! bare_encoding {
             $default.to_slice(out, value)
         }
 
-        /// Encode the given value to a [`Vec`] using the [`DEFAULT`]
-        /// [`Encoding`].
+        /// Encode the given value to a [`Vec`] using the default [`Encoding`].
         ///
         /// [`Vec`]: rust_alloc::vec::Vec
         ///
@@ -122,7 +121,7 @@ macro_rules! bare_encoding {
             $default.to_vec(value)
         }
 
-        /// Encode the given value to a fixed-size bytes using the [`DEFAULT`]
+        /// Encode the given value to a fixed-size bytes using the default
         /// [`Encoding`].
         ///
         /// ```
@@ -156,7 +155,7 @@ macro_rules! bare_encoding {
             $default.to_fixed_bytes::<N, _>(value)
         }
 
-        /// Encode the given value to the given [`Write`] using the [`DEFAULT`]
+        /// Encode the given value to the given [`Write`] using the default
         /// [`Encoding`].
         ///
         /// [`Write`]: std::io::Write
@@ -197,8 +196,8 @@ macro_rules! bare_encoding {
             $default.to_writer(writer, value)
         }
 
-        /// Decode the given type `T` from the given [`Reader`] using the [`DEFAULT`]
-        /// [`Encoding`].
+        /// Decode the given type `T` from the given [`Reader`] using the
+        /// default [`Encoding`].
         ///
         /// [`Reader`]: crate::Reader
         ///
@@ -243,7 +242,7 @@ macro_rules! bare_encoding {
             $default.decode(reader)
         }
 
-        /// Decode the given type `T` from the given slice using the [`DEFAULT`]
+        /// Decode the given type `T` from the given slice using the default
         /// [`Encoding`].
         ///
         /// # Examples

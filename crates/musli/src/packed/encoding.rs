@@ -1,6 +1,3 @@
-//! Module that defines [`Encoding`] whith allows for customization of the
-//! encoding format, and the [`DEFAULT`] encoding configuration.
-
 use core::marker;
 
 #[cfg(feature = "alloc")]
@@ -17,6 +14,7 @@ use crate::storage::en::StorageEncoder;
 /// The default options for the packed encoding.
 pub const OPTIONS: Options = options::new().fixed().native_byte_order().build();
 
+#[allow(unused)]
 const DEFAULT: Encoding = Encoding::new();
 
 crate::macros::bare_encoding!(Binary, DEFAULT, packed, IntoReader, IntoWriter);

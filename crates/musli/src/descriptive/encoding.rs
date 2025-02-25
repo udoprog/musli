@@ -1,6 +1,3 @@
-//! Module that defines [`Encoding`] whith allows for customization of the
-//! encoding format, and the [`DEFAULT`] encoding configuration.
-
 use core::marker;
 
 #[cfg(feature = "alloc")]
@@ -25,6 +22,7 @@ use super::error::Error;
 /// [`variable length`]: https://en.wikipedia.org/wiki/Variable-length_quantity
 pub const OPTIONS: options::Options = options::new().build();
 
+#[allow(unused)]
 const DEFAULT: Encoding = Encoding::new();
 
 crate::macros::bare_encoding!(Binary, DEFAULT, descriptive, IntoReader, IntoWriter);
