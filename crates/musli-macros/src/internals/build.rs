@@ -95,14 +95,14 @@ impl BuildData<'_> {
                 body.validate(cx, mode, "struct", "structs");
             }
             BuildData::Enum(en) => {
-                match en.packing_span {
-                    Some(&(span, Packing::Transparent)) => {
+                match en.packing {
+                    (span, Packing::Transparent) => {
                         cx.error_span(
                             span,
                             format_args!("In {mode} an enum cannot be #[{ATTR}(transparent)]"),
                         );
                     }
-                    Some(&(span, Packing::Packed)) => {
+                    (span, Packing::Packed) => {
                         if only == Only::Decode {
                             cx.error_span(
                                 span,
@@ -116,14 +116,35 @@ impl BuildData<'_> {
                             cx.error_span(
                                 span,
                                 format_args!(
-                                    "In {mode} a #[{ATTR}(packed)] type cannot use #[{ATTR}(tag)]"
+                                    "In {mode} a #[{ATTR}(packed)] enum cannot use #[{ATTR}(tag)]"
                                 ),
                             );
                         }
 
                         if let Some(span) = enum_content {
-                            cx.error_span(span, format_args!("In {mode} a #[{ATTR}(packed)] type cannot use #[{ATTR}(content)]"));
+                            cx.error_span(span, format_args!("In {mode} a #[{ATTR}(packed)] enum cannot use #[{ATTR}(content)]"));
                         }
+                    }
+                    (span, Packing::Untagged) => {
+                        if let Some(span) = enum_tag {
+                            cx.error_span(
+                                span,
+                                format_args!(
+                                    "In {mode} a #[{ATTR}(untagged)] enum cannot use #[{ATTR}(tag)]"
+                                ),
+                            );
+                        }
+
+                        if let Some(span) = enum_content {
+                            cx.error_span(span, format_args!("In {mode} a #[{ATTR}(untagged)] enum cannot use #[{ATTR}(content)]"));
+                        }
+
+                        cx.error_span(
+                            span,
+                            format_args!(
+                                "In {mode} a #[{ATTR}(untagged)] enum is not supported yet"
+                            ),
+                        );
                     }
                     _ => (),
                 }
@@ -131,13 +152,22 @@ impl BuildData<'_> {
                 for v in &en.variants {
                     v.st.validate(cx, mode, "variant", "variants");
 
-                    if let ((_, Packing::Packed), Some(span)) = (v.st.packing, enum_tag) {
-                        cx.error_span(
-                            span,
-                            format_args!(
-                                "In {mode} a #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
-                            ),
-                        );
+                    match (v.st.packing, enum_tag) {
+                        ((_, Packing::Packed), Some(span)) => {
+                            cx.error_span(
+                                span,
+                                format_args!(
+                                    "In {mode} a #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
+                                ),
+                            );
+                        }
+                        ((span, Packing::Untagged), _) => {
+                            cx.error_span(
+                                span,
+                                format_args!("In {mode} a variant cannot be #[{ATTR}(untagged)]"),
+                            );
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -243,6 +273,12 @@ impl<'a> Body<'a> {
                     );
                 };
             }
+            (span, Packing::Untagged) => {
+                cx.error_span(
+                    span,
+                    format_args!("In {mode} a {singular} cannot be #[{ATTR}(untagged)]"),
+                );
+            }
             _ => {}
         }
 
@@ -284,10 +320,9 @@ impl<'a> Body<'a> {
 pub(crate) struct Enum<'a> {
     pub(crate) name: Name<'a, syn::LitStr>,
     pub(crate) enum_tagging: EnumTagging<'a>,
-    pub(crate) enum_packing: Packing,
+    pub(crate) packing: (Span, Packing),
     pub(crate) variants: Vec<Variant<'a>>,
     pub(crate) fallback: Option<&'a syn::Ident>,
-    pub(crate) packing_span: Option<&'a (Span, Packing)>,
 }
 
 pub(crate) struct Variant<'a> {
@@ -452,8 +487,6 @@ fn setup_enum<'a>(
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
 
-    let packing_span = e.type_attr.packing(mode);
-
     let enum_tagging = match e.type_attr.enum_tagging(mode) {
         Some(enum_tagging) => enum_tagging,
         None => {
@@ -469,11 +502,11 @@ fn setup_enum<'a>(
         }
     };
 
-    let enum_packing = e
+    let packing = e
         .type_attr
         .packing(mode)
-        .map(|&(_, p)| p)
-        .unwrap_or_default();
+        .map(|&(span, p)| (span, p))
+        .unwrap_or_else(|| (Span::call_site(), Packing::default()));
 
     let (_, name_type, name_method, name_span) = split_name(
         mode.kind,
@@ -495,10 +528,9 @@ fn setup_enum<'a>(
             format_with: e.type_attr.name_format_with(mode),
         },
         enum_tagging,
-        enum_packing,
+        packing,
         variants,
         fallback,
-        packing_span,
     }
 }
 

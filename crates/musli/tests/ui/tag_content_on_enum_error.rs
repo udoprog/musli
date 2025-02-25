@@ -1,4 +1,4 @@
-use musli::{Encode, Decode};
+use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
 #[musli(tag = "type")]
@@ -8,5 +8,4 @@ struct TagUnsupported;
 #[musli(content = "type")]
 struct ContentUnsupported;
 
-fn main() {
-}
+fn main() {}

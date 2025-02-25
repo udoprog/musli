@@ -1,9 +1,7 @@
-use musli::{Encode, Decode};
+use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
 #[musli(encode_only, packed)]
-enum UntaggedEnumOk {
-}
+enum UntaggedEnumOk {}
 
-fn main() {
-}
+fn main() {}

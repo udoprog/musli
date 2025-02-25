@@ -16,5 +16,4 @@ enum Name<'a> {
     Given(&'a str),
 }
 
-fn main() {
-}
+fn main() {}

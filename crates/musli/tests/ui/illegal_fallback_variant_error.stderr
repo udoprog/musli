@@ -5,7 +5,7 @@ error: In #[musli(Binary, ..)] the #[musli(default)] variant must be empty
   |             ^^^^^^^
 
 error: In #[musli(Binary, ..)] only one #[musli(default)] variant is supported
-  --> tests/ui/illegal_fallback_variant_error.rs:17:13
+  --> tests/ui/illegal_fallback_variant_error.rs:15:13
    |
-17 |     #[musli(default)]
+15 |     #[musli(default)]
    |             ^^^^^^^

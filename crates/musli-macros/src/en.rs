@@ -231,6 +231,9 @@ fn default_encode(
                 }};
             }
         }
+        (_, Packing::Untagged) => {
+            return Err(());
+        }
     }
 
     Ok(encode)
@@ -326,6 +329,9 @@ fn make_encoders(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Vec<
 
                     #leave
                 }};
+            }
+            (_, Packing::Untagged) => {
+                return Err(());
             }
         };
 
@@ -434,7 +440,7 @@ fn encode_variant(
         EnumTagging::Default => {
             encode = default_encode(cx, b, &v.st, Some(&mut size_hint))?;
 
-            if let Packing::Tagged = en.enum_packing {
+            if let (_, Packing::Tagged) = en.packing {
                 let encode_t_encode = &b.encode_t_encode;
                 let name = &v.name;
                 let name_type = en.name.ty();
@@ -511,6 +517,9 @@ fn encode_variant(
                             #(#decls)*
                             #option::Some(#len)
                         }};
+                    }
+                    (_, Packing::Untagged) => {
+                        return Err(());
                     }
                 }
 

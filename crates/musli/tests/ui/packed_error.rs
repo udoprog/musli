@@ -1,4 +1,4 @@
-use musli::{Encode, Decode};
+use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
 #[musli(packed)]
@@ -17,13 +17,12 @@ enum Enum {
         #[musli(default)]
         not_last: Option<u32>,
         last: u32,
-    }
+    },
 }
 
 #[derive(Decode)]
 #[musli(packed)]
-enum EmptyEnum {
-}
+enum EmptyEnum {}
 
 #[derive(Decode)]
 #[musli(packed)]
@@ -61,5 +60,4 @@ pub enum PackedVariant {
     Variant(u32),
 }
 
-fn main() {
-}
+fn main() {}

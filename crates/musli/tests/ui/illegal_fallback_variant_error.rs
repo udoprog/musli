@@ -1,12 +1,10 @@
-use musli::{Encode, Decode};
+use musli::{Decode, Encode};
 
 /// Non-empty fallback variant.
 #[derive(Encode, Decode)]
 enum Enum1 {
     #[musli(default)]
-    Variant {
-        field: u32,
-    }
+    Variant { field: u32 },
 }
 
 /// Multiple fallback variants.
@@ -18,5 +16,4 @@ enum Enum2 {
     Fallback2,
 }
 
-fn main() {
-}
+fn main() {}

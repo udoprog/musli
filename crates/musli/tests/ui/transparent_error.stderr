@@ -29,55 +29,55 @@ error: A #[musli(transparent)] attribute can only be used on variants which have
    |             ^^^^^^^^^^^
 
 error: A #[musli(transparent)] attribute can only be used on variants which have a single field
-  --> tests/ui/transparent_error.rs:29:13
+  --> tests/ui/transparent_error.rs:26:13
    |
-29 |     #[musli(transparent)]
+26 |     #[musli(transparent)]
    |             ^^^^^^^^^^^
 
 error: A #[musli(transparent)] variant must have a single field
-  --> tests/ui/transparent_error.rs:31:13
+  --> tests/ui/transparent_error.rs:28:13
    |
-31 |     #[musli(transparent)]
+28 |     #[musli(transparent)]
    |             ^^^^^^^^^^^
 
 error: A #[musli(transparent)] variant must have a single field
-  --> tests/ui/transparent_error.rs:33:13
+  --> tests/ui/transparent_error.rs:30:13
    |
-33 |     #[musli(transparent)]
+30 |     #[musli(transparent)]
    |             ^^^^^^^^^^^
 
 error: A #[musli(transparent)] or #[musli(packed)] struct cannot have named fields
-  --> tests/ui/transparent_error.rs:40:13
+  --> tests/ui/transparent_error.rs:37:13
    |
-40 |     #[musli(name = "test")]
+37 |     #[musli(name = "test")]
    |             ^^^^
 
 error: A #[musli(transparent)] or #[musli(packed)] variant cannot have named fields
-  --> tests/ui/transparent_error.rs:48:21
+  --> tests/ui/transparent_error.rs:45:21
    |
-48 |     Variant(#[musli(name = "test")] String),
+45 |     Variant(#[musli(name = "test")] String),
    |                     ^^^^
 
 error: A #[musli(transparent)] struct cannot have an optional field
-  --> tests/ui/transparent_error.rs:54:13
+  --> tests/ui/transparent_error.rs:51:13
    |
-54 |     #[musli(skip_encoding_if = String::is_empty)]
+51 |     #[musli(skip_encoding_if = String::is_empty)]
    |             ^^^^^^^^^^^^^^^^
 
 error: A #[musli(transparent)] variant cannot have an optional field
-  --> tests/ui/transparent_error.rs:62:17
+  --> tests/ui/transparent_error.rs:59:17
    |
-62 |         #[musli(skip_encoding_if = String::is_empty)]
+59 |         #[musli(skip_encoding_if = String::is_empty)]
    |                 ^^^^^^^^^^^^^^^^
 
 error: A #[musli(transparent)] attribute can only be used on structs which have a single field
-  --> tests/ui/transparent_error.rs:73:9
+  --> tests/ui/transparent_error.rs:70:9
    |
-73 | #[musli(transparent)]
+70 | #[musli(transparent)]
    |         ^^^^^^^^^^^
 
 error: A #[musli(transparent)] attribute can only be used on variants which have a single field
-  --> tests/ui/transparent_error.rs:83:13
+  --> tests/ui/transparent_error.rs:80:13
    |
-83 |     #[musli(transparent)]
+80 |     #[musli(transparent)]
    |             ^^^^^^^^^^^
