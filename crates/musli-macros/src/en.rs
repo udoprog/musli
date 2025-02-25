@@ -243,7 +243,7 @@ fn make_encoders(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Vec<
 
     let encode_t_encode = &b.encode_t_encode;
 
-    let sequence_decoder_next_var = b.cx.ident("sequence_decoder_next");
+    let sequence_decoder_var = b.cx.ident("sequence_decoder");
     let pair_encoder_var = b.cx.ident("pair_encoder");
     let field_encoder_var = b.cx.ident("field_encoder");
     let value_encoder_var = b.cx.ident("value_encoder");
@@ -253,62 +253,55 @@ fn make_encoders(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Vec<
     let mut encoders = Vec::with_capacity(st.all_fields.len());
 
     for f in &st.unskipped_fields {
-        let encode_path = &f.encode_path.1;
-        let access = &f.self_access;
-        let name = &f.name;
-        let name_type = st.name_type.ty();
+        let enter = cx.trace.then(|| {
+            let name = &f.name;
+            let name_type = st.name_type.ty();
 
-        let mut encode;
-
-        let enter = match &f.member {
-            syn::Member::Named(ident) => {
-                let field_name = syn::LitStr::new(&ident.to_string(), ident.span());
-
-                cx.trace.then(|| {
+            match &f.member {
+                syn::Member::Named(ident) => {
+                    let ident = syn::LitStr::new(&ident.to_string(), ident.span());
                     let formatted_name = st.name_type.name_format(&field_name_static);
 
                     quote! {
-                        #context_t::enter_named_field(#ctx_var, #field_name, #formatted_name);
+                        static #field_name_static: #name_type = #name;
+                        #context_t::enter_named_field(#ctx_var, #ident, #formatted_name);
                     }
-                })
-            }
-            syn::Member::Unnamed(index) => {
-                let index = index.index;
-                cx.trace.then(|| {
+                }
+                syn::Member::Unnamed(index) => {
+                    let index = index.index;
                     let formatted_name = st.name_type.name_format(&field_name_static);
 
                     quote! {
+                        static #field_name_static: #name_type = #name;
                         #context_t::enter_unnamed_field(#ctx_var, #index, #formatted_name);
                     }
-                })
+                }
             }
-        };
+        });
 
         let leave = cx.trace.then(|| quote!(#context_t::leave_field(#ctx_var);));
+
+        let (_, encode_path) = &f.encode_path;
+        let access = &f.self_access;
+
+        let mut encode;
 
         match st.packing {
             (_, Packing::Transparent) => {
                 return Err(());
             }
             (_, Packing::Packed) => {
-                let decl = enter.is_some().then(|| {
-                    quote! {
-                        static #field_name_static: #name_type = #name;
-                    }
-                });
-
                 encode = quote! {{
-                    #decl
                     #enter
-                    let #sequence_decoder_next_var = #sequence_encoder_t::encode_next(#encoder_var)?;
-                    #encode_path(#access, #sequence_decoder_next_var)?;
+
+                    let #sequence_decoder_var = #sequence_encoder_t::encode_next(#encoder_var)?;
+                    #encode_path(#access, #sequence_decoder_var)?;
+
                     #leave
                 }};
             }
             (_, Packing::Tagged) => {
                 encode = quote! {{
-                    static #field_name_static: #name_type = #name;
-
                     #enter
 
                     #map_encoder_t::encode_entry_fn(#encoder_var, move |#pair_encoder_var| {
@@ -610,9 +603,9 @@ fn encode_variant(
             let name_type = en.name_type.ty();
 
             let (build_hint, inner_hint) = length_test(&v.st.unskipped_fields).build_hint(b);
-            let adjacent_encoder = b.cx.ident("adjacent_encoder");
-            let content_encoder = b.cx.ident("content_encoder");
-            let pair = b.cx.ident("pair");
+            let adjacent_encoder_var = b.cx.ident("adjacent_encoder");
+            let content_encoder_var = b.cx.ident("content_encoder");
+            let pair_encoder_var = b.cx.ident("pair_encoder");
             let content_tag = b.cx.ident("content_tag");
 
             let tag_value = tag.value;
@@ -630,7 +623,7 @@ fn encode_variant(
                     let access = &f.self_access;
 
                     inner_encode = quote! {
-                        #encode_path(#access, #content_encoder)?;
+                        #encode_path(#access, #content_encoder_var)?;
                     };
                 }
                 (_, Packing::Packed) => {
@@ -638,7 +631,7 @@ fn encode_variant(
                     let encoders = make_encoders(cx, b, &v.st)?;
 
                     inner_encode = quote! {
-                        #encoder_t::encode_pack_fn(#content_encoder, move |#encoder_var| {
+                        #encoder_t::encode_pack_fn(#content_encoder_var, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result::Ok(())
@@ -650,7 +643,7 @@ fn encode_variant(
                     let encoders = make_encoders(cx, b, &v.st)?;
 
                     inner_encode = quote! {
-                        #encoder_t::encode_map_fn(#content_encoder, #inner_hint, move |#encoder_var| {
+                        #encoder_t::encode_map_fn(#content_encoder_var, #inner_hint, move |#encoder_var| {
                             #(#decls)*
                             #(#encoders)*
                             #result::Ok(())
@@ -663,18 +656,18 @@ fn encode_variant(
                 static #hint: usize = 2;
                 #build_hint
 
-                #encoder_t::encode_map_fn(#encoder_var, #hint, move |#adjacent_encoder| {
+                #encoder_t::encode_map_fn(#encoder_var, #hint, move |#adjacent_encoder_var| {
                     static #tag_static: #tag_type = #tag_value;
                     static #content_static: #content_type = #content_value;
                     static #name_static: #name_type = #name;
 
-                    #map_encoder_t::insert_entry(#adjacent_encoder, #tag_static, #name_static)?;
+                    #map_encoder_t::insert_entry(#adjacent_encoder_var, #tag_static, #name_static)?;
 
-                    #map_encoder_t::encode_entry_fn(#adjacent_encoder, move |#pair| {
-                        let #content_tag = #map_entry_encoder_t::encode_key(#pair)?;
+                    #map_encoder_t::encode_entry_fn(#adjacent_encoder_var, move |#pair_encoder_var| {
+                        let #content_tag = #map_entry_encoder_t::encode_key(#pair_encoder_var)?;
                         #encode_t_encode(#content_static_expr, #content_tag)?;
 
-                        let #content_encoder = #map_entry_encoder_t::encode_value(#pair)?;
+                        let #content_encoder_var = #map_entry_encoder_t::encode_value(#pair_encoder_var)?;
                         #inner_encode
                         #result::Ok(())
                     })?;
