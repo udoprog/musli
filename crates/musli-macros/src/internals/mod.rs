@@ -17,6 +17,6 @@ pub(crate) use self::expansion::Expansion;
 pub(crate) use self::mode::{ImportedMethod, Mode};
 pub(crate) use self::name::NameAll;
 pub(crate) use self::packed::packed;
-pub(crate) use self::tokens::{Import, Tokens};
+pub(crate) use self::tokens::Tokens;
 
 pub(crate) type Result<T, E = ()> = std::result::Result<T, E>;

@@ -85,6 +85,7 @@ where
     type Error = C::Error;
     type Allocator = C::Allocator;
     type Mode = M;
+    type TryClone = Self;
     type DecodeBuffer = Self;
     type DecodePack = Self;
     type DecodeSequence = Self;
@@ -101,6 +102,11 @@ where
 
     #[inline]
     fn expecting(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self._never {}
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
         match self._never {}
     }
 

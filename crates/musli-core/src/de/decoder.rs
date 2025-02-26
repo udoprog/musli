@@ -30,6 +30,14 @@ pub trait Decoder<'de>: Sized {
     type Allocator: Allocator;
     /// Mode associated with decoding.
     type Mode: 'static;
+    /// A clone of the current decoder.
+    type TryClone: Decoder<
+        'de,
+        Cx = Self::Cx,
+        Error = Self::Error,
+        Allocator = Self::Allocator,
+        Mode = Self::Mode,
+    >;
     /// Decoder returned by [`Decoder::decode_buffer`].
     type DecodeBuffer: AsDecoder<
         Cx = Self::Cx,
@@ -138,6 +146,12 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
+    /// Attempt to clone the decoder so that it can be used multiple times.
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        None
+    }
 
     /// Try to quickly decode the specified value.
     ///

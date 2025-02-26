@@ -48,8 +48,14 @@ pub trait Reader<'de>: self::sealed::Sealed {
     where
         Self: 'this;
 
+    /// Type that can be cloned from the reader.
+    type TryClone: Reader<'de>;
+
     /// Borrow the current reader.
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
+
+    /// Try to clone the reader.
+    fn try_clone(&self) -> Option<Self::TryClone>;
 
     /// Test if the reader is at end of input.
     fn is_eof(&mut self) -> bool;
@@ -182,9 +188,16 @@ impl<'de> Reader<'de> for &'de [u8] {
     where
         Self: 'this;
 
+    type TryClone = &'de [u8];
+
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         self
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(self)
     }
 
     #[inline]
@@ -379,9 +392,19 @@ impl<'de> Reader<'de> for SliceReader<'de> {
     where
         Self: 'this;
 
+    type TryClone = Self;
+
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         self
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(Self {
+            range: self.range.clone(),
+            _marker: marker::PhantomData,
+        })
     }
 
     #[inline]
@@ -520,9 +543,19 @@ where
     where
         Self: 'this;
 
+    type TryClone = Limit<R::TryClone>;
+
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         self
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(Limit {
+            remaining: self.remaining,
+            reader: self.reader.try_clone()?,
+        })
     }
 
     #[inline]
@@ -616,9 +649,16 @@ where
     where
         Self: 'this;
 
+    type TryClone = R::TryClone;
+
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         self
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        (**self).try_clone()
     }
 
     #[inline]

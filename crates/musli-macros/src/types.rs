@@ -26,6 +26,8 @@ pub(super) enum Extra {
     Error,
     /// `type Mode = M;`
     Mode,
+    /// `fn try_clone(&self) -> Option<Self::TryClone>`.
+    TryCloneFn,
     /// `type Allocator = <Self::Cx as Context>::Allocator;`
     Allocator,
     /// An associated visitor type.
@@ -52,6 +54,8 @@ pub(super) const DECODER_TYPES: &[(&str, Extra)] = &[
     ("cx", Extra::CxFn),
     ("Error", Extra::Error),
     ("Mode", Extra::Mode),
+    ("TryClone", Extra::None),
+    ("try_clone", Extra::TryCloneFn),
     ("Allocator", Extra::Allocator),
     ("DecodeBuffer", Extra::None),
     ("DecodeSome", Extra::None),
@@ -259,6 +263,16 @@ impl Types {
                         #[inline]
                         fn cx(&self) -> Self::Cx {
                             self.cx
+                        }
+                    });
+
+                    continue;
+                }
+                Extra::TryCloneFn => {
+                    self.item_impl.items.push(syn::parse_quote! {
+                        #[inline]
+                        fn try_clone(&self) -> Option<Self::TryClone> {
+                            None
                         }
                     });
 

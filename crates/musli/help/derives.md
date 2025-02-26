@@ -96,7 +96,7 @@ use musli::{Decode, Encode};
 enum Packed {}
 
 #[derive(Encode, Decode)]
-#[musli(mode = Packed, encode_only, packed)]
+#[musli(mode = Packed, encode_only, untagged)]
 enum Name<'a> {
     Full(&'a str),
     Given(&'a str),

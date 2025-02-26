@@ -3,13 +3,19 @@
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode)]
-#[musli(packed)]
+#[musli(untagged)]
 pub enum Enum {
+    #[musli(packed)]
     EmptyVariant1,
+    #[musli(packed)]
     EmptyVariant2,
+    #[musli(packed)]
     StringVariant { value: String },
+    #[musli(packed)]
     IntegerVariant { value: u32 },
+    #[musli(packed)]
     StringTupleVariant(String, String),
+    #[musli(packed)]
     IntegerTupleVariant(u32, u32),
 }
 

@@ -60,6 +60,7 @@ where
     type Error = C::Error;
     type Allocator = C::Allocator;
     type Mode = M;
+    type TryClone = StorageDecoder<OPT, PACK, R::TryClone, C, M>;
     type DecodePack = StorageDecoder<OPT, true, R, C, M>;
     type DecodeSome = Self;
     type DecodeSequence = LimitedStorageDecoder<OPT, PACK, R, C, M>;
@@ -75,6 +76,11 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "type supported by the storage decoder")
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(StorageDecoder::new(self.cx, self.reader.try_clone()?))
     }
 
     #[inline]

@@ -56,6 +56,7 @@ where
     type Error = C::Error;
     type Allocator = C::Allocator;
     type Mode = M;
+    type TryClone = JsonKeyDecoder<P::TryClone, C, M>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -65,6 +66,11 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "value that can be decoded from a object key")
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(JsonKeyDecoder::new(self.cx, self.parser.try_clone()?))
     }
 
     #[inline]

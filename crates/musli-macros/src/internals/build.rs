@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::punctuated::Punctuated;
@@ -23,7 +21,7 @@ pub(crate) struct Parameters {
     pub(crate) allocator_exists: bool,
 }
 
-pub(crate) struct Build<'tok, 'a> {
+pub(crate) struct Build<'a> {
     pub(crate) mode: Mode<'a>,
     pub(crate) input: &'a syn::DeriveInput,
     pub(crate) cx: &'a Ctxt,
@@ -35,11 +33,11 @@ pub(crate) struct Build<'tok, 'a> {
     pub(crate) encode_t_encode: ImportedMethod<'a>,
     pub(crate) enum_tag: Option<Span>,
     pub(crate) enum_content: Option<Span>,
-    pub(crate) tokens: &'tok Tokens<'a>,
+    pub(crate) tokens: &'a Tokens<'a>,
     pub(crate) p: Parameters,
 }
 
-impl Build<'_, '_> {
+impl Build<'_> {
     /// Validate encode attributes.
     pub(crate) fn validate_encode(&self) -> Result<()> {
         self.validate(Only::Encode)
@@ -103,27 +101,10 @@ impl BuildData<'_> {
                         );
                     }
                     (span, Packing::Packed) => {
-                        if only == Only::Decode {
-                            cx.error_span(
-                                span,
-                                format_args!(
-                                    "In {mode} an enum cannot be #[{ATTR}(packed)] when decoding"
-                                ),
-                            );
-                        }
-
-                        if let Some(span) = enum_tag {
-                            cx.error_span(
-                                span,
-                                format_args!(
-                                    "In {mode} a #[{ATTR}(packed)] enum cannot use #[{ATTR}(tag)]"
-                                ),
-                            );
-                        }
-
-                        if let Some(span) = enum_content {
-                            cx.error_span(span, format_args!("In {mode} a #[{ATTR}(packed)] enum cannot use #[{ATTR}(content)]"));
-                        }
+                        cx.error_span(
+                            span,
+                            format_args!("In {mode} an enum cannot be #[{ATTR}(packed)]"),
+                        );
                     }
                     (span, Packing::Untagged) => {
                         if let Some(span) = enum_tag {
@@ -139,12 +120,14 @@ impl BuildData<'_> {
                             cx.error_span(span, format_args!("In {mode} a #[{ATTR}(untagged)] enum cannot use #[{ATTR}(content)]"));
                         }
 
-                        cx.error_span(
-                            span,
-                            format_args!(
-                                "In {mode} a #[{ATTR}(untagged)] enum is not supported yet"
-                            ),
-                        );
+                        if only == Only::Decode {
+                            cx.error_span(
+                                span,
+                                format_args!(
+                                    "In {mode} a #[{ATTR}(untagged)] enum is not supported yet"
+                                ),
+                            );
+                        }
                     }
                     _ => (),
                 }
@@ -152,22 +135,13 @@ impl BuildData<'_> {
                 for v in &en.variants {
                     v.st.validate(cx, mode, "variant", "variants");
 
-                    match (v.st.packing, enum_tag) {
-                        ((_, Packing::Packed), Some(span)) => {
-                            cx.error_span(
-                                span,
-                                format_args!(
-                                    "In {mode} a #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
-                                ),
-                            );
-                        }
-                        ((span, Packing::Untagged), _) => {
-                            cx.error_span(
-                                span,
-                                format_args!("In {mode} a variant cannot be #[{ATTR}(untagged)]"),
-                            );
-                        }
-                        _ => {}
+                    if let ((_, Packing::Packed), Some(span)) = (v.st.packing, enum_tag) {
+                        cx.error_span(
+                            span,
+                            format_args!(
+                                "In {mode} a #[{ATTR}(packed)] variant cannot be used in an enum using #[{ATTR}(tag)]"
+                            ),
+                        );
                     }
                 }
             }
@@ -177,21 +151,31 @@ impl BuildData<'_> {
 
 pub(crate) struct Body<'a> {
     pub(crate) name: Name<'a, syn::LitStr>,
-    pub(crate) unskipped_fields: Vec<Rc<Field<'a>>>,
-    pub(crate) all_fields: Vec<Rc<Field<'a>>>,
+    pub(crate) all_fields: Vec<Field<'a>>,
     pub(crate) packing: (Span, Packing),
     pub(crate) kind: StructKind,
     pub(crate) path: syn::Path,
 }
 
 impl<'a> Body<'a> {
-    /// Declare variables.
-    pub(crate) fn field_tests(&self) -> impl Iterator<Item = impl ToTokens> + '_ {
-        self.unskipped_fields.iter().flat_map(|f| {
-            let (_, path) = f.skip_encoding_if.as_ref()?;
+    /// Iterate over unskipped fields.
+    #[inline]
+    pub(crate) fn unskipped_fields(&self) -> impl Iterator<Item = &Field<'a>> {
+        self.all_fields.iter().filter(|f| f.skip.is_none())
+    }
 
-            let access = &f.self_access;
-            let var = &f.var;
+    /// Construct field tests.
+    #[inline]
+    pub(crate) fn field_tests(&self) -> impl Iterator<Item = impl ToTokens> + '_ {
+        self.unskipped_fields().flat_map(|f| {
+            let Field {
+                skip_encoding_if,
+                access,
+                var,
+                ..
+            } = f;
+
+            let (_, path) = skip_encoding_if.as_ref()?;
 
             Some(quote! {
                 let #var = !#path(#access);
@@ -201,9 +185,12 @@ impl<'a> Body<'a> {
 
     /// Access the single transparent field in the body.
     pub(crate) fn transparent_field(&self) -> Result<&Field<'a>, ()> {
-        let [f] = &self.unskipped_fields[..] else {
+        let mut it = self.unskipped_fields();
+        let f = it.next().ok_or(())?;
+
+        if it.next().is_some() {
             return Err(());
-        };
+        }
 
         Ok(f)
     }
@@ -219,7 +206,7 @@ impl<'a> Body<'a> {
             (_, Packing::Packed) => {
                 let mut last_default = None;
 
-                for f in &self.unskipped_fields {
+                for f in self.unskipped_fields() {
                     if let Some((span, _)) = f.default_attr {
                         last_default = Some(span);
                     } else if let Some(span) = last_default {
@@ -241,7 +228,7 @@ impl<'a> Body<'a> {
                     );
                 }
             }
-            (_, Packing::Transparent) if !matches!(&self.unskipped_fields[..], [_]) => {
+            (_, Packing::Transparent) if self.transparent_field().is_err() => {
                 'done: {
                     if self.all_fields.is_empty() {
                         cx.error_span(
@@ -254,7 +241,7 @@ impl<'a> Body<'a> {
                         break 'done;
                     }
 
-                    if self.unskipped_fields.is_empty() {
+                    if self.unskipped_fields().next().is_none() {
                         cx.error_span(
                             self.packing.0,
                             format_args!(
@@ -282,28 +269,26 @@ impl<'a> Body<'a> {
             _ => {}
         }
 
-        for f in &self.all_fields {
-            if matches!(self.packing, (_, Packing::Transparent | Packing::Packed)) {
+        if let (_, packing @ (Packing::Transparent | Packing::Packed)) = self.packing {
+            for f in &self.all_fields {
                 if let Some(span) = f.name_span {
                     cx.error_span(
                         span,
-                        format_args!(
-                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] {singular} cannot have named fields"
-                        ),
+                        format_args!("A #[{ATTR}({packing})]{singular} cannot have named fields"),
                     );
                 }
 
                 if let Some(span) = f.pattern {
                     cx.error_span(
                         span.span(),
-                        format_args!(
-                            "A #[{ATTR}(transparent)] or #[{ATTR}(packed)] {singular} cannot have field patterns"
-                        ),
+                        format_args!("A #[{ATTR}({packing})]{singular} cannot have field patterns"),
                     );
                 }
             }
+        }
 
-            if matches!(self.packing, (_, Packing::Transparent)) {
+        if matches!(self.packing, (_, Packing::Transparent)) {
+            for f in &self.all_fields {
                 if let Some(&(span, _)) = f.skip_encoding_if {
                     cx.error_span(
                         span,
@@ -349,7 +334,7 @@ pub(crate) struct Field<'a> {
     pub(crate) skip_encoding_if: Option<&'a (Span, syn::Path)>,
     /// Fill with default value, if missing.
     pub(crate) default_attr: Option<(Span, Option<&'a syn::Path>)>,
-    pub(crate) self_access: syn::Expr,
+    pub(crate) access: syn::Expr,
     pub(crate) member: syn::Member,
     pub(crate) var: syn::Ident,
     pub(crate) ty: &'a syn::Type,
@@ -358,7 +343,7 @@ pub(crate) struct Field<'a> {
 impl Field<'_> {
     /// If the field is skipped, set up the expression which initializes the
     /// field to its default value.
-    pub(crate) fn init_default(&self, b: &Build<'_, '_>) -> Option<TokenStream> {
+    pub(crate) fn init_default(&self, b: &Build<'_>) -> Option<TokenStream> {
         let span = *self.skip.as_ref()?;
 
         let Tokens {
@@ -377,13 +362,13 @@ impl Field<'_> {
 /// Setup a build.
 ///
 /// Handles mode decoding, and construction of parameters which might give rise to errors.
-pub(crate) fn setup<'tok, 'a>(
+pub(crate) fn setup<'a>(
     e: &'a Expander,
     expansion: Expansion<'a>,
     mode: Mode<'a>,
-    tokens: &'tok Tokens<'a>,
+    tokens: &'a Tokens<'a>,
     p: Parameters,
-) -> Result<Build<'tok, 'a>> {
+) -> Result<Build<'a>> {
     let data = match &e.data {
         Data::Struct(data) => BuildData::Struct(setup_struct(e, &mode, data, &p.allocator_ident)),
         Data::Enum(data) => BuildData::Enum(setup_enum(e, &mode, data, &p.allocator_ident)),
@@ -428,7 +413,6 @@ fn setup_struct<'a>(
     data: &'a StructData<'a>,
     allocator_ident: &syn::Ident,
 ) -> Body<'a> {
-    let mut unskipped_fields = Vec::new();
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
     let packing = e
@@ -453,13 +437,7 @@ fn setup_struct<'a>(
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
 
     for f in &data.fields {
-        let field = Rc::new(setup_field(e, mode, f, name_all, None, allocator_ident));
-
-        if field.skip.is_none() {
-            unskipped_fields.push(field.clone());
-        }
-
-        all_fields.push(field);
+        all_fields.push(setup_field(e, mode, f, name_all, None, allocator_ident));
     }
 
     Body {
@@ -470,7 +448,6 @@ fn setup_struct<'a>(
             method: name_method,
             format_with: e.type_attr.name_format_with(mode),
         },
-        unskipped_fields,
         all_fields,
         packing,
         kind: data.kind,
@@ -541,13 +518,11 @@ fn setup_variant<'a>(
     fallback: &mut Option<&'a syn::Ident>,
     allocator_ident: &syn::Ident,
 ) -> Variant<'a> {
-    let mut unskipped_fields = Vec::new();
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
     let packing = data
         .attr
         .packing(mode)
-        .or_else(|| e.type_attr.packing(mode))
         .map(|&(span, v)| (span, v))
         .unwrap_or_else(|| (Span::call_site(), Packing::default()));
 
@@ -597,18 +572,7 @@ fn setup_variant<'a>(
     let mut patterns = Punctuated::default();
 
     for f in &data.fields {
-        let field = Rc::new(setup_field(
-            e,
-            mode,
-            f,
-            name_all,
-            Some(&mut patterns),
-            allocator_ident,
-        ));
-
-        if field.skip.is_none() {
-            unskipped_fields.push(field.clone());
-        }
+        let field = setup_field(e, mode, f, name_all, Some(&mut patterns), allocator_ident);
 
         all_fields.push(field);
     }
@@ -621,7 +585,6 @@ fn setup_variant<'a>(
             method: name_method,
             format_with: data.attr.name_format_with(mode),
         },
-        unskipped_fields,
         all_fields,
         packing,
         kind: data.kind,
@@ -670,7 +633,7 @@ fn setup_field<'a>(
         }),
     };
 
-    let self_access;
+    let access;
 
     if let Some(patterns) = patterns {
         match data.ident {
@@ -681,11 +644,11 @@ fn setup_field<'a>(
                 if skip.is_none() {
                     colon_token = None;
                     pat = syn::parse_quote!(ref #ident);
-                    self_access = syn::parse_quote!(#ident);
+                    access = syn::parse_quote!(#ident);
                 } else {
                     colon_token = Some(<Token![:]>::default());
                     pat = syn::parse_quote!(_);
-                    self_access = syn::Expr::Path(syn::ExprPath {
+                    access = syn::Expr::Path(syn::ExprPath {
                         attrs: Vec::new(),
                         qself: None,
                         path: syn::Path::from(quote::format_ident!("skipped_{ident}")),
@@ -712,7 +675,7 @@ fn setup_field<'a>(
                     path = syn::Path::from(quote::format_ident!("skipped_{}", data.index));
                 };
 
-                self_access = syn::Expr::Path(syn::ExprPath {
+                access = syn::Expr::Path(syn::ExprPath {
                     attrs: Vec::new(),
                     qself: None,
                     path,
@@ -727,7 +690,7 @@ fn setup_field<'a>(
             }
         }
     } else {
-        self_access = syn::parse_quote!(&self.#member);
+        access = syn::parse_quote!(&self.#member);
     };
 
     let var = match &member {
@@ -749,7 +712,7 @@ fn setup_field<'a>(
         skip,
         skip_encoding_if,
         default_attr,
-        self_access,
+        access,
         member,
         var,
         ty: data.ty,

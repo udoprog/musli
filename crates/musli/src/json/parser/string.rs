@@ -43,6 +43,17 @@ pub enum StringReference<'de, 'scratch> {
     Scratch(&'scratch str),
 }
 
+impl StringReference<'_, '_> {
+    /// Returns the string as a borrowed reference.
+    #[inline]
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            Self::Borrowed(s) => s,
+            Self::Scratch(s) => s,
+        }
+    }
+}
+
 /// Accessor for a slice.
 pub(crate) struct SliceAccess<'de, C> {
     cx: C,

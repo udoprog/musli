@@ -81,7 +81,7 @@ where
             Token::String => {
                 // Skip over opening quote.
                 self.parser.skip(self.cx, 1)?;
-                self.parser.skip_string(self.cx)
+                self.parser.skip_string_inner(self.cx)
             }
             actual => Err(self
                 .cx
@@ -116,6 +116,7 @@ where
     type Error = C::Error;
     type Allocator = C::Allocator;
     type Mode = M;
+    type TryClone = JsonDecoder<P::TryClone, C, M>;
     type DecodeBuffer = IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
     type DecodePack = JsonSequenceDecoder<P, C, M>;
     type DecodeSequence = JsonSequenceDecoder<P, C, M>;
@@ -132,6 +133,11 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "value that can be decoded from JSON")
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(JsonDecoder::new(self.cx, self.parser.try_clone()?))
     }
 
     #[inline]
@@ -181,10 +187,8 @@ where
         let start = self.cx.mark();
         let mut scratch = Vec::new_in(self.cx.alloc());
 
-        let string = match self.parser.parse_string(self.cx, true, &mut scratch)? {
-            StringReference::Borrowed(string) => string,
-            StringReference::Scratch(string) => string,
-        };
+        let string = self.parser.parse_string(self.cx, true, &mut scratch)?;
+        let string = string.as_str();
 
         let mut it = string.chars();
         let first = it.next();

@@ -105,6 +105,7 @@ where
     type Error = C::Error;
     type Allocator = C::Allocator;
     type Mode = M;
+    type TryClone = Self;
     type DecodeBuffer = AsValueDecoder<'de, OPT, C, A, M>;
     type DecodeSome = Self;
     type DecodePack = StorageDecoder<OPT, true, SliceReader<'de>, C, M>;
@@ -121,6 +122,11 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "cannot be decoded from value")
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(ValueDecoder::new(self.cx, self.value))
     }
 
     #[inline]

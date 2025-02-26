@@ -26,11 +26,15 @@ pub trait Parser<'de>: private::Sealed {
     where
         Self: 'this;
 
+    /// The type of parser that can be cloned into.
+    type TryClone: Parser<'de>;
+
     /// Reborrow the current parser.
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
-    /// Must parse the string from the input buffer and validate that it is
-    /// valid UTF-8.
+    /// Try to clone the parser.
+    fn try_clone(&self) -> Option<Self::TryClone>;
+
     #[doc(hidden)]
     fn parse_string<'scratch, C>(
         &mut self,
@@ -39,11 +43,33 @@ pub trait Parser<'de>: private::Sealed {
         scratch: &'scratch mut Vec<u8, C::Allocator>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
+        C: Context,
+    {
+        let start = cx.mark();
+        let actual = self.lex(cx);
+
+        if !matches!(actual, Token::String) {
+            return Err(cx.marked_message(&start, format_args!("Expected string, found {actual}")));
+        }
+
+        self.skip(cx, 1)?;
+        self.parse_string_inner(cx, validate, scratch, &start)
+    }
+
+    #[doc(hidden)]
+    fn parse_string_inner<'scratch, C>(
+        &mut self,
+        cx: C,
+        validate: bool,
+        scratch: &'scratch mut Vec<u8, C::Allocator>,
+        start: &C::Mark,
+    ) -> Result<StringReference<'de, 'scratch>, C::Error>
+    where
         C: Context;
 
     /// Skip a string.
     #[doc(hidden)]
-    fn skip_string<C>(&mut self, cx: C) -> Result<(), C::Error>
+    fn skip_string_inner<C>(&mut self, cx: C) -> Result<(), C::Error>
     where
         C: Context;
 
@@ -54,7 +80,8 @@ pub trait Parser<'de>: private::Sealed {
     {
         let mut byte = [0];
         self.read(cx, &mut byte[..])?;
-        Ok(byte[0])
+        let [b] = byte;
+        Ok(b)
     }
 
     #[doc(hidden)]
@@ -224,30 +251,38 @@ where
     where
         Self: 'this;
 
+    type TryClone = P::TryClone;
+
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         (**self).borrow_mut()
     }
 
     #[inline]
-    fn parse_string<'scratch, C>(
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        (**self).try_clone()
+    }
+
+    #[inline]
+    fn parse_string_inner<'scratch, C>(
         &mut self,
         cx: C,
         validate: bool,
         scratch: &'scratch mut Vec<u8, C::Allocator>,
+        start: &C::Mark,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: Context,
     {
-        (**self).parse_string(cx, validate, scratch)
+        (**self).parse_string_inner(cx, validate, scratch, start)
     }
 
     #[inline]
-    fn skip_string<C>(&mut self, cx: C) -> Result<(), C::Error>
+    fn skip_string_inner<C>(&mut self, cx: C) -> Result<(), C::Error>
     where
         C: Context,
     {
-        (**self).skip_string(cx)
+        (**self).skip_string_inner(cx)
     }
 
     #[inline]
