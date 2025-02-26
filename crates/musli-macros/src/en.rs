@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
@@ -176,14 +174,17 @@ fn default_encode(
 
     match st.packing {
         (_, Packing::Transparent) => {
-            let f = st.transparent_field()?;
-            let encode_path = &f.encode_path.1;
-            let access = &f.self_access;
+            let Field {
+                encode_path: (_, encode_path),
+                access,
+                size_hint_path,
+                ..
+            } = st.transparent_field()?;
 
             encode = quote!(#encode_path(#access, #encoder_var)?);
 
             if let Some(size_hint) = size_hint {
-                *size_hint = match &f.size_hint_path {
+                *size_hint = match size_hint_path {
                     Some((_, path)) => quote!(#path(#access)),
                     None => quote!(#option::None),
                 };
@@ -209,7 +210,7 @@ fn default_encode(
             let decls = st.field_tests();
             let encoders = make_encoders(cx, b, st)?;
 
-            let len = length_test(&st.unskipped_fields);
+            let len = length_test(st.unskipped_fields());
             let (build_hint, hint) = len.build_hint(b);
 
             encode = quote! {{
@@ -248,11 +249,10 @@ fn make_encoders(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Vec<
 
     let Tokens {
         context_t,
-        sequence_encoder_t,
-        result,
-
+        entry_encoder_t,
         map_encoder_t,
-        map_entry_encoder_t,
+        result,
+        sequence_encoder_t,
         ..
     } = b.tokens;
 
@@ -267,12 +267,21 @@ fn make_encoders(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Vec<
 
     let mut encoders = Vec::with_capacity(st.all_fields.len());
 
-    for f in &st.unskipped_fields {
+    for f in st.unskipped_fields() {
+        let Field {
+            name,
+            member,
+            encode_path: (_, encode_path),
+            access,
+            skip_encoding_if,
+            var,
+            ..
+        } = f;
+
         let enter = cx.trace.then(|| {
-            let name = &f.name;
             let name_type = st.name.ty();
 
-            match &f.member {
+            match member {
                 syn::Member::Named(ident) => {
                     let ident = syn::LitStr::new(&ident.to_string(), ident.span());
                     let formatted_name = st.name.name_format(&field_name_static);
@@ -296,9 +305,6 @@ fn make_encoders(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Vec<
 
         let leave = cx.trace.then(|| quote!(#context_t::leave_field(#ctx_var);));
 
-        let (_, encode_path) = &f.encode_path;
-        let access = &f.self_access;
-
         let mut encode;
 
         match st.packing {
@@ -320,9 +326,9 @@ fn make_encoders(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Vec<
                     #enter
 
                     #map_encoder_t::encode_entry_fn(#encoder_var, move |#pair_encoder_var| {
-                        let #field_encoder_var = #map_entry_encoder_t::encode_key(#pair_encoder_var)?;
+                        let #field_encoder_var = #entry_encoder_t::encode_key(#pair_encoder_var)?;
                         #encode_t_encode(#field_name_expr, #field_encoder_var)?;
-                        let #value_encoder_var = #map_entry_encoder_t::encode_value(#pair_encoder_var)?;
+                        let #value_encoder_var = #entry_encoder_t::encode_value(#pair_encoder_var)?;
                         #encode_path(#access, #value_encoder_var)?;
                         #result::Ok(())
                     })?;
@@ -335,9 +341,7 @@ fn make_encoders(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Vec<
             }
         };
 
-        if f.skip_encoding_if.is_some() {
-            let var = &f.var;
-
+        if skip_encoding_if.is_some() {
             encode = quote! {
                 if #var {
                     #encode
@@ -404,8 +408,8 @@ fn encode_variant(
     let Tokens {
         context_t,
         encoder_t,
+        entry_encoder_t,
         map_encoder_t,
-        map_entry_encoder_t,
         option,
         result,
         variant_encoder_t,
@@ -413,7 +417,7 @@ fn encode_variant(
     } = b.tokens;
 
     let content_static = b.cx.ident("CONTENT");
-    let hint = b.cx.ident("STRUCT_HINT");
+    let hint_static = b.cx.ident("HINT");
     let name_static = b.cx.ident("NAME");
     let name_expr = en.name.expr(name_static.clone());
     let tag_encoder = b.cx.ident("tag_encoder");
@@ -473,11 +477,14 @@ fn encode_variant(
 
                 match v.st.packing {
                     (_, Packing::Transparent) => {
-                        let f = v.st.transparent_field()?;
+                        let Field {
+                            access,
+                            size_hint_path,
+                            encode_path: (_, encode_path),
+                            ..
+                        } = v.st.transparent_field()?;
 
-                        let access = &f.self_access;
-
-                        let Some((_, path)) = &f.size_hint_path else {
+                        let Some((_, path)) = size_hint_path else {
                             encode = quote! {
                                 return #result::Err(#context_t::message(
                                     #ctx_var,
@@ -493,9 +500,6 @@ fn encode_variant(
                         len.expressions.push(quote!(1));
                         len.expressions.push(quote!(#path(#access)?));
 
-                        let access = &f.self_access;
-                        let encode_path = &f.encode_path.1;
-
                         inner_encode = quote! {
                             let #encoder_var = #map_encoder_t::as_encoder(#encoder_var);
                             #encode_path(#access, #encoder_var)?;
@@ -507,7 +511,7 @@ fn encode_variant(
                         return Err(());
                     }
                     (_, Packing::Tagged) => {
-                        len = length_test(&v.st.unskipped_fields);
+                        len = length_test(v.st.unskipped_fields());
                         len.expressions.push(quote!(1));
 
                         let decls = v.st.field_tests();
@@ -570,9 +574,9 @@ fn encode_variant(
             let inner_encode = default_encode(cx, b, &v.st, None)?;
 
             encode = quote! {{
-                static #hint: usize = 2;
+                static #hint_static: usize = 2;
 
-                #encoder_t::encode_map_fn(#encoder_var, #hint, move |#adjacent_encoder_var| {
+                #encoder_t::encode_map_fn(#encoder_var, #hint_static, move |#adjacent_encoder_var| {
                     static #tag_static: #tag_type = #tag_value;
                     static #content_static: #content_type = #content_value;
                     static #name_static: #name_type = #name;
@@ -580,10 +584,10 @@ fn encode_variant(
                     #map_encoder_t::insert_entry(#adjacent_encoder_var, #tag_static, #name_static)?;
 
                     #map_encoder_t::encode_entry_fn(#adjacent_encoder_var, move |#pair_encoder_var| {
-                        let #content_tag = #map_entry_encoder_t::encode_key(#pair_encoder_var)?;
+                        let #content_tag = #entry_encoder_t::encode_key(#pair_encoder_var)?;
                         #encode_t_encode(#content_static_expr, #content_tag)?;
 
-                        let #encoder_var = #map_entry_encoder_t::encode_value(#pair_encoder_var)?;
+                        let #encoder_var = #entry_encoder_t::encode_value(#pair_encoder_var)?;
                         #inner_encode;
                         #result::Ok(())
                     })?;
@@ -681,15 +685,19 @@ enum LengthTestKind {
     Dynamic,
 }
 
-fn length_test(fields: &[Rc<Field<'_>>]) -> LengthTest {
+fn length_test<'a>(fields: impl IntoIterator<Item = &'a Field<'a>>) -> LengthTest {
     let mut kind = LengthTestKind::Static;
 
     let mut expressions = Punctuated::<_, Token![+]>::new();
     let mut count = 0usize;
 
-    for f in fields {
-        if f.skip_encoding_if.is_some() {
-            let var = &f.var;
+    for Field {
+        skip_encoding_if,
+        var,
+        ..
+    } in fields
+    {
+        if skip_encoding_if.is_some() {
             kind = LengthTestKind::Dynamic;
             expressions.push(quote!(if #var { 1 } else { 0 }))
         } else {
@@ -698,6 +706,5 @@ fn length_test(fields: &[Rc<Field<'_>>]) -> LengthTest {
     }
 
     expressions.push(quote!(#count));
-
     LengthTest { kind, expressions }
 }
