@@ -21,7 +21,7 @@ pub(crate) struct Parameters {
     pub(crate) allocator_exists: bool,
 }
 
-pub(crate) struct Build<'tok, 'a> {
+pub(crate) struct Build<'a> {
     pub(crate) mode: Mode<'a>,
     pub(crate) input: &'a syn::DeriveInput,
     pub(crate) cx: &'a Ctxt,
@@ -33,11 +33,11 @@ pub(crate) struct Build<'tok, 'a> {
     pub(crate) encode_t_encode: ImportedMethod<'a>,
     pub(crate) enum_tag: Option<Span>,
     pub(crate) enum_content: Option<Span>,
-    pub(crate) tokens: &'tok Tokens<'a>,
+    pub(crate) tokens: &'a Tokens<'a>,
     pub(crate) p: Parameters,
 }
 
-impl Build<'_, '_> {
+impl Build<'_> {
     /// Validate encode attributes.
     pub(crate) fn validate_encode(&self) -> Result<()> {
         self.validate(Only::Encode)
@@ -167,20 +167,20 @@ impl<'a> Body<'a> {
     /// Construct field tests.
     #[inline]
     pub(crate) fn field_tests(&self) -> impl Iterator<Item = impl ToTokens> + '_ {
-        self.unskipped_fields().flat_map(
-            |Field {
-                 skip_encoding_if,
-                 access,
-                 var,
-                 ..
-             }| {
-                let (_, path) = skip_encoding_if.as_ref()?;
+        self.unskipped_fields().flat_map(|f| {
+            let Field {
+                skip_encoding_if,
+                access,
+                var,
+                ..
+            } = f;
 
-                Some(quote! {
-                    let #var = !#path(#access);
-                })
-            },
-        )
+            let (_, path) = skip_encoding_if.as_ref()?;
+
+            Some(quote! {
+                let #var = !#path(#access);
+            })
+        })
     }
 
     /// Access the single transparent field in the body.
@@ -343,7 +343,7 @@ pub(crate) struct Field<'a> {
 impl Field<'_> {
     /// If the field is skipped, set up the expression which initializes the
     /// field to its default value.
-    pub(crate) fn init_default(&self, b: &Build<'_, '_>) -> Option<TokenStream> {
+    pub(crate) fn init_default(&self, b: &Build<'_>) -> Option<TokenStream> {
         let span = *self.skip.as_ref()?;
 
         let Tokens {
@@ -362,13 +362,13 @@ impl Field<'_> {
 /// Setup a build.
 ///
 /// Handles mode decoding, and construction of parameters which might give rise to errors.
-pub(crate) fn setup<'tok, 'a>(
+pub(crate) fn setup<'a>(
     e: &'a Expander,
     expansion: Expansion<'a>,
     mode: Mode<'a>,
-    tokens: &'tok Tokens<'a>,
+    tokens: &'a Tokens<'a>,
     p: Parameters,
-) -> Result<Build<'tok, 'a>> {
+) -> Result<Build<'a>> {
     let data = match &e.data {
         Data::Struct(data) => BuildData::Struct(setup_struct(e, &mode, data, &p.allocator_ident)),
         Data::Enum(data) => BuildData::Enum(setup_enum(e, &mode, data, &p.allocator_ident)),

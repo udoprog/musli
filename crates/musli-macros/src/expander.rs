@@ -232,12 +232,12 @@ impl<'a> Expander<'a> {
         self.cx.into_errors()
     }
 
-    fn setup_builds<'tok, 'b>(
+    fn setup_builds<'b>(
         &'b self,
         modes: &'b [ModeIdent],
-        tokens: &'tok Tokens<'b>,
+        tokens: &'b Tokens<'b>,
         only: Only,
-    ) -> Result<Vec<Build<'tok, 'b>>> {
+    ) -> Result<Vec<Build<'b>>> {
         let mut builds = Vec::new();
 
         let mut missing = BTreeMap::new();

@@ -5,7 +5,7 @@ use super::attr::Packing;
 use super::build::{Body, Build};
 use super::{Only, Tokens};
 
-pub(crate) fn packed(e: &Build<'_, '_>, st: &Body<'_>) -> syn::Expr {
+pub(crate) fn packed(e: &Build<'_>, st: &Body<'_>) -> syn::Expr {
     let Tokens {
         offset_of,
         size_of,

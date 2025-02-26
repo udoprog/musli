@@ -17,7 +17,7 @@ struct Ctxt<'a> {
     trace_body: bool,
 }
 
-pub(crate) fn expand_decode_entry(b: &Build<'_, '_>) -> Result<TokenStream> {
+pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
     b.validate_decode()?;
     b.cx.reset();
 
@@ -142,7 +142,7 @@ pub(crate) fn expand_decode_entry(b: &Build<'_, '_>) -> Result<TokenStream> {
     })
 }
 
-fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
+fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Tokens { result, .. } = b.tokens;
 
     let body = match (st.kind, st.packing) {
@@ -156,7 +156,7 @@ fn decode_struct(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<Toke
     Ok(quote!(#result::Ok({ #body })))
 }
 
-fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStream> {
+fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum) -> Result<TokenStream> {
     let Ctxt {
         ctx_var,
         name_var,
@@ -763,7 +763,7 @@ fn decode_variant(
 }
 
 /// Decode something empty.
-fn decode_empty(cx: &Ctxt, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
+fn decode_empty(cx: &Ctxt, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         ctx_var,
         decoder_var,
@@ -815,7 +815,7 @@ fn decode_empty(cx: &Ctxt, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStre
 /// decoded.
 fn decode_tagged(
     cx: &Ctxt,
-    b: &Build<'_, '_>,
+    b: &Build<'_>,
     st: &Body<'_>,
     variant_tag: Option<&Ident>,
 ) -> Result<TokenStream> {
@@ -1102,7 +1102,7 @@ fn decode_tagged(
 }
 
 /// Decode a transparent value.
-fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
+fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         decoder_var,
         ctx_var,
@@ -1157,7 +1157,7 @@ fn decode_transparent(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result
 }
 
 /// Decode something packed.
-fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_, '_>, st: &Body<'_>) -> Result<TokenStream> {
+fn decode_packed(cx: &Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
     let Ctxt {
         decoder_var,
         ctx_var,
@@ -1261,7 +1261,7 @@ pub(crate) struct NameVariant<'a> {
 
 impl NameVariant<'_> {
     /// Generate the pattern for this output.
-    pub(crate) fn as_arm(&self, b: &Build<'_, '_>, binding_var: &syn::Ident) -> syn::Arm {
+    pub(crate) fn as_arm(&self, b: &Build<'_>, binding_var: &syn::Ident) -> syn::Arm {
         let Tokens { option, .. } = b.tokens;
 
         let path = &self.path;
@@ -1286,7 +1286,7 @@ impl NameVariant<'_> {
 }
 
 fn unsized_arm<'a>(
-    b: &Build<'_, '_>,
+    b: &Build<'_>,
     span: Span,
     index: usize,
     name: &'a syn::Expr,
