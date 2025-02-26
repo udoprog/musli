@@ -85,7 +85,7 @@ where
             }
             actual => Err(self
                 .cx
-                .marked_message(&start, format_args!("Expected value, found {actual}"))),
+                .message_at(&start, format_args!("Expected value, found {actual}"))),
         }
     }
 
@@ -197,7 +197,7 @@ where
             (Some(c), None) => Ok(c),
             _ => Err(self
                 .cx
-                .marked_message(&start, "Expected string with a single character")),
+                .message_at(&start, "Expected string with a single character")),
         }
     }
 
@@ -289,7 +289,7 @@ where
             }
 
             if index != N {
-                return Err(cx.marked_message(
+                return Err(cx.message_at(
                     &mark,
                     format_args!(
                         "Array with length {index} does not have the expected {N} number of elements"

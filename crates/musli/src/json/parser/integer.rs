@@ -233,7 +233,7 @@ where
             p.consume_while(cx, is_digit)?;
         }
         _ => {
-            return Err(cx.marked_message(&start, IntegerError::InvalidNumeric));
+            return Err(cx.message_at(&start, IntegerError::InvalidNumeric));
         }
     }
 
@@ -291,7 +291,7 @@ where
 
     match decode_unsigned_full(cx, p, &start)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.marked_message(&start, error)),
+        Err(error) => Err(cx.message_at(&start, error)),
     }
 }
 
@@ -375,7 +375,7 @@ where
 
     match decode_signed_base(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.marked_message(&start, error)),
+        Err(error) => Err(cx.message_at(&start, error)),
     }
 }
 
@@ -394,7 +394,7 @@ where
 
     match decode_signed_full_inner(cx, p)?.compute() {
         Ok(value) => Ok(value),
-        Err(error) => Err(cx.marked_message(&start, error)),
+        Err(error) => Err(cx.message_at(&start, error)),
     }
 }
 
@@ -419,7 +419,7 @@ where
             base
         }
         _ => {
-            return Err(cx.marked_message(start, IntegerError::InvalidNumeric));
+            return Err(cx.message_at(start, IntegerError::InvalidNumeric));
         }
     };
 
@@ -461,7 +461,7 @@ where
                 m.value = match m.value.checked_pow10(zeros as u32) {
                     Some(mantissa) => mantissa,
                     None => {
-                        return Err(cx.marked_message(start, IntegerError::IntegerOverflow));
+                        return Err(cx.message_at(start, IntegerError::IntegerOverflow));
                     }
                 };
             }
@@ -509,7 +509,7 @@ where
 
     match if is_negative { e.negate() } else { e.signed() } {
         Some(value) => Ok(value),
-        None => Err(cx.marked_message(start, IntegerError::IntegerOverflow)),
+        None => Err(cx.message_at(start, IntegerError::IntegerOverflow)),
     }
 }
 
@@ -522,7 +522,7 @@ where
     C: Context,
 {
     let Some(out) = out.checked_mul10() else {
-        return Err(cx.marked_message(start, IntegerError::IntegerOverflow));
+        return Err(cx.message_at(start, IntegerError::IntegerOverflow));
     };
 
     Ok(out + T::from_byte(p.read_byte(cx)? - b'0'))

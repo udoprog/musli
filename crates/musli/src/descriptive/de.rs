@@ -136,7 +136,7 @@ where
         let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
         if tag.kind() != kind {
-            return Err(self.cx.marked_message(
+            return Err(self.cx.message_at(
                 mark,
                 Expected {
                     expected: kind,
@@ -164,7 +164,7 @@ where
 
         match tag.kind() {
             Kind::Bytes => self.decode_len(tag),
-            _ => Err(self.cx.marked_message(start, "Expected prefix or pack")),
+            _ => Err(self.cx.message_at(start, "Expected prefix or pack")),
         }
     }
 }
@@ -297,7 +297,7 @@ where
         let len = self.decode_prefix(Kind::Bytes, &pos)?;
 
         if len != N {
-            return Err(self.cx.marked_message(
+            return Err(self.cx.message_at(
                 &pos,
                 format_args! {
                     "Bad length, got {len} but expect {N}"
@@ -441,7 +441,7 @@ where
         match tag {
             FALSE => Ok(false),
             TRUE => Ok(true),
-            tag => Err(self.cx.marked_message(
+            tag => Err(self.cx.message_at(
                 &pos,
                 format_args! {
                     "Bad boolean, got {tag:?}"
@@ -460,14 +460,14 @@ where
         if tag != CHAR {
             return Err(self
                 .cx
-                .marked_message(&pos, format_args!("Expected {CHAR:?}, got {tag:?}")));
+                .message_at(&pos, format_args!("Expected {CHAR:?}, got {tag:?}")));
         }
 
         let num = c::decode(self.cx, self.reader.borrow_mut())?;
 
         match char::from_u32(num) {
             Some(d) => Ok(d),
-            None => Err(self.cx.marked_message(&pos, format_args!("Bad character"))),
+            None => Err(self.cx.message_at(&pos, format_args!("Bad character"))),
         }
     }
 
@@ -559,7 +559,7 @@ where
         match tag {
             NONE => Ok(None),
             SOME => Ok(Some(self)),
-            tag => Err(self.cx.marked_message(
+            tag => Err(self.cx.message_at(
                 &pos,
                 format_args! {
                     "Expected option, was {tag:?}"
