@@ -151,7 +151,7 @@ where
             }),
             kind => Err(self
                 .cx
-                .marked_message(start, format_args!("Expected prefix, but got {kind:?}"))),
+                .message_at(start, format_args!("Expected prefix, but got {kind:?}"))),
         }
     }
 }
@@ -280,7 +280,7 @@ where
         let len = self.decode_len(&mark)?;
 
         if len != N {
-            return Err(self.cx.marked_message(
+            return Err(self.cx.message_at(
                 &mark,
                 BadLength {
                     actual: len,

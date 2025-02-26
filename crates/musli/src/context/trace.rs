@@ -50,6 +50,9 @@ pub trait TraceImpl<A>: self::sealed::Sealed {
     fn mark(&self) -> Self::Mark;
 
     #[doc(hidden)]
+    fn restore(&self, mark: &Self::Mark);
+
+    #[doc(hidden)]
     fn custom<T>(&self, alloc: A, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug;
@@ -60,12 +63,12 @@ pub trait TraceImpl<A>: self::sealed::Sealed {
         T: fmt::Display;
 
     #[doc(hidden)]
-    fn marked_message<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
+    fn message_at<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: fmt::Display;
 
     #[doc(hidden)]
-    fn marked_custom<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
+    fn custom_at<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug;
 
@@ -284,6 +287,11 @@ where
     }
 
     #[inline]
+    fn restore(&self, mark: &Self::Mark) {
+        self.mark.set(*mark);
+    }
+
+    #[inline]
     fn custom<T>(&self, alloc: A, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
@@ -304,7 +312,7 @@ where
     }
 
     #[inline]
-    fn marked_message<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
+    fn message_at<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: fmt::Display,
     {
@@ -314,7 +322,7 @@ where
     }
 
     #[inline]
-    fn marked_custom<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
+    fn custom_at<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {
@@ -448,6 +456,11 @@ where
     fn mark(&self) -> Self::Mark {}
 
     #[inline]
+    fn restore(&self, mark: &Self::Mark) -> Self::Mark {
+        _ = mark;
+    }
+
+    #[inline]
     fn advance(&self, n: usize) {
         _ = n;
     }
@@ -471,7 +484,7 @@ where
     }
 
     #[inline]
-    fn marked_message<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
+    fn message_at<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: fmt::Display,
     {
@@ -481,7 +494,7 @@ where
     }
 
     #[inline]
-    fn marked_custom<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
+    fn custom_at<T>(&self, alloc: A, mark: &Self::Mark, message: &T)
     where
         T: 'static + Send + Sync + fmt::Display + fmt::Debug,
     {

@@ -320,26 +320,31 @@ where
     }
 
     #[inline]
-    fn marked_message<M>(self, mark: &Self::Mark, message: M) -> Self::Error
+    fn message_at<M>(self, mark: &Self::Mark, message: M) -> Self::Error
     where
         M: fmt::Display,
     {
-        self.trace.marked_message(self.alloc, mark, &message);
+        self.trace.message_at(self.alloc, mark, &message);
         self.capture.message(self.alloc, message)
     }
 
     #[inline]
-    fn marked_custom<E>(self, mark: &Self::Mark, message: E) -> Self::Error
+    fn custom_at<E>(self, mark: &Self::Mark, message: E) -> Self::Error
     where
         E: 'static + Send + Sync + Error,
     {
-        self.trace.marked_custom(self.alloc, mark, &message);
+        self.trace.custom_at(self.alloc, mark, &message);
         self.capture.custom(self.alloc, message)
     }
 
     #[inline]
     fn mark(self) -> Self::Mark {
         self.trace.mark()
+    }
+
+    #[inline]
+    fn restore(self, mark: &Self::Mark) {
+        self.trace.restore(mark);
     }
 
     #[inline]

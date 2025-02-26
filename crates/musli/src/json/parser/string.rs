@@ -94,7 +94,7 @@ where
             let Some(val) = decode_hex_val(b) else {
                 return Err(self
                     .cx
-                    .marked_message(&start, "Non-hex digit in escape sequence"));
+                    .message_at(&start, "Non-hex digit in escape sequence"));
             };
 
             n = (n << 4) + val;
@@ -140,7 +140,7 @@ where
                         return if validate {
                             Err(self
                                 .cx
-                                .marked_message(&start, "Lone leading surrogate in hex escape"))
+                                .message_at(&start, "Lone leading surrogate in hex escape"))
                         } else {
                             Ok(encode_surrogate(scratch, n))
                         };
@@ -155,7 +155,7 @@ where
 
                         if self.next()? != b'\\' {
                             return if validate {
-                                Err(self.cx.marked_message(&pos, "Unexpected end of hex escape"))
+                                Err(self.cx.message_at(&pos, "Unexpected end of hex escape"))
                             } else {
                                 Ok(encode_surrogate(scratch, n1))
                             };
@@ -163,7 +163,7 @@ where
 
                         if self.next()? != b'u' {
                             return if validate {
-                                Err(self.cx.marked_message(&pos, "Unexpected end of hex escape"))
+                                Err(self.cx.message_at(&pos, "Unexpected end of hex escape"))
                             } else {
                                 if !encode_surrogate(scratch, n1) {
                                     return Ok(false);
@@ -183,7 +183,7 @@ where
                         if !(0xDC00..=0xDFFF).contains(&n2) {
                             return Err(self
                                 .cx
-                                .marked_message(&start, "Lone leading surrogate in hex escape"));
+                                .message_at(&start, "Lone leading surrogate in hex escape"));
                         }
 
                         let n = ((((n1 - 0xD800) as u32) << 10) | (n2 - 0xDC00) as u32) + 0x1_0000;
@@ -191,7 +191,7 @@ where
                         match char::from_u32(n) {
                             Some(c) => c,
                             None => {
-                                return Err(self.cx.marked_message(&start, "Invalid unicode"));
+                                return Err(self.cx.message_at(&start, "Invalid unicode"));
                             }
                         }
                     }
@@ -206,7 +206,7 @@ where
                     .is_ok()
             }
             _ => {
-                return Err(self.cx.marked_message(&start, "Invalid string escape"));
+                return Err(self.cx.message_at(&start, "Invalid string escape"));
             }
         };
 
@@ -227,7 +227,7 @@ where
                         return if validate {
                             Err(self
                                 .cx
-                                .marked_message(&start, "Lone leading surrogate in hex escape"))
+                                .message_at(&start, "Lone leading surrogate in hex escape"))
                         } else {
                             Ok(())
                         };
@@ -242,7 +242,7 @@ where
 
                         if self.next()? != b'\\' {
                             return if validate {
-                                Err(self.cx.marked_message(&pos, "Unexpected end of hex escape"))
+                                Err(self.cx.message_at(&pos, "Unexpected end of hex escape"))
                             } else {
                                 Ok(())
                             };
@@ -250,7 +250,7 @@ where
 
                         if self.next()? != b'u' {
                             return if validate {
-                                Err(self.cx.marked_message(&pos, "Unexpected end of hex escape"))
+                                Err(self.cx.message_at(&pos, "Unexpected end of hex escape"))
                             } else {
                                 // The \ prior to this byte started an escape sequence,
                                 // so we need to parse that now. This recursive call
@@ -266,13 +266,13 @@ where
                         if !(0xDC00..=0xDFFF).contains(&n2) {
                             return Err(self
                                 .cx
-                                .marked_message(&start, "Lone leading surrogate in hex escape"));
+                                .message_at(&start, "Lone leading surrogate in hex escape"));
                         }
 
                         let n = ((((n1 - 0xD800) as u32) << 10) | (n2 - 0xDC00) as u32) + 0x1_0000;
 
                         if char::from_u32(n).is_none() {
-                            return Err(self.cx.marked_message(&start, "Invalid unicode"));
+                            return Err(self.cx.message_at(&start, "Invalid unicode"));
                         }
                     }
 
@@ -282,7 +282,7 @@ where
                 }
             }
             _ => {
-                return Err(self.cx.marked_message(&start, "Invalid string escape"));
+                return Err(self.cx.message_at(&start, "Invalid string escape"));
             }
         };
 
@@ -353,7 +353,7 @@ where
                     self.cx.advance(1);
 
                     if !self.parse_escape(validate, scratch)? {
-                        return Err(self.cx.marked_message(&open_mark, "Buffer overflow"));
+                        return Err(self.cx.message_at(&open_mark, "Buffer overflow"));
                     }
 
                     open = self.index;
@@ -363,7 +363,7 @@ where
                     if validate {
                         return Err(self
                             .cx
-                            .marked_message(&open_mark, "Control character while parsing string"));
+                            .message_at(&open_mark, "Control character while parsing string"));
                     }
 
                     self.index = self.index.wrapping_add(1);
@@ -405,7 +405,7 @@ where
     #[inline]
     fn check_utf8(&self, bytes: &[u8], start: &C::Mark) -> Result<(), C::Error> {
         if crate::str::from_utf8(bytes).is_err() {
-            Err(self.cx.marked_message(start, "Invalid unicode string"))
+            Err(self.cx.message_at(start, "Invalid unicode string"))
         } else {
             Ok(())
         }

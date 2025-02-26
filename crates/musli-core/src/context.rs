@@ -32,8 +32,11 @@ pub trait Context: Copy {
     /// mark can be quite useful for determining the context of an error.
     ///
     /// This typically indicates a byte offset, and is used by
-    /// [`marked_message`][Context::marked_message] to report a spanned error.
+    /// [`message_at`][Context::message_at] to report a spanned error.
     fn mark(self) -> Self::Mark;
+
+    /// Restore the state of the context to the specified mark.
+    fn restore(self, mark: &Self::Mark);
 
     /// Access the underlying allocator.
     fn alloc(self) -> Self::Allocator;
@@ -66,7 +69,7 @@ pub trait Context: Copy {
     ///
     /// A mark is generated using [Context::mark] and indicates a prior state.
     #[inline]
-    fn marked_message<M>(self, mark: &Self::Mark, message: M) -> Self::Error
+    fn message_at<M>(self, mark: &Self::Mark, message: M) -> Self::Error
     where
         M: fmt::Display,
     {
@@ -78,7 +81,7 @@ pub trait Context: Copy {
     ///
     /// A mark is generated using [Context::mark] and indicates a prior state.
     #[inline]
-    fn marked_custom<E>(self, mark: &Self::Mark, message: E) -> Self::Error
+    fn custom_at<E>(self, mark: &Self::Mark, message: E) -> Self::Error
     where
         E: 'static + Send + Sync + Error,
     {
