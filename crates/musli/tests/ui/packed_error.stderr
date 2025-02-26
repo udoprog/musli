@@ -22,13 +22,13 @@ error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)]
 28 | #[musli(packed)]
    |         ^^^^^^
 
-error: A #[musli(transparent)] or #[musli(packed)] struct cannot have named fields
+error: A #[musli(packed)]struct cannot have named fields
   --> tests/ui/packed_error.rs:36:13
    |
 36 |     #[musli(name = "test")]
    |             ^^^^
 
-error: A #[musli(transparent)] or #[musli(packed)] struct cannot have named fields
+error: A #[musli(packed)]struct cannot have named fields
   --> tests/ui/packed_error.rs:42:38
    |
 42 | struct DenyNamedPackedStruct(#[musli(name = "test")] String);
@@ -45,7 +45,7 @@ error[E0428]: the name `DenyNamedPackedStruct` is defined multiple times
    |
    = note: `DenyNamedPackedStruct` must be defined only once in the type namespace of this module
 
-error: A #[musli(transparent)] or #[musli(packed)] variant cannot have named fields
+error: A #[musli(packed)]variant cannot have named fields
   --> tests/ui/packed_error.rs:49:17
    |
 49 |         #[musli(name = "test")]
@@ -57,7 +57,7 @@ error: In #[musli(Binary, ..)] a #[musli(packed)] variant cannot be used in an e
 45 | #[musli(tag = "type")]
    |         ^^^
 
-error: A #[musli(transparent)] or #[musli(packed)] variant cannot have named fields
+error: A #[musli(packed)]variant cannot have named fields
   --> tests/ui/packed_error.rs:53:19
    |
 53 |     Tuple(#[musli(name = "test")] String),
