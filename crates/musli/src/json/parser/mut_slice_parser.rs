@@ -1,6 +1,6 @@
 use crate::alloc::Vec;
 use crate::json::error::ErrorMessage;
-use crate::json::parser::{Parser, StringReference, Token};
+use crate::json::parser::{Parser, StringReference};
 use crate::reader::SliceUnderflow;
 use crate::Context;
 
@@ -47,33 +47,24 @@ impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
     }
 
     #[inline]
-    fn parse_string<'scratch, C>(
+    fn parse_string_inner<'scratch, C>(
         &mut self,
         cx: C,
         validate: bool,
         scratch: &'scratch mut Vec<u8, C::Allocator>,
+        start: &C::Mark,
     ) -> Result<StringReference<'de, 'scratch>, C::Error>
     where
         C: Context,
     {
-        let start = cx.mark();
-        let actual = self.lex(cx);
-
-        if !matches!(actual, Token::String) {
-            return Err(cx.marked_message(&start, format_args!("Expected string, found {actual}")));
-        }
-
-        self.skip(cx, 1)?;
-
         let mut access = SliceAccess::new(cx, self.slice, 0);
-        let out = access.parse_string(validate, &start, scratch);
+        let out = access.parse_string(validate, start, scratch);
         *self.slice = &self.slice[access.index..];
-
         out
     }
 
     #[inline]
-    fn skip_string<C>(&mut self, cx: C) -> Result<(), C::Error>
+    fn skip_string_inner<C>(&mut self, cx: C) -> Result<(), C::Error>
     where
         C: Context,
     {
