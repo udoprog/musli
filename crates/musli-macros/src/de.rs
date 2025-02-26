@@ -270,13 +270,13 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                 })
             };
 
-            let fmt_patterns = variants.iter().map(|o| {
+            let fmt_debug = variants.iter().map(|o| {
                 let variant = &o.variant;
                 let name = o.name;
                 quote!(#output_type::#variant => #fmt::Debug::fmt(&#name, f))
             });
 
-            let fmt_patterns2 = variants.iter().map(|o| {
+            let fmt_display = variants.iter().map(|o| {
                 let variant = &o.variant;
                 let name = o.name;
                 quote!(#output_type::#variant => #fmt::Display::fmt(&#name, f))
@@ -290,14 +290,14 @@ fn decode_enum(cx: &Ctxt<'_>, b: &Build<'_, '_>, en: &Enum) -> Result<TokenStrea
                 impl #fmt::Debug for #output_type {
                     #[inline]
                     fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
-                        match *self { #(#fmt_patterns,)* }
+                        match *self { #(#fmt_debug,)* }
                     }
                 }
 
                 impl #fmt::Display for #output_type {
                     #[inline]
                     fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
-                        match *self { #(#fmt_patterns2,)* }
+                        match *self { #(#fmt_display,)* }
                     }
                 }
             });

@@ -116,6 +116,7 @@ where
     type Error = C::Error;
     type Allocator = C::Allocator;
     type Mode = M;
+    type TryClone = JsonDecoder<P::TryClone, C, M>;
     type DecodeBuffer = IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
     type DecodePack = JsonSequenceDecoder<P, C, M>;
     type DecodeSequence = JsonSequenceDecoder<P, C, M>;
@@ -132,6 +133,11 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "value that can be decoded from JSON")
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(JsonDecoder::new(self.cx, self.parser.try_clone()?))
     }
 
     #[inline]

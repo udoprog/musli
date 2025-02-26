@@ -231,6 +231,7 @@ where
     type Error = C::Error;
     type Allocator = C::Allocator;
     type Mode = M;
+    type TryClone = SelfDecoder<OPT, R::TryClone, C, M>;
     type DecodeBuffer = IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
     type DecodePack = SelfDecoder<OPT, Limit<R>, C, M>;
     type DecodeSome = Self;
@@ -247,6 +248,11 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "type supported by the descriptive decoder")
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(SelfDecoder::new(self.cx, self.reader.try_clone()?))
     }
 
     #[inline]

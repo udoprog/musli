@@ -26,8 +26,14 @@ pub trait Parser<'de>: private::Sealed {
     where
         Self: 'this;
 
+    /// The type of parser that can be cloned into.
+    type TryClone: Parser<'de>;
+
     /// Reborrow the current parser.
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
+
+    /// Try to clone the parser.
+    fn try_clone(&self) -> Option<Self::TryClone>;
 
     /// Must parse the string from the input buffer and validate that it is
     /// valid UTF-8.
@@ -224,9 +230,16 @@ where
     where
         Self: 'this;
 
+    type TryClone = P::TryClone;
+
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         (**self).borrow_mut()
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        (**self).try_clone()
     }
 
     #[inline]

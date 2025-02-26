@@ -28,15 +28,22 @@ impl<'a, 'de> MutSliceParser<'a, 'de> {
     }
 }
 
-impl<'de> Parser<'de> for MutSliceParser<'_, 'de> {
+impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
     type Mut<'this>
         = MutSliceParser<'this, 'de>
     where
         Self: 'this;
 
+    type TryClone = MutSliceParser<'a, 'de>;
+
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         MutSliceParser::new(self.slice)
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        None
     }
 
     #[inline]

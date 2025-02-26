@@ -26,9 +26,19 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         Self: 'this;
 
+    type TryClone = SliceParser<'de>;
+
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
         self
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(SliceParser {
+            slice: self.slice,
+            index: self.index,
+        })
     }
 
     #[inline]

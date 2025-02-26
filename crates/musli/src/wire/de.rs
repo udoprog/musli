@@ -222,6 +222,7 @@ where
     type Error = C::Error;
     type Allocator = C::Allocator;
     type Mode = M;
+    type TryClone = WireDecoder<OPT, R::TryClone, C, M>;
     type DecodePack = WireDecoder<OPT, Limit<R>, C, M>;
     type DecodeSome = Self;
     type DecodeSequence = RemainingWireDecoder<OPT, R, C, M>;
@@ -237,6 +238,11 @@ where
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "type supported by the wire decoder")
+    }
+
+    #[inline]
+    fn try_clone(&self) -> Option<Self::TryClone> {
+        Some(WireDecoder::new(self.cx, self.reader.try_clone()?))
     }
 
     #[inline]
