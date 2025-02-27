@@ -247,6 +247,8 @@ This attribute is useful for performing simple decoding over "raw" bytes when
 combined with an encoder which does minimal prefixing and packs fields. Using a
 packed format is typically also the most efficient mode of operation in Müsli.
 
+<br>
+
 ##### Bitwise optimizations
 
 If a struct is tagged with `#[musli(packed)]`, and the bitwise pattern of a
@@ -433,6 +435,8 @@ particularly helpful, one example is `#[musli(name(type = [u8]))]` which formats
 the value as an array of numbers. Here `#[musli(name(format_with = BStr::new))]`
 might be more helpful.
 
+<br>
+
 ##### Examples
 
 ```rust
@@ -589,7 +593,7 @@ enum Message {
 
 <br>
 
-##### Using numerical tagging
+##### Using a numerical tag
 
 ```rust
 use musli::{Encode, Decode};
@@ -601,6 +605,62 @@ enum Message {
     Request { id: String, method: String },
     #[musli(name = 2)]
     Reply { id: String, body: Vec<u8> },
+}
+```
+
+<br>
+
+#### `#[musli(untagged)]`
+
+The `#[musli(untagged)]` attribute results in variants being encoded as-is
+without any information about which variant is being encoded. When decoding,
+variants will be decoded one after another in declaration order. The first one
+to be successfully decoded is the one which will be used.
+
+Note that this *can* result in encoding being assymetric. And exactly which
+variant is being decoded depends on the format.
+
+Note that a decoder must implement [`Decoder::try_clone`] for untagged enums to
+be decoded. If this is not implemented, the decoder must support
+[`Decoder::decode_buffer`] instead.
+
+Note that standard decoders do not support [`Decoder::try_clone`] when decoding
+`&mut &[u8]`. The root cause of this is that exclusive references cannot be
+cloned. This limitation might be lifted in the future:
+
+```rust,compile_fail
+fn require_clone(_: impl Clone) {}
+
+fn main() {
+    let mut value: [u8; 4] = [1, 2, 3, 4];
+    require_clone(&value[..]);
+    require_clone(&mut &value[..]); // the trait `Clone` is not implemented for `&mut &[u8]`
+}
+```
+
+<br>
+
+##### Examples
+
+```rust
+use musli::{Encode, Decode};
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+pub struct Numbers {
+    foo: u32,
+    bar: u32,
+    baz: u32,
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(untagged)]
+pub enum Untagged {
+    Person {
+        name: String,
+        age: u32,
+    },
+    #[musli(transparent)]
+    Numbers(Numbers),
 }
 ```
 
@@ -790,6 +850,8 @@ names. Available options are:
 This can be overrided for values which are unsized, but cannot be determined
 through heuristics. Such a type must also implement [`Decode`] (for `"sized"`),
 `DecodeUnsized`, or `DecodeUnsizedBytes` as appropriate.
+
+<br>
 
 ##### Examples
 
@@ -1466,6 +1528,7 @@ which decoder implementation to call.
 [`DecodePacked`]: <https://docs.rs/musli/latest/musli/de/trait.DecodePacked.html>
 [`Decoder::decode_buffer`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html#method.decode_buffer>
 [`Decoder::decode_variant`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html#method.decode_variant>
+[`Decoder::try_clone`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html#method.try_clone>
 [`Decoder`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html>
 [`DecodeTrace`]: <https://docs.rs/musli/latest/musli/trait.DecodeTrace.html>
 [`Drop`]: <https://doc.rust-lang.org/std/ops/trait.Drop.html>
