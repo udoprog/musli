@@ -274,5 +274,14 @@ pub mod __priv {
                 "Type {type_name} received invalid variant field tag {tag:?} for variant {variant:?}",
             ))
         }
+
+        /// Untagged enum could not be decoded.
+        #[inline]
+        pub fn untagged_mismatch<C>(cx: C, type_name: &'static str) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!("No variant of {type_name} could be decoded"))
+        }
     }
 }

@@ -16,12 +16,6 @@ error: In #[musli(Binary, ..)] a struct cannot be #[musli(untagged)]
 12 | #[musli(untagged)]
    |         ^^^^^^^^
 
-error: In #[musli(Binary, ..)] a #[musli(untagged)] enum is not supported yet
-  --> tests/ui/untagged_error.rs:16:9
-   |
-16 | #[musli(untagged)]
-   |         ^^^^^^^^
-
 error: In #[musli(Binary, ..)] a variant cannot be #[musli(untagged)]
   --> tests/ui/untagged_error.rs:22:13
    |
@@ -39,9 +33,3 @@ error: In #[musli(Binary, ..)] a variant cannot be #[musli(untagged)]
    |
 26 |     #[musli(untagged)]
    |             ^^^^^^^^
-
-error: In #[musli(Binary, ..)] a #[musli(untagged)] enum is not supported yet
-  --> tests/ui/untagged_error.rs:20:9
-   |
-20 | #[musli(untagged)]
-   |         ^^^^^^^^

@@ -64,7 +64,7 @@ pub(crate) enum BuildData<'a> {
 impl BuildData<'_> {
     fn validate(
         &self,
-        only: Only,
+        _: Only,
         cx: &Ctxt,
         mode: &Mode<'_>,
         enum_tag: Option<Span>,
@@ -106,7 +106,7 @@ impl BuildData<'_> {
                             format_args!("In {mode} an enum cannot be #[{ATTR}(packed)]"),
                         );
                     }
-                    (span, Packing::Untagged) => {
+                    (_, Packing::Untagged) => {
                         if let Some(span) = enum_tag {
                             cx.error_span(
                                 span,
@@ -118,15 +118,6 @@ impl BuildData<'_> {
 
                         if let Some(span) = enum_content {
                             cx.error_span(span, format_args!("In {mode} a #[{ATTR}(untagged)] enum cannot use #[{ATTR}(content)]"));
-                        }
-
-                        if only == Only::Decode {
-                            cx.error_span(
-                                span,
-                                format_args!(
-                                    "In {mode} a #[{ATTR}(untagged)] enum is not supported yet"
-                                ),
-                            );
                         }
                     }
                     _ => (),

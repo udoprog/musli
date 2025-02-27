@@ -4,7 +4,7 @@ use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode)]
 #[musli(untagged)]
-pub enum Enum {
+pub enum OneWay {
     #[musli(packed)]
     EmptyVariant1,
     #[musli(packed)]
@@ -46,48 +46,86 @@ pub struct EmptyVariant;
 /// Untagged enums may only implement `Encode`, and will be encoded according to
 /// the exact specification of fields part of the variant.
 #[test]
-fn untagged_enums() -> Result<(), Box<dyn core::error::Error>> {
+fn one_way_untagged_enum() {
     musli::macros::assert_decode_eq! {
         full,
-        Enum::EmptyVariant1,
+        OneWay::EmptyVariant1,
         EmptyVariant,
         json = r#"[]"#,
     };
 
     musli::macros::assert_decode_eq! {
         full,
-        Enum::EmptyVariant2,
+        OneWay::EmptyVariant2,
         EmptyVariant,
         json = r#"[]"#,
     };
 
     musli::macros::assert_decode_eq! {
         full,
-        Enum::StringVariant { value: String::from("Hello World") },
+        OneWay::StringVariant { value: String::from("Hello World") },
         StringVariant { value: String::from("Hello World") },
         json = r#"["Hello World"]"#,
     };
 
     musli::macros::assert_decode_eq! {
         full,
-        Enum::IntegerVariant { value: 421 },
+        OneWay::IntegerVariant { value: 421 },
         IntegerVariant { value: 421 },
         json = r#"[421]"#,
     };
 
     musli::macros::assert_decode_eq! {
         full,
-        Enum::StringTupleVariant(String::from("Hello..."), String::from("World!")),
+        OneWay::StringTupleVariant(String::from("Hello..."), String::from("World!")),
         StringTupleVariant(String::from("Hello..."), String::from("World!")),
         json = r#"["Hello...","World!"]"#,
     };
 
     musli::macros::assert_decode_eq! {
         full,
-        Enum::IntegerTupleVariant(10, 20),
+        OneWay::IntegerTupleVariant(10, 20),
         IntegerTupleVariant(10, 20),
         json = r#"[10,20]"#,
     };
+}
 
-    Ok(())
+#[derive(Debug, PartialEq, Encode, Decode)]
+pub struct Struct {
+    foo: u32,
+    bar: u32,
+    baz: u32,
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(untagged)]
+pub enum Untagged {
+    Person {
+        name: String,
+        age: u32,
+    },
+    #[musli(transparent)]
+    Struct(Struct),
+}
+
+#[test]
+fn untagged_enum() {
+    musli::macros::assert_roundtrip_eq! {
+        full,
+        Untagged::Person {
+            name: String::from("John"),
+            age: 37,
+        },
+        json = r#"{"name":"John","age":37}"#,
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        full,
+        Untagged::Struct(Struct {
+            foo: 1,
+            bar: 2,
+            baz: 3,
+        }),
+        json = r#"{"foo":1,"bar":2,"baz":3}"#,
+    };
 }
