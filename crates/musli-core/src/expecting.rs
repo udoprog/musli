@@ -18,10 +18,10 @@ pub trait Expecting {
     }
 }
 
-impl Expecting for str {
+impl Expecting for &str {
     #[inline]
     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.fmt(f)
+        (*self).fmt(f)
     }
 }
 

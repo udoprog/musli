@@ -21,8 +21,8 @@ use std::path::{Path, PathBuf};
 
 use crate::alloc::ToOwned;
 use crate::de::{
-    Decode, DecodeBytes, DecodeTrace, Decoder, EntryDecoder, MapDecoder, SequenceDecoder,
-    UnsizedVisitor,
+    Decode, DecodeBytes, DecodeMap, DecodeTrace, Decoder, EntryDecoder, MapBuilder, MapDecoder,
+    SequenceDecoder, UnsizedVisitor,
 };
 use crate::en::{
     Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntryEncoder, MapEncoder,
@@ -474,8 +474,10 @@ macro_rules! map {
         $(#[$($meta:meta)*])*
         $cx:ident,
         $ty:ident<K $(: $key_bound0:ident $(+ $key_bound:ident)*)?, V $(, $extra:ident: $extra_bound0:ident $(+ $extra_bound:ident)*)*>,
+        $builder:ident,
         $access:ident,
-        $with_capacity:expr
+        $with_capacity:expr,
+        $new:expr $(,)?
     ) => {
         $(#[$($meta)*])*
         impl<'de, M, K, V $(, $extra)*> Encode<M> for $ty<K, V $(, $extra)*>
@@ -599,18 +601,67 @@ macro_rules! map {
                 })
             }
         }
+
+        /// Builder for a map.
+        pub struct $builder<K, V $(, $extra)*> {
+            map: $ty<K, V $(, $extra)*>,
+        }
+
+        impl<'de, M, C, K, V $(, $extra)*> MapBuilder<'de, M, C> for $builder<K, V $(, $extra)*>
+        where
+            M: 'static,
+            K: Decode<'de, M, C::Allocator> $(+ $key_bound0 $(+ $key_bound)*)*,
+            V: Decode<'de, M, C::Allocator>,
+            C: Context,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            type Output = $ty<K, V $(, $extra)*>;
+
+            #[inline]
+            fn insert_field<A, B>(&mut self, key: A, value: B) -> Result<bool, C::Error>
+            where
+                A: Decoder<'de, Cx = C, Error = C::Error, Allocator = C::Allocator, Mode = M>,
+                B: Decoder<'de, Cx = C, Error = C::Error, Allocator = C::Allocator, Mode = M>,
+            {
+                self.map.insert(key.decode()?, value.decode()?);
+                Ok(true)
+            }
+
+            #[inline]
+            fn build(self) -> Result<Self::Output, C::Error> {
+                Ok(self.map)
+            }
+        }
+
+        impl<'de, M, C, K, V $(, $extra)*> DecodeMap<'de, M, C> for $ty<K, V $(, $extra)*>
+        where
+            M: 'static,
+            K: Decode<'de, M, C::Allocator> $(+ $key_bound0 $(+ $key_bound)*)*,
+            V: Decode<'de, M, C::Allocator>,
+            C: Context,
+            $($extra: $extra_bound0 $(+ $extra_bound)*),*
+        {
+            type MapBuilder = $builder<K, V $(, $extra)*>;
+
+            #[inline]
+            fn new_map_builder() -> Self::MapBuilder {
+                $builder { map: $new }
+            }
+        }
     }
 }
 
-map!(_cx, BTreeMap<K: Ord, V>, map, BTreeMap::new());
+map!(_cx, BTreeMap<K: Ord, V>, BTreeMapBuilder, map, BTreeMap::new(), BTreeMap::new());
 
 map!(
     #[cfg(feature = "std")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
     _cx,
     HashMap<K: Eq + Hash, V, S: BuildHasher + Default>,
+    HashMapBuilder,
     map,
-    HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint()), S::default())
+    HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint()), S::default()),
+    HashMap::with_hasher(S::default()),
 );
 
 impl<M> Encode<M> for CString {
