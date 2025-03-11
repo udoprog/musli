@@ -225,3 +225,38 @@ pub mod speedy {
         T::read_from_buffer(buf)
     }
 }
+
+#[cfg(feature = "epserde")]
+#[crate::benchmarker]
+pub mod epserde {
+    use alloc::vec::Vec;
+    use epserde::{
+        deser::{DeserType, Deserialize},
+        ser::Serialize,
+    };
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(1 << 20)
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
+    pub fn encode<'buf, T>(
+        buf: &'buf mut Vec<u8>,
+        value: &T,
+    ) -> Result<&'buf [u8], epserde::ser::Error>
+    where
+        T: Serialize,
+    {
+        value.serialize(buf).map(|size| &buf[..size])
+    }
+
+    pub fn decode<T>(buf: &[u8]) -> Result<DeserType<'_, T>, epserde::deser::Error>
+    where
+        T: Deserialize,
+    {
+        T::deserialize_eps(buf)
+    }
+}
