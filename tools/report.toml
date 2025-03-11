@@ -145,6 +145,26 @@ expected = [
 ]
 
 [[reports]]
+id = "epserde"
+title = "ε-serde"
+link = "epserde"
+description = [
+    "This is a test suite for ε-serde features",
+]
+features = [
+    "musli-wire",
+    "musli-descriptive",
+    "musli-storage",
+    "musli-packed",
+    "musli-value",
+    "epserde",
+]
+expected = [
+    "musli",
+]
+
+[[reports]]
+skip = true # currently broken
 id = "zerocopy-rkyv"
 title = "Müsli vs rkyv"
 link = "müsli-vs-rkyv"

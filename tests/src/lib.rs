@@ -146,6 +146,8 @@ macro_rules! feature_matrix {
         $call!(serde_rmp $(, $($tt)*)*);
         #[cfg(feature = "zerocopy")]
         $call!(zerocopy $(, $($tt)*)*);
+        #[cfg(feature = "epserde")]
+        $call!(epserde $(, $($tt)*)*);
         #[cfg(feature = "dlhn")]
         $call!(serde_dlhn $(, $($tt)*)*);
         #[cfg(feature = "serde_cbor")]
@@ -181,6 +183,10 @@ macro_rules! if_supported {
     (zerocopy, medium_enum, $($tt:tt)*) => {};
     (zerocopy, mesh, $($tt:tt)*) => {};
 
+    (epserde, large, $($tt:tt)*) => {};
+    (epserde, allocated, $($tt:tt)*) => {};
+    (epserde, medium_enum, $($tt:tt)*) => {};
+
     ($framework:ident, $test:ident, $($tt:tt)*) => { $($tt)* };
 }
 
@@ -191,7 +197,7 @@ macro_rules! types {
         $call!(primpacked, PrimitivesPacked, PRIMITIVES_PACKED, 1000);
         $call!(large, LargeStruct, LARGE_STRUCTS, 10000);
         $call!(allocated, Allocated, ALLOCATED, 5000);
-        #[cfg(any(not(feature = "no-empty"), not(feature = "no-nonunit-variant")))]
+        #[cfg(any(not(feature = "no-empty"), not(feature = r#"no-nonunit-variant"#)))]
         $call!(medium_enum, MediumEnum, MEDIUM_ENUMS, 1000);
         $call!(mesh, Mesh, MESHES, 1000);
     };

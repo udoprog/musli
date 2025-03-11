@@ -20,7 +20,7 @@ harness = false
 
 [features]
 default = ["std", "alloc"]
-std = ["musli?/std", "serde?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std"]
+std = ["musli?/std", "serde?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std", "epserde?/std"]
 alloc = ["musli?/alloc", "musli-zerocopy?/alloc"]
 verbose = ["musli?/verbose"]
 extra = ["rkyv", "dlhn", "serde_cbor"]
@@ -61,6 +61,7 @@ no-char = []
 no-binary-equality = []
 
 serde = ["dep:serde", "bitcode?/serde"]
+epserde = ["dep:epserde"]
 serde_json = ["dep:serde_json", "serde"]
 bincode = ["dep:bincode", "serde"]
 rmp-serde = ["dep:rmp-serde", "serde"]
@@ -94,6 +95,7 @@ bson = { version = "2.9.0", default-features = false, optional = true }
 zerocopy = { version = "0.8.13", default-features = false, optional = true, features = ["derive"] }
 miniserde = { version = "0.1.38", default-features = false, optional = true }
 speedy = { version = "0.8.7", optional = true }
+epserde = { version = "0.8.0", default-features = false, optional = true, features = ["derive"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
