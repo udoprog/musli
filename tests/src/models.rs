@@ -98,9 +98,11 @@ impl PartialEq<PrimitivesPacked> for &PrimitivesPacked {
 }
 
 #[derive(Debug, Clone, PartialEq, Generate)]
-#[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(all(feature = "serde", not(feature = "eserde")), derive(Deserialize))]
+#[cfg_attr(feature = "eserde", derive(eserde::Deserialize))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -155,8 +157,10 @@ impl PartialEq<Primitives> for &Primitives {
 }
 
 #[derive(Debug, Clone, PartialEq, Generate)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(all(feature = "serde", not(feature = "eserde")), derive(Deserialize))]
+#[cfg_attr(feature = "eserde", derive(eserde::Deserialize))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -235,8 +239,8 @@ impl PartialEq<Allocated> for &Allocated {
 }
 
 #[derive(Debug, Clone, PartialEq, Generate)]
-#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 pub struct Tuples {
@@ -268,8 +272,10 @@ impl PartialEq<Tuples> for &Tuples {
 }
 
 #[derive(Debug, Clone, PartialEq, Generate)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(all(feature = "serde", not(feature = "eserde")), derive(Deserialize))]
+#[cfg_attr(feature = "eserde", derive(eserde::Deserialize))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -331,8 +337,10 @@ impl PartialEq<MediumEnum> for &MediumEnum {
 }
 
 #[derive(Debug, Clone, PartialEq, Generate)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(all(feature = "serde", not(feature = "eserde")), derive(Deserialize))]
+#[cfg_attr(feature = "eserde", derive(eserde::Deserialize))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -396,8 +404,10 @@ impl PartialEq<LargeStruct> for &LargeStruct {
 }
 
 #[derive(Debug, Clone, PartialEq, Generate)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(all(feature = "serde", not(feature = "eserde")), derive(Deserialize))]
+#[cfg_attr(feature = "eserde", derive(eserde::Deserialize))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -422,8 +432,10 @@ impl PartialEq<Mesh> for &ArchivedMesh {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(all(feature = "serde", not(feature = "eserde")), derive(Deserialize))]
+#[cfg_attr(feature = "eserde", derive(eserde::Deserialize))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -443,8 +455,10 @@ pub struct Triangle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(all(feature = "serde", not(feature = "eserde")), derive(Deserialize))]
+#[cfg_attr(feature = "eserde", derive(eserde::Deserialize))]
 #[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",

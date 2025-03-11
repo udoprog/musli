@@ -59,6 +59,8 @@ macro_rules! feature_matrix {
         $call!(musli_zerocopy $(, $($tt)*)*);
         #[cfg(feature = "serde_json")]
         $call!(serde_json $(, $($tt)*)*);
+        #[cfg(feature = "eserde_json")]
+        $call!(eserde_json $(, $($tt)*)*);
         #[cfg(feature = "bincode")]
         $call!(serde_bincode $(, $($tt)*)*);
         #[cfg(feature = "rmp-serde")]
@@ -99,6 +101,8 @@ macro_rules! if_supported {
     (zerocopy, allocated, $($tt:tt)*) => {};
     (zerocopy, medium_enum, $($tt:tt)*) => {};
     (zerocopy, mesh, $($tt:tt)*) => {};
+
+    (eserde_json, primpacked, $($tt:tt)*) => {};
 
     ($framework:ident, $test:ident, $($tt:tt)*) => { $($tt)* };
 }

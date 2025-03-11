@@ -61,7 +61,9 @@ no-char = []
 no-binary-equality = []
 
 serde = ["dep:serde", "bitcode?/serde"]
+eserde = ["dep:eserde", "no-tuple", "no-cstring"]
 serde_json = ["dep:serde_json", "serde"]
+eserde_json = ["dep:serde_json", "eserde", "serde"]
 bincode = ["dep:bincode", "serde"]
 rmp-serde = ["dep:rmp-serde", "serde"]
 postcard = ["dep:postcard", "serde"]
@@ -94,6 +96,7 @@ bson = { version = "2.9.0", default-features = false, optional = true }
 zerocopy = { version = "0.8.13", default-features = false, optional = true, features = ["derive"] }
 miniserde = { version = "0.1.38", default-features = false, optional = true }
 speedy = { version = "0.8.7", optional = true }
+eserde = { version = "0.1.5", default-features = false, optional = true, features = ["json", "derive"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }

@@ -145,6 +145,25 @@ expected = [
 ]
 
 [[reports]]
+id = "eserde"
+title = "ε-serde"
+link = "eserde"
+description = [
+    "This is a test suite for ε-serde features, which currently only supports JSON decoding.",
+]
+features = [
+    "musli-json",
+    "serde_json",
+    "eserde",
+]
+expected = [
+    "musli",
+    "serde",
+    "no-tuple",
+    "no-cstring",
+]
+
+[[reports]]
 id = "zerocopy-rkyv"
 title = "Müsli vs rkyv"
 link = "müsli-vs-rkyv"
