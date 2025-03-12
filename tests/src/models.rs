@@ -35,7 +35,7 @@ use crate::mode::Packed;
 use crate::generate::Generate;
 pub use rand::prelude::*;
 
-statics! {
+options! {
     pub(crate) unsafe fn init_ranges();
     pub(crate) fn enumerate_ranges();
     static PRIMITIVES_RANGE: Range<usize> = 10..100, 1..3;

@@ -156,7 +156,7 @@ fn build_fields(
         let ty = &field.ty;
 
         let generate = if let Some(range) = attr.range {
-            quote!(<#ty as #generate>::generate_range(#rng, #clone::clone(&#range)))
+            quote!(<#ty as #generate>::generate_range(#rng, #clone::clone(#range.get())))
         } else {
             quote!(<#ty as #generate>::generate(#rng))
         };
