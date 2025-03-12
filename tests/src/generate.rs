@@ -21,14 +21,14 @@ use alloc::collections::{BTreeMap, BTreeSet};
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
 
-miri! {
-    pub(crate) unsafe fn init_ranges(),
-    pub(crate) fn enumerate_ranges(),
-    pub static STRING_RANGE: Range<usize> = 4..32, 2..16;
+statics! {
+    pub(crate) unsafe fn init_ranges();
+    pub(crate) fn enumerate_ranges();
+    static STRING_RANGE: Range<usize> = 4..32, 2..16;
     #[cfg(any(feature = "std", feature = "alloc"))]
-    pub static MAP_RANGE: Range<usize> = 10..20, 1..3;
+    static MAP_RANGE: Range<usize> = 10..20, 1..3;
     #[cfg(feature = "alloc")]
-    pub static VEC_RANGE: Range<usize> = 10..20, 1..3;
+    static VEC_RANGE: Range<usize> = 10..20, 1..3;
 }
 
 /// Random number generator.

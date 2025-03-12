@@ -21,9 +21,9 @@ struct SizeSet {
     samples: Vec<i64>,
 }
 
-tests::miri! {
-    pub unsafe fn init_constants(),
-    pub(crate) fn enumerate_constants(),
+tests::statics! {
+    pub unsafe fn init_constants();
+    pub(crate) fn enumerate_constants();
     static ITER: usize = 10000, 2;
     static LARGE_STRUCTS: usize = 10, 2;
     static PRIMITIVES: usize = 500, 2;
@@ -115,14 +115,12 @@ fn main() -> Result<()> {
                 );
                 println!();
 
-                let mut out = Vec::new();
-                enumerate_constants(&mut out);
-                tests::enumerate_statics(&mut out);
-
-                for (key, value) in out {
+                let mut f = |key, value| {
                     println!("  {key} = {value:?}");
-                }
+                };
 
+                enumerate_constants(&mut f);
+                tests::enumerate_statics(&mut f);
                 return Ok(());
             }
             other if other.starts_with("--") => {

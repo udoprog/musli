@@ -12,10 +12,10 @@ pub const RNG_SEED: u64 = 2718281828459045235;
 pub use tests_macros::benchmarker;
 
 #[macro_export]
-macro_rules! miri {
+macro_rules! statics {
     (
-        $init_vis:vis unsafe fn $init:ident(),
-        $enumerate_vis:vis fn $enumerate:ident(),
+        $init_vis:vis unsafe fn $init:ident();
+        $enumerate_vis:vis fn $enumerate:ident();
         $($(#[$($meta:meta)*])* $vis:vis static $ident:ident: $value_ty:ty = $range:expr, $miri:expr;)*
     ) => {
         /// Initialize the specified statics.
@@ -39,11 +39,10 @@ macro_rules! miri {
         }
 
         #[allow(unused)]
-        $enumerate_vis fn $enumerate(out: &mut Vec<(&'static str, &'static dyn core::fmt::Debug)>) {
+        $enumerate_vis fn $enumerate(out: &mut dyn FnMut(&'static str, &'static dyn core::fmt::Debug)) {
             $({
                 let key = concat!("MUSLI_", stringify!($ident));
-                let value: &dyn core::fmt::Debug = &$ident;
-                out.push((key, value));
+                out(key, &$ident);
             })*
         }
 
@@ -99,9 +98,7 @@ pub unsafe fn init_statics() {
 }
 
 /// Enumerate all available statics.
-pub fn enumerate_statics(
-    out: &mut ::alloc::vec::Vec<(&'static str, &'static dyn core::fmt::Debug)>,
-) {
+pub fn enumerate_statics(out: &mut dyn FnMut(&'static str, &'static dyn core::fmt::Debug)) {
     self::models::enumerate_ranges(out);
     self::generate::enumerate_ranges(out);
 }
