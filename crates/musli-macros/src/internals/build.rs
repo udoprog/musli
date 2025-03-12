@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned, ToTokens};
 use syn::punctuated::Punctuated;
@@ -9,7 +11,7 @@ use crate::expander::{
     UnsizedMethod, VariantData,
 };
 
-use super::attr::{DefaultOrCustom, EnumTagging, FieldEncoding, ModeKind, Packing};
+use super::attr::{DefaultOrCustom, EnumTagging, FieldEncoding, ModeKind, MusliBound, Packing};
 use super::mode::ImportedMethod;
 use super::name::NameAll;
 use super::{Ctxt, Expansion, Mode, Only, Result, Tokens, ATTR};
@@ -25,8 +27,8 @@ pub(crate) struct Build<'a> {
     pub(crate) mode: Mode<'a>,
     pub(crate) input: &'a syn::DeriveInput,
     pub(crate) cx: &'a Ctxt,
-    pub(crate) bounds: &'a [(Span, syn::WherePredicate)],
-    pub(crate) decode_bounds: &'a [(Span, syn::WherePredicate)],
+    pub(crate) bounds: &'a [(Span, MusliBound)],
+    pub(crate) decode_bounds: &'a [(Span, MusliBound)],
     pub(crate) expansion: Expansion<'a>,
     pub(crate) data: BuildData<'a>,
     pub(crate) decode_t_decode: ImportedMethod<'a>,
@@ -797,4 +799,34 @@ fn determine_name_method(ty: &syn::Type) -> (NameMethod, Option<NameAll>) {
     }
 
     (NameMethod::Sized, None)
+}
+
+/// Extract existing ident bounds which are present, so that the default type bounds can be excluded on this basis.
+pub(crate) fn existing_bounds(bounds: &[(Span, MusliBound)]) -> HashSet<syn::Ident> {
+    let mut idents = HashSet::new();
+
+    for (_, bound) in bounds {
+        let ident = match bound {
+            MusliBound::Excluded(ident) => ident.clone(),
+            MusliBound::Predicate(predicate) => {
+                let syn::WherePredicate::Type(predicate) = predicate else {
+                    continue;
+                };
+
+                let syn::Type::Path(ty) = &predicate.bounded_ty else {
+                    continue;
+                };
+
+                let Some(ident) = ty.path.get_ident() else {
+                    continue;
+                };
+
+                ident.clone()
+            }
+        };
+
+        idents.insert(ident);
+    }
+
+    idents
 }

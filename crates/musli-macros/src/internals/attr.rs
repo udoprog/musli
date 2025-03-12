@@ -5,7 +5,7 @@ use std::mem;
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::meta::ParseNestedMeta;
-use syn::parse::Parse;
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::Token;
 
@@ -285,9 +285,9 @@ layer! {
         packing: Packing,
         @multiple
         /// Bounds in a where predicate.
-        bounds: syn::WherePredicate,
+        bounds: MusliBound,
         /// Bounds to require for a `Decode` implementation.
-        decode_bounds: syn::WherePredicate,
+        decode_bounds: MusliBound,
         /// Lifetimes specified.
         decode_bounds_lifetimes: syn::Lifetime,
         /// Types specified.
@@ -548,13 +548,54 @@ fn parse_bound_types(
     Ok(())
 }
 
+pub(crate) enum MusliBound {
+    Excluded(syn::Ident),
+    Predicate(syn::WherePredicate),
+}
+
+impl MusliBound {
+    #[inline]
+    pub(crate) fn as_predicate(&self) -> Option<&syn::WherePredicate> {
+        match self {
+            MusliBound::Excluded(..) => None,
+            MusliBound::Predicate(predicate) => Some(predicate),
+        }
+    }
+}
+
+impl Parse for MusliBound {
+    #[inline]
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let Some(ident) = input.parse::<Option<syn::Ident>>()? else {
+            return Ok(MusliBound::Predicate(input.parse()?));
+        };
+
+        let Some(colon) = input.parse::<Option<Token![:]>>()? else {
+            return Ok(MusliBound::Excluded(ident));
+        };
+
+        Ok(MusliBound::Predicate(syn::WherePredicate::Type(
+            syn::PredicateType {
+                lifetimes: None,
+                bounded_ty: syn::Type::Path(syn::TypePath {
+                    qself: None,
+                    path: syn::Path::from(syn::PathSegment::from(ident)),
+                }),
+                colon_token: colon,
+                bounds: input.parse_terminated(syn::TypeParamBound::parse, Token![+])?,
+            },
+        )))
+    }
+}
+
 fn parse_bounds(
     meta: &syn::meta::ParseNestedMeta,
-    out: &mut Vec<(Span, syn::WherePredicate)>,
+    out: &mut Vec<(Span, MusliBound)>,
 ) -> syn::Result<()> {
     let content;
     syn::braced!(content in meta.input);
-    let where_clauses = content.parse_terminated(syn::WherePredicate::parse, Token![,])?;
+
+    let where_clauses = content.parse_terminated(MusliBound::parse, Token![,])?;
 
     for where_clause in where_clauses {
         out.push((meta.path.span(), where_clause));

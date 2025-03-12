@@ -6,7 +6,7 @@ use syn::Token;
 use crate::expander::{Name, NameMethod, StructKind};
 use crate::internals::apply;
 use crate::internals::attr::{EnumTagging, Packing};
-use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
+use crate::internals::build::{self, Body, Build, BuildData, Enum, Field, Variant};
 use crate::internals::{Result, Tokens};
 
 struct Ctxt<'a> {
@@ -36,6 +36,16 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
         trace_body: true,
     };
 
+    let Tokens {
+        allocator_t,
+        context_t,
+        result,
+        decode_t,
+        decoder_t,
+        try_fast_decode,
+        ..
+    } = b.tokens;
+
     let packed;
 
     let body = match &b.data {
@@ -59,16 +69,6 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
     let mut generics = b.input.generics.clone();
     let type_ident = &b.input.ident;
 
-    let Tokens {
-        allocator_t,
-        context_t,
-        result,
-        decode_t,
-        decoder_t,
-        try_fast_decode,
-        ..
-    } = b.tokens;
-
     let lt = &b.p.lt;
 
     if !b.p.lt_exists {
@@ -83,6 +83,7 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
     }
 
     let allocator_ident = &b.p.allocator_ident;
+    let mode_ident = b.expansion.mode_path(b.tokens);
 
     if !b.p.allocator_exists {
         generics
@@ -100,8 +101,33 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
             b.bounds
                 .iter()
                 .chain(b.decode_bounds.iter())
-                .map(|(_, v)| v.clone()),
+                .flat_map(|(_, v)| v.as_predicate())
+                .cloned(),
         );
+    }
+
+    let existing_bounds = build::existing_bounds(b.decode_bounds);
+
+    for t in b.input.generics.type_params() {
+        if existing_bounds.contains(&t.ident) {
+            continue;
+        }
+
+        let mut bounds = Punctuated::new();
+        bounds.push(syn::parse_quote!(#decode_t<#lt, #mode_ident, #allocator_ident>));
+
+        generics
+            .make_where_clause()
+            .predicates
+            .push(syn::WherePredicate::Type(syn::PredicateType {
+                lifetimes: None,
+                bounded_ty: syn::Type::Path(syn::TypePath {
+                    qself: None,
+                    path: syn::Path::from(syn::PathSegment::from(t.ident.clone())),
+                }),
+                colon_token: <Token![:]>::default(),
+                bounds,
+            }));
     }
 
     let (impl_generics, _, where_clause) = generics.split_for_impl();
@@ -112,8 +138,6 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
     if cfg!(not(feature = "verbose")) {
         attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
     }
-
-    let mode_ident = b.expansion.mode_path(b.tokens);
 
     Ok(quote! {
         const _: () = {

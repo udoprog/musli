@@ -491,6 +491,33 @@ specified in the `decode_bound` parameter directly like
 An HRTB can also be used like `#[musli(decode_bound<A> = {T: for<'de>
 Decode<'de, Binary, A>})]`.
 
+By default, a bound is added for every type parameter allowing types like these
+to compile without additional specification:
+
+```rust
+use musli::{Decode, Encode};
+
+#[derive(Debug, Clone, Encode, Decode)]
+pub struct Mesh<V: AsRef<[u32]> = Vec<u32>> {
+    pub triangles: V,
+}
+```
+
+Note that any identifier mentioned in a bound configuration will cause the
+default bound to be excluded.
+
+```rust
+use std::marker::PhantomData;
+use musli::{Decode, Encode};
+
+#[derive(Debug, Clone, Encode, Decode)]
+#[musli(Binary, bound = {T}, decode_bound = {T})]
+pub struct Ignore<T> {
+    #[musli(default)]
+    pub _marker: PhantomData<T>,
+}
+```
+
 <br>
 
 ##### Examples
