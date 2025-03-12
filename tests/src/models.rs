@@ -33,9 +33,11 @@ use crate::generate::Generate;
 pub use rand::prelude::*;
 
 miri! {
-    pub const PRIMITIVES_RANGE: Range<usize> = 10..100, 1..3;
-    pub const MEDIUM_RANGE: Range<usize> = 10..100, 1..3;
-    pub const SMALL_FIELDS: Range<usize> = 1..3, 1..2;
+    pub(crate) unsafe fn init_ranges(),
+    pub(crate) fn enumerate_ranges(),
+    pub static PRIMITIVES_RANGE: Range<usize> = 10..100, 1..3;
+    pub static MEDIUM_RANGE: Range<usize> = 10..100, 1..3;
+    pub static SMALL_FIELDS: Range<usize> = 1..3, 1..2;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]

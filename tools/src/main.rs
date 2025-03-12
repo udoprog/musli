@@ -92,6 +92,8 @@ struct Report {
     expected: Vec<String>,
     #[serde(default)]
     only: Vec<String>,
+    #[serde(default)]
+    env: HashMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -239,9 +241,9 @@ fn main() -> Result<()> {
             for b in &bins {
                 println!("Sanity checking: {}", b.report.title);
 
-                sanity_check(&b.bins.fuzz()?).context("Sanity check failed")?;
+                sanity_check(&b.bins.fuzz()?, b.bins.report).context("Sanity check failed")?;
                 // Test benches binaries.
-                run_path(&b.bins.comparison()?, &[], &[])?;
+                run_path(&b.bins.comparison()?, &[], &[], b.bins.report)?;
             }
 
             let branch = a.branch.as_deref().unwrap_or(manifest.branch.as_str());
@@ -279,8 +281,8 @@ fn main() -> Result<()> {
             if !a.no_size {
                 for bins in &bins {
                     println!("Sizing: {}", bins.report.title);
-                    let size_set =
-                        collect_size_sets(&bins.bins.fuzz()?).context("Collecting size sets")?;
+                    let size_set = collect_size_sets(&bins.bins.fuzz()?, bins.report)
+                        .context("Collecting size sets")?;
                     size_sets.push((bins.report, size_set));
                 }
             }
@@ -503,6 +505,7 @@ fn main() -> Result<()> {
                     "clippy",
                     None::<OsString>,
                     &a.remaining[..],
+                    report,
                 )?;
 
                 builds.push((report, build));
@@ -555,6 +558,7 @@ fn main() -> Result<()> {
                     "build",
                     None::<OsString>,
                     &a.remaining[..],
+                    report,
                 )?;
 
                 builds.push(build);
@@ -576,9 +580,9 @@ fn main() -> Result<()> {
             for b in &bins {
                 println!("Sanity checking: {}", b.report.title);
 
-                sanity_check(&b.bins.fuzz()?).context("Sanity check failed")?;
+                sanity_check(&b.bins.fuzz()?, b.bins.report).context("Sanity check failed")?;
                 // Test benches binaries.
-                run_path(&b.bins.comparison()?, &[], &[])?;
+                run_path(&b.bins.comparison()?, &[], &[], b.bins.report)?;
             }
         }
     }
@@ -754,7 +758,12 @@ fn build_report<'a>(
             OsStr::new("CRITERION_HOME"),
             bins.paths.criterion_output.as_os_str(),
         )];
-        run_path(&bins.bins.comparison()?, &args, &comparison_env[..])?;
+        run_path(
+            &bins.bins.comparison()?,
+            &args,
+            &comparison_env[..],
+            bins.report,
+        )?;
     }
 
     if !bins.paths.criterion_output.is_dir() {
@@ -983,11 +992,15 @@ fn copy_svg(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-fn run_path(path: &Path, args: &[&str], env: &[(&OsStr, &OsStr)]) -> Result<()> {
+fn run_path(path: &Path, args: &[&str], env: &[(&OsStr, &OsStr)], report: &Report) -> Result<()> {
     let mut command = Command::new(path);
 
     for arg in args {
         command.arg(arg);
+    }
+
+    for (key, value) in &report.env {
+        command.env(key, value);
     }
 
     for (key, value) in env {
@@ -1042,13 +1055,20 @@ fn build_tests(
     command: impl AsRef<OsStr>,
     head: impl IntoIterator<Item: AsRef<OsStr>>,
     remaining: impl IntoIterator<Item: AsRef<OsStr>, IntoIter: ExactSizeIterator>,
+    report: &Report,
 ) -> Result<CustomBuild> {
     let mut child = Command::new("cargo");
+
     child
         .arg(command)
         .args(["-p", "tests"])
         .args(head)
         .arg("--message-format=json");
+
+    for (key, value) in &report.env {
+        child.env(key, value);
+    }
+
     child.stdout(Stdio::piped());
 
     let features_argument = manifest
@@ -1161,6 +1181,7 @@ fn build_bench(manifest: &Manifest, release: bool, report: &Report) -> Result<Bu
         "build",
         head.into_iter().chain(["--benches"]),
         None::<OsString>,
+        report,
     )?;
 
     if !build.bad_features.is_empty() {
@@ -1216,9 +1237,14 @@ fn print_command(child: &Command, env: &[(&OsStr, &OsStr)]) {
 }
 
 /// This ensures that the roundtrip encoding is correct.
-fn sanity_check(path: &Path) -> Result<()> {
+fn sanity_check(path: &Path, report: &Report) -> Result<()> {
     let mut child = Command::new(path);
     child.args(["--iter", "1"]);
+
+    for (key, value) in &report.env {
+        child.env(key, value);
+    }
+
     print_command(&child, &[]);
     let status = child.status()?;
     ensure!(status.success(), "Command failed: {}", status.success());
@@ -1226,10 +1252,15 @@ fn sanity_check(path: &Path) -> Result<()> {
 }
 
 /// Collect size sets from the fuzz command.
-fn collect_size_sets(path: &Path) -> Result<Vec<SizeSet>> {
+fn collect_size_sets(path: &Path, report: &Report) -> Result<Vec<SizeSet>> {
     let mut child = Command::new(path);
     child.stdout(Stdio::piped());
     child.arg("--size");
+
+    for (key, value) in &report.env {
+        child.env(key, value);
+    }
+
     print_command(&child, &[]);
 
     let mut child = child.spawn()?;
