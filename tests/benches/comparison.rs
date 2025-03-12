@@ -191,4 +191,14 @@ fn criterion_benchmark(c: &mut Criterion) {
 }
 
 criterion::criterion_group!(benches, criterion_benchmark);
-criterion::criterion_main!(benches);
+
+fn main() {
+    // SAFETY: This is only called once at the beginning of the program.
+    unsafe {
+        tests::init_statics();
+    }
+
+    benches();
+
+    Criterion::default().configure_from_args().final_summary();
+}

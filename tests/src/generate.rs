@@ -22,11 +22,13 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use std::collections::{HashMap, HashSet};
 
 miri! {
-    pub const STRING_RANGE: Range<usize> = 4..32, 2..16;
+    pub(crate) unsafe fn init_ranges(),
+    pub(crate) fn enumerate_ranges(),
+    pub static STRING_RANGE: Range<usize> = 4..32, 2..16;
     #[cfg(any(feature = "std", feature = "alloc"))]
-    pub const MAP_RANGE: Range<usize> = 10..20, 1..3;
+    pub static MAP_RANGE: Range<usize> = 10..20, 1..3;
     #[cfg(feature = "alloc")]
-    pub const VEC_RANGE: Range<usize> = 10..20, 1..3;
+    pub static VEC_RANGE: Range<usize> = 10..20, 1..3;
 }
 
 /// Random number generator.
@@ -132,7 +134,7 @@ where
     where
         R: rand::Rng,
     {
-        <Vec<T> as Generate>::generate_range(rng, VEC_RANGE)
+        <Vec<T> as Generate>::generate_range(rng, VEC_RANGE.clone())
     }
 
     fn generate_range<R>(rng: &mut R, range: Range<usize>) -> Self
@@ -162,7 +164,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE)
+        Self::generate_range(rng, MAP_RANGE.clone())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -191,7 +193,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE)
+        Self::generate_range(rng, MAP_RANGE.clone())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -220,7 +222,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE)
+        Self::generate_range(rng, MAP_RANGE.clone())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -248,7 +250,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE)
+        Self::generate_range(rng, MAP_RANGE.clone())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -273,7 +275,7 @@ impl Generate for String {
     {
         let mut string = String::new();
 
-        for _ in 0..rng.random_range(STRING_RANGE) {
+        for _ in 0..rng.random_range(STRING_RANGE.clone()) {
             string.push(rng.random());
         }
 
@@ -289,7 +291,7 @@ impl Generate for CString {
     {
         let mut string = Vec::new();
 
-        for _ in 0..rng.random_range(STRING_RANGE) {
+        for _ in 0..rng.random_range(STRING_RANGE.clone()) {
             string.push(rng.random_range(1..=u8::MAX));
         }
 

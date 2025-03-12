@@ -13,16 +13,97 @@ pub use tests_macros::benchmarker;
 
 #[macro_export]
 macro_rules! miri {
-    ($($(#[$($meta:meta)*])* $vis:vis const $ident:ident: $value_ty:ty = $range:expr, $miri:expr;)*) => {
+    (
+        $init_vis:vis unsafe fn $init:ident(),
+        $enumerate_vis:vis fn $enumerate:ident(),
+        $($(#[$($meta:meta)*])* $vis:vis static $ident:ident: $value_ty:ty = $range:expr, $miri:expr;)*
+    ) => {
+        /// Initialize the specified statics.
+        ///
+        /// # Safety
+        ///
+        /// Must only be called ONCE at the start of a program.
+        $init_vis unsafe fn $init() {
+            $({
+                let key = concat!("MUSLI_", stringify!($ident));
+
+                if let Ok(var) = ::std::env::var(key) {
+                    if let Some(value) = $crate::parse::<$value_ty>(&var) {
+                        let ptr = (&$ident as *const $value_ty as *mut $value_ty);
+                        ptr.write(value);
+                    } else {
+                        std::eprintln!("Could not parse {key}={var}")
+                    }
+                }
+            })*
+        }
+
+        #[allow(unused)]
+        $enumerate_vis fn $enumerate(out: &mut Vec<(&'static str, &'static dyn core::fmt::Debug)>) {
+            $({
+                let key = concat!("MUSLI_", stringify!($ident));
+                let value: &dyn core::fmt::Debug = &$ident;
+                out.push((key, value));
+            })*
+        }
+
         $(
             $(#[$($meta)*])*
             #[cfg(miri)]
-            $vis const $ident: $value_ty = $miri;
+            $vis static $ident: $value_ty = $miri;
             $(#[$($meta)*])*
             #[cfg(not(miri))]
-            $vis const $ident: $value_ty = $range;
+            $vis static $ident: $value_ty = $range;
         )*
     }
+}
+
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for ::core::ops::Range<usize> {}
+    impl Sealed for usize {}
+}
+
+pub trait Parse: Sized + self::sealed::Sealed {
+    fn parse(input: &str) -> Option<Self>;
+}
+
+impl Parse for ::core::ops::Range<usize> {
+    #[inline]
+    fn parse(input: &str) -> Option<Self> {
+        let (from, to) = input.split_once("..")?;
+        Some(from.parse().ok()?..to.parse().ok()?)
+    }
+}
+
+impl Parse for usize {
+    #[inline]
+    fn parse(input: &str) -> Option<Self> {
+        input.parse().ok()
+    }
+}
+
+#[doc(hidden)]
+pub fn parse<T: Parse>(input: &str) -> Option<T> {
+    T::parse(input)
+}
+
+/// Initialize the specified statics.
+///
+/// # Safety
+///
+/// Must only be called ONCE at the start of a program.
+pub unsafe fn init_statics() {
+    self::models::init_ranges();
+    self::generate::init_ranges();
+}
+
+/// Enumerate all available statics.
+pub fn enumerate_statics(
+    out: &mut ::alloc::vec::Vec<(&'static str, &'static dyn core::fmt::Debug)>,
+) {
+    self::models::enumerate_ranges(out);
+    self::generate::enumerate_ranges(out);
 }
 
 pub mod generate;

@@ -132,6 +132,8 @@ fn build_fields(
     rng: &syn::Ident,
     generate: &proc_macro2::Ident,
 ) -> Result<Vec<syn::FieldValue>, ()> {
+    let clone: syn::Path = syn::parse_quote!(::std::clone::Clone);
+
     let mut out = Vec::new();
 
     for (n, field) in fields.iter().enumerate() {
@@ -154,7 +156,7 @@ fn build_fields(
         let ty = &field.ty;
 
         let generate = if let Some(range) = attr.range {
-            quote!(<#ty as #generate>::generate_range(#rng, #range))
+            quote!(<#ty as #generate>::generate_range(#rng, #clone::clone(&#range)))
         } else {
             quote!(<#ty as #generate>::generate(#rng))
         };

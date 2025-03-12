@@ -8,8 +8,6 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
-use tests::generate;
-use tests::models;
 use tests::models::*;
 use tests::utils;
 use tests::AlignedBuf;
@@ -24,16 +22,24 @@ struct SizeSet {
 }
 
 tests::miri! {
-    const ITER: usize = 10000, 2;
-    const LARGE_STRUCTS: usize = 10, 2;
-    const PRIMITIVES: usize = 500, 2;
-    const PRIMITIVES_PACKED: usize = 500, 2;
-    const MEDIUM_ENUMS: usize = 500, 2;
-    const ALLOCATED: usize = 100, 2;
-    const MESHES: usize = 10, 2;
+    pub unsafe fn init_constants(),
+    pub(crate) fn enumerate_constants(),
+    static ITER: usize = 10000, 2;
+    static LARGE_STRUCTS: usize = 10, 2;
+    static PRIMITIVES: usize = 500, 2;
+    static PRIMITIVES_PACKED: usize = 500, 2;
+    static MEDIUM_ENUMS: usize = 500, 2;
+    static ALLOCATED: usize = 100, 2;
+    static MESHES: usize = 10, 2;
 }
 
 fn main() -> Result<()> {
+    // SAFETY: These are only initialized *once* at the beginning of the program.
+    unsafe {
+        init_constants();
+        tests::init_statics();
+    }
+
     let root = env::var_os("CARGO_MANIFEST_DIR")
         .map(|path| PathBuf::from(path).join("..").join(".."))
         .unwrap_or_else(|| PathBuf::from("."));
@@ -108,21 +114,15 @@ fn main() -> Result<()> {
                     "Note: Running this utility under miri reduces the range of these constants."
                 );
                 println!();
-                println!("  ITER = {ITER}");
-                println!("  LARGE_STRUCTS = {LARGE_STRUCTS}");
-                println!("  PRIMITIVES = {PRIMITIVES}");
-                println!("  PRIMITIVES_PACKED = {PRIMITIVES_PACKED}");
-                println!("  MEDIUM_ENUMS = {MEDIUM_ENUMS}");
-                println!("  ALLOCATED = {ALLOCATED}");
-                println!("  generate::STRING_RANGE = {:?}", generate::STRING_RANGE);
-                println!("  generate::MAP_RANGE = {:?}", generate::MAP_RANGE);
-                println!("  generate::VEC_RANGE = {:?}", generate::VEC_RANGE);
-                println!(
-                    "  models::PRIMITIVES_RANGE = {:?}",
-                    models::PRIMITIVES_RANGE
-                );
-                println!("  models::MEDIUM_RANGE = {:?}", models::MEDIUM_RANGE);
-                println!("  models::SMALL_FIELDS = {:?}", models::SMALL_FIELDS);
+
+                let mut out = Vec::new();
+                enumerate_constants(&mut out);
+                tests::enumerate_statics(&mut out);
+
+                for (key, value) in out {
+                    println!("  {key} = {value:?}");
+                }
+
                 return Ok(());
             }
             other if other.starts_with("--") => {
