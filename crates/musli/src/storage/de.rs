@@ -356,7 +356,8 @@ where
                 // Read into allocated space and mark as initialized.
                 unsafe {
                     self.reader.read_bytes_uninit(self.cx, ptr, n)?;
-                    at += max_chunk;
+                    at += chunk;
+                    out.set_len(at);
                 }
 
                 self.cx.leave_sequence_index();
