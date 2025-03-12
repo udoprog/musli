@@ -5,7 +5,7 @@ use syn::Token;
 
 use crate::expander::Name;
 use crate::internals::attr::{EnumTagging, Packing};
-use crate::internals::build::{Body, Build, BuildData, Enum, Field, Variant};
+use crate::internals::build::{self, Body, Build, BuildData, Enum, Field, Variant};
 use crate::internals::{Result, Tokens};
 
 #[derive(Clone, Copy)]
@@ -67,6 +67,7 @@ pub(crate) fn expand_encode_entry(b: &Build<'_>) -> Result<TokenStream> {
         return Err(());
     }
 
+    let mode_ident = b.expansion.mode_path(b.tokens);
     let mut impl_generics = b.input.generics.clone();
 
     if !b.bounds.is_empty() {
@@ -74,7 +75,31 @@ pub(crate) fn expand_encode_entry(b: &Build<'_>) -> Result<TokenStream> {
 
         where_clause
             .predicates
-            .extend(b.bounds.iter().map(|(_, v)| v.clone()));
+            .extend(b.bounds.iter().flat_map(|(_, v)| v.as_predicate()).cloned());
+    }
+
+    let existing_bounds = build::existing_bounds(b.bounds);
+
+    for t in b.input.generics.type_params() {
+        if existing_bounds.contains(&t.ident) {
+            continue;
+        }
+
+        let mut bounds = Punctuated::new();
+        bounds.push(syn::parse_quote!(#encode_t<#mode_ident>));
+
+        impl_generics
+            .make_where_clause()
+            .predicates
+            .push(syn::WherePredicate::Type(syn::PredicateType {
+                lifetimes: None,
+                bounded_ty: syn::Type::Path(syn::TypePath {
+                    qself: None,
+                    path: syn::Path::from(syn::PathSegment::from(t.ident.clone())),
+                }),
+                colon_token: <Token![:]>::default(),
+                bounds,
+            }));
     }
 
     let (impl_generics, _, where_clause) = impl_generics.split_for_impl();
@@ -85,8 +110,6 @@ pub(crate) fn expand_encode_entry(b: &Build<'_>) -> Result<TokenStream> {
     if cfg!(not(feature = "verbose")) {
         attributes.push(syn::parse_quote!(#[allow(clippy::just_underscores_and_digits)]));
     }
-
-    let mode_ident = b.expansion.mode_path(b.tokens);
 
     Ok(quote! {
         const _: () = {
