@@ -150,6 +150,9 @@ title = "ε-serde"
 link = "epserde"
 description = [
     "This is a test suite for ε-serde features",
+    "",
+    "Since ε-serde works best for larger inputs,",
+    "we increase the size of the input being deserialized."
 ]
 features = [
     "musli-wire",
@@ -162,6 +165,7 @@ features = [
 expected = [
     "musli",
 ]
+env = {"MUSLI_VEC" = "10000..20000"}
 
 [[reports]]
 skip = true # currently broken

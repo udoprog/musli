@@ -412,7 +412,7 @@ impl PartialEq<LargeStruct> for &LargeStruct {
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
-    rkyv(compare(PartialEq), derive(Debug))
+    rkyv(compare(PartialEq), derive(Debug), archive_bounds(V::Archived: core::fmt::Debug))
 )]
 #[cfg_attr(
     feature = "miniserde",
