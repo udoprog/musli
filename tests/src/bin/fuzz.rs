@@ -21,7 +21,7 @@ struct SizeSet {
     samples: Vec<i64>,
 }
 
-tests::statics! {
+tests::options! {
     pub unsafe fn init_constants();
     pub(crate) fn enumerate_constants();
     static ITER: usize = 10000, 2;
@@ -46,7 +46,7 @@ fn main() -> Result<()> {
 
     let mut it = std::env::args().skip(1);
 
-    let mut iter = ITER;
+    let mut iter = *ITER.get();
     let mut random = false;
     let mut size = false;
     let mut filter = Vec::new();
@@ -93,7 +93,7 @@ fn main() -> Result<()> {
             "-h" | "--help" => {
                 println!("Available options:");
                 println!(
-                    " --iter <count>  - Perform the <count> number of iterations when fuzzing, (default: {})", ITER);
+                    " --iter <count>  - Perform the <count> number of iterations when fuzzing, (default: {})", ITER.get());
                 println!(" --random        - Feed each framework randomly generated.");
                 println!(
                     " --size          - Construct random data structures and print their sizes."
@@ -111,7 +111,7 @@ fn main() -> Result<()> {
                 );
                 println!();
                 println!(
-                    "Note: Running this utility under miri reduces the range of these constants."
+                    "Variables in use that can be overrided through environment variables, note that running under miri reduces their value:"
                 );
                 println!();
 
@@ -342,7 +342,7 @@ fn main() -> Result<()> {
 
     macro_rules! build {
         ($name:ident, $ty:ty, $num:expr, $size_hint:expr) => {{
-            let $name = rng.next_vector::<$ty>($num);
+            let $name = rng.next_vector::<$ty>(*$num.get());
             if random {
                 tests::feature_matrix!(random, $name, $ty, $size_hint);
             }

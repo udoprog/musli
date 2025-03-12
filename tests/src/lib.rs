@@ -12,7 +12,7 @@ pub const RNG_SEED: u64 = 2718281828459045235;
 pub use tests_macros::benchmarker;
 
 #[macro_export]
-macro_rules! statics {
+macro_rules! options {
     (
         $init_vis:vis unsafe fn $init:ident();
         $enumerate_vis:vis fn $enumerate:ident();
@@ -29,8 +29,7 @@ macro_rules! statics {
 
                 if let Ok(var) = ::std::env::var(key) {
                     if let Some(value) = $crate::parse::<$value_ty>(&var) {
-                        let ptr = (&$ident as *const $value_ty as *mut $value_ty);
-                        ptr.write(value);
+                        _ = $ident.replace(value);
                     } else {
                         std::eprintln!("Could not parse {key}={var}")
                     }
@@ -42,17 +41,17 @@ macro_rules! statics {
         $enumerate_vis fn $enumerate(out: &mut dyn FnMut(&'static str, &'static dyn core::fmt::Debug)) {
             $({
                 let key = concat!("MUSLI_", stringify!($ident));
-                out(key, &$ident);
+                out(key, $ident.get());
             })*
         }
 
         $(
             $(#[$($meta)*])*
             #[cfg(miri)]
-            $vis static $ident: $value_ty = $miri;
+            $vis static $ident: $crate::Opt<$value_ty> = $crate::Opt::new($miri);
             $(#[$($meta)*])*
             #[cfg(not(miri))]
-            $vis static $ident: $value_ty = $range;
+            $vis static $ident: $crate::Opt<$value_ty> = $crate::Opt::new($range);
         )*
     }
 }
@@ -111,7 +110,10 @@ mod mode;
 #[cfg(feature = "musli")]
 pub use self::mode::Packed;
 pub mod models;
+mod opt;
 pub mod utils;
+#[doc(hidden)]
+pub use self::opt::Opt;
 
 pub use self::aligned_buf::AlignedBuf;
 mod aligned_buf;

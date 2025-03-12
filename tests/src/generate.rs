@@ -21,7 +21,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 #[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
 
-statics! {
+options! {
     pub(crate) unsafe fn init_ranges();
     pub(crate) fn enumerate_ranges();
     static STRING_RANGE: Range<usize> = 4..32, 2..16;
@@ -134,7 +134,7 @@ where
     where
         R: rand::Rng,
     {
-        <Vec<T> as Generate>::generate_range(rng, VEC_RANGE.clone())
+        <Vec<T> as Generate>::generate_range(rng, VEC_RANGE.get().clone())
     }
 
     fn generate_range<R>(rng: &mut R, range: Range<usize>) -> Self
@@ -164,7 +164,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.clone())
+        Self::generate_range(rng, MAP_RANGE.get().clone())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -193,7 +193,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.clone())
+        Self::generate_range(rng, MAP_RANGE.get().clone())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -222,7 +222,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.clone())
+        Self::generate_range(rng, MAP_RANGE.get().clone())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -250,7 +250,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.clone())
+        Self::generate_range(rng, MAP_RANGE.get().clone())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -275,7 +275,7 @@ impl Generate for String {
     {
         let mut string = String::new();
 
-        for _ in 0..rng.random_range(STRING_RANGE.clone()) {
+        for _ in 0..rng.random_range(STRING_RANGE.get().clone()) {
             string.push(rng.random());
         }
 
@@ -291,7 +291,7 @@ impl Generate for CString {
     {
         let mut string = Vec::new();
 
-        for _ in 0..rng.random_range(STRING_RANGE.clone()) {
+        for _ in 0..rng.random_range(STRING_RANGE.get().clone()) {
             string.push(rng.random_range(1..=u8::MAX));
         }
 
