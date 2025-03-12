@@ -64,7 +64,11 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
         }
 
         if attr.path().is_ident("zero_copy") {
-            let result = attr.parse_nested_meta(|meta: ParseNestedMeta| {
+            let syn::Meta::List(meta) = &attr.meta else {
+                continue;
+            };
+
+            let result = meta.parse_args_with(syn::meta::parser(|meta: ParseNestedMeta| {
                 if meta.path.is_ident("bounds") {
                     meta.input.parse::<Token![=]>()?;
                     let content;
@@ -101,7 +105,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     meta.input.span(),
                     "ZeroCopy: Unsupported attribute",
                 ))
-            });
+            }));
 
             if let Err(error) = result {
                 cx.error(error);
