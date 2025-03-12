@@ -122,6 +122,7 @@ fn main() -> Result<()> {
                     models::PRIMITIVES_RANGE
                 );
                 println!("  models::MEDIUM_RANGE = {:?}", models::MEDIUM_RANGE);
+                println!("  models::SMALL_FIELDS = {:?}", models::SMALL_FIELDS);
                 return Ok(());
             }
             other if other.starts_with("--") => {
