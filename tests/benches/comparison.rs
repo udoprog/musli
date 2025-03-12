@@ -158,6 +158,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
             group!(dec, $name, it);
 
+            #[cfg(not(feature = "no-rt"))]
             macro_rules! it {
                 ($b:expr, $framework:ident) => {{
                     if utils::$framework::is_enabled() {
