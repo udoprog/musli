@@ -171,7 +171,7 @@ struct ArgsReport {
 }
 
 #[derive(Parser)]
-struct ArgsClippy {
+struct ArgsRemaining {
     remaining: Vec<OsString>,
 }
 
@@ -184,8 +184,10 @@ struct ArgsBuild {
 enum Cmd {
     /// Run all benchmarks and generate report.
     Report(ArgsReport),
+    /// Run `cargo bench` with over all supported feature configurations.
+    Bench(ArgsRemaining),
     /// Run `cargo clippy` with over all supported feature configurations.
-    Clippy(ArgsClippy),
+    Clippy(ArgsRemaining),
     /// Run `cargo build` with over all supported feature configurations.
     Build(ArgsBuild),
     /// Perform a basic check.
@@ -484,6 +486,37 @@ fn main() -> Result<()> {
             println!("Writing: {}", report.display());
             fs::write(report, o.as_bytes())?;
         }
+        Cmd::Bench(a) => {
+            let mut builds = Vec::new();
+
+            for report in &manifest.reports {
+                if report.skip {
+                    continue;
+                }
+
+                if let Some(do_report) = args.report.as_deref() {
+                    if do_report != report.id {
+                        continue;
+                    }
+                }
+
+                let mut child = build_cargo(
+                    &manifest,
+                    &report.features,
+                    "bench",
+                    None::<OsString>,
+                    &a.remaining[..],
+                    report,
+                )?;
+
+                print_command(&child);
+                builds.push((report, child.status()?));
+            }
+
+            if builds.iter().any(|(_, status)| !status.success()) {
+                bail!("One or more commands failed")
+            }
+        }
         Cmd::Clippy(a) => {
             let mut builds = Vec::new();
 
@@ -503,7 +536,7 @@ fn main() -> Result<()> {
                     &report.features,
                     &report.expected,
                     "clippy",
-                    None::<OsString>,
+                    [],
                     &a.remaining[..],
                     report,
                 )?;
@@ -556,7 +589,7 @@ fn main() -> Result<()> {
                     &report.features,
                     &report.expected,
                     "build",
-                    None::<OsString>,
+                    [],
                     &a.remaining[..],
                     report,
                 )?;
@@ -655,7 +688,7 @@ impl InteriorBins<'_> {
         let rebuild = self.clean || self.no_release;
 
         if rebuild || !(to_comparison.is_file() && to_fuzz.is_file()) {
-            let mut built = build_bench(self.manifest, !self.no_release, self.report)
+            let mut built = build_commands(self.manifest, !self.no_release, self.report)
                 .context("Building bench binaries")?;
 
             shuffle(&mut built.comparison, &to_comparison)?;
@@ -1007,7 +1040,7 @@ fn run_path(path: &Path, args: &[&str], env: &[(&OsStr, &OsStr)], report: &Repor
         command.env(*key, *value);
     }
 
-    print_command(&command, env);
+    print_command(&command);
 
     let status = command.status()?;
 
@@ -1048,22 +1081,17 @@ struct Build {
     comparison: PathBuf,
 }
 
-fn build_tests(
+fn build_cargo(
     manifest: &Manifest,
     features: &[String],
-    expected: &[String],
     command: impl AsRef<OsStr>,
     head: impl IntoIterator<Item: AsRef<OsStr>>,
     remaining: impl IntoIterator<Item: AsRef<OsStr>, IntoIter: ExactSizeIterator>,
     report: &Report,
-) -> Result<CustomBuild> {
+) -> Result<Command> {
     let mut child = Command::new("cargo");
 
-    child
-        .arg(command)
-        .args(["-p", "tests"])
-        .args(head)
-        .arg("--message-format=json");
+    child.arg(command).args(["-p", "tests"]).args(head);
 
     for (key, value) in &report.env {
         child.env(key, value);
@@ -1088,7 +1116,30 @@ fn build_tests(
         child.args(remaining);
     }
 
-    print_command(&child, &[]);
+    Ok(child)
+}
+
+fn build_tests<'a>(
+    manifest: &Manifest,
+    features: &[String],
+    expected: &[String],
+    command: impl AsRef<OsStr>,
+    head: impl IntoIterator<Item = &'a str>,
+    remaining: impl IntoIterator<Item: AsRef<OsStr>, IntoIter: ExactSizeIterator>,
+    report: &Report,
+) -> Result<CustomBuild> {
+    let mut child = build_cargo(
+        manifest,
+        features,
+        command,
+        head.into_iter().chain(["--message-format=json"]),
+        remaining,
+        report,
+    )?;
+
+    child.stdout(Stdio::piped());
+
+    print_command(&child);
 
     let mut child = child.spawn()?;
 
@@ -1170,8 +1221,8 @@ fn build_tests(
     })
 }
 
-/// Build benchmarks.
-fn build_bench(manifest: &Manifest, release: bool, report: &Report) -> Result<Build> {
+/// Build commands.
+fn build_commands(manifest: &Manifest, release: bool, report: &Report) -> Result<Build> {
     let head = release.then_some("--release");
 
     let build = build_tests(
@@ -1216,7 +1267,7 @@ fn build_bench(manifest: &Manifest, release: bool, report: &Report) -> Result<Bu
     Ok(Build { fuzz, comparison })
 }
 
-fn print_command(child: &Command, env: &[(&OsStr, &OsStr)]) {
+fn print_command(child: &Command) {
     let program = child.get_program().to_string_lossy();
 
     let args = child
@@ -1227,9 +1278,11 @@ fn print_command(child: &Command, env: &[(&OsStr, &OsStr)]) {
 
     let mut e = String::new();
 
-    if !env.is_empty() {
-        for (key, value) in env {
-            _ = write!(e, "{}={} ", key.to_string_lossy(), value.to_string_lossy());
+    if child.get_envs().next().is_some() {
+        for (key, value) in child.get_envs() {
+            if let Some(value) = value {
+                _ = write!(e, "{}={} ", key.to_string_lossy(), value.to_string_lossy());
+            }
         }
     }
 
@@ -1245,7 +1298,7 @@ fn sanity_check(path: &Path, report: &Report) -> Result<()> {
         child.env(key, value);
     }
 
-    print_command(&child, &[]);
+    print_command(&child);
     let status = child.status()?;
     ensure!(status.success(), "Command failed: {}", status.success());
     Ok(())
@@ -1261,7 +1314,7 @@ fn collect_size_sets(path: &Path, report: &Report) -> Result<Vec<SizeSet>> {
         child.env(key, value);
     }
 
-    print_command(&child, &[]);
+    print_command(&child);
 
     let mut child = child.spawn()?;
 
