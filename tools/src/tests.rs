@@ -9,15 +9,50 @@ use serde::Deserialize;
 
 use crate::{build_cargo, print_command, ReportRef};
 
-#[derive(Default, Debug)]
-pub(crate) struct CustomBuild {
+pub(crate) struct CustomBuild<'a> {
     pub(crate) status: ExitStatus,
-    all: Vec<(String, String, PathBuf)>,
     pub(crate) messages: Vec<String>,
-    pub(crate) bad_features: Vec<(String, Features)>,
+    report: ReportRef<'a>,
+    all: Vec<(String, String, PathBuf)>,
+    bad_features: Vec<(String, Features)>,
 }
 
-impl CustomBuild {
+impl CustomBuild<'_> {
+    pub(crate) fn report(&self) -> bool {
+        let mut ok = true;
+
+        if !self.bad_features.is_empty() {
+            for (name, bad_features) in &self.bad_features {
+                match bad_features {
+                    Features::Expected(expected) => {
+                        println!("{}: Expected `{name}`: {expected:?}", self.report.id)
+                    }
+                    Features::Unexpected(unexpected) => {
+                        println!("{}: Unexpected `{name}`: {unexpected:?}", self.report.id)
+                    }
+                }
+            }
+
+            ok = false;
+        }
+
+        if !self.status.success() {
+            println!(
+                "{}: Build failed: {}",
+                self.report.id,
+                self.status.success()
+            );
+
+            for message in &self.messages {
+                println!("{message}");
+            }
+
+            ok = false;
+        }
+
+        ok
+    }
+
     /// Fetch a built binary that matches the given kind and name.
     pub(crate) fn bin(&self, kind: &str, name: &str) -> Option<PathBuf> {
         let mut bins = Vec::new();
@@ -33,7 +68,7 @@ impl CustomBuild {
 }
 
 #[derive(Debug)]
-pub(crate) enum Features {
+enum Features {
     Expected(BTreeSet<String>),
     Unexpected(BTreeSet<String>),
 }
@@ -44,6 +79,7 @@ pub(crate) fn build<'a>(
     command: impl AsRef<OsStr>,
     head: impl IntoIterator<Item = &'a str>,
     remaining: impl IntoIterator<Item: AsRef<OsStr>, IntoIter: ExactSizeIterator>,
+    print: bool,
 ) -> Result<CustomBuild> {
     let mut child = build_cargo(
         report,
@@ -72,6 +108,11 @@ pub(crate) fn build<'a>(
         match line.reason.as_str() {
             "compiler-message" => {
                 let message: CompilerMessage = serde_json::from_value(line.extra)?;
+
+                if print {
+                    println!("{}", message.message.rendered);
+                }
+
                 messages.push(message.message.rendered);
             }
             "compiler-artifact" => {
@@ -129,8 +170,9 @@ pub(crate) fn build<'a>(
 
     Ok(CustomBuild {
         status,
-        all,
         messages,
+        report,
+        all,
         bad_features,
     })
 }

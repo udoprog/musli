@@ -5,12 +5,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{anyhow, ensure, Context, Result};
 use clap::Parser;
 
 use crate::manifest::ReportRef;
 use crate::print_command;
-use crate::tests::{self, Features};
+use crate::tests;
 
 #[derive(Default, Parser)]
 pub(crate) struct BinArgs {
@@ -214,36 +214,18 @@ fn build_commands(release: bool, report: ReportRef<'_>) -> Result<Build> {
         "build",
         head.into_iter().chain(["--benches"]),
         None::<OsString>,
+        false,
     )?;
 
-    if !build.bad_features.is_empty() {
-        for (name, bad_features) in build.bad_features {
-            match bad_features {
-                Features::Expected(expected) => {
-                    println!("{}: Expected `{name}`: {expected:?}", report.id)
-                }
-                Features::Unexpected(unexpected) => {
-                    println!("{}: Unexpected `{name}`: {unexpected:?}", report.id)
-                }
-            }
-        }
-
-        bail!("{}: Got bad features during build", report.id);
-    }
-
-    if !build.status.success() {
-        for message in build.messages {
-            print!("{message}");
-        }
-
-        bail!("Command failed: {}", build.status.success());
-    }
+    ensure!(build.report(), "Build failed");
 
     let fuzz = build
         .bin("bin", "fuzz")
-        .with_context(|| anyhow!("missing fuzz in {build:?}"))?;
+        .with_context(|| "missing fuzz binary")?;
+
     let comparison = build
         .bin("bench", "comparison")
-        .context("missing comparison")?;
+        .context("missing comparison binary")?;
+
     Ok(Build { fuzz, comparison })
 }

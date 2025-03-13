@@ -13,19 +13,14 @@ pub(crate) struct Args {
 }
 
 pub(crate) fn entry(a: &Args, manifest: &Manifest) -> Result<()> {
-    let mut builds = Vec::new();
+    let mut ok = true;
 
     for report in manifest.reports(&a.shared) {
-        builds.push(tests::build(report, "build", [], &a.remaining[..])?);
+        let build = tests::build(report, "build", [], &a.remaining[..], true)?;
+        ok |= build.report();
     }
 
-    if builds.iter().any(|b| !b.status.success()) {
-        for build in builds {
-            for message in build.messages {
-                print!("{message}")
-            }
-        }
-
+    if !ok {
         bail!("One or more commands failed")
     }
 

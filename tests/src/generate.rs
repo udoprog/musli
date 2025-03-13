@@ -134,7 +134,7 @@ where
     where
         R: rand::Rng,
     {
-        <Vec<T> as Generate>::generate_range(rng, VEC_RANGE.get().clone())
+        <Vec<T> as Generate>::generate_range(rng, VEC_RANGE.get())
     }
 
     fn generate_range<R>(rng: &mut R, range: Range<usize>) -> Self
@@ -164,7 +164,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.get().clone())
+        Self::generate_range(rng, MAP_RANGE.get())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -193,7 +193,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.get().clone())
+        Self::generate_range(rng, MAP_RANGE.get())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -222,7 +222,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.get().clone())
+        Self::generate_range(rng, MAP_RANGE.get())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -250,7 +250,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.get().clone())
+        Self::generate_range(rng, MAP_RANGE.get())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -275,7 +275,7 @@ impl Generate for String {
     {
         let mut string = String::new();
 
-        for _ in 0..rng.random_range(STRING_RANGE.get().clone()) {
+        for _ in 0..rng.random_range(STRING_RANGE.get()) {
             string.push(rng.random());
         }
 
@@ -291,7 +291,7 @@ impl Generate for CString {
     {
         let mut string = Vec::new();
 
-        for _ in 0..rng.random_range(STRING_RANGE.get().clone()) {
+        for _ in 0..rng.random_range(STRING_RANGE.get()) {
             string.push(rng.random_range(1..=u8::MAX));
         }
 

@@ -46,7 +46,7 @@ fn main() -> Result<()> {
 
     let mut it = std::env::args().skip(1);
 
-    let mut iter = *ITER.get();
+    let mut iter = ITER.get();
     let mut random = false;
     let mut size = false;
     let mut filter = Vec::new();
@@ -115,12 +115,12 @@ fn main() -> Result<()> {
                 );
                 println!();
 
-                let mut f = |key, value| {
+                let f: fn(&str, &dyn core::fmt::Debug) = |key, value| {
                     println!("  {key} = {value:?}");
                 };
 
-                enumerate_constants(&mut f);
-                tests::enumerate_statics(&mut f);
+                enumerate_constants(f);
+                tests::enumerate_statics(f);
                 return Ok(());
             }
             other if other.starts_with("--") => {
@@ -342,7 +342,7 @@ fn main() -> Result<()> {
 
     macro_rules! build {
         ($name:ident, $ty:ty, $num:expr, $size_hint:expr) => {{
-            let $name = rng.next_vector::<$ty>(*$num.get());
+            let $name = rng.next_vector::<$ty>($num.get());
 
             if random {
                 tests::feature_matrix!(random, $name, $ty, $size_hint);
