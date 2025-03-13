@@ -165,7 +165,13 @@ features = [
 expected = [
     "musli",
 ]
-env = {"MUSLI_VEC" = "10000..20000"}
+
+[[reports.env]]
+key = "MUSLI_VEC"
+value = "10000..20000"
+description = """
+ε-serde benefits from larger inputs, this ensures that the size of the supported suite (primarily `mesh`) reflects that by making the inputs bigger.
+"""
 
 [[reports]]
 skip = true # currently broken
