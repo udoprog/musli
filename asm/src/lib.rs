@@ -194,8 +194,8 @@ pub mod musli {
     use musli::storage::Encoding;
     use musli::{Decode, Encode};
 
+    use tests::mode::Packed;
     use tests::models::Primitives as Model;
-    use tests::Packed;
 
     const OPTIONS: Options = options::new().fixed().native_byte_order().build();
     const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();

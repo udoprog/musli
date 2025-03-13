@@ -1,9 +1,11 @@
+use std::ffi::OsString;
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use clap::Parser;
 
 use crate::bins::BinArgs;
+use crate::tests;
 use crate::{Manifest, SharedArgs};
 
 #[derive(Parser)]
@@ -12,6 +14,7 @@ pub(crate) struct Args {
     shared: SharedArgs,
     #[command(flatten)]
     bin: BinArgs,
+    remaining: Vec<OsString>,
 }
 
 pub(crate) fn entry(a: &Args, manifest: &Manifest, target: &Path, output: &Path) -> Result<()> {
@@ -27,5 +30,13 @@ pub(crate) fn entry(a: &Args, manifest: &Manifest, target: &Path, output: &Path)
         b.comparison()?.run(&[], &[])?;
     }
 
+    let mut ok = true;
+
+    for report in manifest.reports(&a.shared) {
+        let build = tests::build(report, "build", [], &a.remaining[..], true)?;
+        ok |= build.report();
+    }
+
+    ensure!(ok, "Check failed");
     Ok(())
 }

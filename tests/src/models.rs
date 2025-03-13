@@ -1,24 +1,30 @@
+#[cfg(feature = "alloc")]
 mod allocated;
+#[cfg(feature = "alloc")]
 pub use self::allocated::Allocated;
 
-mod primpacked;
-pub use self::primpacked::PrimitivesPacked;
+mod packed;
+pub use self::packed::Packed;
 
 mod primitives;
 pub use self::primitives::Primitives;
 
+#[cfg(feature = "alloc")]
 mod mesh;
+#[cfg(feature = "alloc")]
 pub use self::mesh::Mesh;
 
 mod tuples;
 pub use self::tuples::Tuples;
 
+#[cfg(feature = "alloc")]
 mod large;
-pub use self::large::LargeStruct;
+#[cfg(feature = "alloc")]
+pub use self::large::Large;
 
-mod medium_enum;
+mod full_enum;
 #[cfg(any(not(feature = "no-empty"), not(feature = "no-nonunit-variant")))]
-pub use self::medium_enum::MediumEnum;
+pub use self::full_enum::FullEnum;
 
 use core::ops::Range;
 

@@ -3,29 +3,19 @@ use std::collections::HashMap;
 #[cfg(all(feature = "std", not(feature = "no-set")))]
 use std::collections::HashSet;
 
-#[cfg(all(feature = "alloc", not(feature = "no-btree")))]
+#[cfg(not(feature = "no-btree"))]
 use alloc::collections::{BTreeMap, BTreeSet};
 
-#[cfg(all(feature = "alloc", not(feature = "no-cstring")))]
+#[cfg(not(feature = "no-cstring"))]
 use alloc::ffi::CString;
-#[cfg(feature = "alloc")]
 use alloc::string::String;
-#[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-
-#[cfg(feature = "musli")]
-use musli::{Decode, Encode};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "musli")]
-use crate::mode::Packed;
 
 use crate::generate::Generate;
 
 #[derive(Debug, Clone, PartialEq, Generate)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
+#[cfg_attr(feature = "musli", derive(musli::Encode, musli::Decode), musli(mode = crate::mode::Packed, packed))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -68,23 +58,19 @@ pub struct Allocated {
         not(feature = "no-string-set")
     ))]
     string_set: HashSet<String>,
-    #[cfg(all(
-        feature = "alloc",
-        not(feature = "no-btree"),
-        not(feature = "no-number-key")
-    ))]
+    #[cfg(all(not(feature = "no-btree"), not(feature = "no-number-key")))]
     #[generate(range = super::SMALL_FIELDS.get())]
     number_btree: BTreeMap<u32, u64>,
-    #[cfg(all(feature = "alloc", not(feature = "no-btree")))]
+    #[cfg(not(feature = "no-btree"))]
     #[generate(range = super::SMALL_FIELDS.get())]
     string_btree: BTreeMap<String, u64>,
-    #[cfg(all(feature = "alloc", not(feature = "no-btree")))]
+    #[cfg(not(feature = "no-btree"))]
     #[generate(range = super::SMALL_FIELDS.get())]
     number_btree_set: BTreeSet<u32>,
-    #[cfg(all(feature = "alloc", not(feature = "no-btree")))]
+    #[cfg(not(feature = "no-btree"))]
     #[generate(range = super::SMALL_FIELDS.get())]
     string_btree_set: BTreeSet<String>,
-    #[cfg(all(feature = "alloc", not(feature = "no-cstring")))]
+    #[cfg(not(feature = "no-cstring"))]
     c_string: CString,
 }
 

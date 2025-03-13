@@ -34,7 +34,7 @@ impl ModeKind {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ModeIdent {
-    pub(crate) ident: syn::Ident,
+    pub(crate) path: syn::Path,
     pub(crate) kind: ModeKind,
 }
 
@@ -984,16 +984,21 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 }
 
 fn parse_mode(meta: &ParseNestedMeta<'_>) -> syn::Result<ModeIdent> {
-    let ident: syn::Ident = meta.input.parse()?;
-    let s = ident.to_string();
+    let path: syn::Path = meta.input.parse()?;
 
-    let kind = match s.as_str() {
-        "Binary" => ModeKind::Binary,
-        "Text" => ModeKind::Text,
-        _ => ModeKind::Custom,
+    let kind = if let Some(ident) = path.get_ident() {
+        let s = ident.to_string();
+
+        match s.as_str() {
+            "Binary" => ModeKind::Binary,
+            "Text" => ModeKind::Text,
+            _ => ModeKind::Custom,
+        }
+    } else {
+        ModeKind::Custom
     };
 
-    Ok(ModeIdent { ident, kind })
+    Ok(ModeIdent { path, kind })
 }
 
 fn parse_path_mode(meta: &ParseNestedMeta<'_>) -> Option<ModeIdent> {
@@ -1012,7 +1017,7 @@ fn parse_path_mode(meta: &ParseNestedMeta<'_>) -> Option<ModeIdent> {
     };
 
     Some(ModeIdent {
-        ident: ident.clone(),
+        path: meta.path.clone(),
         kind,
     })
 }

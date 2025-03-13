@@ -107,9 +107,7 @@ pub mod generate;
 #[doc(inline)]
 pub use self::generate::{Generate, Rng};
 #[cfg(feature = "musli")]
-mod mode;
-#[cfg(feature = "musli")]
-pub use self::mode::Packed;
+pub mod mode;
 pub mod models;
 mod opt;
 pub mod utils;
@@ -174,18 +172,18 @@ macro_rules! feature_matrix {
 macro_rules! if_supported {
     (musli_zerocopy, large, $($tt:tt)*) => {};
     (musli_zerocopy, allocated, $($tt:tt)*) => {};
-    (musli_zerocopy, medium_enum, $($tt:tt)*) => {};
+    (musli_zerocopy, full_enum, $($tt:tt)*) => {};
     (musli_zerocopy, mesh, $($tt:tt)*) => {};
 
     (zerocopy, primitives, $($tt:tt)*) => {};
     (zerocopy, large, $($tt:tt)*) => {};
     (zerocopy, allocated, $($tt:tt)*) => {};
-    (zerocopy, medium_enum, $($tt:tt)*) => {};
+    (zerocopy, full_enum, $($tt:tt)*) => {};
     (zerocopy, mesh, $($tt:tt)*) => {};
 
     (epserde, large, $($tt:tt)*) => {};
     (epserde, allocated, $($tt:tt)*) => {};
-    (epserde, medium_enum, $($tt:tt)*) => {};
+    (epserde, full_enum, $($tt:tt)*) => {};
 
     ($framework:ident, $test:ident, $($tt:tt)*) => { $($tt)* };
 }
@@ -194,11 +192,14 @@ macro_rules! if_supported {
 macro_rules! types {
     ($call:path) => {
         $call!(primitives, Primitives, PRIMITIVES, 1000);
-        $call!(primpacked, PrimitivesPacked, PRIMITIVES_PACKED, 1000);
-        $call!(large, LargeStruct, LARGE_STRUCTS, 10000);
+        $call!(packed, Packed, PACKED, 1000);
+        #[cfg(feature = "alloc")]
+        $call!(large, Large, LARGE, 10000);
+        #[cfg(feature = "alloc")]
         $call!(allocated, Allocated, ALLOCATED, 5000);
         #[cfg(any(not(feature = "no-empty"), not(feature = r#"no-nonunit-variant"#)))]
-        $call!(medium_enum, MediumEnum, MEDIUM_ENUMS, 1000);
+        $call!(full_enum, FullEnum, FULL_ENUM, 1000);
+        #[cfg(feature = "alloc")]
         $call!(mesh, Mesh, MESHES, 1000);
     };
 }

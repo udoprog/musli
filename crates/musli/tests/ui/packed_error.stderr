@@ -10,13 +10,13 @@ error: Only #[musli(default)] fields can be used at the end of packed containers
 17 |         #[musli(default)]
    |                 ^^^^^^^
 
-error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)]
+error: In #[musli(Binary | Text, ..)] an enum cannot be #[musli(packed)]
   --> tests/ui/packed_error.rs:24:9
    |
 24 | #[musli(packed)]
    |         ^^^^^^
 
-error: In #[musli(Binary, ..)] an enum cannot be #[musli(packed)]
+error: In #[musli(Binary | Text, ..)] an enum cannot be #[musli(packed)]
   --> tests/ui/packed_error.rs:28:9
    |
 28 | #[musli(packed)]
@@ -51,7 +51,7 @@ error: A #[musli(packed)]variant cannot have named fields
 49 |         #[musli(name = "test")]
    |                 ^^^^
 
-error: In #[musli(Binary, ..)] a #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
+error: In #[musli(Binary | Text, ..)] a #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
   --> tests/ui/packed_error.rs:45:9
    |
 45 | #[musli(tag = "type")]
@@ -63,7 +63,7 @@ error: A #[musli(packed)]variant cannot have named fields
 53 |     Tuple(#[musli(name = "test")] String),
    |                   ^^^^
 
-error: In #[musli(Binary, ..)] a #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
+error: In #[musli(Binary | Text, ..)] a #[musli(packed)] variant cannot be used in an enum using #[musli(tag)]
   --> tests/ui/packed_error.rs:57:9
    |
 57 | #[musli(tag = "type")]

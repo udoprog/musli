@@ -1,10 +1,10 @@
-error: In #[musli(Binary, ..)] the #[musli(default)] variant must be empty
+error: In #[musli(Binary | Text, ..)] the #[musli(default)] variant must be empty
  --> tests/ui/illegal_fallback_variant_error.rs:6:13
   |
 6 |     #[musli(default)]
   |             ^^^^^^^
 
-error: In #[musli(Binary, ..)] only one #[musli(default)] variant is supported
+error: In #[musli(Binary | Text, ..)] only one #[musli(default)] variant is supported
   --> tests/ui/illegal_fallback_variant_error.rs:15:13
    |
 15 |     #[musli(default)]

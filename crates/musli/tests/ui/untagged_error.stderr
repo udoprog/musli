@@ -1,34 +1,34 @@
-error: In #[musli(Binary, ..)] a struct cannot be #[musli(untagged)]
+error: In #[musli(Binary | Text, ..)] a struct cannot be #[musli(untagged)]
  --> tests/ui/untagged_error.rs:4:9
   |
 4 | #[musli(untagged)]
   |         ^^^^^^^^
 
-error: In #[musli(Binary, ..)] a struct cannot be #[musli(untagged)]
+error: In #[musli(Binary | Text, ..)] a struct cannot be #[musli(untagged)]
  --> tests/ui/untagged_error.rs:8:9
   |
 8 | #[musli(untagged)]
   |         ^^^^^^^^
 
-error: In #[musli(Binary, ..)] a struct cannot be #[musli(untagged)]
+error: In #[musli(Binary | Text, ..)] a struct cannot be #[musli(untagged)]
   --> tests/ui/untagged_error.rs:12:9
    |
 12 | #[musli(untagged)]
    |         ^^^^^^^^
 
-error: In #[musli(Binary, ..)] a variant cannot be #[musli(untagged)]
+error: In #[musli(Binary | Text, ..)] a variant cannot be #[musli(untagged)]
   --> tests/ui/untagged_error.rs:22:13
    |
 22 |     #[musli(untagged)]
    |             ^^^^^^^^
 
-error: In #[musli(Binary, ..)] a variant cannot be #[musli(untagged)]
+error: In #[musli(Binary | Text, ..)] a variant cannot be #[musli(untagged)]
   --> tests/ui/untagged_error.rs:24:13
    |
 24 |     #[musli(untagged)]
    |             ^^^^^^^^
 
-error: In #[musli(Binary, ..)] a variant cannot be #[musli(untagged)]
+error: In #[musli(Binary | Text, ..)] a variant cannot be #[musli(untagged)]
   --> tests/ui/untagged_error.rs:26:13
    |
 26 |     #[musli(untagged)]

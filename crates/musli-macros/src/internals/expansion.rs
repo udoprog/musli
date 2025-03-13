@@ -26,8 +26,8 @@ impl<'a> Expansion<'a> {
 
     pub(crate) fn mode_path(&self, tokens: &Tokens<'a>) -> ModePath<'a> {
         match &self.mode_ident.kind {
-            ModeKind::Custom => ModePath::Ident(&self.mode_ident.ident),
-            _ => ModePath::Musli(tokens.prefix, &self.mode_ident.ident),
+            ModeKind::Custom => ModePath::Ident(&self.mode_ident.path),
+            _ => ModePath::Musli(tokens.prefix, &self.mode_ident.path),
         }
     }
 }

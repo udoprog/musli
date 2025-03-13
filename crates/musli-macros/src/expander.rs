@@ -205,11 +205,17 @@ impl<'a> Expander<'a> {
         let default = vec![
             ModeIdent {
                 kind: ModeKind::Binary,
-                ident: syn::Ident::new("Binary", Span::call_site()),
+                path: syn::Path::from(syn::PathSegment::from(syn::Ident::new(
+                    "Binary",
+                    Span::call_site(),
+                ))),
             },
             ModeIdent {
                 kind: ModeKind::Text,
-                ident: syn::Ident::new("Text", Span::call_site()),
+                path: syn::Path::from(syn::PathSegment::from(syn::Ident::new(
+                    "Text",
+                    Span::call_site(),
+                ))),
             },
         ];
 
