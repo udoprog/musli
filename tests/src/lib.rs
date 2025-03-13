@@ -138,8 +138,10 @@ macro_rules! feature_matrix {
         $call!(musli_zerocopy $(, $($tt)*)*);
         #[cfg(feature = "serde_json")]
         $call!(serde_json $(, $($tt)*)*);
-        #[cfg(feature = "bincode")]
-        $call!(serde_bincode $(, $($tt)*)*);
+        #[cfg(feature = "bincode-serde")]
+        $call!(bincode_serde $(, $($tt)*)*);
+        #[cfg(feature = "bincode-derive")]
+        $call!(bincode_derive $(, $($tt)*)*);
         #[cfg(feature = "rmp-serde")]
         $call!(serde_rmp $(, $($tt)*)*);
         #[cfg(feature = "zerocopy")]

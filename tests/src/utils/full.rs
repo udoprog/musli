@@ -32,34 +32,79 @@ pub mod serde_json {
     }
 }
 
-#[cfg(feature = "bincode")]
+#[cfg(feature = "bincode-serde")]
 #[crate::benchmarker]
-pub mod serde_bincode {
+pub mod bincode_serde {
     use alloc::vec::Vec;
 
-    use serde::{Deserialize, Serialize};
+    use serde::de::DeserializeOwned;
+    use serde::Serialize;
+
+    use bincode::config::Configuration;
+    use bincode::error::{DecodeError, EncodeError};
+
+    const CONFIG: Configuration = bincode::config::standard();
 
     pub fn buffer() -> Vec<u8> {
         Vec::with_capacity(4096)
     }
 
     pub fn reset(buf: &mut Vec<u8>) {
-        buf.clear();
+        buf.resize(2 << 20, 0);
     }
 
-    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], bincode::Error>
+    pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T) -> Result<&'buf [u8], EncodeError>
     where
         T: Serialize,
     {
-        bincode::serialize_into(&mut *buf, value)?;
-        Ok(buf.as_slice())
+        let len = bincode::serde::encode_into_slice(value, buf, CONFIG)?;
+        Ok(&buf[..len])
     }
 
-    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, bincode::Error>
+    pub fn decode<T>(buf: &[u8]) -> Result<T, DecodeError>
     where
-        T: Deserialize<'buf>,
+        T: DeserializeOwned,
     {
-        bincode::deserialize(buf)
+        let (value, _) = bincode::serde::decode_from_slice(buf, CONFIG)?;
+        Ok(value)
+    }
+}
+
+#[cfg(feature = "bincode-derive")]
+#[crate::benchmarker]
+pub mod bincode_derive {
+    use alloc::vec::Vec;
+
+    use bincode::Decode;
+    use bincode::Encode;
+
+    use bincode::config::Configuration;
+    use bincode::error::{DecodeError, EncodeError};
+
+    const CONFIG: Configuration = bincode::config::standard();
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.resize(2 << 20, 0);
+    }
+
+    pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T) -> Result<&'buf [u8], EncodeError>
+    where
+        T: Encode,
+    {
+        let len = bincode::encode_into_slice(value, buf, CONFIG)?;
+        Ok(&buf[..len])
+    }
+
+    pub fn decode<T>(buf: &[u8]) -> Result<T, DecodeError>
+    where
+        T: Decode<()>,
+    {
+        let (value, _) = bincode::decode_from_slice(buf, CONFIG)?;
+        Ok(value)
     }
 }
 
