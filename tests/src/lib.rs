@@ -187,8 +187,6 @@ macro_rules! if_supported {
     (epserde, allocated, $($tt:tt)*) => {};
     (epserde, full_enum, $($tt:tt)*) => {};
 
-    (bincode_derive, mesh, $($tt:tt)*) => {};
-
     ($framework:ident, $test:ident, $($tt:tt)*) => { $($tt)* };
 }
 
