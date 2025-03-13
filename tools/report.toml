@@ -233,7 +233,7 @@ features = [
     "bson",
 ]
 expected = [
-    "musli", "serde", "no-128", "no-u64", "no-empty", "no-newtype", "no-number-key"
+    "musli", "serde", "no-128", "no-u64", "no-empty", "no-number-key"
 ]
 
 [[reports]]
