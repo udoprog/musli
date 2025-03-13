@@ -21,6 +21,7 @@ use crate::generate::Generate;
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
+#[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
 pub enum FullEnum {
     #[cfg(not(feature = "no-empty"))]
     Empty,

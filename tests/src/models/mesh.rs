@@ -55,6 +55,7 @@ impl PartialEq<Mesh> for &ArchivedMesh {
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 #[cfg_attr(feature = "epserde", derive(epserde::Epserde), repr(C), zero_copy)]
+#[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
 pub struct Triangle {
     pub v0: Vec3,
     pub v1: Vec3,
@@ -77,6 +78,7 @@ pub struct Triangle {
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 #[cfg_attr(feature = "epserde", derive(epserde::Epserde), repr(C), zero_copy)]
+#[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
