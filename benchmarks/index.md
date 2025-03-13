@@ -29,8 +29,9 @@ Below you'll also find [size comparisons](#size-comparisons).
 
 ## System Information
 
-CPU: Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz 4797MHz
-Memory: 67319MB
+**CPU:** Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz 4700MHz
+
+**Memory:** 67319MB
 
 ## Reports
 
