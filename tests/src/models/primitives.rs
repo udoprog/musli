@@ -1,23 +1,9 @@
-#[cfg(feature = "musli-zerocopy")]
-use musli_zerocopy::ZeroCopy;
-
-#[cfg(feature = "epserde")]
-use epserde::Epserde;
-
-#[cfg(feature = "musli")]
-use musli::{Decode, Encode};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "musli")]
-use crate::mode::Packed;
-
 use crate::generate::Generate;
 
 #[derive(Debug, Clone, PartialEq, Generate)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
-#[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
+#[cfg_attr(feature = "musli", derive(musli::Encode, musli::Decode), musli(mode = crate::mode::Packed, packed))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "musli-zerocopy", derive(musli_zerocopy::ZeroCopy))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -30,7 +16,7 @@ use crate::generate::Generate;
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
-#[cfg_attr(feature = "epserde", derive(Copy, Epserde), zero_copy)]
+#[cfg_attr(feature = "epserde", derive(Copy, epserde::Epserde), zero_copy)]
 pub struct Primitives {
     boolean: bool,
     #[cfg(not(feature = "no-char"))]

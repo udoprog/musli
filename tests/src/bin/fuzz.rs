@@ -25,10 +25,10 @@ tests::options! {
     pub unsafe fn init_constants();
     pub(crate) fn enumerate_constants();
     static ITER: usize = 10000, 2;
-    static LARGE_STRUCTS: usize = 10, 2;
+    static LARGE: usize = 10, 2;
     static PRIMITIVES: usize = 500, 2;
-    static PRIMITIVES_PACKED: usize = 500, 2;
-    static MEDIUM_ENUMS: usize = 500, 2;
+    static PACKED: usize = 500, 2;
+    static FULL_ENUM: usize = 500, 2;
     static ALLOCATED: usize = 100, 2;
     static MESHES: usize = 10, 2;
 }

@@ -1,28 +1,14 @@
-#[cfg(feature = "musli-zerocopy")]
-use musli_zerocopy::ZeroCopy;
-
-#[cfg(feature = "zerocopy")]
-use zerocopy::{FromBytes, Immutable, IntoBytes};
-
-#[cfg(feature = "epserde")]
-use epserde::Epserde;
-
-#[cfg(feature = "musli")]
-use musli::{Decode, Encode};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "musli")]
-use crate::mode::Packed;
-
 use crate::generate::Generate;
 
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed, packed))]
-#[cfg_attr(feature = "musli-zerocopy", derive(ZeroCopy))]
+#[cfg_attr(feature = "musli", derive(musli::Encode, musli::Decode), musli(mode = crate::mode::Packed, packed))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "musli-zerocopy", derive(musli_zerocopy::ZeroCopy))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
-#[cfg_attr(feature = "zerocopy", derive(IntoBytes, FromBytes, Immutable))]
+#[cfg_attr(
+    feature = "zerocopy",
+    derive(zerocopy::IntoBytes, zerocopy::FromBytes, zerocopy::Immutable)
+)]
 #[cfg_attr(
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Deserialize, rkyv::Serialize),
@@ -37,8 +23,8 @@ use crate::generate::Generate;
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
-#[cfg_attr(feature = "epserde", derive(Epserde), zero_copy)]
-pub struct PrimitivesPacked {
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde), zero_copy)]
+pub struct Packed {
     unsigned8: u8,
     #[cfg_attr(feature = "musli", musli(bytes))]
     _pad0: [u8; 1],
@@ -66,16 +52,16 @@ pub struct PrimitivesPacked {
 }
 
 #[cfg(feature = "rkyv")]
-impl PartialEq<PrimitivesPacked> for &ArchivedPrimitivesPacked {
+impl PartialEq<Packed> for &ArchivedPacked {
     #[inline]
-    fn eq(&self, other: &PrimitivesPacked) -> bool {
+    fn eq(&self, other: &Packed) -> bool {
         *other == **self
     }
 }
 
-impl PartialEq<PrimitivesPacked> for &PrimitivesPacked {
+impl PartialEq<Packed> for &Packed {
     #[inline]
-    fn eq(&self, other: &PrimitivesPacked) -> bool {
+    fn eq(&self, other: &Packed) -> bool {
         *other == **self
     }
 }

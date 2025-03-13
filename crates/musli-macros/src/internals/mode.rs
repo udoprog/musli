@@ -13,8 +13,8 @@ use super::ATTR;
 
 #[derive(Clone, Copy)]
 pub(crate) enum ModePath<'a> {
-    Ident(&'a syn::Ident),
-    Musli(&'a syn::Path, &'a syn::Ident),
+    Ident(&'a syn::Path),
+    Musli(&'a syn::Path, &'a syn::Path),
 }
 
 impl ToTokens for ModePath<'_> {
@@ -167,8 +167,8 @@ impl fmt::Display for Mode<'_> {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.mode_path {
-            ModePath::Ident(ident) => write!(f, "#[{ATTR}(mode = {ident}, ..)]"),
-            ModePath::Musli(_, ident) => write!(f, "#[{ATTR}({ident}, ..)]"),
+            ModePath::Ident(..) => write!(f, "#[{ATTR}(mode = <path>, ..)]"),
+            ModePath::Musli(..) => write!(f, "#[{ATTR}(Binary | Text, ..)]"),
         }
     }
 }

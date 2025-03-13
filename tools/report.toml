@@ -40,12 +40,12 @@ id = "primitives"
 description = "A small object containing one of each primitive type and a string and a byte array."
 
 [[groups]]
-id = "primpacked"
+id = "packed"
 description = "Tried to achieve the same goal as `primitives`, but with a packed layout to support certain zerocopy libraries."
 
 [[groups]]
-id = "medium_enum"
-description = "A moderately sized enum with every kind of supported variant."
+id = "full_enum"
+description = "An enum with every kind of supported variant."
 
 [[groups]]
 id = "large"
@@ -162,6 +162,7 @@ features = [
 expected = [
     "musli",
 ]
+only = ["primitives", "packed", "mesh"]
 
 [[reports.env]]
 key = "MUSLI_VEC_RANGE"
@@ -184,7 +185,7 @@ features = ["musli-zerocopy", "rkyv"]
 expected = [
     "no-cstring", "no-map", "no-set", "no-tuple", "no-usize", "no-isize",
 ]
-only = ["primitives", "primpacked"]
+only = ["primitives", "packed"]
 
 [[reports]]
 id = "zerocopy-zerocopy"
@@ -197,7 +198,7 @@ description = [
 title = "Müsli vs zerocopy"
 features = ["musli-zerocopy", "zerocopy"]
 expected = []
-only = ["primpacked"]
+only = ["packed"]
 
 [[reports]]
 id = "bitcode-derive"

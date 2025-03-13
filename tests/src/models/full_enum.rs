@@ -1,23 +1,15 @@
 #![cfg(any(not(feature = "no-empty"), not(feature = "no-nonunit-variant")))]
 
-#[cfg(all(feature = "alloc", not(feature = "no-nonunit-variant")))]
+#[cfg(not(feature = "no-nonunit-variant"))]
 use alloc::string::String;
-#[cfg(all(feature = "alloc", not(feature = "no-nonunit-variant")))]
+#[cfg(not(feature = "no-nonunit-variant"))]
 use alloc::vec::Vec;
-
-#[cfg(feature = "musli")]
-use musli::{Decode, Encode};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "musli")]
-use crate::mode::Packed;
 
 use crate::generate::Generate;
 
 #[derive(Debug, Clone, PartialEq, Generate)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "musli", derive(Encode, Decode), musli(mode = Packed))]
+#[cfg_attr(feature = "musli", derive(musli::Encode, musli::Decode), musli(mode = crate::mode::Packed))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(
     feature = "rkyv",
@@ -29,7 +21,7 @@ use crate::generate::Generate;
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
-pub enum MediumEnum {
+pub enum FullEnum {
     #[cfg(not(feature = "no-empty"))]
     Empty,
     #[cfg(not(feature = "no-nonunit-variant"))]
@@ -40,13 +32,9 @@ pub enum MediumEnum {
     #[cfg(not(feature = "no-nonunit-variant"))]
     Tuple(u64, u64),
     #[cfg_attr(feature = "musli", musli(transparent))]
-    #[cfg(all(
-        feature = "alloc",
-        not(feature = "no-newtype"),
-        not(feature = "no-nonunit-variant")
-    ))]
+    #[cfg(not(any(feature = "no-newtype", feature = "no-nonunit-variant")))]
     NewTypeString(String),
-    #[cfg(all(feature = "alloc", not(feature = "no-nonunit-variant")))]
+    #[cfg(not(feature = "no-nonunit-variant"))]
     TupleString(String, Vec<u8>),
     #[cfg(not(feature = "no-nonunit-variant"))]
     Struct {
@@ -62,17 +50,17 @@ pub enum MediumEnum {
     feature = "rkyv",
     any(not(feature = "no-empty"), not(feature = "no-nonunit-variant"))
 ))]
-impl PartialEq<MediumEnum> for &ArchivedMediumEnum {
+impl PartialEq<FullEnum> for &ArchivedMediumEnum {
     #[inline]
-    fn eq(&self, other: &MediumEnum) -> bool {
+    fn eq(&self, other: &FullEnum) -> bool {
         *other == **self
     }
 }
 
 #[cfg(any(not(feature = "no-empty"), not(feature = "no-nonunit-variant")))]
-impl PartialEq<MediumEnum> for &MediumEnum {
+impl PartialEq<FullEnum> for &FullEnum {
     #[inline]
-    fn eq(&self, other: &MediumEnum) -> bool {
+    fn eq(&self, other: &FullEnum) -> bool {
         *other == **self
     }
 }

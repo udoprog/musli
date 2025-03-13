@@ -1,38 +1,38 @@
 use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
-#[musli(unpacked, tag = "type")]
-enum UnpackedAndTag1 {
+#[musli(untagged, tag = "type")]
+enum UntaggedAndTag1 {
     Variant1,
 }
 
 #[derive(Encode, Decode)]
-#[musli(unpacked, tag(value = "type"))]
-enum UnpackedAndTag2 {
+#[musli(untagged, tag(value = "type"))]
+enum UntaggedAndTag2 {
     Variant1,
 }
 
 #[derive(Encode, Decode)]
-#[musli(unpacked, content = "content")]
-enum UnpackedAndContent1 {
+#[musli(untagged, content = "content")]
+enum UntaggedAndContent1 {
     Variant1,
 }
 
 #[derive(Encode, Decode)]
-#[musli(unpacked, content(value = "content"))]
-enum UnpackedAndContent2 {
+#[musli(untagged, content(value = "content"))]
+enum UntaggedAndContent2 {
     Variant1,
 }
 
 #[derive(Encode, Decode)]
-#[musli(unpacked, tag = "type", content = "content")]
-enum UnpackedAndTagContent1 {
+#[musli(untagged, tag = "type", content = "content")]
+enum UntaggedAndTagContent1 {
     Variant1,
 }
 
 #[derive(Encode, Decode)]
-#[musli(unpacked, tag(value = "type"), content(value = "content"))]
-enum UnpackedAndTagContent2 {
+#[musli(untagged, tag(value = "type"), content(value = "content"))]
+enum UntaggedAndTagContent2 {
     Variant1,
 }
 

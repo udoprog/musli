@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 
-use anyhow::{bail, Result};
+use anyhow::{ensure, Result};
 use clap::Parser;
 
 use crate::{tests, Manifest, SharedArgs};
@@ -20,9 +20,6 @@ pub(crate) fn entry(a: &Args, manifest: &Manifest) -> Result<()> {
         ok |= build.report();
     }
 
-    if !ok {
-        bail!("One or more commands failed")
-    }
-
+    ensure!(ok, "Build failed");
     Ok(())
 }

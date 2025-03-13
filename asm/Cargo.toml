@@ -7,7 +7,8 @@ Helper project to disassemble serialization.
 """
 
 [features]
-default = []
+default = ["alloc"]
+alloc = []
 musli-zerocopy = ["dep:musli-zerocopy", "tests/musli-zerocopy"]
 zerocopy = ["dep:zerocopy", "tests/zerocopy"]
 speedy = ["dep:speedy", "tests/speedy"]

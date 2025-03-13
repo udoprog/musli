@@ -1,52 +1,64 @@
-error: #[musli] Unsupported type attribute
- --> tests/ui/enum_content_tag_error.rs:4:9
+error: In #[musli(Binary | Text, ..)] a #[musli(untagged)] enum cannot use #[musli(tag)]
+ --> tests/ui/enum_content_tag_error.rs:4:19
   |
-4 | #[musli(unpacked, tag = "type")]
-  |         ^^^^^^^^
+4 | #[musli(untagged, tag = "type")]
+  |                   ^^^
 
-error: #[musli] Unsupported type attribute
-  --> tests/ui/enum_content_tag_error.rs:10:9
+error: In #[musli(Binary | Text, ..)] a #[musli(untagged)] enum cannot use #[musli(tag)]
+  --> tests/ui/enum_content_tag_error.rs:10:23
    |
-10 | #[musli(unpacked, tag(value = "type"))]
-   |         ^^^^^^^^
+10 | #[musli(untagged, tag(value = "type"))]
+   |                       ^^^^^
 
-error: #[musli] Unsupported type attribute
-  --> tests/ui/enum_content_tag_error.rs:16:9
+error: In #[musli(Binary | Text, ..)] a #[musli(untagged)] enum cannot use #[musli(content)]
+  --> tests/ui/enum_content_tag_error.rs:16:19
    |
-16 | #[musli(unpacked, content = "content")]
-   |         ^^^^^^^^
+16 | #[musli(untagged, content = "content")]
+   |                   ^^^^^^^
 
-error: #[musli] Unsupported type attribute
-  --> tests/ui/enum_content_tag_error.rs:22:9
+error: In #[musli(Binary | Text, ..)] a #[musli(untagged)] enum cannot use #[musli(content)]
+  --> tests/ui/enum_content_tag_error.rs:22:27
    |
-22 | #[musli(unpacked, content(value = "content"))]
-   |         ^^^^^^^^
+22 | #[musli(untagged, content(value = "content"))]
+   |                           ^^^^^
 
-error: #[musli] Unsupported type attribute
-  --> tests/ui/enum_content_tag_error.rs:28:9
+error: In #[musli(Binary | Text, ..)] a #[musli(untagged)] enum cannot use #[musli(tag)]
+  --> tests/ui/enum_content_tag_error.rs:28:19
    |
-28 | #[musli(unpacked, tag = "type", content = "content")]
-   |         ^^^^^^^^
+28 | #[musli(untagged, tag = "type", content = "content")]
+   |                   ^^^
 
-error: #[musli] Unsupported type attribute
-  --> tests/ui/enum_content_tag_error.rs:34:9
+error: In #[musli(Binary | Text, ..)] a #[musli(untagged)] enum cannot use #[musli(content)]
+  --> tests/ui/enum_content_tag_error.rs:28:33
    |
-34 | #[musli(unpacked, tag(value = "type"), content(value = "content"))]
-   |         ^^^^^^^^
+28 | #[musli(untagged, tag = "type", content = "content")]
+   |                                 ^^^^^^^
 
-error: In #[musli(Binary, ..)] an enum cannot be #[musli(transparent)]
+error: In #[musli(Binary | Text, ..)] a #[musli(untagged)] enum cannot use #[musli(tag)]
+  --> tests/ui/enum_content_tag_error.rs:34:23
+   |
+34 | #[musli(untagged, tag(value = "type"), content(value = "content"))]
+   |                       ^^^^^
+
+error: In #[musli(Binary | Text, ..)] a #[musli(untagged)] enum cannot use #[musli(content)]
+  --> tests/ui/enum_content_tag_error.rs:34:48
+   |
+34 | #[musli(untagged, tag(value = "type"), content(value = "content"))]
+   |                                                ^^^^^
+
+error: In #[musli(Binary | Text, ..)] an enum cannot be #[musli(transparent)]
   --> tests/ui/enum_content_tag_error.rs:40:9
    |
 40 | #[musli(transparent, tag = "type")]
    |         ^^^^^^^^^^^
 
-error: In #[musli(Binary, ..)] an enum cannot be #[musli(transparent)]
+error: In #[musli(Binary | Text, ..)] an enum cannot be #[musli(transparent)]
   --> tests/ui/enum_content_tag_error.rs:46:9
    |
 46 | #[musli(transparent, content = "content")]
    |         ^^^^^^^^^^^
 
-error: In #[musli(Binary, ..)] an enum cannot be #[musli(transparent)]
+error: In #[musli(Binary | Text, ..)] an enum cannot be #[musli(transparent)]
   --> tests/ui/enum_content_tag_error.rs:52:9
    |
 52 | #[musli(transparent, tag = "type", content = "content")]
