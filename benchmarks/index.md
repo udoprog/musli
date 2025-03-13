@@ -29,7 +29,7 @@ Below you'll also find [size comparisons](#size-comparisons).
 
 ## System Information
 
-**CPU:** Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz 4700MHz
+**CPU:** Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz 4699MHz
 
 **Memory:** 67319MB
 
@@ -1207,10 +1207,7 @@ This is a test suite for speedy features.
 > - `MUSLI_VEC_RANGE=10000..20000` - ε-serde benefits from larger inputs, this ensures that the size of the supported suite (primarily `mesh`) reflects that by making the inputs bigger.
 
 
-This is a test suite for ε-serde features
-
-Since ε-serde works best for larger inputs,
-we increase the size of the input being deserialized.
+This is a test suite for ε-serde features.
 
 **More:**
 
@@ -2461,10 +2458,7 @@ This is a test suite for speedy features.
 > - `MUSLI_VEC_RANGE=10000..20000` - ε-serde benefits from larger inputs, this ensures that the size of the supported suite (primarily `mesh`) reflects that by making the inputs bigger.
 
 
-This is a test suite for ε-serde features
-
-Since ε-serde works best for larger inputs,
-we increase the size of the input being deserialized.
+This is a test suite for ε-serde features.
 
 | **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
 | - | - | - | - | - | - | - |
