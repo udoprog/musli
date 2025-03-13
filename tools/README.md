@@ -1,19 +1,22 @@
 # Tools used with Müsli development
 
-Note that the `--report <id>` argument is available to filter out to use parameters for one specific report:
+Note that the `--report <id>` argument is available to filter out to use
+parameters for one specific report (by `id`).
 
 ```sh
-cargo run -- --report full bench
+cargo run -p tools -- bench --report full
 ```
 
-#### Generating benchmarks
+#### Generating report
 
-This obviously takes a long time, but will walk through all feature
-combinations:
+This obviously takes a long time, but will walk through all feature combinations
+and generate a report:
 
 ```sh
-cargo run -- report --bench
+cargo run -p tools -- report
 ```
+
+> If you want the faster version for testing, add `--quick`.
 
 #### Running benchmarks
 
