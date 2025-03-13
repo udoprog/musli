@@ -27,6 +27,7 @@ use super::FullEnum;
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
+#[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
 pub struct Large {
     #[generate(range = super::PRIMITIVES_RANGE.get())]
     primitives: Vec<super::Primitives>,
