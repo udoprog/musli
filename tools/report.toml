@@ -73,7 +73,8 @@ features = [
     "musli-storage",
     "musli-packed",
     "musli-value",
-    "bincode",
+    "bincode-serde",
+    "bincode-derive",
     "rmp-serde",
     "postcard",
     "bitcode",
@@ -253,15 +254,29 @@ expected = [
 ]
 
 [footnotes]
-incomplete = "These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result."
-i128 = "Lacks 128-bit support."
-bson = "BSON does not support serializing directly in-place [without patches](https://github.com/mongodb/bson-rust/pull/328). As a result it is expected to be much slower."
-musli_value = "`musli-value` is a heap-allocated, in-memory format. Deserialization is expected to be as fast as a dynamic in-memory structure can be traversed, but serialization requires a lot of allocations. It is only included for reference."
-miniserde = "`miniserde` only supports allocated serialization (to `String`), and only supported deserialization from `&str` which if treated as opaque data would need to be validated as UTF-8."
+incomplete = """
+These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result.
+"""
+i128 = """
+Lacks 128-bit support.
+"""
+bson = """
+BSON does not support serializing directly in-place [without patches](https://github.com/mongodb/bson-rust/pull/328). As a result it is expected to be much slower.
+"""
+musli_value = """
+`musli-value` is a heap-allocated, in-memory format. Deserialization is expected to be as fast as a dynamic in-memory structure can be traversed, but serialization requires a lot of allocations. It is only included for reference.
+"""
+miniserde = """
+`miniserde` only supports allocated serialization (to `String`), and only supported deserialization from `&str` which if treated as opaque data would need to be validated as UTF-8.
+"""
+bincode_serde = """
+bincode deserialization is shifting away from serde, and the serde implementation does not support borrowing from the input.
+"""
 
 [crate_footnotes]
 bson = ["bson"]
 musli_value = ["musli_value"]
+bincode_serde = ["bincode_serde"]
 
 [size_footnotes]
 musli_json = ["incomplete"]

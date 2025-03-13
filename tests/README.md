@@ -44,7 +44,7 @@ cargo +nightly miri run --bin fuzz --features musli-wire -- --random
 ```
 
 > **Note** you can add the running of optional crates by enabling its
-> corresponding feature, such as `--features bincode`.
+> corresponding feature, such as `--features bincode-serde`.
 
 To select which framework(s) to fuzz, enabled their corresponding features. If
 you just want to fuzz `serde_json`, you'd run:
