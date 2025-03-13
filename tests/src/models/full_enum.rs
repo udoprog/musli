@@ -27,12 +27,12 @@ pub enum FullEnum {
     #[cfg(not(feature = "no-nonunit-variant"))]
     EmptyTuple(),
     #[cfg_attr(feature = "musli", musli(transparent))]
-    #[cfg(all(not(feature = "no-newtype"), not(feature = "no-nonunit-variant")))]
+    #[cfg(not(feature = "no-nonunit-variant"))]
     NewType(u64),
     #[cfg(not(feature = "no-nonunit-variant"))]
     Tuple(u64, u64),
     #[cfg_attr(feature = "musli", musli(transparent))]
-    #[cfg(not(any(feature = "no-newtype", feature = "no-nonunit-variant")))]
+    #[cfg(not(feature = "no-nonunit-variant"))]
     NewTypeString(String),
     #[cfg(not(feature = "no-nonunit-variant"))]
     TupleString(String, Vec<u8>),
