@@ -343,6 +343,7 @@ fn main() -> Result<()> {
     macro_rules! build {
         ($name:ident, $ty:ty, $num:expr, $size_hint:expr) => {{
             let $name = rng.next_vector::<$ty>(*$num.get());
+
             if random {
                 tests::feature_matrix!(random, $name, $ty, $size_hint);
             }

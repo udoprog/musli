@@ -10,7 +10,7 @@ use std::process::Stdio;
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use sysinfo::{CpuRefreshKind, RefreshKind, System};
+use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 
 use crate::bins::{BinArgs, Binary, Bins};
 use crate::manifest::{Group, Kind, Link, ReportEnv};
@@ -143,6 +143,7 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
         o,
         "Below you'll also find [size comparisons](#size-comparisons)."
     )?;
+    writeln!(o)?;
 
     render_system_info(&mut o)?;
     render_reports(&mut o, args, manifest, built_reports, &mut used_footnotes)?;
@@ -264,6 +265,7 @@ where
     let branch = args.branch.as_deref().unwrap_or(manifest.branch.as_str());
 
     writeln!(o, "## Reports")?;
+    writeln!(o)?;
 
     for (bins @ &Bins { report, .. }, group_plots) in reports {
         writeln!(o, "### {}", report.title)?;
@@ -684,16 +686,21 @@ fn render_system_info<O>(o: &mut O) -> Result<()>
 where
     O: ?Sized + fmt::Write,
 {
-    let s =
-        System::new_with_specifics(RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()));
+    let s = System::new_with_specifics(
+        RefreshKind::nothing()
+            .with_memory(MemoryRefreshKind::everything())
+            .with_cpu(CpuRefreshKind::everything()),
+    );
 
     writeln!(o, "## System Information")?;
+    writeln!(o)?;
 
-    for cpu in s.cpus() {
-        writeln!(o, "CPU: {} {}Mhz", cpu.brand(), cpu.frequency())?;
+    for cpu in s.cpus().iter().take(1) {
+        writeln!(o, "**CPU:** {} {}MHz", cpu.brand(), cpu.frequency())?;
+        writeln!(o)?;
     }
 
-    writeln!(o, "Memory: {}MB", s.total_memory() / 1_000_000)?;
+    writeln!(o, "**Memory:** {}MB", s.total_memory() / 1_000_000)?;
     writeln!(o)?;
     Ok(())
 }

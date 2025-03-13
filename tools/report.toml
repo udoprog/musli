@@ -147,12 +147,9 @@ expected = [
 [[reports]]
 id = "epserde"
 title = "ε-serde"
-link = "epserde"
+link = "ε-serde"
 description = [
-    "This is a test suite for ε-serde features",
-    "",
-    "Since ε-serde works best for larger inputs,",
-    "we increase the size of the input being deserialized."
+    "This is a test suite for ε-serde features.",
 ]
 features = [
     "musli-wire",
@@ -167,7 +164,7 @@ expected = [
 ]
 
 [[reports.env]]
-key = "MUSLI_VEC"
+key = "MUSLI_VEC_RANGE"
 value = "10000..20000"
 description = """
 ε-serde benefits from larger inputs, this ensures that the size of the supported suite (primarily `mesh`) reflects that by making the inputs bigger.
