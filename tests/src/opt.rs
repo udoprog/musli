@@ -32,9 +32,12 @@ impl<T> Opt<T> {
     /// Get the value.
     #[inline]
     #[doc(hidden)]
-    pub fn get(&self) -> &T {
+    pub fn get(&self) -> T
+    where
+        T: Clone,
+    {
         // Get a clone of the inner value.
-        unsafe { &(*self.inner.get()) }
+        unsafe { (*self.inner.get()).clone() }
     }
 }
 

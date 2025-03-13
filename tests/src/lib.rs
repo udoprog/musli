@@ -38,10 +38,11 @@ macro_rules! options {
         }
 
         #[allow(unused)]
-        $enumerate_vis fn $enumerate(out: &mut dyn FnMut(&'static str, &'static dyn core::fmt::Debug)) {
+        $enumerate_vis fn $enumerate(out: fn(&str, &dyn core::fmt::Debug)) {
             $({
                 let key = concat!("MUSLI_", stringify!($ident));
-                out(key, $ident.get());
+                let value = $ident.get();
+                out(key, &value);
             })*
         }
 
@@ -97,7 +98,7 @@ pub unsafe fn init_statics() {
 }
 
 /// Enumerate all available statics.
-pub fn enumerate_statics(out: &mut dyn FnMut(&'static str, &'static dyn core::fmt::Debug)) {
+pub fn enumerate_statics(out: fn(&str, &dyn core::fmt::Debug)) {
     self::models::enumerate_ranges(out);
     self::generate::enumerate_ranges(out);
 }
