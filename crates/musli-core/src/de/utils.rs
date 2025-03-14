@@ -13,7 +13,10 @@ where
     let cx = decoder.cx();
 
     decoder.decode_sequence(move |seq| {
-        let mut out = V::with_capacity(cx, crate::internal::size_hint::cautious(seq.size_hint()))?;
+        let mut out = V::with_capacity(
+            cx,
+            crate::internal::size_hint::cautious::<T>(seq.size_hint()),
+        )?;
         let mut index = 0usize;
 
         while let Some(value) = seq.try_decode_next()? {

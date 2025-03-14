@@ -62,6 +62,7 @@ impl SizeHint {
     /// let hint = SizeHint::any();
     /// assert_eq!(hint.or_default(), 0);
     /// ```
+    #[inline]
     pub fn or_default(self) -> usize {
         match self.kind {
             SizeHintKind::Any => 0,
@@ -71,6 +72,7 @@ impl SizeHint {
 }
 
 impl From<Option<usize>> for SizeHint {
+    #[inline]
     fn from(value: Option<usize>) -> Self {
         let kind = match value {
             Some(n) => SizeHintKind::Exact(n),
@@ -93,6 +95,7 @@ impl fmt::Display for SizeHint {
 
 impl SizeHint {
     /// Coerce into an `Option`.
+    #[inline]
     pub fn into_option(self) -> Option<usize> {
         match self.kind {
             SizeHintKind::Any => None,
