@@ -458,7 +458,7 @@ sequence! {
     HashSet<T: Eq + Hash, S: BuildHasher + Default>,
     insert,
     seq,
-    HashSet::with_capacity_and_hasher(size_hint::cautious(seq.size_hint()), S::default())
+    HashSet::with_capacity_and_hasher(size_hint::cautious::<T>(seq.size_hint()), S::default())
 }
 
 sequence! {
@@ -466,7 +466,7 @@ sequence! {
     BinaryHeap<T: Ord>,
     push,
     seq,
-    BinaryHeap::with_capacity(size_hint::cautious(seq.size_hint()))
+    BinaryHeap::with_capacity(size_hint::cautious::<T>(seq.size_hint()))
 }
 
 macro_rules! map {
@@ -610,7 +610,7 @@ map!(
     _cx,
     HashMap<K: Eq + Hash, V, S: BuildHasher + Default>,
     map,
-    HashMap::with_capacity_and_hasher(size_hint::cautious(map.size_hint()), S::default())
+    HashMap::with_capacity_and_hasher(size_hint::cautious::<(K, V)>(map.size_hint()), S::default())
 );
 
 impl<M> Encode<M> for CString {
