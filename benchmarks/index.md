@@ -8,8 +8,8 @@ Identifiers which are used in tests:
 - `dec` - Decode a type.
 - `enc` - Encode a type.
 - `primitives` - A small object containing one of each primitive type and a string and a byte array.
-- `primpacked` - Tried to achieve the same goal as `primitives`, but with a packed layout to support certain zerocopy libraries.
-- `medium_enum` - A moderately sized enum with every kind of supported variant.
+- `packed` - Tried to achieve the same goal as `primitives`, but with a packed layout to support certain zerocopy libraries.
+- `full_enum` - An enum with every kind of supported variant.
 - `large` - A really big and complex struct.
 - `allocated` - A sparse struct which contains fairly plain allocated data like strings and vectors.
 - `mesh` - A mesh containing triangles.
@@ -29,9 +29,9 @@ Below you'll also find [size comparisons](#size-comparisons).
 
 ## System Information
 
-**CPU:** Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz 4699MHz
+**CPU:** Intel(R) Celeron(R) CPU J3455 @ 1.50GHz 2196MHz
 
-**Memory:** 67319MB
+**Memory:** 8155MB
 
 ## Reports
 
@@ -61,15 +61,17 @@ they support the same set of features in what types of data they can represent.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primitives/musli_descriptive` | **374.70ns** ± 0.15ns | 374.50ns &mdash; 374.91ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_descriptive/report/) |
-| `dec/primitives/musli_packed` | **6.82ns** ± 0.04ns | 6.77ns &mdash; 6.88ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_packed/report/) |
-| `dec/primitives/musli_storage` | **217.85ns** ± 0.38ns | 217.30ns &mdash; 218.40ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_storage/report/) |
-| `dec/primitives/musli_value`[^musli_value] | **78.96ns** ± 0.12ns | 78.80ns &mdash; 79.13ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_value/report/) |
-| `dec/primitives/musli_wire` | **229.44ns** ± 1.48ns | 227.34ns &mdash; 231.53ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_wire/report/) |
-| `dec/primitives/postcard` | **100.18ns** ± 0.10ns | 100.03ns &mdash; 100.33ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/postcard/report/) |
-| `dec/primitives/serde_bincode` | **38.60ns** ± 0.25ns | 38.25ns &mdash; 38.96ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/serde_bincode/report/) |
-| `dec/primitives/serde_bitcode` | **366.22ns** ± 0.06ns | 366.13ns &mdash; 366.31ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/serde_bitcode/report/) |
-| `dec/primitives/serde_rmp` | **113.42ns** ± 0.32ns | 112.97ns &mdash; 113.86ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/serde_rmp/report/) |
+| `dec/primitives/bincode1`[^bincode1] | **134.59ns** ± 0.11ns | 134.40ns &mdash; 134.83ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/bincode1/report/) |
+| `dec/primitives/bincode_derive` | **161.17ns** ± 0.19ns | 160.84ns &mdash; 161.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/bincode_derive/report/) |
+| `dec/primitives/bincode_serde`[^bincode_serde] | **200.44ns** ± 0.20ns | 200.10ns &mdash; 200.87ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/bincode_serde/report/) |
+| `dec/primitives/musli_descriptive` | **1.18μs** ± 0.78ns | 1.17μs &mdash; 1.18μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_descriptive/report/) |
+| `dec/primitives/musli_packed` | **22.14ns** ± 0.02ns | 22.10ns &mdash; 22.18ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_packed/report/) |
+| `dec/primitives/musli_storage` | **858.94ns** ± 1.17ns | 856.83ns &mdash; 861.41ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_storage/report/) |
+| `dec/primitives/musli_value`[^musli_value] | **397.21ns** ± 0.43ns | 396.43ns &mdash; 398.11ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_value/report/) |
+| `dec/primitives/musli_wire` | **865.50ns** ± 0.82ns | 864.14ns &mdash; 867.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_wire/report/) |
+| `dec/primitives/postcard` | **267.33ns** ± 0.18ns | 267.00ns &mdash; 267.71ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/postcard/report/) |
+| `dec/primitives/serde_bitcode` | **1.26μs** ± 2.01ns | 1.25μs &mdash; 1.26μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/serde_bitcode/report/) |
+| `dec/primitives/serde_rmp` | **321.46ns** ± 0.30ns | 320.92ns &mdash; 322.09ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/serde_rmp/report/) |
 
 <table>
 <tr>
@@ -87,121 +89,131 @@ they support the same set of features in what types of data they can represent.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primitives/musli_descriptive` | **160.29ns** ± 0.42ns | 159.70ns &mdash; 160.89ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_descriptive/report/) |
-| `enc/primitives/musli_packed` | **7.35ns** ± 0.05ns | 7.28ns &mdash; 7.41ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_packed/report/) |
-| `enc/primitives/musli_storage` | **100.19ns** ± 1.07ns | 98.68ns &mdash; 101.70ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_storage/report/) |
-| `enc/primitives/musli_value`[^musli_value] | **359.41ns** ± 0.08ns | 359.30ns &mdash; 359.53ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_value/report/) |
-| `enc/primitives/musli_wire` | **174.24ns** ± 1.11ns | 172.68ns &mdash; 175.79ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_wire/report/) |
-| `enc/primitives/postcard` | **186.61ns** ± 0.44ns | 186.00ns &mdash; 187.23ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/postcard/report/) |
-| `enc/primitives/serde_bincode` | **31.23ns** ± 0.34ns | 30.74ns &mdash; 31.72ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/serde_bincode/report/) |
-| `enc/primitives/serde_bitcode` | **1.10μs** ± 3.46ns | 1.09μs &mdash; 1.10μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/serde_bitcode/report/) |
-| `enc/primitives/serde_rmp` | **71.73ns** ± 0.04ns | 71.67ns &mdash; 71.78ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/serde_rmp/report/) |
+| `enc/primitives/bincode1`[^bincode1] | **106.21ns** ± 0.07ns | 106.08ns &mdash; 106.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/bincode1/report/) |
+| `enc/primitives/bincode_derive` | **118.07ns** ± 0.48ns | 117.33ns &mdash; 119.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/bincode_derive/report/) |
+| `enc/primitives/bincode_serde`[^bincode_serde] | **120.27ns** ± 0.46ns | 119.54ns &mdash; 121.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/bincode_serde/report/) |
+| `enc/primitives/musli_descriptive` | **963.09ns** ± 0.96ns | 961.43ns &mdash; 965.17ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_descriptive/report/) |
+| `enc/primitives/musli_packed` | **19.93ns** ± 0.02ns | 19.89ns &mdash; 19.97ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_packed/report/) |
+| `enc/primitives/musli_storage` | **567.08ns** ± 0.64ns | 565.92ns &mdash; 568.43ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_storage/report/) |
+| `enc/primitives/musli_value`[^musli_value] | **1.15μs** ± 0.67ns | 1.15μs &mdash; 1.16μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_value/report/) |
+| `enc/primitives/musli_wire` | **834.98ns** ± 1.54ns | 832.47ns &mdash; 838.39ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_wire/report/) |
+| `enc/primitives/postcard` | **432.13ns** ± 0.50ns | 431.26ns &mdash; 433.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/postcard/report/) |
+| `enc/primitives/serde_bitcode` | **3.69μs** ± 4.18ns | 3.68μs &mdash; 3.70μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/serde_bitcode/report/) |
+| `enc/primitives/serde_rmp` | **250.00ns** ± 0.30ns | 249.48ns &mdash; 250.63ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/serde_rmp/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>full/dec/primpacked</code>
+<code>full/dec/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_full.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_full.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_full.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_full.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primpacked/musli_descriptive` | **362.39ns** ± 1.48ns | 360.30ns &mdash; 364.48ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/musli_descriptive/report/) |
-| `dec/primpacked/musli_packed` | **7.33ns** ± 0.05ns | 7.26ns &mdash; 7.40ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/musli_packed/report/) |
-| `dec/primpacked/musli_storage` | **232.55ns** ± 1.93ns | 229.81ns &mdash; 235.28ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/musli_storage/report/) |
-| `dec/primpacked/musli_value`[^musli_value] | **88.58ns** ± 0.18ns | 88.32ns &mdash; 88.84ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/musli_value/report/) |
-| `dec/primpacked/musli_wire` | **279.94ns** ± 1.63ns | 277.64ns &mdash; 282.25ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/musli_wire/report/) |
-| `dec/primpacked/postcard` | **97.25ns** ± 0.81ns | 96.10ns &mdash; 98.40ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/postcard/report/) |
-| `dec/primpacked/serde_bincode` | **38.57ns** ± 0.01ns | 38.56ns &mdash; 38.59ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/serde_bincode/report/) |
-| `dec/primpacked/serde_bitcode` | **457.26ns** ± 0.78ns | 456.16ns &mdash; 458.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/serde_bitcode/report/) |
-| `dec/primpacked/serde_rmp` | **137.95ns** ± 0.51ns | 137.22ns &mdash; 138.67ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primpacked/serde_rmp/report/) |
+| `dec/packed/bincode1`[^bincode1] | **103.85ns** ± 0.08ns | 103.71ns &mdash; 104.02ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/bincode1/report/) |
+| `dec/packed/bincode_derive` | **131.76ns** ± 0.12ns | 131.56ns &mdash; 132.02ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/bincode_derive/report/) |
+| `dec/packed/bincode_serde`[^bincode_serde] | **166.22ns** ± 0.15ns | 165.95ns &mdash; 166.54ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/bincode_serde/report/) |
+| `dec/packed/musli_descriptive` | **1.18μs** ± 0.90ns | 1.18μs &mdash; 1.18μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/musli_descriptive/report/) |
+| `dec/packed/musli_packed` | **26.12ns** ± 0.02ns | 26.08ns &mdash; 26.16ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/musli_packed/report/) |
+| `dec/packed/musli_storage` | **894.99ns** ± 0.93ns | 893.37ns &mdash; 896.99ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/musli_storage/report/) |
+| `dec/packed/musli_value`[^musli_value] | **401.28ns** ± 0.45ns | 400.52ns &mdash; 402.24ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/musli_value/report/) |
+| `dec/packed/musli_wire` | **893.17ns** ± 0.76ns | 891.73ns &mdash; 894.72ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/musli_wire/report/) |
+| `dec/packed/postcard` | **267.07ns** ± 0.31ns | 266.53ns &mdash; 267.73ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/postcard/report/) |
+| `dec/packed/serde_bitcode` | **1.50μs** ± 1.50ns | 1.49μs &mdash; 1.50μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/serde_bitcode/report/) |
+| `dec/packed/serde_rmp` | **396.13ns** ± 0.30ns | 395.57ns &mdash; 396.76ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_packed/serde_rmp/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>full/enc/primpacked</code>
+<code>full/enc/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_full.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_full.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_full.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_full.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primpacked/musli_descriptive` | **131.78ns** ± 0.17ns | 131.55ns &mdash; 132.02ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/musli_descriptive/report/) |
-| `enc/primpacked/musli_packed` | **8.34ns** ± 0.14ns | 8.14ns &mdash; 8.55ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/musli_packed/report/) |
-| `enc/primpacked/musli_storage` | **99.46ns** ± 0.16ns | 99.24ns &mdash; 99.69ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/musli_storage/report/) |
-| `enc/primpacked/musli_value`[^musli_value] | **497.56ns** ± 4.19ns | 491.63ns &mdash; 503.48ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/musli_value/report/) |
-| `enc/primpacked/musli_wire` | **116.74ns** ± 0.58ns | 115.92ns &mdash; 117.56ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/musli_wire/report/) |
-| `enc/primpacked/postcard` | **195.43ns** ± 1.96ns | 192.65ns &mdash; 198.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/postcard/report/) |
-| `enc/primpacked/serde_bincode` | **31.90ns** ± 0.36ns | 31.39ns &mdash; 32.42ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/serde_bincode/report/) |
-| `enc/primpacked/serde_bitcode` | **1.40μs** ± 2.33ns | 1.39μs &mdash; 1.40μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/serde_bitcode/report/) |
-| `enc/primpacked/serde_rmp` | **90.78ns** ± 0.17ns | 90.54ns &mdash; 91.02ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primpacked/serde_rmp/report/) |
+| `enc/packed/bincode1`[^bincode1] | **122.62ns** ± 0.12ns | 122.43ns &mdash; 122.89ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/bincode1/report/) |
+| `enc/packed/bincode_derive` | **111.89ns** ± 0.41ns | 111.22ns &mdash; 112.82ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/bincode_derive/report/) |
+| `enc/packed/bincode_serde`[^bincode_serde] | **119.57ns** ± 0.49ns | 118.75ns &mdash; 120.65ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/bincode_serde/report/) |
+| `enc/packed/musli_descriptive` | **923.26ns** ± 0.55ns | 922.26ns &mdash; 924.41ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/musli_descriptive/report/) |
+| `enc/packed/musli_packed` | **21.57ns** ± 0.02ns | 21.53ns &mdash; 21.61ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/musli_packed/report/) |
+| `enc/packed/musli_storage` | **540.40ns** ± 0.80ns | 539.03ns &mdash; 542.13ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/musli_storage/report/) |
+| `enc/packed/musli_value`[^musli_value] | **1.59μs** ± 1.54ns | 1.59μs &mdash; 1.59μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/musli_value/report/) |
+| `enc/packed/musli_wire` | **585.47ns** ± 0.47ns | 584.62ns &mdash; 586.44ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/musli_wire/report/) |
+| `enc/packed/postcard` | **431.79ns** ± 0.39ns | 431.07ns &mdash; 432.60ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/postcard/report/) |
+| `enc/packed/serde_bitcode` | **4.55μs** ± 5.98ns | 4.54μs &mdash; 4.57μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/serde_bitcode/report/) |
+| `enc/packed/serde_rmp` | **318.48ns** ± 0.46ns | 317.64ns &mdash; 319.45ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_packed/serde_rmp/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>full/dec/medium_enum</code>
+<code>full/dec/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_full.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_full.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_full.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_full.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/medium_enum/musli_descriptive` | **753.53ns** ± 1.50ns | 751.41ns &mdash; 755.64ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/musli_descriptive/report/) |
-| `dec/medium_enum/musli_packed` | **116.97ns** ± 0.18ns | 116.72ns &mdash; 117.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/musli_packed/report/) |
-| `dec/medium_enum/musli_storage` | **490.29ns** ± 0.50ns | 489.59ns &mdash; 490.99ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/musli_storage/report/) |
-| `dec/medium_enum/musli_value`[^musli_value] | **268.68ns** ± 1.01ns | 267.25ns &mdash; 270.12ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/musli_value/report/) |
-| `dec/medium_enum/musli_wire` | **548.66ns** ± 1.77ns | 546.15ns &mdash; 551.17ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/musli_wire/report/) |
-| `dec/medium_enum/postcard` | **332.39ns** ± 0.15ns | 332.18ns &mdash; 332.61ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/postcard/report/) |
-| `dec/medium_enum/serde_bincode` | **240.71ns** ± 0.77ns | 239.62ns &mdash; 241.81ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/serde_bincode/report/) |
-| `dec/medium_enum/serde_bitcode` | **2.57μs** ± 4.72ns | 2.56μs &mdash; 2.57μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/serde_bitcode/report/) |
-| `dec/medium_enum/serde_rmp` | **603.96ns** ± 0.23ns | 603.63ns &mdash; 604.28ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_medium_enum/serde_rmp/report/) |
+| `dec/full_enum/bincode1`[^bincode1] | **693.23ns** ± 0.67ns | 692.08ns &mdash; 694.67ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/bincode1/report/) |
+| `dec/full_enum/bincode_derive` | **1.02μs** ± 1.34ns | 1.01μs &mdash; 1.02μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/bincode_derive/report/) |
+| `dec/full_enum/bincode_serde`[^bincode_serde] | **1.10μs** ± 1.62ns | 1.10μs &mdash; 1.10μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/bincode_serde/report/) |
+| `dec/full_enum/musli_descriptive` | **2.49μs** ± 2.40ns | 2.49μs &mdash; 2.50μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/musli_descriptive/report/) |
+| `dec/full_enum/musli_packed` | **513.46ns** ± 0.86ns | 511.96ns &mdash; 515.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/musli_packed/report/) |
+| `dec/full_enum/musli_storage` | **1.85μs** ± 2.13ns | 1.85μs &mdash; 1.86μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/musli_storage/report/) |
+| `dec/full_enum/musli_value`[^musli_value] | **981.31ns** ± 1.13ns | 979.27ns &mdash; 983.67ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/musli_value/report/) |
+| `dec/full_enum/musli_wire` | **1.87μs** ± 1.79ns | 1.87μs &mdash; 1.88μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/musli_wire/report/) |
+| `dec/full_enum/postcard` | **939.97ns** ± 0.84ns | 938.43ns &mdash; 941.70ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/postcard/report/) |
+| `dec/full_enum/serde_bitcode` | **9.14μs** ± 16.77ns | 9.11μs &mdash; 9.18μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/serde_bitcode/report/) |
+| `dec/full_enum/serde_rmp` | **2.13μs** ± 3.50ns | 2.12μs &mdash; 2.14μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_full_enum/serde_rmp/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>full/enc/medium_enum</code>
+<code>full/enc/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_full.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_full.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_full.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_full.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/medium_enum/musli_descriptive` | **314.55ns** ± 0.30ns | 314.12ns &mdash; 314.98ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/musli_descriptive/report/) |
-| `enc/medium_enum/musli_packed` | **41.42ns** ± 0.44ns | 40.80ns &mdash; 42.04ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/musli_packed/report/) |
-| `enc/medium_enum/musli_storage` | **194.39ns** ± 1.61ns | 192.11ns &mdash; 196.66ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/musli_storage/report/) |
-| `enc/medium_enum/musli_value`[^musli_value] | **1.17μs** ± 2.18ns | 1.16μs &mdash; 1.17μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/musli_value/report/) |
-| `enc/medium_enum/musli_wire` | **339.06ns** ± 0.50ns | 338.35ns &mdash; 339.77ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/musli_wire/report/) |
-| `enc/medium_enum/postcard` | **323.46ns** ± 0.79ns | 322.35ns &mdash; 324.58ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/postcard/report/) |
-| `enc/medium_enum/serde_bincode` | **90.38ns** ± 0.66ns | 89.45ns &mdash; 91.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/serde_bincode/report/) |
-| `enc/medium_enum/serde_bitcode` | **3.52μs** ± 6.70ns | 3.51μs &mdash; 3.53μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/serde_bitcode/report/) |
-| `enc/medium_enum/serde_rmp` | **211.74ns** ± 0.89ns | 210.48ns &mdash; 213.00ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_medium_enum/serde_rmp/report/) |
+| `enc/full_enum/bincode1`[^bincode1] | **304.24ns** ± 0.32ns | 303.66ns &mdash; 304.92ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/bincode1/report/) |
+| `enc/full_enum/bincode_derive` | **381.24ns** ± 8.52ns | 367.36ns &mdash; 400.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/bincode_derive/report/) |
+| `enc/full_enum/bincode_serde`[^bincode_serde] | **389.36ns** ± 9.13ns | 374.44ns &mdash; 409.83ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/bincode_serde/report/) |
+| `enc/full_enum/musli_descriptive` | **1.40μs** ± 1.82ns | 1.40μs &mdash; 1.41μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/musli_descriptive/report/) |
+| `enc/full_enum/musli_packed` | **134.97ns** ± 0.14ns | 134.71ns &mdash; 135.27ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/musli_packed/report/) |
+| `enc/full_enum/musli_storage` | **914.27ns** ± 0.93ns | 912.65ns &mdash; 916.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/musli_storage/report/) |
+| `enc/full_enum/musli_value`[^musli_value] | **3.44μs** ± 3.60ns | 3.43μs &mdash; 3.44μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/musli_value/report/) |
+| `enc/full_enum/musli_wire` | **1.39μs** ± 1.83ns | 1.38μs &mdash; 1.39μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/musli_wire/report/) |
+| `enc/full_enum/postcard` | **893.97ns** ± 0.90ns | 892.30ns &mdash; 895.82ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/postcard/report/) |
+| `enc/full_enum/serde_bitcode` | **12.25μs** ± 14.07ns | 12.22μs &mdash; 12.28μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/serde_bitcode/report/) |
+| `enc/full_enum/serde_rmp` | **648.69ns** ± 0.57ns | 647.62ns &mdash; 649.87ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_full_enum/serde_rmp/report/) |
 
 
 <table>
@@ -220,15 +232,17 @@ they support the same set of features in what types of data they can represent.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/large/musli_descriptive` | **56.88μs** ± 110.59ns | 56.73μs &mdash; 57.04μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_descriptive/report/) |
-| `dec/large/musli_packed` | **9.91μs** ± 21.12ns | 9.88μs &mdash; 9.94μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_packed/report/) |
-| `dec/large/musli_storage` | **37.94μs** ± 152.85ns | 37.72μs &mdash; 38.15μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_storage/report/) |
-| `dec/large/musli_value`[^musli_value] | **17.55μs** ± 22.57ns | 17.51μs &mdash; 17.58μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_value/report/) |
-| `dec/large/musli_wire` | **48.34μs** ± 375.22ns | 47.81μs &mdash; 48.87μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_wire/report/) |
-| `dec/large/postcard` | **19.66μs** ± 48.84ns | 19.60μs &mdash; 19.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/postcard/report/) |
-| `dec/large/serde_bincode` | **13.45μs** ± 20.38ns | 13.42μs &mdash; 13.47μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/serde_bincode/report/) |
-| `dec/large/serde_bitcode` | **21.02μs** ± 51.65ns | 20.95μs &mdash; 21.09μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/serde_bitcode/report/) |
-| `dec/large/serde_rmp` | **35.89μs** ± 620.06ns | 35.01μs &mdash; 36.76μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/serde_rmp/report/) |
+| `dec/large/bincode1`[^bincode1] | **52.48μs** ± 46.38ns | 52.40μs &mdash; 52.58μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/bincode1/report/) |
+| `dec/large/bincode_derive` | **56.57μs** ± 61.69ns | 56.47μs &mdash; 56.71μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/bincode_derive/report/) |
+| `dec/large/bincode_serde`[^bincode_serde] | **64.47μs** ± 49.99ns | 64.37μs &mdash; 64.57μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/bincode_serde/report/) |
+| `dec/large/musli_descriptive` | **194.68μs** ± 252.48ns | 194.25μs &mdash; 195.23μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_descriptive/report/) |
+| `dec/large/musli_packed` | **36.88μs** ± 18.67ns | 36.85μs &mdash; 36.92μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_packed/report/) |
+| `dec/large/musli_storage` | **146.17μs** ± 176.79ns | 145.87μs &mdash; 146.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_storage/report/) |
+| `dec/large/musli_value`[^musli_value] | **72.79μs** ± 101.28ns | 72.63μs &mdash; 73.02μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_value/report/) |
+| `dec/large/musli_wire` | **172.44μs** ± 197.48ns | 172.14μs &mdash; 172.89μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_wire/report/) |
+| `dec/large/postcard` | **71.25μs** ± 69.73ns | 71.14μs &mdash; 71.41μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/postcard/report/) |
+| `dec/large/serde_bitcode` | **81.76μs** ± 92.60ns | 81.59μs &mdash; 81.95μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/serde_bitcode/report/) |
+| `dec/large/serde_rmp` | **120.33μs** ± 116.69ns | 120.12μs &mdash; 120.58μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/serde_rmp/report/) |
 
 <table>
 <tr>
@@ -246,15 +260,17 @@ they support the same set of features in what types of data they can represent.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/large/musli_descriptive` | **21.37μs** ± 106.28ns | 21.22μs &mdash; 21.52μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_descriptive/report/) |
-| `enc/large/musli_packed` | **2.70μs** ± 8.85ns | 2.69μs &mdash; 2.72μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_packed/report/) |
-| `enc/large/musli_storage` | **15.91μs** ± 26.57ns | 15.87μs &mdash; 15.95μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_storage/report/) |
-| `enc/large/musli_value`[^musli_value] | **92.44μs** ± 88.44ns | 92.31μs &mdash; 92.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_value/report/) |
-| `enc/large/musli_wire` | **25.57μs** ± 46.44ns | 25.50μs &mdash; 25.63μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_wire/report/) |
-| `enc/large/postcard` | **23.66μs** ± 166.95ns | 23.42μs &mdash; 23.89μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/postcard/report/) |
-| `enc/large/serde_bincode` | **4.88μs** ± 14.98ns | 4.86μs &mdash; 4.90μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/serde_bincode/report/) |
-| `enc/large/serde_bitcode` | **26.00μs** ± 134.80ns | 25.81μs &mdash; 26.19μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/serde_bitcode/report/) |
-| `enc/large/serde_rmp` | **25.16μs** ± 481.96ns | 24.48μs &mdash; 25.84μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/serde_rmp/report/) |
+| `enc/large/bincode1`[^bincode1] | **23.38μs** ± 21.66ns | 23.34μs &mdash; 23.42μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/bincode1/report/) |
+| `enc/large/bincode_derive` | **18.95μs** ± 69.88ns | 18.84μs &mdash; 19.11μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/bincode_derive/report/) |
+| `enc/large/bincode_serde`[^bincode_serde] | **19.91μs** ± 87.60ns | 19.77μs &mdash; 20.10μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/bincode_serde/report/) |
+| `enc/large/musli_descriptive` | **102.64μs** ± 101.57ns | 102.47μs &mdash; 102.87μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_descriptive/report/) |
+| `enc/large/musli_packed` | **10.38μs** ± 6.50ns | 10.37μs &mdash; 10.40μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_packed/report/) |
+| `enc/large/musli_storage` | **68.19μs** ± 60.77ns | 68.08μs &mdash; 68.32μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_storage/report/) |
+| `enc/large/musli_value`[^musli_value] | **304.98μs** ± 556.16ns | 304.07μs &mdash; 306.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_value/report/) |
+| `enc/large/musli_wire` | **105.11μs** ± 69.98ns | 104.98μs &mdash; 105.26μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_wire/report/) |
+| `enc/large/postcard` | **72.14μs** ± 86.12ns | 71.99μs &mdash; 72.32μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/postcard/report/) |
+| `enc/large/serde_bitcode` | **94.91μs** ± 90.42ns | 94.74μs &mdash; 95.09μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/serde_bitcode/report/) |
+| `enc/large/serde_rmp` | **62.53μs** ± 75.76ns | 62.39μs &mdash; 62.69μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/serde_rmp/report/) |
 
 
 <table>
@@ -273,15 +289,17 @@ they support the same set of features in what types of data they can represent.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/allocated/musli_descriptive` | **1.07μs** ± 0.03ns | 1.07μs &mdash; 1.07μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_descriptive/report/) |
-| `dec/allocated/musli_packed` | **723.30ns** ± 1.46ns | 721.24ns &mdash; 725.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_packed/report/) |
-| `dec/allocated/musli_storage` | **921.92ns** ± 2.59ns | 918.26ns &mdash; 925.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_storage/report/) |
-| `dec/allocated/musli_value`[^musli_value] | **610.20ns** ± 4.33ns | 604.09ns &mdash; 616.31ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_value/report/) |
-| `dec/allocated/musli_wire` | **968.55ns** ± 3.05ns | 964.22ns &mdash; 972.88ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_wire/report/) |
-| `dec/allocated/postcard` | **979.18ns** ± 0.16ns | 978.96ns &mdash; 979.41ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/postcard/report/) |
-| `dec/allocated/serde_bincode` | **899.32ns** ± 0.77ns | 898.22ns &mdash; 900.42ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/serde_bincode/report/) |
-| `dec/allocated/serde_bitcode` | **1.61μs** ± 25.37ns | 1.57μs &mdash; 1.64μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/serde_bitcode/report/) |
-| `dec/allocated/serde_rmp` | **1.06μs** ± 4.56ns | 1.05μs &mdash; 1.06μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/serde_rmp/report/) |
+| `dec/allocated/bincode1`[^bincode1] | **3.04μs** ± 2.29ns | 3.04μs &mdash; 3.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/bincode1/report/) |
+| `dec/allocated/bincode_derive` | **3.75μs** ± 5.65ns | 3.74μs &mdash; 3.77μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/bincode_derive/report/) |
+| `dec/allocated/bincode_serde`[^bincode_serde] | **4.12μs** ± 4.58ns | 4.11μs &mdash; 4.13μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/bincode_serde/report/) |
+| `dec/allocated/musli_descriptive` | **3.39μs** ± 4.27ns | 3.39μs &mdash; 3.40μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_descriptive/report/) |
+| `dec/allocated/musli_packed` | **2.01μs** ± 1.97ns | 2.00μs &mdash; 2.01μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_packed/report/) |
+| `dec/allocated/musli_storage` | **2.90μs** ± 3.02ns | 2.89μs &mdash; 2.90μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_storage/report/) |
+| `dec/allocated/musli_value`[^musli_value] | **1.83μs** ± 1.66ns | 1.82μs &mdash; 1.83μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_value/report/) |
+| `dec/allocated/musli_wire` | **3.11μs** ± 3.05ns | 3.10μs &mdash; 3.11μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_wire/report/) |
+| `dec/allocated/postcard` | **3.21μs** ± 2.58ns | 3.21μs &mdash; 3.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/postcard/report/) |
+| `dec/allocated/serde_bitcode` | **5.76μs** ± 8.08ns | 5.74μs &mdash; 5.77μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/serde_bitcode/report/) |
+| `dec/allocated/serde_rmp` | **4.02μs** ± 6.82ns | 4.01μs &mdash; 4.03μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/serde_rmp/report/) |
 
 <table>
 <tr>
@@ -299,15 +317,17 @@ they support the same set of features in what types of data they can represent.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/allocated/musli_descriptive` | **143.08ns** ± 0.36ns | 142.57ns &mdash; 143.59ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_descriptive/report/) |
-| `enc/allocated/musli_packed` | **53.80ns** ± 0.02ns | 53.78ns &mdash; 53.83ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_packed/report/) |
-| `enc/allocated/musli_storage` | **123.59ns** ± 0.10ns | 123.45ns &mdash; 123.74ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_storage/report/) |
-| `enc/allocated/musli_value`[^musli_value] | **712.59ns** ± 0.67ns | 711.64ns &mdash; 713.54ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_value/report/) |
-| `enc/allocated/musli_wire` | **158.91ns** ± 0.03ns | 158.87ns &mdash; 158.94ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_wire/report/) |
-| `enc/allocated/postcard` | **360.09ns** ± 0.14ns | 359.89ns &mdash; 360.28ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/postcard/report/) |
-| `enc/allocated/serde_bincode` | **96.63ns** ± 0.38ns | 96.09ns &mdash; 97.17ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/serde_bincode/report/) |
-| `enc/allocated/serde_bitcode` | **2.28μs** ± 36.10ns | 2.23μs &mdash; 2.33μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/serde_bitcode/report/) |
-| `enc/allocated/serde_rmp` | **220.62ns** ± 0.88ns | 219.37ns &mdash; 221.87ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/serde_rmp/report/) |
+| `enc/allocated/bincode1`[^bincode1] | **385.40ns** ± 0.30ns | 384.85ns &mdash; 386.02ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/bincode1/report/) |
+| `enc/allocated/bincode_derive` | **437.42ns** ± 1.68ns | 434.68ns &mdash; 441.13ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/bincode_derive/report/) |
+| `enc/allocated/bincode_serde`[^bincode_serde] | **448.11ns** ± 1.96ns | 445.11ns &mdash; 452.59ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/bincode_serde/report/) |
+| `enc/allocated/musli_descriptive` | **589.85ns** ± 0.69ns | 588.61ns &mdash; 591.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_descriptive/report/) |
+| `enc/allocated/musli_packed` | **177.91ns** ± 0.19ns | 177.55ns &mdash; 178.31ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_packed/report/) |
+| `enc/allocated/musli_storage` | **526.65ns** ± 0.79ns | 525.22ns &mdash; 528.31ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_storage/report/) |
+| `enc/allocated/musli_value`[^musli_value] | **2.58μs** ± 3.52ns | 2.58μs &mdash; 2.59μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_value/report/) |
+| `enc/allocated/musli_wire` | **976.63ns** ± 1.20ns | 974.50ns &mdash; 979.18ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_wire/report/) |
+| `enc/allocated/postcard` | **1.21μs** ± 1.72ns | 1.21μs &mdash; 1.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/postcard/report/) |
+| `enc/allocated/serde_bitcode` | **7.68μs** ± 8.62ns | 7.67μs &mdash; 7.70μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/serde_bitcode/report/) |
+| `enc/allocated/serde_rmp` | **739.90ns** ± 0.73ns | 738.69ns &mdash; 741.52ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/serde_rmp/report/) |
 
 
 <table>
@@ -326,15 +346,16 @@ they support the same set of features in what types of data they can represent.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/mesh/musli_descriptive` | **4.83μs** ± 4.37ns | 4.82μs &mdash; 4.83μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_descriptive/report/) |
-| `dec/mesh/musli_packed` | **30.61ns** ± 0.23ns | 30.29ns &mdash; 30.92ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_packed/report/) |
-| `dec/mesh/musli_storage` | **2.73μs** ± 11.42ns | 2.72μs &mdash; 2.75μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_storage/report/) |
-| `dec/mesh/musli_value`[^musli_value] | **1.34μs** ± 3.67ns | 1.34μs &mdash; 1.35μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_value/report/) |
-| `dec/mesh/musli_wire` | **3.10μs** ± 8.90ns | 3.09μs &mdash; 3.11μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_wire/report/) |
-| `dec/mesh/postcard` | **307.20ns** ± 0.32ns | 306.74ns &mdash; 307.66ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/postcard/report/) |
-| `dec/mesh/serde_bincode` | **505.72ns** ± 4.05ns | 499.99ns &mdash; 511.44ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/serde_bincode/report/) |
-| `dec/mesh/serde_bitcode` | **1.45μs** ± 8.84ns | 1.44μs &mdash; 1.47μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/serde_bitcode/report/) |
-| `dec/mesh/serde_rmp` | **2.05μs** ± 18.91ns | 2.02μs &mdash; 2.08μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/serde_rmp/report/) |
+| `dec/mesh/bincode1`[^bincode1] | **532.48ns** ± 0.51ns | 531.58ns &mdash; 533.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/bincode1/report/) |
+| `dec/mesh/bincode_serde`[^bincode_serde] | **409.96ns** ± 0.45ns | 409.17ns &mdash; 410.93ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/bincode_serde/report/) |
+| `dec/mesh/musli_descriptive` | **8.13μs** ± 11.35ns | 8.11μs &mdash; 8.16μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_descriptive/report/) |
+| `dec/mesh/musli_packed` | **86.49ns** ± 0.07ns | 86.36ns &mdash; 86.64ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_packed/report/) |
+| `dec/mesh/musli_storage` | **4.98μs** ± 5.77ns | 4.97μs &mdash; 4.99μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_storage/report/) |
+| `dec/mesh/musli_value`[^musli_value] | **2.26μs** ± 2.46ns | 2.26μs &mdash; 2.27μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_value/report/) |
+| `dec/mesh/musli_wire` | **5.70μs** ± 6.24ns | 5.69μs &mdash; 5.71μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_wire/report/) |
+| `dec/mesh/postcard` | **408.36ns** ± 0.38ns | 407.69ns &mdash; 409.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/postcard/report/) |
+| `dec/mesh/serde_bitcode` | **3.57μs** ± 34.68ns | 3.50μs &mdash; 3.64μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/serde_bitcode/report/) |
+| `dec/mesh/serde_rmp` | **2.88μs** ± 2.04ns | 2.88μs &mdash; 2.89μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/serde_rmp/report/) |
 
 <table>
 <tr>
@@ -352,15 +373,16 @@ they support the same set of features in what types of data they can represent.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/mesh/musli_descriptive` | **1.54μs** ± 16.49ns | 1.52μs &mdash; 1.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_descriptive/report/) |
-| `enc/mesh/musli_packed` | **14.30ns** ± 0.05ns | 14.24ns &mdash; 14.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_packed/report/) |
-| `enc/mesh/musli_storage` | **1.31μs** ± 0.74ns | 1.31μs &mdash; 1.32μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_storage/report/) |
-| `enc/mesh/musli_value`[^musli_value] | **9.71μs** ± 20.15ns | 9.68μs &mdash; 9.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_value/report/) |
-| `enc/mesh/musli_wire` | **1.43μs** ± 2.79ns | 1.43μs &mdash; 1.43μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_wire/report/) |
-| `enc/mesh/postcard` | **217.50ns** ± 0.82ns | 216.34ns &mdash; 218.66ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/postcard/report/) |
-| `enc/mesh/serde_bincode` | **309.01ns** ± 0.16ns | 308.79ns &mdash; 309.23ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/serde_bincode/report/) |
-| `enc/mesh/serde_bitcode` | **1.92μs** ± 1.60ns | 1.91μs &mdash; 1.92μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/serde_bitcode/report/) |
-| `enc/mesh/serde_rmp` | **817.85ns** ± 2.52ns | 814.30ns &mdash; 821.40ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/serde_rmp/report/) |
+| `enc/mesh/bincode1`[^bincode1] | **700.16ns** ± 0.48ns | 699.27ns &mdash; 701.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/bincode1/report/) |
+| `enc/mesh/bincode_serde`[^bincode_serde] | **225.92ns** ± 0.92ns | 224.53ns &mdash; 228.03ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/bincode_serde/report/) |
+| `enc/mesh/musli_descriptive` | **3.43μs** ± 3.28ns | 3.43μs &mdash; 3.44μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_descriptive/report/) |
+| `enc/mesh/musli_packed` | **33.67ns** ± 0.03ns | 33.62ns &mdash; 33.73ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_packed/report/) |
+| `enc/mesh/musli_storage` | **2.55μs** ± 2.82ns | 2.55μs &mdash; 2.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_storage/report/) |
+| `enc/mesh/musli_value`[^musli_value] | **17.44μs** ± 25.46ns | 17.40μs &mdash; 17.50μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_value/report/) |
+| `enc/mesh/musli_wire` | **4.72μs** ± 4.05ns | 4.71μs &mdash; 4.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_wire/report/) |
+| `enc/mesh/postcard` | **385.83ns** ± 0.45ns | 385.05ns &mdash; 386.79ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/postcard/report/) |
+| `enc/mesh/serde_bitcode` | **4.72μs** ± 5.57ns | 4.71μs &mdash; 4.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/serde_bitcode/report/) |
+| `enc/mesh/serde_rmp` | **1.59μs** ± 1.66ns | 1.58μs &mdash; 1.59μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/serde_rmp/report/) |
 
 
 
@@ -389,8 +411,8 @@ These are text-based formats, which support the full feature set of this test su
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primitives/musli_json` | **906.15ns** ± 1.85ns | 903.53ns &mdash; 908.76ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_primitives/musli_json/report/) |
-| `dec/primitives/serde_json` | **1.12μs** ± 0.11ns | 1.12μs &mdash; 1.12μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_primitives/serde_json/report/) |
+| `dec/primitives/musli_json` | **3.61μs** ± 3.00ns | 3.61μs &mdash; 3.62μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_primitives/musli_json/report/) |
+| `dec/primitives/serde_json` | **4.45μs** ± 4.12ns | 4.44μs &mdash; 4.45μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_primitives/serde_json/report/) |
 
 <table>
 <tr>
@@ -408,86 +430,86 @@ These are text-based formats, which support the full feature set of this test su
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primitives/musli_json` | **399.75ns** ± 2.22ns | 396.59ns &mdash; 402.90ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_primitives/musli_json/report/) |
-| `enc/primitives/serde_json` | **324.41ns** ± 0.70ns | 323.42ns &mdash; 325.41ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_primitives/serde_json/report/) |
+| `enc/primitives/musli_json` | **1.39μs** ± 1.31ns | 1.38μs &mdash; 1.39μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_primitives/musli_json/report/) |
+| `enc/primitives/serde_json` | **1.31μs** ± 1.11ns | 1.30μs &mdash; 1.31μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_primitives/serde_json/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>text/dec/primpacked</code>
+<code>text/dec/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-text/dec_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-text/dec_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_text.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_text.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_text.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_text.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primpacked/musli_json` | **1.07μs** ± 5.20ns | 1.06μs &mdash; 1.07μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_primpacked/musli_json/report/) |
-| `dec/primpacked/serde_json` | **1.19μs** ± 7.31ns | 1.18μs &mdash; 1.20μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_primpacked/serde_json/report/) |
+| `dec/packed/musli_json` | **4.19μs** ± 4.35ns | 4.18μs &mdash; 4.20μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_packed/musli_json/report/) |
+| `dec/packed/serde_json` | **4.59μs** ± 4.04ns | 4.58μs &mdash; 4.59μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_packed/serde_json/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>text/enc/primpacked</code>
+<code>text/enc/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-text/enc_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-text/enc_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_text.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_text.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_text.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_text.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primpacked/musli_json` | **368.77ns** ± 3.86ns | 363.31ns &mdash; 374.23ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_primpacked/musli_json/report/) |
-| `enc/primpacked/serde_json` | **361.65ns** ± 0.72ns | 360.62ns &mdash; 362.67ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_primpacked/serde_json/report/) |
+| `enc/packed/musli_json` | **1.20μs** ± 0.69ns | 1.19μs &mdash; 1.20μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_packed/musli_json/report/) |
+| `enc/packed/serde_json` | **1.37μs** ± 1.46ns | 1.37μs &mdash; 1.37μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_packed/serde_json/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>text/dec/medium_enum</code>
+<code>text/dec/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-text/dec_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-text/dec_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_text.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_text.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_text.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_text.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/medium_enum/musli_json` | **2.12μs** ± 0.14ns | 2.12μs &mdash; 2.12μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_medium_enum/musli_json/report/) |
-| `dec/medium_enum/serde_json` | **2.10μs** ± 36.98ns | 2.04μs &mdash; 2.15μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_medium_enum/serde_json/report/) |
+| `dec/full_enum/musli_json` | **8.19μs** ± 23.00ns | 8.15μs &mdash; 8.24μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_full_enum/musli_json/report/) |
+| `dec/full_enum/serde_json` | **7.67μs** ± 5.78ns | 7.66μs &mdash; 7.68μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_full_enum/serde_json/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>text/enc/medium_enum</code>
+<code>text/enc/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-text/enc_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-text/enc_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_text.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_text.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_text.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_text.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/medium_enum/musli_json` | **790.10ns** ± 2.81ns | 786.13ns &mdash; 794.06ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_medium_enum/musli_json/report/) |
-| `enc/medium_enum/serde_json` | **642.57ns** ± 0.67ns | 641.62ns &mdash; 643.52ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_medium_enum/serde_json/report/) |
+| `enc/full_enum/musli_json` | **2.61μs** ± 2.46ns | 2.60μs &mdash; 2.61μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_full_enum/musli_json/report/) |
+| `enc/full_enum/serde_json` | **2.35μs** ± 2.43ns | 2.34μs &mdash; 2.35μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_full_enum/serde_json/report/) |
 
 
 <table>
@@ -506,8 +528,8 @@ These are text-based formats, which support the full feature set of this test su
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/large/musli_json` | **177.98μs** ± 74.87ns | 177.88μs &mdash; 178.09μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_large/musli_json/report/) |
-| `dec/large/serde_json` | **162.03μs** ± 938.18ns | 160.71μs &mdash; 163.35μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_large/serde_json/report/) |
+| `dec/large/musli_json` | **612.88μs** ± 829.36ns | 611.42μs &mdash; 614.65μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_large/musli_json/report/) |
+| `dec/large/serde_json` | **566.20μs** ± 525.69ns | 565.36μs &mdash; 567.38μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_large/serde_json/report/) |
 
 <table>
 <tr>
@@ -525,8 +547,8 @@ These are text-based formats, which support the full feature set of this test su
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/large/musli_json` | **55.05μs** ± 531.49ns | 54.30μs &mdash; 55.81μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_large/musli_json/report/) |
-| `enc/large/serde_json` | **46.65μs** ± 72.19ns | 46.54μs &mdash; 46.75μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_large/serde_json/report/) |
+| `enc/large/musli_json` | **196.03μs** ± 182.78ns | 195.70μs &mdash; 196.41μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_large/musli_json/report/) |
+| `enc/large/serde_json` | **184.23μs** ± 135.58ns | 184.01μs &mdash; 184.53μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_large/serde_json/report/) |
 
 
 <table>
@@ -545,8 +567,8 @@ These are text-based formats, which support the full feature set of this test su
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/allocated/musli_json` | **2.63μs** ± 20.47ns | 2.60μs &mdash; 2.66μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_allocated/musli_json/report/) |
-| `dec/allocated/serde_json` | **2.06μs** ± 6.08ns | 2.05μs &mdash; 2.07μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_allocated/serde_json/report/) |
+| `dec/allocated/musli_json` | **9.82μs** ± 18.88ns | 9.79μs &mdash; 9.86μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_allocated/musli_json/report/) |
+| `dec/allocated/serde_json` | **7.84μs** ± 14.13ns | 7.81μs &mdash; 7.87μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_allocated/serde_json/report/) |
 
 <table>
 <tr>
@@ -564,8 +586,8 @@ These are text-based formats, which support the full feature set of this test su
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/allocated/musli_json` | **698.93ns** ± 5.09ns | 691.72ns &mdash; 706.13ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_allocated/musli_json/report/) |
-| `enc/allocated/serde_json` | **582.70ns** ± 0.37ns | 582.17ns &mdash; 583.23ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_allocated/serde_json/report/) |
+| `enc/allocated/musli_json` | **2.47μs** ± 2.29ns | 2.46μs &mdash; 2.47μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_allocated/musli_json/report/) |
+| `enc/allocated/serde_json` | **2.46μs** ± 2.14ns | 2.46μs &mdash; 2.47μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_allocated/serde_json/report/) |
 
 
 <table>
@@ -584,8 +606,8 @@ These are text-based formats, which support the full feature set of this test su
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/mesh/musli_json` | **16.52μs** ± 35.01ns | 16.47μs &mdash; 16.57μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_mesh/musli_json/report/) |
-| `dec/mesh/serde_json` | **13.63μs** ± 57.33ns | 13.55μs &mdash; 13.71μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_mesh/serde_json/report/) |
+| `dec/mesh/musli_json` | **29.67μs** ± 24.10ns | 29.63μs &mdash; 29.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_mesh/musli_json/report/) |
+| `dec/mesh/serde_json` | **24.78μs** ± 20.46ns | 24.74μs &mdash; 24.82μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/dec_mesh/serde_json/report/) |
 
 <table>
 <tr>
@@ -603,8 +625,8 @@ These are text-based formats, which support the full feature set of this test su
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/mesh/musli_json` | **6.92μs** ± 6.90ns | 6.91μs &mdash; 6.93μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_mesh/musli_json/report/) |
-| `enc/mesh/serde_json` | **6.98μs** ± 20.18ns | 6.95μs &mdash; 7.01μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_mesh/serde_json/report/) |
+| `enc/mesh/musli_json` | **12.68μs** ± 12.51ns | 12.65μs &mdash; 12.70μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_mesh/musli_json/report/) |
+| `enc/mesh/serde_json` | **13.74μs** ± 13.65ns | 13.72μs &mdash; 13.77μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-text/enc_mesh/serde_json/report/) |
 
 
 
@@ -638,12 +660,12 @@ Usually because the underlying framework lacks support for them.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primitives/musli_descriptive` | **249.51ns** ± 1.27ns | 247.73ns &mdash; 251.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_descriptive/report/) |
-| `dec/primitives/musli_packed` | **6.14ns** ± 0.01ns | 6.13ns &mdash; 6.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_packed/report/) |
-| `dec/primitives/musli_storage` | **159.23ns** ± 0.23ns | 158.90ns &mdash; 159.56ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_storage/report/) |
-| `dec/primitives/musli_value`[^musli_value] | **76.69ns** ± 0.68ns | 75.73ns &mdash; 77.66ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_value/report/) |
-| `dec/primitives/musli_wire` | **169.96ns** ± 0.72ns | 168.95ns &mdash; 170.98ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_wire/report/) |
-| `dec/primitives/serde_cbor` | **376.69ns** ± 1.42ns | 374.68ns &mdash; 378.70ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/serde_cbor/report/) |
+| `dec/primitives/musli_descriptive` | **891.60ns** ± 1.05ns | 889.67ns &mdash; 893.79ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_descriptive/report/) |
+| `dec/primitives/musli_packed` | **15.12ns** ± 0.01ns | 15.10ns &mdash; 15.14ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_packed/report/) |
+| `dec/primitives/musli_storage` | **629.01ns** ± 0.62ns | 627.87ns &mdash; 630.28ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_storage/report/) |
+| `dec/primitives/musli_value`[^musli_value] | **341.99ns** ± 0.47ns | 341.17ns &mdash; 342.98ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_value/report/) |
+| `dec/primitives/musli_wire` | **610.08ns** ± 0.58ns | 608.93ns &mdash; 611.20ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/musli_wire/report/) |
+| `dec/primitives/serde_cbor` | **1.65μs** ± 1.97ns | 1.65μs &mdash; 1.66μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primitives/serde_cbor/report/) |
 
 <table>
 <tr>
@@ -661,106 +683,106 @@ Usually because the underlying framework lacks support for them.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primitives/musli_descriptive` | **84.79ns** ± 0.19ns | 84.52ns &mdash; 85.06ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_descriptive/report/) |
-| `enc/primitives/musli_packed` | **7.41ns** ± 0.02ns | 7.38ns &mdash; 7.45ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_packed/report/) |
-| `enc/primitives/musli_storage` | **64.28ns** ± 0.03ns | 64.24ns &mdash; 64.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_storage/report/) |
-| `enc/primitives/musli_value`[^musli_value] | **363.40ns** ± 2.58ns | 359.75ns &mdash; 367.05ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_value/report/) |
-| `enc/primitives/musli_wire` | **140.03ns** ± 0.48ns | 139.35ns &mdash; 140.71ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_wire/report/) |
-| `enc/primitives/serde_cbor` | **111.49ns** ± 1.74ns | 109.03ns &mdash; 113.96ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/serde_cbor/report/) |
+| `enc/primitives/musli_descriptive` | **328.41ns** ± 0.52ns | 327.62ns &mdash; 329.58ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_descriptive/report/) |
+| `enc/primitives/musli_packed` | **17.87ns** ± 0.02ns | 17.83ns &mdash; 17.91ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_packed/report/) |
+| `enc/primitives/musli_storage` | **256.06ns** ± 0.28ns | 255.58ns &mdash; 256.66ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_storage/report/) |
+| `enc/primitives/musli_value`[^musli_value] | **1.13μs** ± 1.30ns | 1.13μs &mdash; 1.13μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_value/report/) |
+| `enc/primitives/musli_wire` | **495.87ns** ± 1.02ns | 493.91ns &mdash; 497.89ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/musli_wire/report/) |
+| `enc/primitives/serde_cbor` | **435.00ns** ± 0.25ns | 434.52ns &mdash; 435.52ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primitives/serde_cbor/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>fewer/dec/primpacked</code>
+<code>fewer/dec/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_fewer.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_fewer.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_fewer.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_fewer.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primpacked/musli_descriptive` | **262.60ns** ± 0.26ns | 262.23ns &mdash; 262.97ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primpacked/musli_descriptive/report/) |
-| `dec/primpacked/musli_packed` | **5.55ns** ± 0.01ns | 5.54ns &mdash; 5.56ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primpacked/musli_packed/report/) |
-| `dec/primpacked/musli_storage` | **162.47ns** ± 1.35ns | 160.56ns &mdash; 164.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primpacked/musli_storage/report/) |
-| `dec/primpacked/musli_value`[^musli_value] | **78.61ns** ± 0.02ns | 78.59ns &mdash; 78.63ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primpacked/musli_value/report/) |
-| `dec/primpacked/musli_wire` | **182.42ns** ± 0.04ns | 182.37ns &mdash; 182.47ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primpacked/musli_wire/report/) |
-| `dec/primpacked/serde_cbor` | **420.08ns** ± 3.80ns | 414.70ns &mdash; 425.45ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_primpacked/serde_cbor/report/) |
+| `dec/packed/musli_descriptive` | **935.47ns** ± 1.06ns | 933.55ns &mdash; 937.69ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_packed/musli_descriptive/report/) |
+| `dec/packed/musli_packed` | **22.15ns** ± 0.02ns | 22.12ns &mdash; 22.18ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_packed/musli_packed/report/) |
+| `dec/packed/musli_storage` | **642.98ns** ± 0.78ns | 641.55ns &mdash; 644.61ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_packed/musli_storage/report/) |
+| `dec/packed/musli_value`[^musli_value] | **347.32ns** ± 0.34ns | 346.72ns &mdash; 348.04ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_packed/musli_value/report/) |
+| `dec/packed/musli_wire` | **614.45ns** ± 0.34ns | 613.85ns &mdash; 615.18ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_packed/musli_wire/report/) |
+| `dec/packed/serde_cbor` | **1.82μs** ± 2.19ns | 1.82μs &mdash; 1.83μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_packed/serde_cbor/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>fewer/enc/primpacked</code>
+<code>fewer/enc/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_fewer.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_fewer.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_fewer.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_fewer.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primpacked/musli_descriptive` | **86.64ns** ± 0.10ns | 86.50ns &mdash; 86.78ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primpacked/musli_descriptive/report/) |
-| `enc/primpacked/musli_packed` | **6.75ns** ± 0.03ns | 6.70ns &mdash; 6.79ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primpacked/musli_packed/report/) |
-| `enc/primpacked/musli_storage` | **65.13ns** ± 0.73ns | 64.10ns &mdash; 66.17ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primpacked/musli_storage/report/) |
-| `enc/primpacked/musli_value`[^musli_value] | **410.85ns** ± 1.42ns | 408.84ns &mdash; 412.85ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primpacked/musli_value/report/) |
-| `enc/primpacked/musli_wire` | **81.61ns** ± 0.13ns | 81.43ns &mdash; 81.80ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primpacked/musli_wire/report/) |
-| `enc/primpacked/serde_cbor` | **118.03ns** ± 0.24ns | 117.69ns &mdash; 118.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_primpacked/serde_cbor/report/) |
+| `enc/packed/musli_descriptive` | **350.50ns** ± 0.39ns | 349.82ns &mdash; 351.35ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_packed/musli_descriptive/report/) |
+| `enc/packed/musli_packed` | **19.52ns** ± 0.02ns | 19.48ns &mdash; 19.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_packed/musli_packed/report/) |
+| `enc/packed/musli_storage` | **261.81ns** ± 0.28ns | 261.32ns &mdash; 262.42ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_packed/musli_storage/report/) |
+| `enc/packed/musli_value`[^musli_value] | **1.29μs** ± 1.47ns | 1.29μs &mdash; 1.29μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_packed/musli_value/report/) |
+| `enc/packed/musli_wire` | **321.31ns** ± 0.37ns | 320.73ns &mdash; 322.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_packed/musli_wire/report/) |
+| `enc/packed/serde_cbor` | **492.77ns** ± 0.33ns | 492.16ns &mdash; 493.46ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_packed/serde_cbor/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>fewer/dec/medium_enum</code>
+<code>fewer/dec/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_fewer.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_fewer.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_fewer.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_fewer.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/medium_enum/musli_descriptive` | **628.02ns** ± 4.52ns | 621.61ns &mdash; 634.44ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_medium_enum/musli_descriptive/report/) |
-| `dec/medium_enum/musli_packed` | **128.01ns** ± 0.23ns | 127.68ns &mdash; 128.34ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_medium_enum/musli_packed/report/) |
-| `dec/medium_enum/musli_storage` | **467.58ns** ± 0.36ns | 467.06ns &mdash; 468.09ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_medium_enum/musli_storage/report/) |
-| `dec/medium_enum/musli_value`[^musli_value] | **264.98ns** ± 0.24ns | 264.64ns &mdash; 265.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_medium_enum/musli_value/report/) |
-| `dec/medium_enum/musli_wire` | **468.03ns** ± 0.43ns | 467.43ns &mdash; 468.63ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_medium_enum/musli_wire/report/) |
-| `dec/medium_enum/serde_cbor` | **1.03μs** ± 11.85ns | 1.01μs &mdash; 1.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_medium_enum/serde_cbor/report/) |
+| `dec/full_enum/musli_descriptive` | **2.11μs** ± 2.34ns | 2.11μs &mdash; 2.12μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_full_enum/musli_descriptive/report/) |
+| `dec/full_enum/musli_packed` | **453.07ns** ± 0.63ns | 451.96ns &mdash; 454.42ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_full_enum/musli_packed/report/) |
+| `dec/full_enum/musli_storage` | **1.46μs** ± 1.38ns | 1.46μs &mdash; 1.46μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_full_enum/musli_storage/report/) |
+| `dec/full_enum/musli_value`[^musli_value] | **934.73ns** ± 1.03ns | 932.94ns &mdash; 936.97ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_full_enum/musli_value/report/) |
+| `dec/full_enum/musli_wire` | **1.61μs** ± 1.89ns | 1.61μs &mdash; 1.61μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_full_enum/musli_wire/report/) |
+| `dec/full_enum/serde_cbor` | **4.44μs** ± 3.65ns | 4.44μs &mdash; 4.45μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_full_enum/serde_cbor/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>fewer/enc/medium_enum</code>
+<code>fewer/enc/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_fewer.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_fewer.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_fewer.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_fewer.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/medium_enum/musli_descriptive` | **220.66ns** ± 0.19ns | 220.38ns &mdash; 220.93ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_medium_enum/musli_descriptive/report/) |
-| `enc/medium_enum/musli_packed` | **39.47ns** ± 0.01ns | 39.46ns &mdash; 39.48ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_medium_enum/musli_packed/report/) |
-| `enc/medium_enum/musli_storage` | **158.31ns** ± 0.15ns | 158.10ns &mdash; 158.51ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_medium_enum/musli_storage/report/) |
-| `enc/medium_enum/musli_value`[^musli_value] | **1.04μs** ± 1.03ns | 1.04μs &mdash; 1.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_medium_enum/musli_value/report/) |
-| `enc/medium_enum/musli_wire` | **285.11ns** ± 0.14ns | 284.91ns &mdash; 285.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_medium_enum/musli_wire/report/) |
-| `enc/medium_enum/serde_cbor` | **282.56ns** ± 1.21ns | 280.85ns &mdash; 284.27ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_medium_enum/serde_cbor/report/) |
+| `enc/full_enum/musli_descriptive` | **836.81ns** ± 1.32ns | 834.43ns &mdash; 839.58ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_full_enum/musli_descriptive/report/) |
+| `enc/full_enum/musli_packed` | **136.38ns** ± 0.21ns | 136.01ns &mdash; 136.83ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_full_enum/musli_packed/report/) |
+| `enc/full_enum/musli_storage` | **608.61ns** ± 0.52ns | 607.72ns &mdash; 609.74ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_full_enum/musli_storage/report/) |
+| `enc/full_enum/musli_value`[^musli_value] | **3.25μs** ± 2.73ns | 3.24μs &mdash; 3.25μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_full_enum/musli_value/report/) |
+| `enc/full_enum/musli_wire` | **1.09μs** ± 1.47ns | 1.08μs &mdash; 1.09μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_full_enum/musli_wire/report/) |
+| `enc/full_enum/serde_cbor` | **1.01μs** ± 1.02ns | 1.01μs &mdash; 1.01μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_full_enum/serde_cbor/report/) |
 
 
 <table>
@@ -779,12 +801,12 @@ Usually because the underlying framework lacks support for them.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/large/musli_descriptive` | **42.22μs** ± 215.57ns | 41.92μs &mdash; 42.53μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_descriptive/report/) |
-| `dec/large/musli_packed` | **3.91μs** ± 27.57ns | 3.87μs &mdash; 3.95μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_packed/report/) |
-| `dec/large/musli_storage` | **28.19μs** ± 93.95ns | 28.05μs &mdash; 28.32μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_storage/report/) |
-| `dec/large/musli_value`[^musli_value] | **12.19μs** ± 155.41ns | 11.97μs &mdash; 12.41μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_value/report/) |
-| `dec/large/musli_wire` | **34.66μs** ± 53.77ns | 34.59μs &mdash; 34.74μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_wire/report/) |
-| `dec/large/serde_cbor` | **65.02μs** ± 317.67ns | 64.57μs &mdash; 65.47μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/serde_cbor/report/) |
+| `dec/large/musli_descriptive` | **140.04μs** ± 113.42ns | 139.86μs &mdash; 140.30μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_descriptive/report/) |
+| `dec/large/musli_packed` | **14.40μs** ± 13.44ns | 14.38μs &mdash; 14.43μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_packed/report/) |
+| `dec/large/musli_storage` | **100.36μs** ± 68.80ns | 100.24μs &mdash; 100.51μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_storage/report/) |
+| `dec/large/musli_value`[^musli_value] | **52.95μs** ± 59.68ns | 52.84μs &mdash; 53.07μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_value/report/) |
+| `dec/large/musli_wire` | **119.76μs** ± 161.82ns | 119.47μs &mdash; 120.10μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/musli_wire/report/) |
+| `dec/large/serde_cbor` | **257.70μs** ± 273.26ns | 257.23μs &mdash; 258.29μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_large/serde_cbor/report/) |
 
 <table>
 <tr>
@@ -802,12 +824,12 @@ Usually because the underlying framework lacks support for them.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/large/musli_descriptive` | **14.75μs** ± 103.78ns | 14.60μs &mdash; 14.89μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_descriptive/report/) |
-| `enc/large/musli_packed` | **1.85μs** ± 3.68ns | 1.85μs &mdash; 1.86μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_packed/report/) |
-| `enc/large/musli_storage` | **11.64μs** ± 86.37ns | 11.52μs &mdash; 11.76μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_storage/report/) |
-| `enc/large/musli_value`[^musli_value] | **68.49μs** ± 259.24ns | 68.12μs &mdash; 68.85μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_value/report/) |
-| `enc/large/musli_wire` | **22.86μs** ± 255.87ns | 22.50μs &mdash; 23.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_wire/report/) |
-| `enc/large/serde_cbor` | **17.88μs** ± 56.16ns | 17.80μs &mdash; 17.96μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/serde_cbor/report/) |
+| `enc/large/musli_descriptive` | **52.55μs** ± 58.17ns | 52.44μs &mdash; 52.67μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_descriptive/report/) |
+| `enc/large/musli_packed` | **5.71μs** ± 4.45ns | 5.70μs &mdash; 5.72μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_packed/report/) |
+| `enc/large/musli_storage` | **40.73μs** ± 40.19ns | 40.66μs &mdash; 40.81μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_storage/report/) |
+| `enc/large/musli_value`[^musli_value] | **239.62μs** ± 254.13ns | 239.19μs &mdash; 240.17μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_value/report/) |
+| `enc/large/musli_wire` | **74.71μs** ± 93.54ns | 74.55μs &mdash; 74.92μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/musli_wire/report/) |
+| `enc/large/serde_cbor` | **67.74μs** ± 51.94ns | 67.65μs &mdash; 67.85μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_large/serde_cbor/report/) |
 
 
 <table>
@@ -826,12 +848,12 @@ Usually because the underlying framework lacks support for them.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/allocated/musli_descriptive` | **676.31ns** ± 1.90ns | 673.63ns &mdash; 678.98ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_descriptive/report/) |
-| `dec/allocated/musli_packed` | **517.12ns** ± 2.92ns | 513.00ns &mdash; 521.24ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_packed/report/) |
-| `dec/allocated/musli_storage` | **659.04ns** ± 1.78ns | 656.53ns &mdash; 661.55ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_storage/report/) |
-| `dec/allocated/musli_value`[^musli_value] | **442.67ns** ± 5.57ns | 434.77ns &mdash; 450.56ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_value/report/) |
-| `dec/allocated/musli_wire` | **624.55ns** ± 2.46ns | 621.06ns &mdash; 628.04ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_wire/report/) |
-| `dec/allocated/serde_cbor` | **1.01μs** ± 5.21ns | 1.00μs &mdash; 1.02μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/serde_cbor/report/) |
+| `dec/allocated/musli_descriptive` | **2.35μs** ± 1.81ns | 2.35μs &mdash; 2.36μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_descriptive/report/) |
+| `dec/allocated/musli_packed` | **1.56μs** ± 2.41ns | 1.56μs &mdash; 1.57μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_packed/report/) |
+| `dec/allocated/musli_storage` | **2.12μs** ± 2.36ns | 2.11μs &mdash; 2.12μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_storage/report/) |
+| `dec/allocated/musli_value`[^musli_value] | **1.30μs** ± 1.45ns | 1.30μs &mdash; 1.30μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_value/report/) |
+| `dec/allocated/musli_wire` | **2.19μs** ± 2.11ns | 2.19μs &mdash; 2.19μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/musli_wire/report/) |
+| `dec/allocated/serde_cbor` | **4.04μs** ± 4.54ns | 4.03μs &mdash; 4.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_allocated/serde_cbor/report/) |
 
 <table>
 <tr>
@@ -849,12 +871,12 @@ Usually because the underlying framework lacks support for them.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/allocated/musli_descriptive` | **117.11ns** ± 0.61ns | 116.25ns &mdash; 117.96ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_descriptive/report/) |
-| `enc/allocated/musli_packed` | **46.90ns** ± 0.24ns | 46.56ns &mdash; 47.24ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_packed/report/) |
-| `enc/allocated/musli_storage` | **104.07ns** ± 0.34ns | 103.59ns &mdash; 104.55ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_storage/report/) |
-| `enc/allocated/musli_value`[^musli_value] | **598.67ns** ± 1.16ns | 597.02ns &mdash; 600.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_value/report/) |
-| `enc/allocated/musli_wire` | **105.96ns** ± 0.10ns | 105.81ns &mdash; 106.10ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_wire/report/) |
-| `enc/allocated/serde_cbor` | **192.18ns** ± 1.94ns | 189.42ns &mdash; 194.93ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/serde_cbor/report/) |
+| `enc/allocated/musli_descriptive` | **408.33ns** ± 0.41ns | 407.56ns &mdash; 409.19ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_descriptive/report/) |
+| `enc/allocated/musli_packed` | **132.83ns** ± 0.09ns | 132.65ns &mdash; 133.02ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_packed/report/) |
+| `enc/allocated/musli_storage` | **343.44ns** ± 0.34ns | 342.83ns &mdash; 344.17ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_storage/report/) |
+| `enc/allocated/musli_value`[^musli_value] | **2.02μs** ± 1.90ns | 2.02μs &mdash; 2.02μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_value/report/) |
+| `enc/allocated/musli_wire` | **385.54ns** ± 0.52ns | 384.69ns &mdash; 386.68ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/musli_wire/report/) |
+| `enc/allocated/serde_cbor` | **624.06ns** ± 0.65ns | 622.87ns &mdash; 625.43ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_allocated/serde_cbor/report/) |
 
 
 <table>
@@ -873,12 +895,12 @@ Usually because the underlying framework lacks support for them.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/mesh/musli_descriptive` | **2.76μs** ± 20.32ns | 2.73μs &mdash; 2.79μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_descriptive/report/) |
-| `dec/mesh/musli_packed` | **25.90ns** ± 0.11ns | 25.75ns &mdash; 26.05ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_packed/report/) |
-| `dec/mesh/musli_storage` | **1.70μs** ± 7.15ns | 1.69μs &mdash; 1.71μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_storage/report/) |
-| `dec/mesh/musli_value`[^musli_value] | **767.11ns** ± 2.11ns | 764.13ns &mdash; 770.09ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_value/report/) |
-| `dec/mesh/musli_wire` | **1.86μs** ± 16.82ns | 1.83μs &mdash; 1.88μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_wire/report/) |
-| `dec/mesh/serde_cbor` | **4.09μs** ± 16.89ns | 4.07μs &mdash; 4.11μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/serde_cbor/report/) |
+| `dec/mesh/musli_descriptive` | **8.21μs** ± 9.04ns | 8.19μs &mdash; 8.23μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_descriptive/report/) |
+| `dec/mesh/musli_packed` | **85.05ns** ± 0.07ns | 84.91ns &mdash; 85.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_packed/report/) |
+| `dec/mesh/musli_storage` | **4.98μs** ± 5.40ns | 4.97μs &mdash; 4.99μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_storage/report/) |
+| `dec/mesh/musli_value`[^musli_value] | **2.29μs** ± 2.64ns | 2.28μs &mdash; 2.29μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_value/report/) |
+| `dec/mesh/musli_wire` | **5.68μs** ± 3.51ns | 5.67μs &mdash; 5.68μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/musli_wire/report/) |
+| `dec/mesh/serde_cbor` | **12.78μs** ± 9.95ns | 12.76μs &mdash; 12.80μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/dec_mesh/serde_cbor/report/) |
 
 <table>
 <tr>
@@ -896,12 +918,12 @@ Usually because the underlying framework lacks support for them.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/mesh/musli_descriptive` | **942.76ns** ± 1.37ns | 940.82ns &mdash; 944.70ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_descriptive/report/) |
-| `enc/mesh/musli_packed` | **7.29ns** ± 0.02ns | 7.26ns &mdash; 7.31ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_packed/report/) |
-| `enc/mesh/musli_storage` | **706.86ns** ± 6.20ns | 698.08ns &mdash; 715.65ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_storage/report/) |
-| `enc/mesh/musli_value`[^musli_value] | **5.56μs** ± 0.36ns | 5.56μs &mdash; 5.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_value/report/) |
-| `enc/mesh/musli_wire` | **835.83ns** ± 2.04ns | 832.95ns &mdash; 838.72ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_wire/report/) |
-| `enc/mesh/serde_cbor` | **1.98μs** ± 3.66ns | 1.97μs &mdash; 1.98μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/serde_cbor/report/) |
+| `enc/mesh/musli_descriptive` | **3.35μs** ± 3.60ns | 3.35μs &mdash; 3.36μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_descriptive/report/) |
+| `enc/mesh/musli_packed` | **33.77ns** ± 0.03ns | 33.72ns &mdash; 33.83ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_packed/report/) |
+| `enc/mesh/musli_storage` | **2.54μs** ± 2.37ns | 2.53μs &mdash; 2.54μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_storage/report/) |
+| `enc/mesh/musli_value`[^musli_value] | **17.15μs** ± 14.37ns | 17.12μs &mdash; 17.18μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_value/report/) |
+| `enc/mesh/musli_wire` | **4.73μs** ± 5.14ns | 4.72μs &mdash; 4.74μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/musli_wire/report/) |
+| `enc/mesh/serde_cbor` | **6.51μs** ± 8.32ns | 6.50μs &mdash; 6.53μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-fewer/enc_mesh/serde_cbor/report/) |
 
 
 
@@ -934,12 +956,12 @@ This is a test suite for speedy features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primitives/musli_descriptive` | **327.43ns** ± 1.82ns | 324.86ns &mdash; 330.01ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_descriptive/report/) |
-| `dec/primitives/musli_packed` | **6.83ns** ± 0.00ns | 6.83ns &mdash; 6.83ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_packed/report/) |
-| `dec/primitives/musli_storage` | **206.09ns** ± 1.71ns | 203.66ns &mdash; 208.51ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_storage/report/) |
-| `dec/primitives/musli_value`[^musli_value] | **96.42ns** ± 0.28ns | 96.03ns &mdash; 96.81ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_value/report/) |
-| `dec/primitives/musli_wire` | **226.52ns** ± 1.16ns | 224.87ns &mdash; 228.17ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_wire/report/) |
-| `dec/primitives/speedy` | **6.19ns** ± 0.02ns | 6.16ns &mdash; 6.22ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/speedy/report/) |
+| `dec/primitives/musli_descriptive` | **1.03μs** ± 1.05ns | 1.03μs &mdash; 1.03μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_descriptive/report/) |
+| `dec/primitives/musli_packed` | **22.58ns** ± 0.02ns | 22.55ns &mdash; 22.61ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_packed/report/) |
+| `dec/primitives/musli_storage` | **780.84ns** ± 0.77ns | 779.56ns &mdash; 782.55ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_storage/report/) |
+| `dec/primitives/musli_value`[^musli_value] | **370.94ns** ± 0.37ns | 370.31ns &mdash; 371.73ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_value/report/) |
+| `dec/primitives/musli_wire` | **806.52ns** ± 0.69ns | 805.27ns &mdash; 807.95ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/musli_wire/report/) |
+| `dec/primitives/speedy` | **19.23ns** ± 0.01ns | 19.21ns &mdash; 19.26ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primitives/speedy/report/) |
 
 <table>
 <tr>
@@ -957,106 +979,106 @@ This is a test suite for speedy features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primitives/musli_descriptive` | **136.38ns** ± 0.29ns | 135.98ns &mdash; 136.79ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_descriptive/report/) |
-| `enc/primitives/musli_packed` | **7.09ns** ± 0.02ns | 7.06ns &mdash; 7.13ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_packed/report/) |
-| `enc/primitives/musli_storage` | **89.38ns** ± 0.21ns | 89.08ns &mdash; 89.67ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_storage/report/) |
-| `enc/primitives/musli_value`[^musli_value] | **384.94ns** ± 5.94ns | 376.54ns &mdash; 393.33ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_value/report/) |
-| `enc/primitives/musli_wire` | **135.67ns** ± 0.34ns | 135.19ns &mdash; 136.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_wire/report/) |
-| `enc/primitives/speedy` | **5.54ns** ± 0.00ns | 5.53ns &mdash; 5.54ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/speedy/report/) |
+| `enc/primitives/musli_descriptive` | **893.18ns** ± 1.17ns | 891.07ns &mdash; 895.63ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_descriptive/report/) |
+| `enc/primitives/musli_packed` | **18.75ns** ± 0.02ns | 18.72ns &mdash; 18.79ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_packed/report/) |
+| `enc/primitives/musli_storage` | **541.66ns** ± 0.67ns | 540.43ns &mdash; 543.05ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_storage/report/) |
+| `enc/primitives/musli_value`[^musli_value] | **1.20μs** ± 1.06ns | 1.20μs &mdash; 1.20μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_value/report/) |
+| `enc/primitives/musli_wire` | **707.51ns** ± 1.35ns | 705.51ns &mdash; 710.60ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/musli_wire/report/) |
+| `enc/primitives/speedy` | **15.93ns** ± 0.01ns | 15.91ns &mdash; 15.96ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primitives/speedy/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>speedy/dec/primpacked</code>
+<code>speedy/dec/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_speedy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_speedy.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_speedy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_speedy.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primpacked/musli_descriptive` | **311.48ns** ± 0.94ns | 310.14ns &mdash; 312.82ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primpacked/musli_descriptive/report/) |
-| `dec/primpacked/musli_packed` | **7.54ns** ± 0.05ns | 7.47ns &mdash; 7.62ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primpacked/musli_packed/report/) |
-| `dec/primpacked/musli_storage` | **229.49ns** ± 1.78ns | 226.96ns &mdash; 232.01ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primpacked/musli_storage/report/) |
-| `dec/primpacked/musli_value`[^musli_value] | **85.47ns** ± 0.11ns | 85.32ns &mdash; 85.62ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primpacked/musli_value/report/) |
-| `dec/primpacked/musli_wire` | **239.13ns** ± 3.08ns | 234.77ns &mdash; 243.50ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primpacked/musli_wire/report/) |
-| `dec/primpacked/speedy` | **5.14ns** ± 0.03ns | 5.11ns &mdash; 5.18ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_primpacked/speedy/report/) |
+| `dec/packed/musli_descriptive` | **1.06μs** ± 0.83ns | 1.06μs &mdash; 1.06μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_packed/musli_descriptive/report/) |
+| `dec/packed/musli_packed` | **23.47ns** ± 0.02ns | 23.45ns &mdash; 23.51ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_packed/musli_packed/report/) |
+| `dec/packed/musli_storage` | **835.03ns** ± 1.06ns | 833.18ns &mdash; 837.29ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_packed/musli_storage/report/) |
+| `dec/packed/musli_value`[^musli_value] | **366.06ns** ± 0.27ns | 365.58ns &mdash; 366.64ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_packed/musli_value/report/) |
+| `dec/packed/musli_wire` | **850.00ns** ± 0.76ns | 848.63ns &mdash; 851.59ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_packed/musli_wire/report/) |
+| `dec/packed/speedy` | **20.71ns** ± 0.02ns | 20.68ns &mdash; 20.76ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_packed/speedy/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>speedy/enc/primpacked</code>
+<code>speedy/enc/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_speedy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_speedy.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_speedy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_speedy.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primpacked/musli_descriptive` | **137.67ns** ± 0.23ns | 137.34ns &mdash; 137.99ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primpacked/musli_descriptive/report/) |
-| `enc/primpacked/musli_packed` | **6.96ns** ± 0.11ns | 6.81ns &mdash; 7.12ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primpacked/musli_packed/report/) |
-| `enc/primpacked/musli_storage` | **92.11ns** ± 0.20ns | 91.83ns &mdash; 92.39ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primpacked/musli_storage/report/) |
-| `enc/primpacked/musli_value`[^musli_value] | **415.61ns** ± 0.87ns | 414.38ns &mdash; 416.85ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primpacked/musli_value/report/) |
-| `enc/primpacked/musli_wire` | **105.45ns** ± 0.05ns | 105.38ns &mdash; 105.52ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primpacked/musli_wire/report/) |
-| `enc/primpacked/speedy` | **5.41ns** ± 0.01ns | 5.39ns &mdash; 5.43ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_primpacked/speedy/report/) |
+| `enc/packed/musli_descriptive` | **907.64ns** ± 0.98ns | 905.93ns &mdash; 909.76ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_packed/musli_descriptive/report/) |
+| `enc/packed/musli_packed` | **20.35ns** ± 0.01ns | 20.32ns &mdash; 20.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_packed/musli_packed/report/) |
+| `enc/packed/musli_storage` | **531.18ns** ± 0.54ns | 530.26ns &mdash; 532.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_packed/musli_storage/report/) |
+| `enc/packed/musli_value`[^musli_value] | **1.36μs** ± 1.28ns | 1.36μs &mdash; 1.36μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_packed/musli_value/report/) |
+| `enc/packed/musli_wire` | **582.63ns** ± 0.51ns | 581.67ns &mdash; 583.68ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_packed/musli_wire/report/) |
+| `enc/packed/speedy` | **16.32ns** ± 0.02ns | 16.29ns &mdash; 16.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_packed/speedy/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>speedy/dec/medium_enum</code>
+<code>speedy/dec/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_speedy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_speedy.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_speedy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_speedy.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/medium_enum/musli_descriptive` | **715.62ns** ± 1.84ns | 713.02ns &mdash; 718.23ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_medium_enum/musli_descriptive/report/) |
-| `dec/medium_enum/musli_packed` | **156.59ns** ± 0.00ns | 156.59ns &mdash; 156.59ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_medium_enum/musli_packed/report/) |
-| `dec/medium_enum/musli_storage` | **522.36ns** ± 0.87ns | 521.14ns &mdash; 523.59ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_medium_enum/musli_storage/report/) |
-| `dec/medium_enum/musli_value`[^musli_value] | **307.74ns** ± 4.42ns | 301.49ns &mdash; 313.99ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_medium_enum/musli_value/report/) |
-| `dec/medium_enum/musli_wire` | **620.45ns** ± 4.70ns | 613.80ns &mdash; 627.10ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_medium_enum/musli_wire/report/) |
-| `dec/medium_enum/speedy` | **182.78ns** ± 1.17ns | 181.12ns &mdash; 184.43ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_medium_enum/speedy/report/) |
+| `dec/full_enum/musli_descriptive` | **2.58μs** ± 2.29ns | 2.58μs &mdash; 2.58μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_full_enum/musli_descriptive/report/) |
+| `dec/full_enum/musli_packed` | **744.33ns** ± 0.93ns | 742.52ns &mdash; 746.17ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_full_enum/musli_packed/report/) |
+| `dec/full_enum/musli_storage` | **1.95μs** ± 2.39ns | 1.95μs &mdash; 1.96μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_full_enum/musli_storage/report/) |
+| `dec/full_enum/musli_value`[^musli_value] | **1.02μs** ± 0.78ns | 1.02μs &mdash; 1.02μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_full_enum/musli_value/report/) |
+| `dec/full_enum/musli_wire` | **2.12μs** ± 1.84ns | 2.11μs &mdash; 2.12μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_full_enum/musli_wire/report/) |
+| `dec/full_enum/speedy` | **759.05ns** ± 0.94ns | 757.36ns &mdash; 761.03ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_full_enum/speedy/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>speedy/enc/medium_enum</code>
+<code>speedy/enc/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_speedy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_speedy.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_speedy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_speedy.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/medium_enum/musli_descriptive` | **289.89ns** ± 0.36ns | 289.38ns &mdash; 290.40ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_medium_enum/musli_descriptive/report/) |
-| `enc/medium_enum/musli_packed` | **40.28ns** ± 0.39ns | 39.73ns &mdash; 40.83ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_medium_enum/musli_packed/report/) |
-| `enc/medium_enum/musli_storage` | **192.52ns** ± 1.31ns | 190.67ns &mdash; 194.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_medium_enum/musli_storage/report/) |
-| `enc/medium_enum/musli_value`[^musli_value] | **1.10μs** ± 1.62ns | 1.10μs &mdash; 1.10μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_medium_enum/musli_value/report/) |
-| `enc/medium_enum/musli_wire` | **292.22ns** ± 1.98ns | 289.43ns &mdash; 295.02ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_medium_enum/musli_wire/report/) |
-| `enc/medium_enum/speedy` | **80.23ns** ± 0.24ns | 79.89ns &mdash; 80.58ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_medium_enum/speedy/report/) |
+| `enc/full_enum/musli_descriptive` | **1.43μs** ± 2.21ns | 1.42μs &mdash; 1.43μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_full_enum/musli_descriptive/report/) |
+| `enc/full_enum/musli_packed` | **140.26ns** ± 0.14ns | 140.01ns &mdash; 140.55ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_full_enum/musli_packed/report/) |
+| `enc/full_enum/musli_storage` | **916.31ns** ± 0.96ns | 914.66ns &mdash; 918.40ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_full_enum/musli_storage/report/) |
+| `enc/full_enum/musli_value`[^musli_value] | **3.59μs** ± 3.46ns | 3.58μs &mdash; 3.60μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_full_enum/musli_value/report/) |
+| `enc/full_enum/musli_wire` | **1.28μs** ± 1.25ns | 1.28μs &mdash; 1.29μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_full_enum/musli_wire/report/) |
+| `enc/full_enum/speedy` | **309.94ns** ± 0.28ns | 309.40ns &mdash; 310.50ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_full_enum/speedy/report/) |
 
 
 <table>
@@ -1075,12 +1097,12 @@ This is a test suite for speedy features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/large/musli_descriptive` | **58.03μs** ± 135.92ns | 57.84μs &mdash; 58.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_descriptive/report/) |
-| `dec/large/musli_packed` | **10.68μs** ± 35.01ns | 10.63μs &mdash; 10.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_packed/report/) |
-| `dec/large/musli_storage` | **43.19μs** ± 55.66ns | 43.11μs &mdash; 43.26μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_storage/report/) |
-| `dec/large/musli_value`[^musli_value] | **18.90μs** ± 24.88ns | 18.86μs &mdash; 18.93μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_value/report/) |
-| `dec/large/musli_wire` | **51.27μs** ± 115.98ns | 51.10μs &mdash; 51.43μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_wire/report/) |
-| `dec/large/speedy` | **10.76μs** ± 0.49ns | 10.76μs &mdash; 10.76μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/speedy/report/) |
+| `dec/large/musli_descriptive` | **199.44μs** ± 192.06ns | 199.11μs &mdash; 199.86μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_descriptive/report/) |
+| `dec/large/musli_packed` | **41.02μs** ± 30.79ns | 40.96μs &mdash; 41.08μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_packed/report/) |
+| `dec/large/musli_storage` | **158.93μs** ± 290.34ns | 158.47μs &mdash; 159.58μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_storage/report/) |
+| `dec/large/musli_value`[^musli_value] | **77.52μs** ± 69.12ns | 77.39μs &mdash; 77.66μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_value/report/) |
+| `dec/large/musli_wire` | **180.74μs** ± 144.75ns | 180.48μs &mdash; 181.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/musli_wire/report/) |
+| `dec/large/speedy` | **43.91μs** ± 49.51ns | 43.82μs &mdash; 44.01μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_large/speedy/report/) |
 
 <table>
 <tr>
@@ -1098,12 +1120,12 @@ This is a test suite for speedy features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/large/musli_descriptive` | **23.37μs** ± 13.57ns | 23.35μs &mdash; 23.39μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_descriptive/report/) |
-| `enc/large/musli_packed` | **2.66μs** ± 22.69ns | 2.63μs &mdash; 2.70μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_packed/report/) |
-| `enc/large/musli_storage` | **16.20μs** ± 74.35ns | 16.10μs &mdash; 16.31μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_storage/report/) |
-| `enc/large/musli_value`[^musli_value] | **92.45μs** ± 708.26ns | 91.44μs &mdash; 93.45μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_value/report/) |
-| `enc/large/musli_wire` | **25.54μs** ± 424.83ns | 24.94μs &mdash; 26.14μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_wire/report/) |
-| `enc/large/speedy` | **2.41μs** ± 8.63ns | 2.40μs &mdash; 2.42μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/speedy/report/) |
+| `enc/large/musli_descriptive` | **116.83μs** ± 82.41ns | 116.69μs &mdash; 117.01μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_descriptive/report/) |
+| `enc/large/musli_packed` | **10.04μs** ± 10.61ns | 10.02μs &mdash; 10.07μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_packed/report/) |
+| `enc/large/musli_storage` | **76.68μs** ± 84.30ns | 76.53μs &mdash; 76.86μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_storage/report/) |
+| `enc/large/musli_value`[^musli_value] | **297.06μs** ± 365.55ns | 296.44μs &mdash; 297.85μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_value/report/) |
+| `enc/large/musli_wire` | **105.44μs** ± 85.98ns | 105.30μs &mdash; 105.63μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/musli_wire/report/) |
+| `enc/large/speedy` | **10.19μs** ± 13.99ns | 10.17μs &mdash; 10.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_large/speedy/report/) |
 
 
 <table>
@@ -1122,12 +1144,12 @@ This is a test suite for speedy features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/allocated/musli_descriptive` | **1.12μs** ± 1.09ns | 1.12μs &mdash; 1.12μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_descriptive/report/) |
-| `dec/allocated/musli_packed` | **704.39ns** ± 0.81ns | 703.25ns &mdash; 705.52ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_packed/report/) |
-| `dec/allocated/musli_storage` | **1.00μs** ± 11.79ns | 988.05ns &mdash; 1.02μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_storage/report/) |
-| `dec/allocated/musli_value`[^musli_value] | **580.20ns** ± 2.55ns | 576.60ns &mdash; 583.80ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_value/report/) |
-| `dec/allocated/musli_wire` | **956.11ns** ± 15.82ns | 933.67ns &mdash; 978.54ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_wire/report/) |
-| `dec/allocated/speedy` | **851.60ns** ± 1.43ns | 849.58ns &mdash; 853.61ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/speedy/report/) |
+| `dec/allocated/musli_descriptive` | **4.18μs** ± 2.89ns | 4.18μs &mdash; 4.19μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_descriptive/report/) |
+| `dec/allocated/musli_packed` | **2.55μs** ± 2.81ns | 2.54μs &mdash; 2.55μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_packed/report/) |
+| `dec/allocated/musli_storage` | **3.55μs** ± 4.84ns | 3.54μs &mdash; 3.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_storage/report/) |
+| `dec/allocated/musli_value`[^musli_value] | **1.88μs** ± 1.58ns | 1.88μs &mdash; 1.88μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_value/report/) |
+| `dec/allocated/musli_wire` | **3.44μs** ± 3.76ns | 3.43μs &mdash; 3.45μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/musli_wire/report/) |
+| `dec/allocated/speedy` | **3.40μs** ± 2.75ns | 3.39μs &mdash; 3.40μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_allocated/speedy/report/) |
 
 <table>
 <tr>
@@ -1145,12 +1167,12 @@ This is a test suite for speedy features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/allocated/musli_descriptive` | **174.18ns** ± 0.27ns | 173.80ns &mdash; 174.56ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_descriptive/report/) |
-| `enc/allocated/musli_packed` | **55.32ns** ± 0.00ns | 55.31ns &mdash; 55.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_packed/report/) |
-| `enc/allocated/musli_storage` | **143.15ns** ± 0.56ns | 142.36ns &mdash; 143.95ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_storage/report/) |
-| `enc/allocated/musli_value`[^musli_value] | **756.22ns** ± 2.74ns | 752.34ns &mdash; 760.11ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_value/report/) |
-| `enc/allocated/musli_wire` | **157.67ns** ± 0.48ns | 156.98ns &mdash; 158.35ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_wire/report/) |
-| `enc/allocated/speedy` | **147.62ns** ± 0.53ns | 146.87ns &mdash; 148.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/speedy/report/) |
+| `enc/allocated/musli_descriptive` | **635.87ns** ± 0.60ns | 634.90ns &mdash; 637.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_descriptive/report/) |
+| `enc/allocated/musli_packed` | **188.96ns** ± 0.12ns | 188.74ns &mdash; 189.23ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_packed/report/) |
+| `enc/allocated/musli_storage` | **576.68ns** ± 0.60ns | 575.65ns &mdash; 577.98ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_storage/report/) |
+| `enc/allocated/musli_value`[^musli_value] | **2.55μs** ± 3.03ns | 2.54μs &mdash; 2.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_value/report/) |
+| `enc/allocated/musli_wire` | **624.50ns** ± 0.84ns | 623.01ns &mdash; 626.31ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/musli_wire/report/) |
+| `enc/allocated/speedy` | **506.55ns** ± 0.31ns | 506.00ns &mdash; 507.20ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_allocated/speedy/report/) |
 
 
 <table>
@@ -1169,12 +1191,12 @@ This is a test suite for speedy features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/mesh/musli_descriptive` | **2.45μs** ± 0.80ns | 2.45μs &mdash; 2.45μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_descriptive/report/) |
-| `dec/mesh/musli_packed` | **27.26ns** ± 0.10ns | 27.12ns &mdash; 27.41ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_packed/report/) |
-| `dec/mesh/musli_storage` | **1.66μs** ± 13.07ns | 1.64μs &mdash; 1.68μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_storage/report/) |
-| `dec/mesh/musli_value`[^musli_value] | **863.64ns** ± 1.98ns | 860.83ns &mdash; 866.45ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_value/report/) |
-| `dec/mesh/musli_wire` | **1.80μs** ± 3.13ns | 1.80μs &mdash; 1.81μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_wire/report/) |
-| `dec/mesh/speedy` | **18.37ns** ± 0.04ns | 18.32ns &mdash; 18.42ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/speedy/report/) |
+| `dec/mesh/musli_descriptive` | **10.86μs** ± 15.04ns | 10.83μs &mdash; 10.89μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_descriptive/report/) |
+| `dec/mesh/musli_packed` | **92.23ns** ± 0.07ns | 92.09ns &mdash; 92.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_packed/report/) |
+| `dec/mesh/musli_storage` | **7.42μs** ± 7.55ns | 7.41μs &mdash; 7.44μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_storage/report/) |
+| `dec/mesh/musli_value`[^musli_value] | **3.43μs** ± 2.81ns | 3.43μs &mdash; 3.44μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_value/report/) |
+| `dec/mesh/musli_wire` | **8.50μs** ± 9.42ns | 8.48μs &mdash; 8.52μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/musli_wire/report/) |
+| `dec/mesh/speedy` | **73.65ns** ± 0.08ns | 73.51ns &mdash; 73.81ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/dec_mesh/speedy/report/) |
 
 <table>
 <tr>
@@ -1192,12 +1214,12 @@ This is a test suite for speedy features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/mesh/musli_descriptive` | **930.31ns** ± 0.89ns | 929.05ns &mdash; 931.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_descriptive/report/) |
-| `enc/mesh/musli_packed` | **6.58ns** ± 0.09ns | 6.45ns &mdash; 6.70ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_packed/report/) |
-| `enc/mesh/musli_storage` | **753.92ns** ± 1.17ns | 752.27ns &mdash; 755.58ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_storage/report/) |
-| `enc/mesh/musli_value`[^musli_value] | **5.67μs** ± 9.25ns | 5.66μs &mdash; 5.68μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_value/report/) |
-| `enc/mesh/musli_wire` | **1.16μs** ± 2.49ns | 1.15μs &mdash; 1.16μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_wire/report/) |
-| `enc/mesh/speedy` | **11.96ns** ± 0.04ns | 11.90ns &mdash; 12.03ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/speedy/report/) |
+| `enc/mesh/musli_descriptive` | **5.04μs** ± 4.83ns | 5.03μs &mdash; 5.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_descriptive/report/) |
+| `enc/mesh/musli_packed` | **42.44ns** ± 0.03ns | 42.39ns &mdash; 42.52ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_packed/report/) |
+| `enc/mesh/musli_storage` | **4.13μs** ± 2.29ns | 4.13μs &mdash; 4.14μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_storage/report/) |
+| `enc/mesh/musli_value`[^musli_value] | **26.29μs** ± 40.76ns | 26.21μs &mdash; 26.37μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_value/report/) |
+| `enc/mesh/musli_wire` | **5.82μs** ± 4.22ns | 5.81μs &mdash; 5.83μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/musli_wire/report/) |
+| `enc/mesh/speedy` | **69.80ns** ± 0.05ns | 69.72ns &mdash; 69.90ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-speedy/enc_mesh/speedy/report/) |
 
 
 
@@ -1230,12 +1252,12 @@ This is a test suite for ε-serde features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primitives/epserde` | **543.18ns** ± 0.53ns | 542.43ns &mdash; 543.93ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/epserde/report/) |
-| `dec/primitives/musli_descriptive` | **353.16ns** ± 1.86ns | 350.53ns &mdash; 355.80ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_descriptive/report/) |
-| `dec/primitives/musli_packed` | **7.33ns** ± 0.02ns | 7.31ns &mdash; 7.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_packed/report/) |
-| `dec/primitives/musli_storage` | **223.07ns** ± 1.19ns | 221.39ns &mdash; 224.76ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_storage/report/) |
-| `dec/primitives/musli_value`[^musli_value] | **86.27ns** ± 1.08ns | 84.74ns &mdash; 87.80ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_value/report/) |
-| `dec/primitives/musli_wire` | **238.98ns** ± 0.79ns | 237.86ns &mdash; 240.10ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_wire/report/) |
+| `dec/primitives/epserde` | **2.00μs** ± 1.82ns | 2.00μs &mdash; 2.01μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/epserde/report/) |
+| `dec/primitives/musli_descriptive` | **1.16μs** ± 1.15ns | 1.16μs &mdash; 1.17μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_descriptive/report/) |
+| `dec/primitives/musli_packed` | **24.78ns** ± 0.02ns | 24.75ns &mdash; 24.82ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_packed/report/) |
+| `dec/primitives/musli_storage` | **868.15ns** ± 1.15ns | 866.06ns &mdash; 870.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_storage/report/) |
+| `dec/primitives/musli_value`[^musli_value] | **397.47ns** ± 0.27ns | 397.00ns &mdash; 398.04ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_value/report/) |
+| `dec/primitives/musli_wire` | **866.28ns** ± 0.66ns | 865.22ns &mdash; 867.76ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primitives/musli_wire/report/) |
 
 <table>
 <tr>
@@ -1253,194 +1275,59 @@ This is a test suite for ε-serde features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primitives/epserde` | **499.16ns** ± 3.73ns | 493.89ns &mdash; 504.43ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/epserde/report/) |
-| `enc/primitives/musli_descriptive` | **162.92ns** ± 1.75ns | 160.45ns &mdash; 165.40ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_descriptive/report/) |
-| `enc/primitives/musli_packed` | **8.06ns** ± 0.03ns | 8.02ns &mdash; 8.09ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_packed/report/) |
-| `enc/primitives/musli_storage` | **98.95ns** ± 1.34ns | 97.05ns &mdash; 100.86ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_storage/report/) |
-| `enc/primitives/musli_value`[^musli_value] | **386.39ns** ± 1.68ns | 384.01ns &mdash; 388.77ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_value/report/) |
-| `enc/primitives/musli_wire` | **172.10ns** ± 0.74ns | 171.05ns &mdash; 173.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_wire/report/) |
+| `enc/primitives/epserde` | **1.78μs** ± 2.06ns | 1.77μs &mdash; 1.78μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/epserde/report/) |
+| `enc/primitives/musli_descriptive` | **966.69ns** ± 0.99ns | 965.02ns &mdash; 968.85ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_descriptive/report/) |
+| `enc/primitives/musli_packed` | **20.19ns** ± 0.01ns | 20.17ns &mdash; 20.22ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_packed/report/) |
+| `enc/primitives/musli_storage` | **565.79ns** ± 0.53ns | 564.81ns &mdash; 566.88ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_storage/report/) |
+| `enc/primitives/musli_value`[^musli_value] | **1.24μs** ± 1.48ns | 1.23μs &mdash; 1.24μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_value/report/) |
+| `enc/primitives/musli_wire` | **835.83ns** ± 1.10ns | 833.87ns &mdash; 838.16ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primitives/musli_wire/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>epserde/dec/primpacked</code>
+<code>epserde/dec/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_epserde.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_epserde.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primpacked/epserde` | **616.82ns** ± 0.28ns | 616.42ns &mdash; 617.22ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primpacked/epserde/report/) |
-| `dec/primpacked/musli_descriptive` | **352.93ns** ± 0.55ns | 352.15ns &mdash; 353.71ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primpacked/musli_descriptive/report/) |
-| `dec/primpacked/musli_packed` | **1.26ns** ± 0.00ns | 1.26ns &mdash; 1.26ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primpacked/musli_packed/report/) |
-| `dec/primpacked/musli_storage` | **221.73ns** ± 0.17ns | 221.48ns &mdash; 221.97ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primpacked/musli_storage/report/) |
-| `dec/primpacked/musli_value`[^musli_value] | **83.46ns** ± 0.56ns | 82.66ns &mdash; 84.26ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primpacked/musli_value/report/) |
-| `dec/primpacked/musli_wire` | **247.54ns** ± 0.18ns | 247.28ns &mdash; 247.80ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_primpacked/musli_wire/report/) |
+| `dec/packed/epserde` | **2.35μs** ± 2.18ns | 2.35μs &mdash; 2.36μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_packed/epserde/report/) |
+| `dec/packed/musli_descriptive` | **1.18μs** ± 1.33ns | 1.18μs &mdash; 1.18μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_packed/musli_descriptive/report/) |
+| `dec/packed/musli_packed` | **5.16ns** ± 0.00ns | 5.16ns &mdash; 5.17ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_packed/musli_packed/report/) |
+| `dec/packed/musli_storage` | **897.30ns** ± 0.99ns | 895.52ns &mdash; 899.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_packed/musli_storage/report/) |
+| `dec/packed/musli_value`[^musli_value] | **402.31ns** ± 0.46ns | 401.51ns &mdash; 403.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_packed/musli_value/report/) |
+| `dec/packed/musli_wire` | **895.99ns** ± 0.82ns | 894.53ns &mdash; 897.73ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_packed/musli_wire/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>epserde/enc/primpacked</code>
+<code>epserde/enc/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_epserde.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_epserde.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primpacked/epserde` | **574.76ns** ± 0.02ns | 574.73ns &mdash; 574.78ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primpacked/epserde/report/) |
-| `enc/primpacked/musli_descriptive` | **132.66ns** ± 0.11ns | 132.51ns &mdash; 132.82ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primpacked/musli_descriptive/report/) |
-| `enc/primpacked/musli_packed` | **2.10ns** ± 0.01ns | 2.09ns &mdash; 2.11ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primpacked/musli_packed/report/) |
-| `enc/primpacked/musli_storage` | **99.09ns** ± 0.70ns | 98.10ns &mdash; 100.09ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primpacked/musli_storage/report/) |
-| `enc/primpacked/musli_value`[^musli_value] | **496.91ns** ± 2.52ns | 493.36ns &mdash; 500.46ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primpacked/musli_value/report/) |
-| `enc/primpacked/musli_wire` | **113.79ns** ± 0.15ns | 113.57ns &mdash; 114.00ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_primpacked/musli_wire/report/) |
-
-
-<table>
-<tr>
-<th colspan="3">
-<code>epserde/dec/medium_enum</code>
-<br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_medium_enum/report/">Report 📓</a>
-</th>
-</tr>
-<tr>
-<td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_epserde.svg"></a></td>
-</tr>
-</table>
-
-| Group | Mean | Interval | Link |
-|-|-|-|-|
-| `dec/medium_enum/musli_descriptive` | **74.32μs** ± 118.43ns | 74.15μs &mdash; 74.49μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_medium_enum/musli_descriptive/report/) |
-| `dec/medium_enum/musli_packed` | **312.37ns** ± 2.58ns | 308.72ns &mdash; 316.02ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_medium_enum/musli_packed/report/) |
-| `dec/medium_enum/musli_storage` | **11.74μs** ± 12.58ns | 11.73μs &mdash; 11.76μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_medium_enum/musli_storage/report/) |
-| `dec/medium_enum/musli_value`[^musli_value] | **23.42μs** ± 5.92ns | 23.41μs &mdash; 23.43μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_medium_enum/musli_value/report/) |
-| `dec/medium_enum/musli_wire` | **62.11μs** ± 1.12μs | 60.53μs &mdash; 63.69μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_medium_enum/musli_wire/report/) |
-
-<table>
-<tr>
-<th colspan="3">
-<code>epserde/enc/medium_enum</code>
-<br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_medium_enum/report/">Report 📓</a>
-</th>
-</tr>
-<tr>
-<td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_epserde.svg"></a></td>
-</tr>
-</table>
-
-| Group | Mean | Interval | Link |
-|-|-|-|-|
-| `enc/medium_enum/musli_descriptive` | **44.32μs** ± 105.15ns | 44.17μs &mdash; 44.46μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_medium_enum/musli_descriptive/report/) |
-| `enc/medium_enum/musli_packed` | **118.94ns** ± 0.23ns | 118.62ns &mdash; 119.26ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_medium_enum/musli_packed/report/) |
-| `enc/medium_enum/musli_storage` | **5.70μs** ± 3.67ns | 5.69μs &mdash; 5.70μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_medium_enum/musli_storage/report/) |
-| `enc/medium_enum/musli_value`[^musli_value] | **94.83μs** ± 85.30ns | 94.71μs &mdash; 94.95μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_medium_enum/musli_value/report/) |
-| `enc/medium_enum/musli_wire` | **44.61μs** ± 65.25ns | 44.52μs &mdash; 44.70μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_medium_enum/musli_wire/report/) |
-
-
-<table>
-<tr>
-<th colspan="3">
-<code>epserde/dec/large</code>
-<br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_large/report/">Report 📓</a>
-</th>
-</tr>
-<tr>
-<td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_large_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_large_epserde.svg"></a></td>
-</tr>
-</table>
-
-| Group | Mean | Interval | Link |
-|-|-|-|-|
-| `dec/large/musli_descriptive` | **1.99ms** ± 1.30μs | 1.99ms &mdash; 1.99ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_large/musli_descriptive/report/) |
-| `dec/large/musli_packed` | **61.62μs** ± 344.39ns | 61.14μs &mdash; 62.11μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_large/musli_packed/report/) |
-| `dec/large/musli_storage` | **728.80μs** ± 1.86μs | 726.17μs &mdash; 731.44μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_large/musli_storage/report/) |
-| `dec/large/musli_value`[^musli_value] | **558.32μs** ± 2.26μs | 555.12μs &mdash; 561.51μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_large/musli_value/report/) |
-| `dec/large/musli_wire` | **1.77ms** ± 3.19μs | 1.76ms &mdash; 1.77ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_large/musli_wire/report/) |
-
-<table>
-<tr>
-<th colspan="3">
-<code>epserde/enc/large</code>
-<br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_large/report/">Report 📓</a>
-</th>
-</tr>
-<tr>
-<td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_large_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_large_epserde.svg"></a></td>
-</tr>
-</table>
-
-| Group | Mean | Interval | Link |
-|-|-|-|-|
-| `enc/large/musli_descriptive` | **1.04ms** ± 2.36μs | 1.04ms &mdash; 1.04ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_large/musli_descriptive/report/) |
-| `enc/large/musli_packed` | **38.70μs** ± 11.54ns | 38.68μs &mdash; 38.71μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_large/musli_packed/report/) |
-| `enc/large/musli_storage` | **330.59μs** ± 290.87ns | 330.18μs &mdash; 331.00μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_large/musli_storage/report/) |
-| `enc/large/musli_value`[^musli_value] | **2.45ms** ± 19.98μs | 2.43ms &mdash; 2.48ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_large/musli_value/report/) |
-| `enc/large/musli_wire` | **1.18ms** ± 5.01μs | 1.17ms &mdash; 1.18ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_large/musli_wire/report/) |
-
-
-<table>
-<tr>
-<th colspan="3">
-<code>epserde/dec/allocated</code>
-<br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_allocated/report/">Report 📓</a>
-</th>
-</tr>
-<tr>
-<td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_allocated_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_allocated_epserde.svg"></a></td>
-</tr>
-</table>
-
-| Group | Mean | Interval | Link |
-|-|-|-|-|
-| `dec/allocated/musli_descriptive` | **1.34μs** ± 2.24ns | 1.34μs &mdash; 1.34μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_allocated/musli_descriptive/report/) |
-| `dec/allocated/musli_packed` | **934.52ns** ± 0.72ns | 933.49ns &mdash; 935.54ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_allocated/musli_packed/report/) |
-| `dec/allocated/musli_storage` | **1.22μs** ± 0.80ns | 1.22μs &mdash; 1.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_allocated/musli_storage/report/) |
-| `dec/allocated/musli_value`[^musli_value] | **693.67ns** ± 0.85ns | 692.47ns &mdash; 694.86ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_allocated/musli_value/report/) |
-| `dec/allocated/musli_wire` | **1.27μs** ± 2.26ns | 1.27μs &mdash; 1.27μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_allocated/musli_wire/report/) |
-
-<table>
-<tr>
-<th colspan="3">
-<code>epserde/enc/allocated</code>
-<br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_allocated/report/">Report 📓</a>
-</th>
-</tr>
-<tr>
-<td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_allocated_epserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_allocated_epserde.svg"></a></td>
-</tr>
-</table>
-
-| Group | Mean | Interval | Link |
-|-|-|-|-|
-| `enc/allocated/musli_descriptive` | **188.67ns** ± 0.08ns | 188.56ns &mdash; 188.79ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_allocated/musli_descriptive/report/) |
-| `enc/allocated/musli_packed` | **62.33ns** ± 0.04ns | 62.27ns &mdash; 62.39ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_allocated/musli_packed/report/) |
-| `enc/allocated/musli_storage` | **154.58ns** ± 0.24ns | 154.23ns &mdash; 154.92ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_allocated/musli_storage/report/) |
-| `enc/allocated/musli_value`[^musli_value] | **812.61ns** ± 5.19ns | 805.29ns &mdash; 819.93ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_allocated/musli_value/report/) |
-| `enc/allocated/musli_wire` | **212.12ns** ± 0.12ns | 211.95ns &mdash; 212.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_allocated/musli_wire/report/) |
+| `enc/packed/epserde` | **2.10μs** ± 1.67ns | 2.09μs &mdash; 2.10μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_packed/epserde/report/) |
+| `enc/packed/musli_descriptive` | **922.34ns** ± 0.65ns | 921.15ns &mdash; 923.71ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_packed/musli_descriptive/report/) |
+| `enc/packed/musli_packed` | **6.86ns** ± 0.00ns | 6.85ns &mdash; 6.87ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_packed/musli_packed/report/) |
+| `enc/packed/musli_storage` | **539.42ns** ± 0.45ns | 538.60ns &mdash; 540.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_packed/musli_storage/report/) |
+| `enc/packed/musli_value`[^musli_value] | **1.65μs** ± 2.21ns | 1.65μs &mdash; 1.66μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_packed/musli_value/report/) |
+| `enc/packed/musli_wire` | **580.23ns** ± 0.53ns | 579.29ns &mdash; 581.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_packed/musli_wire/report/) |
 
 
 <table>
@@ -1459,12 +1346,12 @@ This is a test suite for ε-serde features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/mesh/epserde` | **665.70ns** ± 0.66ns | 664.76ns &mdash; 666.64ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/epserde/report/) |
-| `dec/mesh/musli_descriptive` | **3.84ms** ± 460.25ns | 3.84ms &mdash; 3.84ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_descriptive/report/) |
-| `dec/mesh/musli_packed` | **32.82μs** ± 192.34ns | 32.55μs &mdash; 33.09μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_packed/report/) |
-| `dec/mesh/musli_storage` | **2.44ms** ± 5.67μs | 2.43ms &mdash; 2.44ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_storage/report/) |
-| `dec/mesh/musli_value`[^musli_value] | **1.60ms** ± 3.70μs | 1.60ms &mdash; 1.61ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_value/report/) |
-| `dec/mesh/musli_wire` | **2.71ms** ± 3.72μs | 2.70ms &mdash; 2.71ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_wire/report/) |
+| `dec/mesh/epserde` | **2.35μs** ± 3.24ns | 2.35μs &mdash; 2.36μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/epserde/report/) |
+| `dec/mesh/musli_descriptive` | **12.70ms** ± 8.06μs | 12.69ms &mdash; 12.72ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_descriptive/report/) |
+| `dec/mesh/musli_packed` | **385.70μs** ± 599.97ns | 384.68μs &mdash; 387.02μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_packed/report/) |
+| `dec/mesh/musli_storage` | **7.77ms** ± 2.64μs | 7.77ms &mdash; 7.78ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_storage/report/) |
+| `dec/mesh/musli_value`[^musli_value] | **5.47ms** ± 2.52μs | 5.47ms &mdash; 5.48ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_value/report/) |
+| `dec/mesh/musli_wire` | **8.88ms** ± 3.64μs | 8.88ms &mdash; 8.89ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/dec_mesh/musli_wire/report/) |
 
 <table>
 <tr>
@@ -1482,12 +1369,12 @@ This is a test suite for ε-serde features.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/mesh/epserde` | **22.60μs** ± 18.68ns | 22.57μs &mdash; 22.62μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/epserde/report/) |
-| `enc/mesh/musli_descriptive` | **1.29ms** ± 3.11μs | 1.29ms &mdash; 1.30ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_descriptive/report/) |
-| `enc/mesh/musli_packed` | **22.44μs** ± 225.06ns | 22.12μs &mdash; 22.76μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_packed/report/) |
-| `enc/mesh/musli_storage` | **1.06ms** ± 1.88μs | 1.06ms &mdash; 1.06ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_storage/report/) |
-| `enc/mesh/musli_value`[^musli_value] | **12.36ms** ± 14.60μs | 12.34ms &mdash; 12.38ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_value/report/) |
-| `enc/mesh/musli_wire` | **1.21ms** ± 8.16μs | 1.20ms &mdash; 1.23ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_wire/report/) |
+| `enc/mesh/epserde` | **113.26μs** ± 495.97ns | 112.65μs &mdash; 114.34μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/epserde/report/) |
+| `enc/mesh/musli_descriptive` | **5.37ms** ± 4.12μs | 5.37ms &mdash; 5.38ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_descriptive/report/) |
+| `enc/mesh/musli_packed` | **110.06μs** ± 134.62ns | 109.81μs &mdash; 110.34μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_packed/report/) |
+| `enc/mesh/musli_storage` | **4.02ms** ± 2.48μs | 4.02ms &mdash; 4.03ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_storage/report/) |
+| `enc/mesh/musli_value`[^musli_value] | **27.11ms** ± 38.20μs | 27.04ms &mdash; 27.19ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_value/report/) |
+| `enc/mesh/musli_wire` | **7.51ms** ± 3.37μs | 7.50ms &mdash; 7.52ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-epserde/enc_mesh/musli_wire/report/) |
 
 
 
@@ -1505,40 +1392,40 @@ Note that `zerocopy` only supports packed primitives, so we're only comparing wi
 <table>
 <tr>
 <th colspan="3">
-<code>zerocopy-zerocopy/dec/primpacked</code>
+<code>zerocopy-zerocopy/dec/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/dec_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/dec_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_zerocopy-zerocopy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_zerocopy-zerocopy.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_zerocopy-zerocopy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_zerocopy-zerocopy.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primpacked/musli_zerocopy` | **1.30ns** ± 0.00ns | 1.29ns &mdash; 1.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/dec_primpacked/musli_zerocopy/report/) |
-| `dec/primpacked/zerocopy` | **1.68ns** ± 0.00ns | 1.68ns &mdash; 1.68ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/dec_primpacked/zerocopy/report/) |
+| `dec/packed/musli_zerocopy` | **2.66ns** ± 0.01ns | 2.65ns &mdash; 2.67ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/dec_packed/musli_zerocopy/report/) |
+| `dec/packed/zerocopy` | **6.67ns** ± 0.02ns | 6.64ns &mdash; 6.70ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/dec_packed/zerocopy/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>zerocopy-zerocopy/enc/primpacked</code>
+<code>zerocopy-zerocopy/enc/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/enc_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/enc_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_zerocopy-zerocopy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_zerocopy-zerocopy.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_zerocopy-zerocopy.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_zerocopy-zerocopy.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primpacked/musli_zerocopy` | **4.96ns** ± 0.00ns | 4.95ns &mdash; 4.96ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/enc_primpacked/musli_zerocopy/report/) |
-| `enc/primpacked/zerocopy` | **2.17ns** ± 0.04ns | 2.12ns &mdash; 2.22ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/enc_primpacked/zerocopy/report/) |
+| `enc/packed/musli_zerocopy` | **17.86ns** ± 0.02ns | 17.83ns &mdash; 17.91ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/enc_packed/musli_zerocopy/report/) |
+| `enc/packed/zerocopy` | **7.33ns** ± 0.01ns | 7.30ns &mdash; 7.35ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-zerocopy-zerocopy/enc_packed/zerocopy/report/) |
 
 
 
@@ -1570,11 +1457,11 @@ Uses a custom derive-based framework which does not support everything Müsli an
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primitives/derive_bitcode` | **75.72ns** ± 0.54ns | 74.95ns &mdash; 76.49ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/derive_bitcode/report/) |
-| `dec/primitives/musli_descriptive` | **343.29ns** ± 3.55ns | 338.25ns &mdash; 348.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/musli_descriptive/report/) |
-| `dec/primitives/musli_packed` | **6.91ns** ± 0.01ns | 6.90ns &mdash; 6.92ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/musli_packed/report/) |
-| `dec/primitives/musli_storage` | **219.61ns** ± 0.11ns | 219.45ns &mdash; 219.78ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/musli_storage/report/) |
-| `dec/primitives/musli_wire` | **234.63ns** ± 0.84ns | 233.44ns &mdash; 235.82ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/musli_wire/report/) |
+| `dec/primitives/derive_bitcode` | **242.59ns** ± 0.26ns | 242.17ns &mdash; 243.16ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/derive_bitcode/report/) |
+| `dec/primitives/musli_descriptive` | **1.21μs** ± 2.18ns | 1.20μs &mdash; 1.21μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/musli_descriptive/report/) |
+| `dec/primitives/musli_packed` | **22.21ns** ± 0.02ns | 22.17ns &mdash; 22.25ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/musli_packed/report/) |
+| `dec/primitives/musli_storage` | **865.59ns** ± 1.34ns | 863.12ns &mdash; 868.33ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/musli_storage/report/) |
+| `dec/primitives/musli_wire` | **869.22ns** ± 1.19ns | 867.27ns &mdash; 871.86ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primitives/musli_wire/report/) |
 
 <table>
 <tr>
@@ -1592,101 +1479,101 @@ Uses a custom derive-based framework which does not support everything Müsli an
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primitives/derive_bitcode` | **408.97ns** ± 0.85ns | 407.76ns &mdash; 410.18ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/derive_bitcode/report/) |
-| `enc/primitives/musli_descriptive` | **159.75ns** ± 0.90ns | 158.48ns &mdash; 161.03ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/musli_descriptive/report/) |
-| `enc/primitives/musli_packed` | **7.26ns** ± 0.05ns | 7.20ns &mdash; 7.33ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/musli_packed/report/) |
-| `enc/primitives/musli_storage` | **101.56ns** ± 1.34ns | 99.67ns &mdash; 103.46ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/musli_storage/report/) |
-| `enc/primitives/musli_wire` | **188.15ns** ± 0.35ns | 187.65ns &mdash; 188.65ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/musli_wire/report/) |
+| `enc/primitives/derive_bitcode` | **1.29μs** ± 2.15ns | 1.29μs &mdash; 1.30μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/derive_bitcode/report/) |
+| `enc/primitives/musli_descriptive` | **973.08ns** ± 1.70ns | 970.45ns &mdash; 976.92ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/musli_descriptive/report/) |
+| `enc/primitives/musli_packed` | **20.05ns** ± 0.02ns | 20.01ns &mdash; 20.09ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/musli_packed/report/) |
+| `enc/primitives/musli_storage` | **571.74ns** ± 1.17ns | 569.78ns &mdash; 574.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/musli_storage/report/) |
+| `enc/primitives/musli_wire` | **840.35ns** ± 1.13ns | 838.31ns &mdash; 842.70ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primitives/musli_wire/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>bitcode-derive/dec/primpacked</code>
+<code>bitcode-derive/dec/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_bitcode-derive.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_bitcode-derive.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_bitcode-derive.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_bitcode-derive.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primpacked/derive_bitcode` | **72.48ns** ± 0.65ns | 71.56ns &mdash; 73.41ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primpacked/derive_bitcode/report/) |
-| `dec/primpacked/musli_descriptive` | **349.45ns** ± 1.36ns | 347.53ns &mdash; 351.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primpacked/musli_descriptive/report/) |
-| `dec/primpacked/musli_packed` | **7.23ns** ± 0.01ns | 7.22ns &mdash; 7.25ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primpacked/musli_packed/report/) |
-| `dec/primpacked/musli_storage` | **225.40ns** ± 0.80ns | 224.27ns &mdash; 226.53ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primpacked/musli_storage/report/) |
-| `dec/primpacked/musli_wire` | **240.95ns** ± 0.48ns | 240.27ns &mdash; 241.63ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_primpacked/musli_wire/report/) |
+| `dec/packed/derive_bitcode` | **243.67ns** ± 0.32ns | 243.15ns &mdash; 244.38ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_packed/derive_bitcode/report/) |
+| `dec/packed/musli_descriptive` | **1.18μs** ± 1.30ns | 1.18μs &mdash; 1.19μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_packed/musli_descriptive/report/) |
+| `dec/packed/musli_packed` | **26.10ns** ± 0.02ns | 26.06ns &mdash; 26.13ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_packed/musli_packed/report/) |
+| `dec/packed/musli_storage` | **893.12ns** ± 1.57ns | 890.48ns &mdash; 896.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_packed/musli_storage/report/) |
+| `dec/packed/musli_wire` | **888.71ns** ± 1.33ns | 886.61ns &mdash; 891.72ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_packed/musli_wire/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>bitcode-derive/enc/primpacked</code>
+<code>bitcode-derive/enc/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_bitcode-derive.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_bitcode-derive.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_bitcode-derive.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_bitcode-derive.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primpacked/derive_bitcode` | **422.81ns** ± 1.37ns | 420.87ns &mdash; 424.74ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primpacked/derive_bitcode/report/) |
-| `enc/primpacked/musli_descriptive` | **148.42ns** ± 1.52ns | 146.26ns &mdash; 150.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primpacked/musli_descriptive/report/) |
-| `enc/primpacked/musli_packed` | **8.40ns** ± 0.05ns | 8.34ns &mdash; 8.47ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primpacked/musli_packed/report/) |
-| `enc/primpacked/musli_storage` | **101.05ns** ± 0.19ns | 100.78ns &mdash; 101.33ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primpacked/musli_storage/report/) |
-| `enc/primpacked/musli_wire` | **113.00ns** ± 0.26ns | 112.64ns &mdash; 113.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_primpacked/musli_wire/report/) |
+| `enc/packed/derive_bitcode` | **1.31μs** ± 1.91ns | 1.31μs &mdash; 1.32μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_packed/derive_bitcode/report/) |
+| `enc/packed/musli_descriptive` | **925.67ns** ± 1.55ns | 923.32ns &mdash; 929.22ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_packed/musli_descriptive/report/) |
+| `enc/packed/musli_packed` | **21.65ns** ± 0.02ns | 21.62ns &mdash; 21.69ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_packed/musli_packed/report/) |
+| `enc/packed/musli_storage` | **542.05ns** ± 0.70ns | 540.87ns &mdash; 543.59ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_packed/musli_storage/report/) |
+| `enc/packed/musli_wire` | **581.65ns** ± 0.82ns | 580.31ns &mdash; 583.47ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_packed/musli_wire/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>bitcode-derive/dec/medium_enum</code>
+<code>bitcode-derive/dec/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_bitcode-derive.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_bitcode-derive.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_bitcode-derive.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_bitcode-derive.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/medium_enum/derive_bitcode` | **903.61ns** ± 6.45ns | 894.44ns &mdash; 912.78ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_medium_enum/derive_bitcode/report/) |
-| `dec/medium_enum/musli_descriptive` | **767.99ns** ± 5.76ns | 759.84ns &mdash; 776.14ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_medium_enum/musli_descriptive/report/) |
-| `dec/medium_enum/musli_packed` | **140.16ns** ± 0.89ns | 138.89ns &mdash; 141.43ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_medium_enum/musli_packed/report/) |
-| `dec/medium_enum/musli_storage` | **495.97ns** ± 1.32ns | 494.10ns &mdash; 497.84ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_medium_enum/musli_storage/report/) |
-| `dec/medium_enum/musli_wire` | **578.04ns** ± 0.89ns | 576.78ns &mdash; 579.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_medium_enum/musli_wire/report/) |
+| `dec/full_enum/derive_bitcode` | **3.09μs** ± 4.02ns | 3.09μs &mdash; 3.10μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_full_enum/derive_bitcode/report/) |
+| `dec/full_enum/musli_descriptive` | **2.56μs** ± 4.40ns | 2.55μs &mdash; 2.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_full_enum/musli_descriptive/report/) |
+| `dec/full_enum/musli_packed` | **582.73ns** ± 1.07ns | 580.79ns &mdash; 584.98ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_full_enum/musli_packed/report/) |
+| `dec/full_enum/musli_storage` | **1.85μs** ± 2.43ns | 1.84μs &mdash; 1.85μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_full_enum/musli_storage/report/) |
+| `dec/full_enum/musli_wire` | **1.94μs** ± 2.72ns | 1.93μs &mdash; 1.94μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_full_enum/musli_wire/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>bitcode-derive/enc/medium_enum</code>
+<code>bitcode-derive/enc/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_bitcode-derive.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_bitcode-derive.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_bitcode-derive.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_bitcode-derive.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/medium_enum/derive_bitcode` | **4.22μs** ± 16.77ns | 4.19μs &mdash; 4.24μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_medium_enum/derive_bitcode/report/) |
-| `enc/medium_enum/musli_descriptive` | **298.69ns** ± 2.20ns | 295.59ns &mdash; 301.80ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_medium_enum/musli_descriptive/report/) |
-| `enc/medium_enum/musli_packed` | **38.33ns** ± 0.04ns | 38.27ns &mdash; 38.39ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_medium_enum/musli_packed/report/) |
-| `enc/medium_enum/musli_storage` | **192.42ns** ± 0.22ns | 192.11ns &mdash; 192.73ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_medium_enum/musli_storage/report/) |
-| `enc/medium_enum/musli_wire` | **344.84ns** ± 2.00ns | 342.01ns &mdash; 347.67ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_medium_enum/musli_wire/report/) |
+| `enc/full_enum/derive_bitcode` | **13.36μs** ± 21.70ns | 13.32μs &mdash; 13.40μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_full_enum/derive_bitcode/report/) |
+| `enc/full_enum/musli_descriptive` | **1.41μs** ± 2.07ns | 1.41μs &mdash; 1.42μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_full_enum/musli_descriptive/report/) |
+| `enc/full_enum/musli_packed` | **144.82ns** ± 0.12ns | 144.58ns &mdash; 145.07ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_full_enum/musli_packed/report/) |
+| `enc/full_enum/musli_storage` | **924.67ns** ± 1.31ns | 922.40ns &mdash; 927.53ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_full_enum/musli_storage/report/) |
+| `enc/full_enum/musli_wire` | **1.40μs** ± 1.64ns | 1.40μs &mdash; 1.40μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_full_enum/musli_wire/report/) |
 
 
 <table>
@@ -1705,11 +1592,11 @@ Uses a custom derive-based framework which does not support everything Müsli an
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/large/derive_bitcode` | **8.77μs** ± 29.73ns | 8.73μs &mdash; 8.81μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/derive_bitcode/report/) |
-| `dec/large/musli_descriptive` | **58.11μs** ± 183.17ns | 57.85μs &mdash; 58.37μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/musli_descriptive/report/) |
-| `dec/large/musli_packed` | **11.27μs** ± 15.12ns | 11.25μs &mdash; 11.29μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/musli_packed/report/) |
-| `dec/large/musli_storage` | **41.37μs** ± 95.22ns | 41.24μs &mdash; 41.51μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/musli_storage/report/) |
-| `dec/large/musli_wire` | **48.00μs** ± 136.11ns | 47.81μs &mdash; 48.19μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/musli_wire/report/) |
+| `dec/large/derive_bitcode` | **36.77μs** ± 79.92ns | 36.65μs &mdash; 36.95μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/derive_bitcode/report/) |
+| `dec/large/musli_descriptive` | **195.23μs** ± 294.64ns | 194.80μs &mdash; 195.91μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/musli_descriptive/report/) |
+| `dec/large/musli_packed` | **41.62μs** ± 48.03ns | 41.54μs &mdash; 41.72μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/musli_packed/report/) |
+| `dec/large/musli_storage` | **150.64μs** ± 216.53ns | 150.28μs &mdash; 151.12μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/musli_storage/report/) |
+| `dec/large/musli_wire` | **177.35μs** ± 240.67ns | 176.95μs &mdash; 177.89μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_large/musli_wire/report/) |
 
 <table>
 <tr>
@@ -1727,11 +1614,11 @@ Uses a custom derive-based framework which does not support everything Müsli an
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/large/derive_bitcode` | **17.76μs** ± 78.03ns | 17.65μs &mdash; 17.87μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/derive_bitcode/report/) |
-| `enc/large/musli_descriptive` | **21.48μs** ± 55.18ns | 21.41μs &mdash; 21.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/musli_descriptive/report/) |
-| `enc/large/musli_packed` | **2.61μs** ± 4.57ns | 2.60μs &mdash; 2.62μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/musli_packed/report/) |
-| `enc/large/musli_storage` | **15.07μs** ± 73.92ns | 14.97μs &mdash; 15.18μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/musli_storage/report/) |
-| `enc/large/musli_wire` | **25.74μs** ± 265.85ns | 25.36μs &mdash; 26.12μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/musli_wire/report/) |
+| `enc/large/derive_bitcode` | **83.83μs** ± 234.76ns | 83.44μs &mdash; 84.35μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/derive_bitcode/report/) |
+| `enc/large/musli_descriptive` | **103.40μs** ± 137.45ns | 103.16μs &mdash; 103.69μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/musli_descriptive/report/) |
+| `enc/large/musli_packed` | **10.43μs** ± 10.46ns | 10.41μs &mdash; 10.45μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/musli_packed/report/) |
+| `enc/large/musli_storage` | **68.44μs** ± 95.17ns | 68.29μs &mdash; 68.66μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/musli_storage/report/) |
+| `enc/large/musli_wire` | **105.11μs** ± 143.61ns | 104.89μs &mdash; 105.44μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_large/musli_wire/report/) |
 
 
 <table>
@@ -1750,11 +1637,11 @@ Uses a custom derive-based framework which does not support everything Müsli an
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/allocated/derive_bitcode` | **1.03μs** ± 1.37ns | 1.02μs &mdash; 1.03μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/derive_bitcode/report/) |
-| `dec/allocated/musli_descriptive` | **1.11μs** ± 1.93ns | 1.11μs &mdash; 1.12μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/musli_descriptive/report/) |
-| `dec/allocated/musli_packed` | **782.97ns** ± 2.95ns | 778.78ns &mdash; 787.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/musli_packed/report/) |
-| `dec/allocated/musli_storage` | **1.01μs** ± 4.39ns | 1.00μs &mdash; 1.02μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/musli_storage/report/) |
-| `dec/allocated/musli_wire` | **1.01μs** ± 13.63ns | 989.46ns &mdash; 1.03μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/musli_wire/report/) |
+| `dec/allocated/derive_bitcode` | **3.96μs** ± 5.30ns | 3.95μs &mdash; 3.98μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/derive_bitcode/report/) |
+| `dec/allocated/musli_descriptive` | **3.83μs** ± 8.02ns | 3.82μs &mdash; 3.85μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/musli_descriptive/report/) |
+| `dec/allocated/musli_packed` | **2.69μs** ± 2.50ns | 2.68μs &mdash; 2.69μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/musli_packed/report/) |
+| `dec/allocated/musli_storage` | **3.52μs** ± 5.74ns | 3.51μs &mdash; 3.53μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/musli_storage/report/) |
+| `dec/allocated/musli_wire` | **3.74μs** ± 4.75ns | 3.73μs &mdash; 3.75μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_allocated/musli_wire/report/) |
 
 <table>
 <tr>
@@ -1772,11 +1659,11 @@ Uses a custom derive-based framework which does not support everything Müsli an
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/allocated/derive_bitcode` | **1.65μs** ± 2.19ns | 1.65μs &mdash; 1.65μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/derive_bitcode/report/) |
-| `enc/allocated/musli_descriptive` | **141.56ns** ± 0.05ns | 141.48ns &mdash; 141.63ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/musli_descriptive/report/) |
-| `enc/allocated/musli_packed` | **54.20ns** ± 0.04ns | 54.15ns &mdash; 54.25ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/musli_packed/report/) |
-| `enc/allocated/musli_storage` | **110.80ns** ± 0.14ns | 110.59ns &mdash; 111.00ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/musli_storage/report/) |
-| `enc/allocated/musli_wire` | **135.04ns** ± 0.02ns | 135.02ns &mdash; 135.07ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/musli_wire/report/) |
+| `enc/allocated/derive_bitcode` | **7.22μs** ± 11.13ns | 7.21μs &mdash; 7.25μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/derive_bitcode/report/) |
+| `enc/allocated/musli_descriptive` | **588.06ns** ± 0.68ns | 586.89ns &mdash; 589.55ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/musli_descriptive/report/) |
+| `enc/allocated/musli_packed` | **171.90ns** ± 0.12ns | 171.68ns &mdash; 172.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/musli_packed/report/) |
+| `enc/allocated/musli_storage` | **522.95ns** ± 1.14ns | 521.12ns &mdash; 525.50ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/musli_storage/report/) |
+| `enc/allocated/musli_wire` | **557.36ns** ± 0.99ns | 555.78ns &mdash; 559.60ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_allocated/musli_wire/report/) |
 
 
 <table>
@@ -1795,11 +1682,11 @@ Uses a custom derive-based framework which does not support everything Müsli an
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/mesh/derive_bitcode` | **140.08ns** ± 0.16ns | 139.85ns &mdash; 140.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/derive_bitcode/report/) |
-| `dec/mesh/musli_descriptive` | **3.96μs** ± 4.65ns | 3.96μs &mdash; 3.97μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/musli_descriptive/report/) |
-| `dec/mesh/musli_packed` | **30.08ns** ± 0.01ns | 30.07ns &mdash; 30.10ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/musli_packed/report/) |
-| `dec/mesh/musli_storage` | **2.47μs** ± 1.54ns | 2.47μs &mdash; 2.47μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/musli_storage/report/) |
-| `dec/mesh/musli_wire` | **2.62μs** ± 0.33ns | 2.62μs &mdash; 2.63μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/musli_wire/report/) |
+| `dec/mesh/derive_bitcode` | **345.66ns** ± 0.40ns | 345.00ns &mdash; 346.56ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/derive_bitcode/report/) |
+| `dec/mesh/musli_descriptive` | **8.11μs** ± 11.79ns | 8.09μs &mdash; 8.14μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/musli_descriptive/report/) |
+| `dec/mesh/musli_packed` | **87.20ns** ± 0.08ns | 87.05ns &mdash; 87.35ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/musli_packed/report/) |
+| `dec/mesh/musli_storage` | **4.97μs** ± 5.21ns | 4.96μs &mdash; 4.98μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/musli_storage/report/) |
+| `dec/mesh/musli_wire` | **5.72μs** ± 14.10ns | 5.70μs &mdash; 5.75μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/dec_mesh/musli_wire/report/) |
 
 <table>
 <tr>
@@ -1817,11 +1704,11 @@ Uses a custom derive-based framework which does not support everything Müsli an
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/mesh/derive_bitcode` | **683.04ns** ± 0.22ns | 682.74ns &mdash; 683.35ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/derive_bitcode/report/) |
-| `enc/mesh/musli_descriptive` | **1.38μs** ± 4.43ns | 1.37μs &mdash; 1.38μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/musli_descriptive/report/) |
-| `enc/mesh/musli_packed` | **9.78ns** ± 0.07ns | 9.67ns &mdash; 9.88ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/musli_packed/report/) |
-| `enc/mesh/musli_storage` | **1.13μs** ± 1.49ns | 1.13μs &mdash; 1.14μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/musli_storage/report/) |
-| `enc/mesh/musli_wire` | **1.27μs** ± 8.50ns | 1.25μs &mdash; 1.28μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/musli_wire/report/) |
+| `enc/mesh/derive_bitcode` | **1.79μs** ± 2.03ns | 1.79μs &mdash; 1.80μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/derive_bitcode/report/) |
+| `enc/mesh/musli_descriptive` | **3.39μs** ± 5.51ns | 3.38μs &mdash; 3.40μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/musli_descriptive/report/) |
+| `enc/mesh/musli_packed` | **33.66ns** ± 0.02ns | 33.62ns &mdash; 33.71ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/musli_packed/report/) |
+| `enc/mesh/musli_storage` | **2.54μs** ± 4.52ns | 2.53μs &mdash; 2.55μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/musli_storage/report/) |
+| `enc/mesh/musli_wire` | **4.72μs** ± 4.42ns | 4.71μs &mdash; 4.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bitcode-derive/enc_mesh/musli_wire/report/) |
 
 
 
@@ -1831,7 +1718,6 @@ Uses a custom derive-based framework which does not support everything Müsli an
 > - `128` - 128-bit integers are not supported.
 > - `u64` - Format is limited to the bounds of signed 64-bit integers.
 > - `empty` - Empty variants are not supported.
-> - `newtype` - Newtype variants are not supported.
 > - `number-key` - Maps with numerical keys like `HashMap<u32, T>` are not supported.
 
 Specific comparison to BSON, because the format is limited in capabilities.
@@ -1857,11 +1743,11 @@ Specific comparison to BSON, because the format is limited in capabilities.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primitives/bson`[^bson] | **731.96ns** ± 0.17ns | 731.72ns &mdash; 732.20ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/bson/report/) |
-| `dec/primitives/musli_descriptive` | **254.71ns** ± 0.09ns | 254.58ns &mdash; 254.84ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/musli_descriptive/report/) |
-| `dec/primitives/musli_packed` | **5.90ns** ± 0.03ns | 5.86ns &mdash; 5.94ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/musli_packed/report/) |
-| `dec/primitives/musli_storage` | **156.97ns** ± 2.58ns | 153.30ns &mdash; 160.63ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/musli_storage/report/) |
-| `dec/primitives/musli_wire` | **166.53ns** ± 0.52ns | 165.79ns &mdash; 167.27ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/musli_wire/report/) |
+| `dec/primitives/bson`[^bson] | **2.81μs** ± 5.28ns | 2.80μs &mdash; 2.82μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/bson/report/) |
+| `dec/primitives/musli_descriptive` | **894.29ns** ± 1.14ns | 892.38ns &mdash; 896.80ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/musli_descriptive/report/) |
+| `dec/primitives/musli_packed` | **15.34ns** ± 0.01ns | 15.32ns &mdash; 15.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/musli_packed/report/) |
+| `dec/primitives/musli_storage` | **603.48ns** ± 1.16ns | 601.75ns &mdash; 606.11ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/musli_storage/report/) |
+| `dec/primitives/musli_wire` | **613.57ns** ± 1.19ns | 611.57ns &mdash; 616.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primitives/musli_wire/report/) |
 
 <table>
 <tr>
@@ -1879,101 +1765,101 @@ Specific comparison to BSON, because the format is limited in capabilities.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primitives/bson`[^bson] | **402.37ns** ± 1.21ns | 400.67ns &mdash; 404.08ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/bson/report/) |
-| `enc/primitives/musli_descriptive` | **84.00ns** ± 0.22ns | 83.68ns &mdash; 84.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/musli_descriptive/report/) |
-| `enc/primitives/musli_packed` | **7.02ns** ± 0.00ns | 7.02ns &mdash; 7.02ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/musli_packed/report/) |
-| `enc/primitives/musli_storage` | **67.10ns** ± 0.38ns | 66.56ns &mdash; 67.65ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/musli_storage/report/) |
-| `enc/primitives/musli_wire` | **127.82ns** ± 0.39ns | 127.26ns &mdash; 128.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/musli_wire/report/) |
+| `enc/primitives/bson`[^bson] | **1.35μs** ± 1.63ns | 1.34μs &mdash; 1.35μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/bson/report/) |
+| `enc/primitives/musli_descriptive` | **329.47ns** ± 0.45ns | 328.68ns &mdash; 330.45ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/musli_descriptive/report/) |
+| `enc/primitives/musli_packed` | **17.88ns** ± 0.02ns | 17.85ns &mdash; 17.91ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/musli_packed/report/) |
+| `enc/primitives/musli_storage` | **254.92ns** ± 0.31ns | 254.39ns &mdash; 255.59ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/musli_storage/report/) |
+| `enc/primitives/musli_wire` | **494.41ns** ± 0.99ns | 492.55ns &mdash; 496.45ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primitives/musli_wire/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>bson/dec/primpacked</code>
+<code>bson/dec/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_bson.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_bson.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_bson.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_bson.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primpacked/bson`[^bson] | **1.03μs** ± 11.28ns | 1.02μs &mdash; 1.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primpacked/bson/report/) |
-| `dec/primpacked/musli_descriptive` | **261.33ns** ± 0.16ns | 261.10ns &mdash; 261.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primpacked/musli_descriptive/report/) |
-| `dec/primpacked/musli_packed` | **5.57ns** ± 0.01ns | 5.56ns &mdash; 5.58ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primpacked/musli_packed/report/) |
-| `dec/primpacked/musli_storage` | **147.20ns** ± 0.34ns | 146.72ns &mdash; 147.67ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primpacked/musli_storage/report/) |
-| `dec/primpacked/musli_wire` | **170.33ns** ± 0.81ns | 169.18ns &mdash; 171.47ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_primpacked/musli_wire/report/) |
+| `dec/packed/bson`[^bson] | **4.03μs** ± 5.64ns | 4.02μs &mdash; 4.04μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_packed/bson/report/) |
+| `dec/packed/musli_descriptive` | **923.24ns** ± 1.18ns | 921.19ns &mdash; 925.82ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_packed/musli_descriptive/report/) |
+| `dec/packed/musli_packed` | **22.30ns** ± 0.02ns | 22.27ns &mdash; 22.34ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_packed/musli_packed/report/) |
+| `dec/packed/musli_storage` | **599.07ns** ± 0.71ns | 597.87ns &mdash; 600.63ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_packed/musli_storage/report/) |
+| `dec/packed/musli_wire` | **587.26ns** ± 0.63ns | 586.15ns &mdash; 588.62ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_packed/musli_wire/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>bson/enc/primpacked</code>
+<code>bson/enc/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_bson.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_bson.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_bson.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_bson.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primpacked/bson`[^bson] | **689.22ns** ± 0.19ns | 688.94ns &mdash; 689.49ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primpacked/bson/report/) |
-| `enc/primpacked/musli_descriptive` | **84.12ns** ± 0.42ns | 83.52ns &mdash; 84.72ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primpacked/musli_descriptive/report/) |
-| `enc/primpacked/musli_packed` | **7.27ns** ± 0.02ns | 7.25ns &mdash; 7.30ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primpacked/musli_packed/report/) |
-| `enc/primpacked/musli_storage` | **60.87ns** ± 0.03ns | 60.82ns &mdash; 60.91ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primpacked/musli_storage/report/) |
-| `enc/primpacked/musli_wire` | **77.03ns** ± 0.28ns | 76.64ns &mdash; 77.43ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_primpacked/musli_wire/report/) |
+| `enc/packed/bson`[^bson] | **2.40μs** ± 3.74ns | 2.39μs &mdash; 2.41μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_packed/bson/report/) |
+| `enc/packed/musli_descriptive` | **337.91ns** ± 0.38ns | 337.27ns &mdash; 338.73ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_packed/musli_descriptive/report/) |
+| `enc/packed/musli_packed` | **19.54ns** ± 0.02ns | 19.50ns &mdash; 19.58ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_packed/musli_packed/report/) |
+| `enc/packed/musli_storage` | **250.07ns** ± 0.32ns | 249.53ns &mdash; 250.76ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_packed/musli_storage/report/) |
+| `enc/packed/musli_wire` | **284.14ns** ± 0.38ns | 283.49ns &mdash; 284.98ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_packed/musli_wire/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>bson/dec/medium_enum</code>
+<code>bson/dec/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_bson.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_bson.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_bson.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_bson.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/medium_enum/bson`[^bson] | **2.13μs** ± 0.81ns | 2.12μs &mdash; 2.13μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_medium_enum/bson/report/) |
-| `dec/medium_enum/musli_descriptive` | **590.63ns** ± 0.63ns | 589.73ns &mdash; 591.53ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_medium_enum/musli_descriptive/report/) |
-| `dec/medium_enum/musli_packed` | **113.93ns** ± 0.15ns | 113.71ns &mdash; 114.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_medium_enum/musli_packed/report/) |
-| `dec/medium_enum/musli_storage` | **376.26ns** ± 0.97ns | 374.89ns &mdash; 377.62ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_medium_enum/musli_storage/report/) |
-| `dec/medium_enum/musli_wire` | **446.64ns** ± 2.16ns | 443.59ns &mdash; 449.69ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_medium_enum/musli_wire/report/) |
+| `dec/full_enum/bson`[^bson] | **9.78μs** ± 12.25ns | 9.76μs &mdash; 9.81μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_full_enum/bson/report/) |
+| `dec/full_enum/musli_descriptive` | **2.41μs** ± 2.31ns | 2.41μs &mdash; 2.42μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_full_enum/musli_descriptive/report/) |
+| `dec/full_enum/musli_packed` | **743.34ns** ± 1.13ns | 741.34ns &mdash; 745.73ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_full_enum/musli_packed/report/) |
+| `dec/full_enum/musli_storage` | **1.71μs** ± 2.42ns | 1.71μs &mdash; 1.72μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_full_enum/musli_storage/report/) |
+| `dec/full_enum/musli_wire` | **1.88μs** ± 2.76ns | 1.87μs &mdash; 1.88μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_full_enum/musli_wire/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>bson/enc/medium_enum</code>
+<code>bson/enc/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_bson.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_bson.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_bson.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_bson.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/medium_enum/bson`[^bson] | **1.53μs** ± 13.40ns | 1.51μs &mdash; 1.54μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_medium_enum/bson/report/) |
-| `enc/medium_enum/musli_descriptive` | **185.08ns** ± 0.81ns | 183.94ns &mdash; 186.22ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_medium_enum/musli_descriptive/report/) |
-| `enc/medium_enum/musli_packed` | **27.93ns** ± 0.02ns | 27.90ns &mdash; 27.95ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_medium_enum/musli_packed/report/) |
-| `enc/medium_enum/musli_storage` | **130.73ns** ± 0.01ns | 130.72ns &mdash; 130.74ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_medium_enum/musli_storage/report/) |
-| `enc/medium_enum/musli_wire` | **250.61ns** ± 0.93ns | 249.30ns &mdash; 251.93ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_medium_enum/musli_wire/report/) |
+| `enc/full_enum/bson`[^bson] | **6.63μs** ± 8.58ns | 6.62μs &mdash; 6.65μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_full_enum/bson/report/) |
+| `enc/full_enum/musli_descriptive` | **829.47ns** ± 1.06ns | 827.66ns &mdash; 831.80ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_full_enum/musli_descriptive/report/) |
+| `enc/full_enum/musli_packed` | **117.25ns** ± 0.15ns | 116.98ns &mdash; 117.57ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_full_enum/musli_packed/report/) |
+| `enc/full_enum/musli_storage` | **606.37ns** ± 0.70ns | 605.18ns &mdash; 607.92ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_full_enum/musli_storage/report/) |
+| `enc/full_enum/musli_wire` | **1.09μs** ± 1.27ns | 1.09μs &mdash; 1.09μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_full_enum/musli_wire/report/) |
 
 
 <table>
@@ -1992,11 +1878,11 @@ Specific comparison to BSON, because the format is limited in capabilities.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/large/bson`[^bson] | **577.89μs** ± 2.57μs | 574.26μs &mdash; 581.52μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/bson/report/) |
-| `dec/large/musli_descriptive` | **151.41μs** ± 0.67ns | 151.41μs &mdash; 151.41μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/musli_descriptive/report/) |
-| `dec/large/musli_packed` | **31.91μs** ± 66.12ns | 31.82μs &mdash; 32.01μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/musli_packed/report/) |
-| `dec/large/musli_storage` | **104.25μs** ± 1.26μs | 102.47μs &mdash; 106.03μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/musli_storage/report/) |
-| `dec/large/musli_wire` | **136.14μs** ± 424.37ns | 135.54μs &mdash; 136.74μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/musli_wire/report/) |
+| `dec/large/bson`[^bson] | **2.08ms** ± 1.54μs | 2.08ms &mdash; 2.08ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/bson/report/) |
+| `dec/large/musli_descriptive` | **483.76μs** ± 575.58ns | 482.83μs &mdash; 485.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/musli_descriptive/report/) |
+| `dec/large/musli_packed` | **105.56μs** ± 92.55ns | 105.39μs &mdash; 105.75μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/musli_packed/report/) |
+| `dec/large/musli_storage` | **347.21μs** ± 634.82ns | 346.23μs &mdash; 348.65μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/musli_storage/report/) |
+| `dec/large/musli_wire` | **448.98μs** ± 598.08ns | 448.03μs &mdash; 450.32μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_large/musli_wire/report/) |
 
 <table>
 <tr>
@@ -2014,11 +1900,11 @@ Specific comparison to BSON, because the format is limited in capabilities.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/large/bson`[^bson] | **361.70μs** ± 2.71μs | 357.88μs &mdash; 365.52μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/bson/report/) |
-| `enc/large/musli_descriptive` | **50.17μs** ± 312.66ns | 49.72μs &mdash; 50.61μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/musli_descriptive/report/) |
-| `enc/large/musli_packed` | **9.05μs** ± 7.43ns | 9.04μs &mdash; 9.06μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/musli_packed/report/) |
-| `enc/large/musli_storage` | **34.48μs** ± 58.58ns | 34.39μs &mdash; 34.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/musli_storage/report/) |
-| `enc/large/musli_wire` | **63.37μs** ± 84.67ns | 63.25μs &mdash; 63.49μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/musli_wire/report/) |
+| `enc/large/bson`[^bson] | **1.12ms** ± 1.63μs | 1.12ms &mdash; 1.13ms | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/bson/report/) |
+| `enc/large/musli_descriptive` | **169.80μs** ± 265.09ns | 169.39μs &mdash; 170.40μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/musli_descriptive/report/) |
+| `enc/large/musli_packed` | **32.26μs** ± 28.21ns | 32.21μs &mdash; 32.32μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/musli_packed/report/) |
+| `enc/large/musli_storage` | **131.41μs** ± 152.96ns | 131.17μs &mdash; 131.75μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/musli_storage/report/) |
+| `enc/large/musli_wire` | **235.26μs** ± 364.90ns | 234.72μs &mdash; 236.10μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_large/musli_wire/report/) |
 
 
 <table>
@@ -2037,11 +1923,11 @@ Specific comparison to BSON, because the format is limited in capabilities.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/allocated/bson`[^bson] | **1.89μs** ± 8.84ns | 1.88μs &mdash; 1.90μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/bson/report/) |
-| `dec/allocated/musli_descriptive` | **1.03μs** ± 4.19ns | 1.03μs &mdash; 1.04μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/musli_descriptive/report/) |
-| `dec/allocated/musli_packed` | **771.93ns** ± 2.04ns | 769.04ns &mdash; 774.83ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/musli_packed/report/) |
-| `dec/allocated/musli_storage` | **954.95ns** ± 0.48ns | 954.27ns &mdash; 955.62ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/musli_storage/report/) |
-| `dec/allocated/musli_wire` | **952.41ns** ± 1.43ns | 950.40ns &mdash; 954.43ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/musli_wire/report/) |
+| `dec/allocated/bson`[^bson] | **7.57μs** ± 9.67ns | 7.55μs &mdash; 7.59μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/bson/report/) |
+| `dec/allocated/musli_descriptive` | **3.13μs** ± 5.46ns | 3.12μs &mdash; 3.15μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/musli_descriptive/report/) |
+| `dec/allocated/musli_packed` | **2.33μs** ± 1.35ns | 2.32μs &mdash; 2.33μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/musli_packed/report/) |
+| `dec/allocated/musli_storage` | **2.84μs** ± 3.60ns | 2.83μs &mdash; 2.84μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/musli_storage/report/) |
+| `dec/allocated/musli_wire` | **2.84μs** ± 3.35ns | 2.83μs &mdash; 2.84μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_allocated/musli_wire/report/) |
 
 <table>
 <tr>
@@ -2059,11 +1945,11 @@ Specific comparison to BSON, because the format is limited in capabilities.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/allocated/bson`[^bson] | **703.37ns** ± 7.18ns | 693.21ns &mdash; 713.54ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/bson/report/) |
-| `enc/allocated/musli_descriptive` | **106.61ns** ± 0.69ns | 105.63ns &mdash; 107.58ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/musli_descriptive/report/) |
-| `enc/allocated/musli_packed` | **44.74ns** ± 0.37ns | 44.21ns &mdash; 45.26ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/musli_packed/report/) |
-| `enc/allocated/musli_storage` | **92.73ns** ± 0.00ns | 92.72ns &mdash; 92.73ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/musli_storage/report/) |
-| `enc/allocated/musli_wire` | **99.08ns** ± 0.18ns | 98.81ns &mdash; 99.34ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/musli_wire/report/) |
+| `enc/allocated/bson`[^bson] | **2.42μs** ± 2.86ns | 2.42μs &mdash; 2.43μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/bson/report/) |
+| `enc/allocated/musli_descriptive` | **403.64ns** ± 0.54ns | 402.72ns &mdash; 404.82ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/musli_descriptive/report/) |
+| `enc/allocated/musli_packed` | **155.10ns** ± 0.10ns | 154.92ns &mdash; 155.31ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/musli_packed/report/) |
+| `enc/allocated/musli_storage` | **341.22ns** ± 0.57ns | 340.22ns &mdash; 342.44ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/musli_storage/report/) |
+| `enc/allocated/musli_wire` | **347.26ns** ± 0.93ns | 346.06ns &mdash; 349.34ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_allocated/musli_wire/report/) |
 
 
 <table>
@@ -2082,11 +1968,11 @@ Specific comparison to BSON, because the format is limited in capabilities.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/mesh/bson`[^bson] | **8.88μs** ± 119.49ns | 8.71μs &mdash; 9.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/bson/report/) |
-| `dec/mesh/musli_descriptive` | **2.63μs** ± 6.66ns | 2.62μs &mdash; 2.64μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/musli_descriptive/report/) |
-| `dec/mesh/musli_packed` | **28.75ns** ± 0.31ns | 28.31ns &mdash; 29.19ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/musli_packed/report/) |
-| `dec/mesh/musli_storage` | **1.68μs** ± 3.50ns | 1.67μs &mdash; 1.68μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/musli_storage/report/) |
-| `dec/mesh/musli_wire` | **1.80μs** ± 7.57ns | 1.79μs &mdash; 1.81μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/musli_wire/report/) |
+| `dec/mesh/bson`[^bson] | **34.50μs** ± 57.26ns | 34.41μs &mdash; 34.63μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/bson/report/) |
+| `dec/mesh/musli_descriptive` | **11.34μs** ± 12.33ns | 11.32μs &mdash; 11.37μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/musli_descriptive/report/) |
+| `dec/mesh/musli_packed` | **91.64ns** ± 0.07ns | 91.51ns &mdash; 91.78ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/musli_packed/report/) |
+| `dec/mesh/musli_storage` | **6.93μs** ± 5.80ns | 6.92μs &mdash; 6.94μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/musli_storage/report/) |
+| `dec/mesh/musli_wire` | **7.96μs** ± 11.81ns | 7.94μs &mdash; 7.99μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/dec_mesh/musli_wire/report/) |
 
 <table>
 <tr>
@@ -2104,11 +1990,11 @@ Specific comparison to BSON, because the format is limited in capabilities.
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/mesh/bson`[^bson] | **3.13μs** ± 7.56ns | 3.12μs &mdash; 3.14μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/bson/report/) |
-| `enc/mesh/musli_descriptive` | **848.39ns** ± 0.30ns | 847.97ns &mdash; 848.82ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/musli_descriptive/report/) |
-| `enc/mesh/musli_packed` | **8.13ns** ± 0.01ns | 8.11ns &mdash; 8.14ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/musli_packed/report/) |
-| `enc/mesh/musli_storage` | **750.34ns** ± 0.99ns | 748.95ns &mdash; 751.73ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/musli_storage/report/) |
-| `enc/mesh/musli_wire` | **780.08ns** ± 6.20ns | 771.30ns &mdash; 788.86ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/musli_wire/report/) |
+| `enc/mesh/bson`[^bson] | **12.68μs** ± 21.50ns | 12.65μs &mdash; 12.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/bson/report/) |
+| `enc/mesh/musli_descriptive` | **4.75μs** ± 10.54ns | 4.73μs &mdash; 4.77μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/musli_descriptive/report/) |
+| `enc/mesh/musli_packed` | **40.25ns** ± 0.03ns | 40.21ns &mdash; 40.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/musli_packed/report/) |
+| `enc/mesh/musli_storage` | **3.54μs** ± 9.21ns | 3.53μs &mdash; 3.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/musli_storage/report/) |
+| `enc/mesh/musli_wire` | **6.63μs** ± 12.47ns | 6.62μs &mdash; 6.66μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-bson/enc_mesh/musli_wire/report/) |
 
 
 
@@ -2148,9 +2034,9 @@ An experimental framework which only supports JSON and a limited number of Rust 
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primitives/miniserde` | **465.99ns** ± 1.97ns | 463.21ns &mdash; 468.78ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primitives/miniserde/report/) |
-| `dec/primitives/musli_json` | **626.55ns** ± 3.66ns | 621.38ns &mdash; 631.72ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primitives/musli_json/report/) |
-| `dec/primitives/serde_json` | **535.83ns** ± 5.73ns | 527.73ns &mdash; 543.93ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primitives/serde_json/report/) |
+| `dec/primitives/miniserde` | **2.08μs** ± 2.86ns | 2.07μs &mdash; 2.08μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primitives/miniserde/report/) |
+| `dec/primitives/musli_json` | **2.60μs** ± 4.45ns | 2.59μs &mdash; 2.61μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primitives/musli_json/report/) |
+| `dec/primitives/serde_json` | **2.22μs** ± 4.51ns | 2.21μs &mdash; 2.23μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primitives/serde_json/report/) |
 
 <table>
 <tr>
@@ -2168,91 +2054,91 @@ An experimental framework which only supports JSON and a limited number of Rust 
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primitives/miniserde` | **636.36ns** ± 2.03ns | 633.49ns &mdash; 639.22ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primitives/miniserde/report/) |
-| `enc/primitives/musli_json` | **281.16ns** ± 0.05ns | 281.09ns &mdash; 281.22ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primitives/musli_json/report/) |
-| `enc/primitives/serde_json` | **273.81ns** ± 3.70ns | 268.59ns &mdash; 279.03ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primitives/serde_json/report/) |
+| `enc/primitives/miniserde` | **2.32μs** ± 4.30ns | 2.31μs &mdash; 2.33μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primitives/miniserde/report/) |
+| `enc/primitives/musli_json` | **1.00μs** ± 1.07ns | 1.00μs &mdash; 1.00μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primitives/musli_json/report/) |
+| `enc/primitives/serde_json` | **960.23ns** ± 0.78ns | 958.84ns &mdash; 961.90ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primitives/serde_json/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>miniserde/dec/primpacked</code>
+<code>miniserde/dec/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_miniserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_primpacked_miniserde.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_miniserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_packed_miniserde.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/primpacked/miniserde` | **631.57ns** ± 0.59ns | 630.73ns &mdash; 632.41ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primpacked/miniserde/report/) |
-| `dec/primpacked/musli_json` | **853.93ns** ± 6.49ns | 844.76ns &mdash; 863.11ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primpacked/musli_json/report/) |
-| `dec/primpacked/serde_json` | **684.63ns** ± 3.28ns | 679.99ns &mdash; 689.28ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_primpacked/serde_json/report/) |
+| `dec/packed/miniserde` | **2.79μs** ± 4.09ns | 2.78μs &mdash; 2.79μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_packed/miniserde/report/) |
+| `dec/packed/musli_json` | **3.45μs** ± 5.29ns | 3.44μs &mdash; 3.46μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_packed/musli_json/report/) |
+| `dec/packed/serde_json` | **2.78μs** ± 4.22ns | 2.78μs &mdash; 2.79μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_packed/serde_json/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>miniserde/enc/primpacked</code>
+<code>miniserde/enc/packed</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primpacked/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_packed/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_miniserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_primpacked_miniserde.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_miniserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_packed_miniserde.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/primpacked/miniserde` | **912.67ns** ± 10.87ns | 897.33ns &mdash; 928.01ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primpacked/miniserde/report/) |
-| `enc/primpacked/musli_json` | **289.69ns** ± 0.12ns | 289.52ns &mdash; 289.86ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primpacked/musli_json/report/) |
-| `enc/primpacked/serde_json` | **309.38ns** ± 1.62ns | 307.10ns &mdash; 311.67ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_primpacked/serde_json/report/) |
+| `enc/packed/miniserde` | **3.04μs** ± 4.86ns | 3.03μs &mdash; 3.05μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_packed/miniserde/report/) |
+| `enc/packed/musli_json` | **913.05ns** ± 1.87ns | 910.07ns &mdash; 917.26ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_packed/musli_json/report/) |
+| `enc/packed/serde_json` | **1.13μs** ± 1.84ns | 1.12μs &mdash; 1.13μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_packed/serde_json/report/) |
 
 
 <table>
 <tr>
 <th colspan="3">
-<code>miniserde/dec/medium_enum</code>
+<code>miniserde/dec/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_miniserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_medium_enum_miniserde.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_miniserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/dec_full_enum_miniserde.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/medium_enum/miniserde` | **19.88ns** ± 0.01ns | 19.87ns &mdash; 19.89ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_medium_enum/miniserde/report/) |
-| `dec/medium_enum/musli_json` | **18.51ns** ± 0.20ns | 18.23ns &mdash; 18.79ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_medium_enum/musli_json/report/) |
-| `dec/medium_enum/serde_json` | **24.75ns** ± 0.33ns | 24.29ns &mdash; 25.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_medium_enum/serde_json/report/) |
+| `dec/full_enum/miniserde` | **68.30ns** ± 0.09ns | 68.15ns &mdash; 68.49ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_full_enum/miniserde/report/) |
+| `dec/full_enum/musli_json` | **60.54ns** ± 0.07ns | 60.43ns &mdash; 60.69ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_full_enum/musli_json/report/) |
+| `dec/full_enum/serde_json` | **71.29ns** ± 0.07ns | 71.18ns &mdash; 71.46ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_full_enum/serde_json/report/) |
 
 <table>
 <tr>
 <th colspan="3">
-<code>miniserde/enc/medium_enum</code>
+<code>miniserde/enc/full_enum</code>
 <br />
-<a href="https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_medium_enum/report/">Report 📓</a>
+<a href="https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_full_enum/report/">Report 📓</a>
 </th>
 </tr>
 <tr>
 <td colspan="3">
-<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_miniserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_medium_enum_miniserde.svg"></a></td>
+<a href="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_miniserde.svg"><img style="background-color: white;" src="https://raw.githubusercontent.com/udoprog/musli/gh-pages/benchmarks/images/enc_full_enum_miniserde.svg"></a></td>
 </tr>
 </table>
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/medium_enum/miniserde` | **27.99ns** ± 0.01ns | 27.98ns &mdash; 27.99ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_medium_enum/miniserde/report/) |
-| `enc/medium_enum/musli_json` | **7.08ns** ± 0.02ns | 7.05ns &mdash; 7.12ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_medium_enum/musli_json/report/) |
-| `enc/medium_enum/serde_json` | **9.07ns** ± 0.05ns | 9.00ns &mdash; 9.14ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_medium_enum/serde_json/report/) |
+| `enc/full_enum/miniserde` | **97.52ns** ± 0.08ns | 97.39ns &mdash; 97.69ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_full_enum/miniserde/report/) |
+| `enc/full_enum/musli_json` | **23.46ns** ± 0.02ns | 23.42ns &mdash; 23.52ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_full_enum/musli_json/report/) |
+| `enc/full_enum/serde_json` | **28.14ns** ± 0.03ns | 28.10ns &mdash; 28.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_full_enum/serde_json/report/) |
 
 
 <table>
@@ -2271,9 +2157,9 @@ An experimental framework which only supports JSON and a limited number of Rust 
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/large/miniserde` | **29.54μs** ± 64.69ns | 29.45μs &mdash; 29.63μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_large/miniserde/report/) |
-| `dec/large/musli_json` | **45.25μs** ± 144.01ns | 45.04μs &mdash; 45.45μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_large/musli_json/report/) |
-| `dec/large/serde_json` | **37.49μs** ± 49.67ns | 37.42μs &mdash; 37.56μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_large/serde_json/report/) |
+| `dec/large/miniserde` | **123.13μs** ± 206.83ns | 122.81μs &mdash; 123.60μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_large/miniserde/report/) |
+| `dec/large/musli_json` | **180.81μs** ± 207.13ns | 180.45μs &mdash; 181.25μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_large/musli_json/report/) |
+| `dec/large/serde_json` | **146.16μs** ± 194.83ns | 145.82μs &mdash; 146.58μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_large/serde_json/report/) |
 
 <table>
 <tr>
@@ -2291,9 +2177,9 @@ An experimental framework which only supports JSON and a limited number of Rust 
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/large/miniserde` | **27.94μs** ± 28.02ns | 27.90μs &mdash; 27.98μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_large/miniserde/report/) |
-| `enc/large/musli_json` | **19.35μs** ± 254.41ns | 18.99μs &mdash; 19.71μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_large/musli_json/report/) |
-| `enc/large/serde_json` | **17.57μs** ± 27.00ns | 17.53μs &mdash; 17.61μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_large/serde_json/report/) |
+| `enc/large/miniserde` | **102.20μs** ± 133.81ns | 101.97μs &mdash; 102.49μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_large/miniserde/report/) |
+| `enc/large/musli_json` | **63.35μs** ± 115.05ns | 63.16μs &mdash; 63.61μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_large/musli_json/report/) |
+| `enc/large/serde_json` | **62.39μs** ± 61.87ns | 62.28μs &mdash; 62.52μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_large/serde_json/report/) |
 
 
 <table>
@@ -2312,9 +2198,9 @@ An experimental framework which only supports JSON and a limited number of Rust 
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/allocated/miniserde` | **200.70ns** ± 0.71ns | 199.70ns &mdash; 201.70ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_allocated/miniserde/report/) |
-| `dec/allocated/musli_json` | **191.20ns** ± 1.77ns | 188.70ns &mdash; 193.70ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_allocated/musli_json/report/) |
-| `dec/allocated/serde_json` | **150.12ns** ± 0.10ns | 149.98ns &mdash; 150.26ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_allocated/serde_json/report/) |
+| `dec/allocated/miniserde` | **672.90ns** ± 0.73ns | 671.58ns &mdash; 674.43ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_allocated/miniserde/report/) |
+| `dec/allocated/musli_json` | **667.41ns** ± 1.12ns | 665.68ns &mdash; 669.97ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_allocated/musli_json/report/) |
+| `dec/allocated/serde_json` | **478.08ns** ± 0.58ns | 477.13ns &mdash; 479.37ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_allocated/serde_json/report/) |
 
 <table>
 <tr>
@@ -2332,9 +2218,9 @@ An experimental framework which only supports JSON and a limited number of Rust 
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/allocated/miniserde` | **228.28ns** ± 1.27ns | 226.49ns &mdash; 230.08ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_allocated/miniserde/report/) |
-| `enc/allocated/musli_json` | **41.84ns** ± 0.07ns | 41.74ns &mdash; 41.94ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_allocated/musli_json/report/) |
-| `enc/allocated/serde_json` | **46.37ns** ± 0.01ns | 46.36ns &mdash; 46.38ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_allocated/serde_json/report/) |
+| `enc/allocated/miniserde` | **742.58ns** ± 1.10ns | 740.63ns &mdash; 744.91ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_allocated/miniserde/report/) |
+| `enc/allocated/musli_json` | **167.73ns** ± 0.28ns | 167.30ns &mdash; 168.36ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_allocated/musli_json/report/) |
+| `enc/allocated/serde_json` | **186.23ns** ± 0.24ns | 185.82ns &mdash; 186.74ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_allocated/serde_json/report/) |
 
 
 <table>
@@ -2353,9 +2239,9 @@ An experimental framework which only supports JSON and a limited number of Rust 
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `dec/mesh/miniserde` | **6.96μs** ± 40.24ns | 6.90μs &mdash; 7.01μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_mesh/miniserde/report/) |
-| `dec/mesh/musli_json` | **8.52μs** ± 31.75ns | 8.48μs &mdash; 8.57μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_mesh/musli_json/report/) |
-| `dec/mesh/serde_json` | **7.18μs** ± 21.23ns | 7.15μs &mdash; 7.21μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_mesh/serde_json/report/) |
+| `dec/mesh/miniserde` | **22.67μs** ± 28.08ns | 22.62μs &mdash; 22.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_mesh/miniserde/report/) |
+| `dec/mesh/musli_json` | **30.79μs** ± 57.71ns | 30.70μs &mdash; 30.92μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_mesh/musli_json/report/) |
+| `dec/mesh/serde_json` | **24.65μs** ± 42.67ns | 24.58μs &mdash; 24.75μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/dec_mesh/serde_json/report/) |
 
 <table>
 <tr>
@@ -2373,9 +2259,9 @@ An experimental framework which only supports JSON and a limited number of Rust 
 
 | Group | Mean | Interval | Link |
 |-|-|-|-|
-| `enc/mesh/miniserde` | **7.69μs** ± 17.70ns | 7.67μs &mdash; 7.72μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_mesh/miniserde/report/) |
-| `enc/mesh/musli_json` | **3.36μs** ± 18.80ns | 3.33μs &mdash; 3.38μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_mesh/musli_json/report/) |
-| `enc/mesh/serde_json` | **3.56μs** ± 31.14ns | 3.52μs &mdash; 3.60μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_mesh/serde_json/report/) |
+| `enc/mesh/miniserde` | **25.78μs** ± 27.94ns | 25.74μs &mdash; 25.85μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_mesh/miniserde/report/) |
+| `enc/mesh/musli_json` | **12.84μs** ± 20.78ns | 12.81μs &mdash; 12.88μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_mesh/musli_json/report/) |
+| `enc/mesh/serde_json` | **14.04μs** ± 24.13ns | 14.00μs &mdash; 14.09μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-miniserde/enc_mesh/serde_json/report/) |
 
 
 
@@ -2384,8 +2270,8 @@ An experimental framework which only supports JSON and a limited number of Rust 
 This is not yet an area which has received much focus, but because people are bound to ask the following section performs a raw size comparison between different formats.
 Each test suite serializes a collection of values, which have all been randomly populated.
 - A small object containing one of each primitive type and a string and a byte array. (`primitives`)
-- Tried to achieve the same goal as `primitives`, but with a packed layout to support certain zerocopy libraries. (`primpacked`)
-- A moderately sized enum with every kind of supported variant. (`medium_enum`)
+- Tried to achieve the same goal as `primitives`, but with a packed layout to support certain zerocopy libraries. (`packed`)
+- An enum with every kind of supported variant. (`full_enum`)
 - A really big and complex struct. (`large`)
 - A sparse struct which contains fairly plain allocated data like strings and vectors. (`allocated`)
 - A mesh containing triangles. (`mesh`)
@@ -2399,25 +2285,27 @@ Each test suite serializes a collection of values, which have all been randomly 
 These frameworks provide a fair comparison against Müsli on various areas since
 they support the same set of features in what types of data they can represent.
 
-| **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
+| **framework** | `primitives` | `packed` | `large` | `allocated` | `full_enum` | `mesh` |
 | - | - | - | - | - | - | - |
-| `musli_descriptive` | <a title="samples: 500, min: 154, max: 164, stddev: 1.5621574824581534">159.89 ± 1.56</a> | <a title="samples: 500, min: 161, max: 170, stddev: 1.5612764008976794">165.80 ± 1.56</a> | <a title="samples: 10, min: 25295, max: 61463, stddev: 11847.805317863726">49647.50 ± 11847.81</a> | <a title="samples: 100, min: 447, max: 887, stddev: 103.34544934345199">645.91 ± 103.35</a> | <a title="samples: 4000, min: 4, max: 190, stddev: 65.04924003975692">54.03 ± 65.05</a> | <a title="samples: 10, min: 1094, max: 1748, stddev: 237.80992409905858">1442.80 ± 237.81</a> |
-| `musli_packed` | <a title="samples: 500, min: 95, max: 95, stddev: 0">95.00 ± 0.00</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 10, min: 22958, max: 63679, stddev: 12161.381693294557">48955.90 ± 12161.38</a> | <a title="samples: 100, min: 505, max: 963, stddev: 105.73878191089588">708.50 ± 105.74</a> | <a title="samples: 4000, min: 16, max: 191, stddev: 54.14185957048389">59.62 ± 54.14</a> | <a title="samples: 10, min: 488, max: 776, stddev: 104.72363630050286">641.60 ± 104.72</a> |
-| `musli_storage` | <a title="samples: 500, min: 122, max: 131, stddev: 1.3556681009745792">127.86 ± 1.36</a> | <a title="samples: 500, min: 127, max: 134, stddev: 1.3827783625729677">130.88 ± 1.38</a> | <a title="samples: 10, min: 21145, max: 49729, stddev: 9297.125779508418">40343.20 ± 9297.13</a> | <a title="samples: 100, min: 419, max: 854, stddev: 101.93807139631396">616.64 ± 101.94</a> | <a title="samples: 4000, min: 2, max: 151, stddev: 53.034005312040286">43.58 ± 53.03</a> | <a title="samples: 10, min: 813, max: 1299, stddev: 176.72113625709858">1072.20 ± 176.72</a> |
-| `musli_wire` | <a title="samples: 500, min: 137, max: 147, stddev: 1.7739210805444463">143.30 ± 1.77</a> | <a title="samples: 500, min: 143, max: 153, stddev: 1.8691292090168572">148.43 ± 1.87</a> | <a title="samples: 10, min: 23533, max: 57105, stddev: 10938.562155969128">46124.40 ± 10938.56</a> | <a title="samples: 100, min: 432, max: 873, stddev: 103.44413903165322">632.99 ± 103.44</a> | <a title="samples: 4000, min: 3, max: 179, stddev: 59.57751017791893">49.59 ± 59.58</a> | <a title="samples: 10, min: 933, max: 1491, stddev: 202.90204533222428">1230.60 ± 202.90</a> |
-| `postcard` | <a title="samples: 500, min: 105, max: 114, stddev: 1.4079360780944647">110.85 ± 1.41</a> | <a title="samples: 500, min: 107, max: 114, stddev: 1.3359101766211645">110.81 ± 1.34</a> | <a title="samples: 10, min: 18832, max: 41860, stddev: 7489.294573589692">34429.30 ± 7489.29</a> | <a title="samples: 100, min: 406, max: 841, stddev: 101.93807139631396">603.64 ± 101.94</a> | <a title="samples: 4000, min: 1, max: 146, stddev: 48.185339854954464">39.82 ± 48.19</a> | <a title="samples: 10, min: 481, max: 769, stddev: 104.72363630050286">634.60 ± 104.72</a> |
-| `serde_bincode` | <a title="samples: 500, min: 93, max: 95, stddev: 0.20591260281973842">94.96 ± 0.21</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 10, min: 18076, max: 39362, stddev: 6572.198284440299">32140.10 ± 6572.20</a> | <a title="samples: 100, min: 504, max: 962, stddev: 105.73878191089588">707.50 ± 105.74</a> | <a title="samples: 4000, min: 4, max: 163, stddev: 47.42856512429996">42.61 ± 47.43</a> | <a title="samples: 10, min: 488, max: 776, stddev: 104.72363630050286">641.60 ± 104.72</a> |
-| `serde_bitcode` | <a title="samples: 500, min: 103, max: 105, stddev: 0.3823924685450779">104.92 ± 0.38</a> | <a title="samples: 500, min: 105, max: 105, stddev: 0">105.00 ± 0.00</a> | <a title="samples: 10, min: 16856, max: 35939, stddev: 6106.095791092701">29713.30 ± 6106.10</a> | <a title="samples: 100, min: 401, max: 838, stddev: 101.51465854742356">597.71 ± 101.51</a> | <a title="samples: 4000, min: 1, max: 147, stddev: 47.011009750376175">38.98 ± 47.01</a> | <a title="samples: 10, min: 481, max: 769, stddev: 104.72363630050286">634.60 ± 104.72</a> |
-| `serde_rmp` | <a title="samples: 500, min: 111, max: 115, stddev: 0.7291090453423233">113.82 ± 0.73</a> | <a title="samples: 500, min: 116, max: 123, stddev: 1.4824304368165206">119.88 ± 1.48</a> | <a title="samples: 10, min: 20714, max: 48016, stddev: 8571.98435661195">38904.70 ± 8571.98</a> | <a title="samples: 100, min: 412, max: 851, stddev: 102.82278492629929">609.57 ± 102.82</a> | <a title="samples: 4000, min: 6, max: 173, stddev: 50.88175615827298">51.21 ± 50.88</a> | <a title="samples: 10, min: 652, max: 1044, stddev: 142.58415059185225">860.60 ± 142.58</a> |
+| `bincode1` | <a title="samples: 500, min: 93, max: 95, stddev: 0.20591260281973842">94.96 ± 0.21</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 10, min: 18030, max: 40236, stddev: 7034.590902106533">30208.80 ± 7034.59</a> | <a title="samples: 100, min: 460, max: 1000, stddev: 118.27502652715827">703.59 ± 118.28</a> | <a title="samples: 4000, min: 4, max: 163, stddev: 47.62791866122228">42.81 ± 47.63</a> | <a title="samples: 10, min: 536, max: 920, stddev: 141.09060918431106">699.20 ± 141.09</a> |
+| `bincode_derive` | <a title="samples: 500, min: 103, max: 105, stddev: 0.24019991673603594">104.95 ± 0.24</a> | <a title="samples: 500, min: 104, max: 106, stddev: 0.12623787070447653">105.99 ± 0.13</a> | <a title="samples: 10, min: 17881, max: 42139, stddev: 7637.403276637943">31145.70 ± 7637.40</a> | <a title="samples: 100, min: 356, max: 883, stddev: 113.92333343086482">596.71 ± 113.92</a> | <a title="samples: 4000, min: 1, max: 146, stddev: 47.05755374007393">39.06 ± 47.06</a> | - |
+| `bincode_serde` | <a title="samples: 500, min: 103, max: 105, stddev: 0.24019991673603594">104.95 ± 0.24</a> | <a title="samples: 500, min: 104, max: 106, stddev: 0.12623787070447653">105.99 ± 0.13</a> | <a title="samples: 10, min: 17881, max: 42139, stddev: 7637.403276637943">31145.70 ± 7637.40</a> | <a title="samples: 100, min: 356, max: 883, stddev: 113.92333343086482">596.71 ± 113.92</a> | <a title="samples: 4000, min: 1, max: 146, stddev: 47.05755374007393">39.06 ± 47.06</a> | <a title="samples: 10, min: 529, max: 913, stddev: 141.09060918431106">692.20 ± 141.09</a> |
+| `musli_descriptive` | <a title="samples: 500, min: 154, max: 164, stddev: 1.5621574824581534">159.89 ± 1.56</a> | <a title="samples: 500, min: 161, max: 170, stddev: 1.5612764008976794">165.80 ± 1.56</a> | <a title="samples: 10, min: 24272, max: 62325, stddev: 11746.630546671671">44494.00 ± 11746.63</a> | <a title="samples: 100, min: 392, max: 936, stddev: 115.89930284518539">641.46 ± 115.90</a> | <a title="samples: 4000, min: 4, max: 191, stddev: 65.1371927530652">54.22 ± 65.14</a> | <a title="samples: 10, min: 1203, max: 2075, stddev: 320.39325835603967">1573.60 ± 320.39</a> |
+| `musli_packed` | <a title="samples: 500, min: 95, max: 95, stddev: 0">95.00 ± 0.00</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 10, min: 25182, max: 59884, stddev: 11282.295849693006">43302.60 ± 11282.30</a> | <a title="samples: 100, min: 461, max: 1001, stddev: 118.27502652715827">704.59 ± 118.28</a> | <a title="samples: 4000, min: 16, max: 191, stddev: 54.28528938856252">59.82 ± 54.29</a> | <a title="samples: 10, min: 536, max: 920, stddev: 141.09060918431106">699.20 ± 141.09</a> |
+| `musli_storage` | <a title="samples: 500, min: 122, max: 131, stddev: 1.3556681009745792">127.86 ± 1.36</a> | <a title="samples: 500, min: 127, max: 134, stddev: 1.3827783625729677">130.88 ± 1.38</a> | <a title="samples: 10, min: 20434, max: 50623, stddev: 9394.129614285723">36673.30 ± 9394.13</a> | <a title="samples: 100, min: 369, max: 901, stddev: 114.19128294226314">612.47 ± 114.19</a> | <a title="samples: 4000, min: 2, max: 151, stddev: 53.14677231438912">43.76 ± 53.15</a> | <a title="samples: 10, min: 894, max: 1542, stddev: 238.09040299852492">1169.40 ± 238.09</a> |
+| `musli_wire` | <a title="samples: 500, min: 137, max: 147, stddev: 1.7739210805444463">143.30 ± 1.77</a> | <a title="samples: 500, min: 143, max: 153, stddev: 1.8691292090168572">148.43 ± 1.87</a> | <a title="samples: 10, min: 22877, max: 57794, stddev: 10846.271040777103">41447.90 ± 10846.27</a> | <a title="samples: 100, min: 378, max: 924, stddev: 116.24610918220016">628.39 ± 116.25</a> | <a title="samples: 4000, min: 3, max: 179, stddev: 59.66024592431755">49.77 ± 59.66</a> | <a title="samples: 10, min: 1026, max: 1770, stddev: 273.3630552946027">1342.20 ± 273.36</a> |
+| `postcard` | <a title="samples: 500, min: 105, max: 114, stddev: 1.4079360780944647">110.85 ± 1.41</a> | <a title="samples: 500, min: 107, max: 114, stddev: 1.3359101766211645">110.81 ± 1.34</a> | <a title="samples: 10, min: 18204, max: 43171, stddev: 7838.735447124108">31857.70 ± 7838.74</a> | <a title="samples: 100, min: 356, max: 888, stddev: 114.19128294226314">599.47 ± 114.19</a> | <a title="samples: 4000, min: 1, max: 146, stddev: 48.32612079403852">40.01 ± 48.33</a> | <a title="samples: 10, min: 529, max: 913, stddev: 141.09060918431106">692.20 ± 141.09</a> |
+| `serde_bitcode` | <a title="samples: 500, min: 103, max: 105, stddev: 0.3823924685450779">104.92 ± 0.38</a> | <a title="samples: 500, min: 105, max: 105, stddev: 0">105.00 ± 0.00</a> | <a title="samples: 10, min: 16433, max: 37270, stddev: 6598.064050158955">27956.30 ± 6598.06</a> | <a title="samples: 100, min: 357, max: 876, stddev: 113.18496852497684">593.73 ± 113.18</a> | <a title="samples: 4000, min: 1, max: 147, stddev: 47.18087031838193">39.18 ± 47.18</a> | <a title="samples: 10, min: 529, max: 913, stddev: 141.09060918431106">692.20 ± 141.09</a> |
+| `serde_rmp` | <a title="samples: 500, min: 111, max: 115, stddev: 0.7291090453423233">113.82 ± 0.73</a> | <a title="samples: 500, min: 116, max: 123, stddev: 1.4824304368165206">119.88 ± 1.48</a> | <a title="samples: 10, min: 20514, max: 48425, stddev: 8759.264095230832">35601.10 ± 8759.26</a> | <a title="samples: 100, min: 362, max: 893, stddev: 114.88570450669658">605.43 ± 114.89</a> | <a title="samples: 4000, min: 6, max: 173, stddev: 51.05828320654722">51.40 ± 51.06</a> | <a title="samples: 10, min: 717, max: 1239, stddev: 191.9722896670246">938.80 ± 191.97</a> |
 
 #### Text-based formats sizes
 
 These are text-based formats, which support the full feature set of this test suite.
 
-| **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
+| **framework** | `primitives` | `packed` | `large` | `allocated` | `full_enum` | `mesh` |
 | - | - | - | - | - | - | - |
-| `musli_json`[^incomplete] | <a title="samples: 500, min: 428, max: 442, stddev: 2.370359466410104">435.41 ± 2.37</a> | <a title="samples: 500, min: 443, max: 460, stddev: 2.9921657708088594">452.29 ± 2.99</a> | <a title="samples: 10, min: 53818, max: 135258, stddev: 26708.92076460597">105772.30 ± 26708.92</a> | <a title="samples: 100, min: 695, max: 1223, stddev: 116.12703216736405">935.82 ± 116.13</a> | <a title="samples: 4000, min: 12, max: 508, stddev: 154.99859129823562">109.97 ± 155.00</a> | <a title="samples: 10, min: 2114, max: 3369, stddev: 457.93677511202355">2780.10 ± 457.94</a> |
-| `serde_json`[^incomplete] | <a title="samples: 500, min: 428, max: 442, stddev: 2.370359466410104">435.41 ± 2.37</a> | <a title="samples: 500, min: 443, max: 460, stddev: 2.9921657708088594">452.29 ± 2.99</a> | <a title="samples: 10, min: 53655, max: 135057, stddev: 26723.303290573942">105487.20 ± 26723.30</a> | <a title="samples: 100, min: 693, max: 1221, stddev: 116.12703216736405">933.82 ± 116.13</a> | <a title="samples: 4000, min: 7, max: 508, stddev: 155.48331177955228">107.34 ± 155.48</a> | <a title="samples: 10, min: 2114, max: 3369, stddev: 457.93677511202355">2780.10 ± 457.94</a> |
+| `musli_json`[^incomplete] | <a title="samples: 500, min: 428, max: 442, stddev: 2.370359466410104">435.41 ± 2.37</a> | <a title="samples: 500, min: 443, max: 460, stddev: 2.9921657708088594">452.29 ± 2.99</a> | <a title="samples: 10, min: 46119, max: 135589, stddev: 26685.953122195206">93040.40 ± 26685.95</a> | <a title="samples: 100, min: 624, max: 1294, stddev: 125.8695292753572">927.04 ± 125.87</a> | <a title="samples: 4000, min: 12, max: 508, stddev: 154.95497984172707">110.17 ± 154.95</a> | <a title="samples: 10, min: 2315, max: 3998, stddev: 614.3611722757225">3029.50 ± 614.36</a> |
+| `serde_json`[^incomplete] | <a title="samples: 500, min: 428, max: 442, stddev: 2.370359466410104">435.41 ± 2.37</a> | <a title="samples: 500, min: 443, max: 460, stddev: 2.9921657708088594">452.29 ± 2.99</a> | <a title="samples: 10, min: 45838, max: 135320, stddev: 26682.236564613544">92751.90 ± 26682.24</a> | <a title="samples: 100, min: 622, max: 1292, stddev: 125.8695292753572">925.04 ± 125.87</a> | <a title="samples: 4000, min: 7, max: 508, stddev: 155.44015658043512">107.54 ± 155.44</a> | <a title="samples: 10, min: 2315, max: 3998, stddev: 614.3611722757225">3029.50 ± 614.36</a> |
 
 #### Fewer features sizes
 
@@ -2428,13 +2316,13 @@ These are text-based formats, which support the full feature set of this test su
 This is a suite where support for 128-bit integers and maps are disabled.
 Usually because the underlying framework lacks support for them.
 
-| **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
+| **framework** | `primitives` | `packed` | `large` | `allocated` | `full_enum` | `mesh` |
 | - | - | - | - | - | - | - |
-| `musli_descriptive` | <a title="samples: 500, min: 112, max: 120, stddev: 1.4613363746926964">116.36 ± 1.46</a> | <a title="samples: 500, min: 118, max: 126, stddev: 1.457772273024832">122.33 ± 1.46</a> | <a title="samples: 10, min: 14103, max: 58953, stddev: 14713.168535702976">33757.20 ± 14713.17</a> | <a title="samples: 100, min: 265, max: 730, stddev: 97.39532380971892">495.47 ± 97.40</a> | <a title="samples: 4000, min: 4, max: 182, stddev: 54.82959230595704">48.67 ± 54.83</a> | <a title="samples: 10, min: 1094, max: 1966, stddev: 274.8875406416231">1508.20 ± 274.89</a> |
-| `musli_packed` | <a title="samples: 500, min: 63, max: 63, stddev: 0">63.00 ± 0.00</a> | <a title="samples: 500, min: 64, max: 64, stddev: 0">64.00 ± 0.00</a> | <a title="samples: 10, min: 12152, max: 57583, stddev: 15034.268941654595">32770.30 ± 15034.27</a> | <a title="samples: 100, min: 313, max: 783, stddev: 99.04539312860544">549.99 ± 99.05</a> | <a title="samples: 4000, min: 16, max: 190, stddev: 48.47447442726962">55.68 ± 48.47</a> | <a title="samples: 10, min: 488, max: 872, stddev: 121.05139404401753">670.40 ± 121.05</a> |
-| `musli_storage` | <a title="samples: 500, min: 84, max: 91, stddev: 1.280818488311287">88.25 ± 1.28</a> | <a title="samples: 500, min: 88, max: 94, stddev: 1.2251938622112004">91.33 ± 1.23</a> | <a title="samples: 10, min: 10977, max: 46389, stddev: 11613.773927539662">26517.60 ± 11613.77</a> | <a title="samples: 100, min: 247, max: 706, stddev: 96.35662924781045">474.00 ± 96.36</a> | <a title="samples: 4000, min: 2, max: 148, stddev: 44.30593878858108">38.72 ± 44.31</a> | <a title="samples: 10, min: 813, max: 1461, stddev: 204.27422744927958">1120.80 ± 204.27</a> |
-| `musli_wire` | <a title="samples: 500, min: 96, max: 106, stddev: 1.7524143345681649">101.86 ± 1.75</a> | <a title="samples: 500, min: 102, max: 111, stddev: 1.7655310815729104">106.83 ± 1.77</a> | <a title="samples: 10, min: 12723, max: 54167, stddev: 13604.62029642871">30988.30 ± 13604.62</a> | <a title="samples: 100, min: 253, max: 720, stddev: 97.62660446824933">484.81 ± 97.63</a> | <a title="samples: 4000, min: 3, max: 177, stddev: 50.35150094833317">44.45 ± 50.35</a> | <a title="samples: 10, min: 933, max: 1677, stddev: 234.53707596028397">1286.40 ± 234.54</a> |
-| `serde_cbor`[^i128] | <a title="samples: 500, min: 210, max: 213, stddev: 0.5346961754117986">212.69 ± 0.53</a> | <a title="samples: 500, min: 218, max: 222, stddev: 0.847610759724064">221.17 ± 0.85</a> | <a title="samples: 10, min: 19941, max: 65898, stddev: 15353.406965556536">38517.50 ± 15353.41</a> | <a title="samples: 100, min: 344, max: 806, stddev: 97.04497668607067">573.25 ± 97.04</a> | <a title="samples: 4000, min: 6, max: 251, stddev: 80.65625115110487">66.15 ± 80.66</a> | <a title="samples: 10, min: 1062, max: 1900, stddev: 264.53135919962307">1460.60 ± 264.53</a> |
+| `musli_descriptive` | <a title="samples: 500, min: 112, max: 120, stddev: 1.4613363746926964">116.36 ± 1.46</a> | <a title="samples: 500, min: 118, max: 126, stddev: 1.457772273024832">122.33 ± 1.46</a> | <a title="samples: 10, min: 17911, max: 59909, stddev: 12329.34556089657">33591.80 ± 12329.35</a> | <a title="samples: 100, min: 265, max: 730, stddev: 97.87126800036872">494.43 ± 97.87</a> | <a title="samples: 4000, min: 4, max: 182, stddev: 54.906162304426424">48.72 ± 54.91</a> | <a title="samples: 10, min: 1094, max: 1639, stddev: 182.39188578442847">1421.00 ± 182.39</a> |
+| `musli_packed` | <a title="samples: 500, min: 63, max: 63, stddev: 0">63.00 ± 0.00</a> | <a title="samples: 500, min: 64, max: 64, stddev: 0">64.00 ± 0.00</a> | <a title="samples: 10, min: 15484, max: 58672, stddev: 13016.95506214875">32171.90 ± 13016.96</a> | <a title="samples: 100, min: 313, max: 783, stddev: 99.62658831858087">548.77 ± 99.63</a> | <a title="samples: 4000, min: 16, max: 190, stddev: 48.587230312474944">55.74 ± 48.59</a> | <a title="samples: 10, min: 488, max: 728, stddev: 80.31936254727125">632.00 ± 80.32</a> |
+| `musli_storage` | <a title="samples: 500, min: 84, max: 91, stddev: 1.280818488311287">88.25 ± 1.28</a> | <a title="samples: 500, min: 88, max: 94, stddev: 1.2251938622112004">91.33 ± 1.23</a> | <a title="samples: 10, min: 14230, max: 47327, stddev: 9752.03951796751">26568.20 ± 9752.04</a> | <a title="samples: 100, min: 247, max: 706, stddev: 96.8645363381253">472.96 ± 96.86</a> | <a title="samples: 4000, min: 2, max: 148, stddev: 44.386133192135325">38.78 ± 44.39</a> | <a title="samples: 10, min: 813, max: 1218, stddev: 135.53892429852024">1056.00 ± 135.54</a> |
+| `musli_wire` | <a title="samples: 500, min: 96, max: 106, stddev: 1.7524143345681649">101.86 ± 1.75</a> | <a title="samples: 500, min: 102, max: 111, stddev: 1.7655310815729104">106.83 ± 1.77</a> | <a title="samples: 10, min: 16316, max: 55119, stddev: 11435.094954131338">30855.30 ± 11435.09</a> | <a title="samples: 100, min: 253, max: 720, stddev: 98.16000152811735">483.71 ± 98.16</a> | <a title="samples: 4000, min: 3, max: 177, stddev: 50.42654553841163">44.50 ± 50.43</a> | <a title="samples: 10, min: 933, max: 1398, stddev: 155.61876493533805">1212.00 ± 155.62</a> |
+| `serde_cbor`[^i128] | <a title="samples: 500, min: 210, max: 213, stddev: 0.5346961754117986">212.69 ± 0.53</a> | <a title="samples: 500, min: 218, max: 222, stddev: 0.847610759724064">221.17 ± 0.85</a> | <a title="samples: 10, min: 24082, max: 66856, stddev: 12008.235377856316">39243.90 ± 12008.24</a> | <a title="samples: 100, min: 344, max: 806, stddev: 97.56187985068759">572.14 ± 97.56</a> | <a title="samples: 4000, min: 6, max: 251, stddev: 80.69812101901833">66.21 ± 80.70</a> | <a title="samples: 10, min: 1060, max: 1587, stddev: 175.81990786028754">1376.60 ± 175.82</a> |
 
 #### Speedy sizes
 
@@ -2444,13 +2332,13 @@ Usually because the underlying framework lacks support for them.
 
 This is a test suite for speedy features.
 
-| **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
+| **framework** | `primitives` | `packed` | `large` | `allocated` | `full_enum` | `mesh` |
 | - | - | - | - | - | - | - |
-| `musli_descriptive` | <a title="samples: 500, min: 142, max: 151, stddev: 1.5066187308008552">147.31 ± 1.51</a> | <a title="samples: 500, min: 148, max: 157, stddev: 1.4568459081179361">153.36 ± 1.46</a> | <a title="samples: 10, min: 20863, max: 76189, stddev: 16011.1090671446">51615.20 ± 16011.11</a> | <a title="samples: 100, min: 399, max: 929, stddev: 115.78223697959892">649.44 ± 115.78</a> | <a title="samples: 4000, min: 4, max: 178, stddev: 61.49601393383164">51.87 ± 61.50</a> | <a title="samples: 10, min: 1094, max: 2075, stddev: 355.0456449528708">1562.70 ± 355.05</a> |
-| `musli_packed` | <a title="samples: 500, min: 87, max: 87, stddev: 0">87.00 ± 0.00</a> | <a title="samples: 500, min: 88, max: 88, stddev: 0">88.00 ± 0.00</a> | <a title="samples: 10, min: 19140, max: 75044, stddev: 16137.649090248555">50607.20 ± 16137.65</a> | <a title="samples: 100, min: 455, max: 993, stddev: 118.21224090592312">707.69 ± 118.21</a> | <a title="samples: 4000, min: 16, max: 188, stddev: 51.97509226543033">58.03 ± 51.98</a> | <a title="samples: 10, min: 488, max: 920, stddev: 156.35037575906236">694.40 ± 156.35</a> |
-| `musli_storage` | <a title="samples: 500, min: 113, max: 120, stddev: 1.3242356285797454">117.32 ± 1.32</a> | <a title="samples: 500, min: 115, max: 123, stddev: 1.2658135723715367">120.35 ± 1.27</a> | <a title="samples: 10, min: 17350, max: 62185, stddev: 12927.496600657068">42189.80 ± 12927.50</a> | <a title="samples: 100, min: 375, max: 896, stddev: 114.19683182995925">620.94 ± 114.20</a> | <a title="samples: 4000, min: 2, max: 146, stddev: 50.08570871765708">41.69 ± 50.09</a> | <a title="samples: 10, min: 813, max: 1542, stddev: 263.84125909341776">1161.30 ± 263.84</a> |
-| `musli_wire` | <a title="samples: 500, min: 126, max: 136, stddev: 1.8188908708330995">131.81 ± 1.82</a> | <a title="samples: 500, min: 131, max: 141, stddev: 1.6698970028118476">136.96 ± 1.67</a> | <a title="samples: 10, min: 19358, max: 70864, stddev: 14885.987432481596">47974.40 ± 14885.99</a> | <a title="samples: 100, min: 387, max: 919, stddev: 116.08491504067182">637.45 ± 116.08</a> | <a title="samples: 4000, min: 3, max: 173, stddev: 56.37342208656458">47.56 ± 56.37</a> | <a title="samples: 10, min: 933, max: 1770, stddev: 302.9288530331834">1332.90 ± 302.93</a> |
-| `speedy` | <a title="samples: 500, min: 87, max: 87, stddev: 0">87.00 ± 0.00</a> | <a title="samples: 500, min: 88, max: 88, stddev: 0">88.00 ± 0.00</a> | <a title="samples: 10, min: 14500, max: 49508, stddev: 9951.212014624149">33687.20 ± 9951.21</a> | <a title="samples: 100, min: 395, max: 921, stddev: 115.5135537501985">643.33 ± 115.51</a> | <a title="samples: 4000, min: 4, max: 152, stddev: 43.70155850767784">39.53 ± 43.70</a> | <a title="samples: 10, min: 484, max: 916, stddev: 156.35037575906236">690.40 ± 156.35</a> |
+| `musli_descriptive` | <a title="samples: 500, min: 142, max: 151, stddev: 1.5066187308008552">147.31 ± 1.51</a> | <a title="samples: 500, min: 148, max: 157, stddev: 1.4568459081179361">153.36 ± 1.46</a> | <a title="samples: 10, min: 23377, max: 68953, stddev: 15397.839366612445">46767.80 ± 15397.84</a> | <a title="samples: 100, min: 357, max: 943, stddev: 109.28406059439776">635.71 ± 109.28</a> | <a title="samples: 4000, min: 4, max: 182, stddev: 61.47068097068729">51.89 ± 61.47</a> | <a title="samples: 10, min: 1094, max: 2075, stddev: 348.288687729016">1497.30 ± 348.29</a> |
+| `musli_packed` | <a title="samples: 500, min: 87, max: 87, stddev: 0">87.00 ± 0.00</a> | <a title="samples: 500, min: 88, max: 88, stddev: 0">88.00 ± 0.00</a> | <a title="samples: 10, min: 24025, max: 67698, stddev: 15427.674502659174">46003.20 ± 15427.67</a> | <a title="samples: 100, min: 418, max: 1011, stddev: 110.74424364272846">694.45 ± 110.74</a> | <a title="samples: 4000, min: 16, max: 188, stddev: 51.97279987587292">58.07 ± 51.97</a> | <a title="samples: 10, min: 488, max: 920, stddev: 153.37483496323637">665.60 ± 153.37</a> |
+| `musli_storage` | <a title="samples: 500, min: 113, max: 120, stddev: 1.3242356285797454">117.32 ± 1.32</a> | <a title="samples: 500, min: 115, max: 123, stddev: 1.2658135723715367">120.35 ± 1.27</a> | <a title="samples: 10, min: 19248, max: 56180, stddev: 12302.367814368094">38383.60 ± 12302.37</a> | <a title="samples: 100, min: 334, max: 914, stddev: 107.59809477867162">607.50 ± 107.60</a> | <a title="samples: 4000, min: 2, max: 146, stddev: 50.107195481287924">41.72 ± 50.11</a> | <a title="samples: 10, min: 813, max: 1542, stddev: 258.8200340004614">1112.70 ± 258.82</a> |
+| `musli_wire` | <a title="samples: 500, min: 126, max: 136, stddev: 1.8188908708330995">131.81 ± 1.82</a> | <a title="samples: 500, min: 131, max: 141, stddev: 1.6698970028118476">136.96 ± 1.67</a> | <a title="samples: 10, min: 21869, max: 64077, stddev: 14259.703540045986">43542.50 ± 14259.70</a> | <a title="samples: 100, min: 344, max: 933, stddev: 109.64829000034612">623.65 ± 109.65</a> | <a title="samples: 4000, min: 3, max: 177, stddev: 56.335655474574445">47.57 ± 56.34</a> | <a title="samples: 10, min: 933, max: 1770, stddev: 297.16374274127054">1277.10 ± 297.16</a> |
+| `speedy` | <a title="samples: 500, min: 87, max: 87, stddev: 0">87.00 ± 0.00</a> | <a title="samples: 500, min: 88, max: 88, stddev: 0">88.00 ± 0.00</a> | <a title="samples: 10, min: 15393, max: 44466, stddev: 9393.865457840026">30849.60 ± 9393.87</a> | <a title="samples: 100, min: 358, max: 943, stddev: 108.45893739106982">630.17 ± 108.46</a> | <a title="samples: 4000, min: 4, max: 152, stddev: 43.73431921200396">39.57 ± 43.73</a> | <a title="samples: 10, min: 484, max: 916, stddev: 153.37483496323637">661.60 ± 153.37</a> |
 
 #### ε-serde sizes
 
@@ -2460,13 +2348,13 @@ This is a test suite for speedy features.
 
 This is a test suite for ε-serde features.
 
-| **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
+| **framework** | `primitives` | `packed` | `large` | `allocated` | `full_enum` | `mesh` |
 | - | - | - | - | - | - | - |
-| `epserde` | <a title="samples: 500, min: 176, max: 176, stddev: 0">176.00 ± 0.00</a> | <a title="samples: 500, min: 176, max: 176, stddev: 0">176.00 ± 0.00</a> | - | - | - | <a title="samples: 10, min: 517888, max: 903568, stddev: 114727.41475619504">674401.60 ± 114727.41</a> |
-| `musli_descriptive` | <a title="samples: 500, min: 154, max: 164, stddev: 1.5621574824581534">159.89 ± 1.56</a> | <a title="samples: 500, min: 161, max: 170, stddev: 1.5612764008976794">165.80 ± 1.56</a> | <a title="samples: 10, min: 477189, max: 980191, stddev: 136607.76031997596">824339.60 ± 136607.76</a> | <a title="samples: 100, min: 388, max: 933, stddev: 117.03841249777783">634.90 ± 117.04</a> | <a title="samples: 4000, min: 4, max: 50173, stddev: 12482.538507407333">4670.64 ± 12482.54</a> | <a title="samples: 10, min: 1175898, max: 2051714, stddev: 260527.16207307443">1531314.50 ± 260527.16</a> |
-| `musli_packed` | <a title="samples: 500, min: 95, max: 95, stddev: 0">95.00 ± 0.00</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 10, min: 373894, max: 635712, stddev: 80692.72130619962">561265.00 ± 80692.72</a> | <a title="samples: 100, min: 441, max: 991, stddev: 119.43036925338545">696.87 ± 119.43</a> | <a title="samples: 4000, min: 16, max: 20161, stddev: 5010.736010426201">1906.01 ± 5010.74</a> | <a title="samples: 10, min: 517832, max: 903512, stddev: 114727.41475619504">674345.60 ± 114727.41</a> |
-| `musli_storage` | <a title="samples: 500, min: 122, max: 131, stddev: 1.3556681009745792">127.86 ± 1.36</a> | <a title="samples: 500, min: 127, max: 134, stddev: 1.3827783625729677">130.88 ± 1.38</a> | <a title="samples: 10, min: 311478, max: 552661, stddev: 71044.21728958662">482614.10 ± 71044.22</a> | <a title="samples: 100, min: 363, max: 902, stddev: 115.48063863695938">606.11 ± 115.48</a> | <a title="samples: 4000, min: 2, max: 20121, stddev: 5001.599059857751">1890.15 ± 5001.60</a> | <a title="samples: 10, min: 873832, max: 1524668, stddev: 193602.8367986637">1137948.90 ± 193602.84</a> |
-| `musli_wire` | <a title="samples: 500, min: 137, max: 147, stddev: 1.7739210805444463">143.30 ± 1.77</a> | <a title="samples: 500, min: 143, max: 153, stddev: 1.8691292090168572">148.43 ± 1.87</a> | <a title="samples: 10, min: 453056, max: 913257, stddev: 125780.0236707324">771645.70 ± 125780.02</a> | <a title="samples: 100, min: 377, max: 922, stddev: 116.93856335700383">621.82 ± 116.94</a> | <a title="samples: 4000, min: 3, max: 45207, stddev: 11254.26837820462">4211.44 ± 11254.27</a> | <a title="samples: 10, min: 1003289, max: 1750545, stddev: 222284.69048769417">1306534.30 ± 222284.69</a> |
+| `epserde` | <a title="samples: 500, min: 192, max: 192, stddev: 0">192.00 ± 0.00</a> | <a title="samples: 500, min: 176, max: 176, stddev: 0">176.00 ± 0.00</a> | - | - | - | <a title="samples: 10, min: 568776, max: 899016, stddev: 125339.04410932773">705537.60 ± 125339.04</a> |
+| `musli_descriptive` | <a title="samples: 500, min: 154, max: 164, stddev: 1.5621574824581534">159.89 ± 1.56</a> | <a title="samples: 500, min: 161, max: 170, stddev: 1.5612764008976794">165.80 ± 1.56</a> | <a title="samples: 10, min: 1475531, max: 2672265, stddev: 404103.990138541">2162425.10 ± 404103.99</a> | <a title="samples: 100, min: 357, max: 934, stddev: 119.45318915792913">649.34 ± 119.45</a> | <a title="samples: 4000, min: 4, max: 50035, stddev: 12604.07962230398">4711.84 ± 12604.08</a> | <a title="samples: 10, min: 1291438, max: 2041359, stddev: 284624.50807210896">1602001.10 ± 284624.51</a> |
+| `musli_packed` | <a title="samples: 500, min: 95, max: 95, stddev: 0">95.00 ± 0.00</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 10, min: 1502145, max: 2458826, stddev: 323571.68407875247">2029630.80 ± 323571.68</a> | <a title="samples: 100, min: 407, max: 1000, stddev: 121.77120965154286">712.85 ± 121.77</a> | <a title="samples: 4000, min: 16, max: 20112, stddev: 5059.551836073763">1922.78 ± 5059.55</a> | <a title="samples: 10, min: 568712, max: 898952, stddev: 125339.04410932773">705473.60 ± 125339.04</a> |
+| `musli_storage` | <a title="samples: 500, min: 122, max: 131, stddev: 1.3556681009745792">127.86 ± 1.36</a> | <a title="samples: 500, min: 127, max: 134, stddev: 1.3827783625729677">130.88 ± 1.38</a> | <a title="samples: 10, min: 1286408, max: 2136665, stddev: 288816.5798160487">1756605.40 ± 288816.58</a> | <a title="samples: 100, min: 329, max: 902, stddev: 117.92638212037203">620.22 ± 117.93</a> | <a title="samples: 4000, min: 2, max: 20072, stddev: 5050.4238939467705">1906.92 ± 5050.42</a> | <a title="samples: 10, min: 959692, max: 1516973, stddev: 211510.065675017">1190477.50 ± 211510.07</a> |
+| `musli_wire` | <a title="samples: 500, min: 137, max: 147, stddev: 1.7739210805444463">143.30 ± 1.77</a> | <a title="samples: 500, min: 143, max: 153, stddev: 1.8691292090168572">148.43 ± 1.87</a> | <a title="samples: 10, min: 1447312, max: 2589632, stddev: 385125.1673318818">2099262.30 ± 385125.17</a> | <a title="samples: 100, min: 343, max: 923, stddev: 119.8778590899921">636.17 ± 119.88</a> | <a title="samples: 4000, min: 3, max: 45094, stddev: 11363.682493086957">4248.45 ± 11363.68</a> | <a title="samples: 10, min: 1101869, max: 1741710, stddev: 242844.82670234094">1366844.90 ± 242844.83</a> |
 
 #### Müsli vs zerocopy sizes
 
@@ -2474,7 +2362,7 @@ Compares [`musli-zerocopy`] with [`zerocopy`].
 
 Note that `zerocopy` only supports packed primitives, so we're only comparing with that suite.
 
-| **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
+| **framework** | `primitives` | `packed` | `large` | `allocated` | `full_enum` | `mesh` |
 | - | - | - | - | - | - | - |
 | `musli_zerocopy` | <a title="samples: 500, min: 112, max: 112, stddev: 0">112.00 ± 0.00</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | - | - | - | - |
 | `zerocopy` | - | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | - | - | - | - |
@@ -2486,13 +2374,13 @@ Note that `zerocopy` only supports packed primitives, so we're only comparing wi
 
 Uses a custom derive-based framework which does not support everything Müsli and serde does.
 
-| **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
+| **framework** | `primitives` | `packed` | `large` | `allocated` | `full_enum` | `mesh` |
 | - | - | - | - | - | - | - |
-| `derive_bitcode` | <a title="samples: 500, min: 103, max: 105, stddev: 0.3823924685450779">104.92 ± 0.38</a> | <a title="samples: 500, min: 106, max: 106, stddev: 0">106.00 ± 0.00</a> | <a title="samples: 10, min: 16854, max: 35937, stddev: 6106.095908188799">29711.40 ± 6106.10</a> | <a title="samples: 100, min: 358, max: 875, stddev: 108.95348135787124">610.17 ± 108.95</a> | <a title="samples: 4000, min: 1, max: 147, stddev: 47.113127416888794">39.09 ± 47.11</a> | <a title="samples: 10, min: 481, max: 913, stddev: 142.79495789417777">745.00 ± 142.79</a> |
-| `musli_descriptive` | <a title="samples: 500, min: 154, max: 164, stddev: 1.5621574824581534">159.89 ± 1.56</a> | <a title="samples: 500, min: 161, max: 170, stddev: 1.5612764008976794">165.80 ± 1.56</a> | <a title="samples: 10, min: 25295, max: 61463, stddev: 11847.805317863726">49647.50 ± 11847.81</a> | <a title="samples: 100, min: 399, max: 929, stddev: 111.46204510953493">656.45 ± 111.46</a> | <a title="samples: 4000, min: 4, max: 191, stddev: 65.10617330128954">54.13 ± 65.11</a> | <a title="samples: 10, min: 1094, max: 2075, stddev: 324.2635502180287">1693.50 ± 324.26</a> |
-| `musli_packed` | <a title="samples: 500, min: 95, max: 95, stddev: 0">95.00 ± 0.00</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 10, min: 22958, max: 63679, stddev: 12161.381693294557">48955.90 ± 12161.38</a> | <a title="samples: 100, min: 455, max: 993, stddev: 113.68683784853901">714.73 ± 113.69</a> | <a title="samples: 4000, min: 16, max: 191, stddev: 54.262294917834616">59.73 ± 54.26</a> | <a title="samples: 10, min: 488, max: 920, stddev: 142.79495789417777">752.00 ± 142.79</a> |
-| `musli_storage` | <a title="samples: 500, min: 122, max: 131, stddev: 1.3556681009745792">127.86 ± 1.36</a> | <a title="samples: 500, min: 127, max: 134, stddev: 1.3827783625729677">130.88 ± 1.38</a> | <a title="samples: 10, min: 21145, max: 49729, stddev: 9297.125779508418">40343.20 ± 9297.13</a> | <a title="samples: 100, min: 375, max: 896, stddev: 109.76911951910701">627.98 ± 109.77</a> | <a title="samples: 4000, min: 2, max: 151, stddev: 53.10567152150549">43.68 ± 53.11</a> | <a title="samples: 10, min: 813, max: 1542, stddev: 240.96649144642498">1258.50 ± 240.97</a> |
-| `musli_wire` | <a title="samples: 500, min: 137, max: 147, stddev: 1.7739210805444463">143.30 ± 1.77</a> | <a title="samples: 500, min: 143, max: 153, stddev: 1.8691292090168572">148.43 ± 1.87</a> | <a title="samples: 10, min: 23533, max: 57105, stddev: 10938.562155969128">46124.40 ± 10938.56</a> | <a title="samples: 100, min: 387, max: 919, stddev: 111.71110016466581">644.51 ± 111.71</a> | <a title="samples: 4000, min: 3, max: 179, stddev: 59.633462174667244">49.69 ± 59.63</a> | <a title="samples: 10, min: 933, max: 1770, stddev: 276.6652309199694">1444.50 ± 276.67</a> |
+| `derive_bitcode` | <a title="samples: 500, min: 103, max: 105, stddev: 0.3823924685450779">104.92 ± 0.38</a> | <a title="samples: 500, min: 106, max: 106, stddev: 0">106.00 ± 0.00</a> | <a title="samples: 10, min: 16431, max: 37268, stddev: 6598.064050158955">27954.30 ± 6598.06</a> | <a title="samples: 100, min: 321, max: 900, stddev: 105.21475704481762">576.07 ± 105.21</a> | <a title="samples: 4000, min: 1, max: 147, stddev: 47.08329850846753">39.10 ± 47.08</a> | <a title="samples: 10, min: 481, max: 913, stddev: 127.80985877466573">620.20 ± 127.81</a> |
+| `musli_descriptive` | <a title="samples: 500, min: 154, max: 164, stddev: 1.5621574824581534">159.89 ± 1.56</a> | <a title="samples: 500, min: 161, max: 170, stddev: 1.5612764008976794">165.80 ± 1.56</a> | <a title="samples: 10, min: 24272, max: 62325, stddev: 11746.630546671671">44494.00 ± 11746.63</a> | <a title="samples: 100, min: 357, max: 943, stddev: 107.18993376245737">621.59 ± 107.19</a> | <a title="samples: 4000, min: 4, max: 191, stddev: 65.06053832729559">54.16 ± 65.06</a> | <a title="samples: 10, min: 1094, max: 2075, stddev: 290.2348876341368">1410.10 ± 290.23</a> |
+| `musli_packed` | <a title="samples: 500, min: 95, max: 95, stddev: 0">95.00 ± 0.00</a> | <a title="samples: 500, min: 96, max: 96, stddev: 0">96.00 ± 0.00</a> | <a title="samples: 10, min: 25182, max: 59884, stddev: 11282.295849693006">43302.60 ± 11282.30</a> | <a title="samples: 100, min: 418, max: 1011, stddev: 108.84955626919204">679.79 ± 108.85</a> | <a title="samples: 4000, min: 16, max: 191, stddev: 54.16632770400354">59.74 ± 54.17</a> | <a title="samples: 10, min: 488, max: 920, stddev: 127.80985877466573">627.20 ± 127.81</a> |
+| `musli_storage` | <a title="samples: 500, min: 122, max: 131, stddev: 1.3556681009745792">127.86 ± 1.36</a> | <a title="samples: 500, min: 127, max: 134, stddev: 1.3827783625729677">130.88 ± 1.38</a> | <a title="samples: 10, min: 20434, max: 50623, stddev: 9394.129614285723">36673.30 ± 9394.13</a> | <a title="samples: 100, min: 334, max: 914, stddev: 105.75013191481136">593.64 ± 105.75</a> | <a title="samples: 4000, min: 2, max: 151, stddev: 53.06677648903792">43.69 ± 53.07</a> | <a title="samples: 10, min: 813, max: 1542, stddev: 215.67913668224844">1047.90 ± 215.68</a> |
+| `musli_wire` | <a title="samples: 500, min: 137, max: 147, stddev: 1.7739210805444463">143.30 ± 1.77</a> | <a title="samples: 500, min: 143, max: 153, stddev: 1.8691292090168572">148.43 ± 1.87</a> | <a title="samples: 10, min: 22877, max: 57794, stddev: 10846.271040777103">41447.90 ± 10846.27</a> | <a title="samples: 100, min: 344, max: 933, stddev: 107.54220752802128">609.56 ± 107.54</a> | <a title="samples: 4000, min: 3, max: 179, stddev: 59.57236437938294">49.70 ± 59.57</a> | <a title="samples: 10, min: 933, max: 1770, stddev: 247.63160137591484">1202.70 ± 247.63</a> |
 
 #### BSON sizes
 
@@ -2500,18 +2388,17 @@ Uses a custom derive-based framework which does not support everything Müsli an
 > - `128` - 128-bit integers are not supported.
 > - `u64` - Format is limited to the bounds of signed 64-bit integers.
 > - `empty` - Empty variants are not supported.
-> - `newtype` - Newtype variants are not supported.
 > - `number-key` - Maps with numerical keys like `HashMap<u32, T>` are not supported.
 
 Specific comparison to BSON, because the format is limited in capabilities.
 
-| **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
+| **framework** | `primitives` | `packed` | `large` | `allocated` | `full_enum` | `mesh` |
 | - | - | - | - | - | - | - |
-| `bson` | <a title="samples: 500, min: 240, max: 241, stddev: 0.22992172581119874">240.94 ± 0.23</a> | <a title="samples: 500, min: 289, max: 289, stddev: 0">289.00 ± 0.00</a> | <a title="samples: 10, min: 43093, max: 106608, stddev: 21441.159101363897">82425.30 ± 21441.16</a> | <a title="samples: 100, min: 429, max: 1038, stddev: 116.21976208889778">731.37 ± 116.22</a> | <a title="samples: 2500, min: 22, max: 305, stddev: 114.65799941321195">118.24 ± 114.66</a> | <a title="samples: 10, min: 2002, max: 3269, stddev: 466.4043739074495">2436.40 ± 466.40</a> |
-| `musli_descriptive` | <a title="samples: 500, min: 111, max: 118, stddev: 1.3158054567450292">115.28 ± 1.32</a> | <a title="samples: 500, min: 117, max: 124, stddev: 1.252956503634502">121.39 ± 1.25</a> | <a title="samples: 10, min: 22021, max: 56575, stddev: 11366.720621621698">43841.90 ± 11366.72</a> | <a title="samples: 100, min: 262, max: 869, stddev: 115.76712659472898">563.82 ± 115.77</a> | <a title="samples: 2500, min: 4, max: 187, stddev: 60.226860606875476">58.85 ± 60.23</a> | <a title="samples: 10, min: 1203, max: 1966, stddev: 280.8733522426077">1464.60 ± 280.87</a> |
-| `musli_packed` | <a title="samples: 500, min: 63, max: 63, stddev: 0">63.00 ± 0.00</a> | <a title="samples: 500, min: 64, max: 64, stddev: 0">64.00 ± 0.00</a> | <a title="samples: 10, min: 20550, max: 59197, stddev: 12505.213420409906">44063.90 ± 12505.21</a> | <a title="samples: 100, min: 319, max: 948, stddev: 119.38412792327128">631.70 ± 119.38</a> | <a title="samples: 2500, min: 16, max: 191, stddev: 51.180023140284234">65.51 ± 51.18</a> | <a title="samples: 10, min: 536, max: 872, stddev: 123.68734777656121">651.20 ± 123.69</a> |
-| `musli_storage` | <a title="samples: 500, min: 84, max: 89, stddev: 1.0394537026726993">87.24 ± 1.04</a> | <a title="samples: 500, min: 87, max: 92, stddev: 0.9957911427603747">90.38 ± 1.00</a> | <a title="samples: 10, min: 17313, max: 45421, stddev: 9094.942519884335">35094.60 ± 9094.94</a> | <a title="samples: 100, min: 244, max: 845, stddev: 114.40807488984332">543.18 ± 114.41</a> | <a title="samples: 2500, min: 2, max: 149, stddev: 46.92655737809889">44.57 ± 46.93</a> | <a title="samples: 10, min: 894, max: 1461, stddev: 208.72239937294702">1088.40 ± 208.72</a> |
-| `musli_wire` | <a title="samples: 500, min: 95, max: 104, stddev: 1.6029210835221925">100.74 ± 1.60</a> | <a title="samples: 500, min: 101, max: 109, stddev: 1.4871233977044382">105.91 ± 1.49</a> | <a title="samples: 10, min: 20054, max: 52487, stddev: 10619.612921853603">40522.30 ± 10619.61</a> | <a title="samples: 100, min: 250, max: 857, stddev: 115.97885841824795">552.62 ± 115.98</a> | <a title="samples: 2500, min: 3, max: 183, stddev: 54.62712120403199">52.78 ± 54.63</a> | <a title="samples: 10, min: 1026, max: 1677, stddev: 239.64423631708735">1249.20 ± 239.64</a> |
+| `bson` | <a title="samples: 500, min: 240, max: 241, stddev: 0.22992172581119874">240.94 ± 0.23</a> | <a title="samples: 500, min: 289, max: 289, stddev: 0">289.00 ± 0.00</a> | <a title="samples: 10, min: 65872, max: 116971, stddev: 16042.38189328505">90022.70 ± 16042.38</a> | <a title="samples: 100, min: 521, max: 1078, stddev: 121.78852326882037">759.34 ± 121.79</a> | <a title="samples: 3500, min: 22, max: 305, stddev: 103.08684069506583">100.64 ± 103.09</a> | <a title="samples: 10, min: 1821, max: 3450, stddev: 607.0924558911929">2635.50 ± 607.09</a> |
+| `musli_descriptive` | <a title="samples: 500, min: 111, max: 118, stddev: 1.3158054567450292">115.28 ± 1.32</a> | <a title="samples: 500, min: 117, max: 124, stddev: 1.252956503634502">121.39 ± 1.25</a> | <a title="samples: 10, min: 35046, max: 64551, stddev: 8696.71462335059">48964.60 ± 8696.71</a> | <a title="samples: 100, min: 360, max: 898, stddev: 120.13429984812831">590.50 ± 120.13</a> | <a title="samples: 3500, min: 4, max: 183, stddev: 55.11211415110206">54.09 ± 55.11</a> | <a title="samples: 10, min: 1094, max: 2075, stddev: 365.5971143212156">1584.50 ± 365.60</a> |
+| `musli_packed` | <a title="samples: 500, min: 63, max: 63, stddev: 0">63.00 ± 0.00</a> | <a title="samples: 500, min: 64, max: 64, stddev: 0">64.00 ± 0.00</a> | <a title="samples: 10, min: 35463, max: 67494, stddev: 9349.629822083865">49661.30 ± 9349.63</a> | <a title="samples: 100, min: 419, max: 974, stddev: 123.35546197878713">658.50 ± 123.36</a> | <a title="samples: 3500, min: 16, max: 191, stddev: 48.83977827090391">60.90 ± 48.84</a> | <a title="samples: 10, min: 488, max: 920, stddev: 160.99689437998487">704.00 ± 161.00</a> |
+| `musli_storage` | <a title="samples: 500, min: 84, max: 89, stddev: 1.0394537026726993">87.24 ± 1.04</a> | <a title="samples: 500, min: 87, max: 92, stddev: 0.9957911427603747">90.38 ± 1.00</a> | <a title="samples: 10, min: 28183, max: 52693, stddev: 7061.771168764958">39724.40 ± 7061.77</a> | <a title="samples: 100, min: 342, max: 872, stddev: 118.64781961755557">569.57 ± 118.65</a> | <a title="samples: 3500, min: 2, max: 149, stddev: 44.45512611933154">43.07 ± 44.46</a> | <a title="samples: 10, min: 813, max: 1542, stddev: 271.68225926622443">1177.50 ± 271.68</a> |
+| `musli_wire` | <a title="samples: 500, min: 95, max: 104, stddev: 1.6029210835221925">100.74 ± 1.60</a> | <a title="samples: 500, min: 101, max: 109, stddev: 1.4871233977044382">105.91 ± 1.49</a> | <a title="samples: 10, min: 32480, max: 60285, stddev: 8116.21985655884">45522.80 ± 8116.22</a> | <a title="samples: 100, min: 347, max: 887, stddev: 120.4613631003734">579.40 ± 120.46</a> | <a title="samples: 3500, min: 3, max: 177, stddev: 50.50468332375432">49.42 ± 50.50</a> | <a title="samples: 10, min: 933, max: 1770, stddev: 311.9314828612207">1351.50 ± 311.93</a> |
 
 #### Miniserde sizes
 
@@ -2528,17 +2415,25 @@ Specific comparison to BSON, because the format is limited in capabilities.
 
 An experimental framework which only supports JSON and a limited number of Rust types.
 
-| **framework** | `primitives` | `primpacked` | `large` | `allocated` | `medium_enum` | `mesh` |
+| **framework** | `primitives` | `packed` | `large` | `allocated` | `full_enum` | `mesh` |
 | - | - | - | - | - | - | - |
 | `miniserde` | <a title="samples: 500, min: 312, max: 326, stddev: 2.2674205609017446">319.30 ± 2.27</a> | <a title="samples: 500, min: 347, max: 361, stddev: 2.460792555255309">355.35 ± 2.46</a> | <a title="samples: 10, min: 11381, max: 32089, stddev: 7047.0232304143865">20566.30 ± 7047.02</a> | <a title="samples: 100, min: 42, max: 154, stddev: 32.055788868783125">98.08 ± 32.06</a> | <a title="samples: 500, min: 7, max: 7, stddev: 0">7.00 ± 0.00</a> | <a title="samples: 10, min: 3450, max: 5975, stddev: 859.0277120093391">4874.70 ± 859.03</a> |
 | `musli_json`[^incomplete] | <a title="samples: 500, min: 302, max: 317, stddev: 2.3087754329947305">310.67 ± 2.31</a> | <a title="samples: 500, min: 339, max: 353, stddev: 2.5256729796234514">346.68 ± 2.53</a> | <a title="samples: 10, min: 11086, max: 31243, stddev: 6860.941743667556">20023.70 ± 6860.94</a> | <a title="samples: 100, min: 42, max: 154, stddev: 32.055788868783125">98.08 ± 32.06</a> | <a title="samples: 500, min: 7, max: 7, stddev: 0">7.00 ± 0.00</a> | <a title="samples: 10, min: 2294, max: 4011, stddev: 577.4698260515436">3261.00 ± 577.47</a> |
 | `serde_json`[^incomplete] | <a title="samples: 500, min: 302, max: 317, stddev: 2.3087754329947305">310.67 ± 2.31</a> | <a title="samples: 500, min: 339, max: 353, stddev: 2.5256729796234514">346.68 ± 2.53</a> | <a title="samples: 10, min: 11086, max: 31243, stddev: 6860.941743667556">20023.70 ± 6860.94</a> | <a title="samples: 100, min: 42, max: 154, stddev: 32.055788868783125">98.08 ± 32.06</a> | <a title="samples: 500, min: 7, max: 7, stddev: 0">7.00 ± 0.00</a> | <a title="samples: 10, min: 2294, max: 4011, stddev: 577.4698260515436">3261.00 ± 577.47</a> |
 
 
+[^bincode1]: Version 1 of bincode serialization.
+
+[^bincode_serde]: bincode 2 is shifting away from serde, and the serde implementation does not support borrowing from its input.
+
 [^bson]: BSON does not support serializing directly in-place [without patches](https://github.com/mongodb/bson-rust/pull/328). As a result it is expected to be much slower.
+
 [^i128]: Lacks 128-bit support.
+
 [^incomplete]: These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result.
+
 [^musli_value]: `musli-value` is a heap-allocated, in-memory format. Deserialization is expected to be as fast as a dynamic in-memory structure can be traversed, but serialization requires a lot of allocations. It is only included for reference.
+
 [`rkyv`]: https://docs.rs/rkyv
 [`zerocopy`]: https://docs.rs/zerocopy
 [`musli-zerocopy`]: https://docs.rs/musli-zerocopy
