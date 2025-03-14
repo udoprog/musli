@@ -92,12 +92,15 @@ pub use musli_core::alloc::{Alloc, AllocError, Allocator, Box, Disabled, String,
 #[doc(inline)]
 pub use musli_core::alloc::{System, SystemAlloc};
 
-mod stack;
+mod slice;
 #[doc(inline)]
-pub use self::stack::{Slice, SliceAlloc};
+pub use self::slice::{Slice, SliceAlloc};
 
 mod array_buffer;
 pub use self::array_buffer::ArrayBuffer;
+
+mod slice_buffer;
+pub use self::slice_buffer::SliceBuffer;
 
 /// Call the given block `body` with an instance of the [`DefaultAllocator`].
 ///
