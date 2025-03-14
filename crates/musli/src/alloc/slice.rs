@@ -8,7 +8,7 @@ use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
-use super::{Alloc, AllocError, Allocator};
+use super::{Alloc, AllocError, Allocator, SliceBuffer};
 
 // We keep max bytes to 2^31, since that ensures that addition between two
 // magnitutes never overflow.
@@ -120,15 +120,20 @@ pub struct Slice<'a> {
 }
 
 impl<'a> Slice<'a> {
-    /// Construct a new slice allocator.
+    /// Construct a new slice allocator around a [`SliceBuffer`].
     ///
     /// See [type-level documentation][Slice] for more information.
     ///
     /// # Panics
     ///
     /// This panics if called with a buffer larger than `2^31` bytes.
-    pub fn new(buffer: &'a mut [MaybeUninit<u8>]) -> Self {
+    pub fn new<B>(buffer: &'a mut B) -> Self
+    where
+        B: ?Sized + SliceBuffer,
+    {
+        let buffer = buffer.as_uninit_bytes();
         let size = buffer.len();
+
         assert!(
             size <= MAX_BYTES,
             "Buffer of {size} bytes is larger than the maximum {MAX_BYTES}"
