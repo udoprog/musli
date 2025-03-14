@@ -31,11 +31,12 @@ pub(crate) struct Args {
     /// Filter to pass to benchmarks when running them.
     #[arg(short = 'f', long)]
     filter: Option<String>,
-    /// Force the running of benchmarks.
+    /// Disable running benchmarks.
     ///
-    /// This will be done automatically for a report, if its output is missing.
+    /// This will otherwise be done automatically for a report if its output is
+    /// missing.
     #[arg(long)]
-    bench: bool,
+    no_bench: bool,
     /// Run `--quick` benchmarks.
     #[arg(long)]
     quick: bool,
@@ -50,51 +51,56 @@ pub(crate) struct Args {
 pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Path) -> Result<()> {
     let bins = manifest.bins(target, output, &args.shared, &args.bins)?;
 
-    for b in &bins {
-        println!("Sanity checking: {}", b.report.title);
-
-        b.tests()?
-            .run(&["--iter", "1"], &[])
-            .context("Sanity check failed")?;
-
-        b.comparison()?.run(&[], &[])?;
-    }
-
     let mut built_reports = Vec::new();
     let mut size_sets = Vec::new();
-    let mut errored = Vec::new();
 
-    for bins in &bins {
-        println!("Building: {}", bins.report.title);
-
-        match build_report(args, bins, args.bench, args.filter.as_deref()) {
-            Ok(group_plots) => {
-                built_reports.push((bins, group_plots));
-            }
-            Err(error) => {
-                errored.push((bins.report, error));
-            }
+    if !args.no_bench {
+        for b in &bins {
+            b.comparison()?.run(&[], &[])?;
         }
-    }
 
-    if !errored.is_empty() {
-        for (report, error) in &errored {
-            println!("Failed to build report: {}", report.title);
+        let mut errored = Vec::new();
 
-            for error in error.chain() {
-                println!("Caused by: {error}");
+        for bins in &bins {
+            println!("Building: {}", bins.report.title);
+
+            match build_report(args, bins, args.filter.as_deref()) {
+                Ok(group_plots) => {
+                    built_reports.push((bins, group_plots));
+                }
+                Err(error) => {
+                    errored.push((bins.report, error));
+                }
             }
         }
 
-        bail!("{} builds failed", errored.len());
+        if !errored.is_empty() {
+            for (report, error) in &errored {
+                println!("Failed to build report: {}", report.title);
+
+                for error in error.chain() {
+                    println!("Caused by: {error}");
+                }
+            }
+
+            bail!("{} builds failed", errored.len());
+        }
     }
+
     if !args.no_size {
+        for b in &bins {
+            b.tests()?
+                .run(&["--iter", "1"], &[])
+                .context("Sanity check failed")?;
+        }
+
         for bins in &bins {
             println!("Sizing: {}", bins.report.title);
             let size_set = collect_size_sets(bins.tests()?).context("Collecting size sets")?;
             size_sets.push((bins.report, size_set));
         }
     }
+
     let mut used_footnotes = BTreeSet::new();
     let mut o = String::new();
 
@@ -124,21 +130,25 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
     }
 
     writeln!(o)?;
-    writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
 
-    for (bins, _) in &built_reports {
-        let Report {
-            id, title, link, ..
-        } = &*bins.report;
+    if !built_reports.is_empty() {
+        writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
 
-        writeln!(
-            o,
-            "- [**{title}**](#{link}) ([Report 📓]({url}/criterion-{id}/report/), [Sizes](#{link}-sizes))",
-            url = manifest.url
-        )?;
+        for (bins, _) in &built_reports {
+            let Report {
+                id, title, link, ..
+            } = &*bins.report;
+
+            writeln!(
+                o,
+                "- [**{title}**](#{link}) ([Report 📓]({url}/criterion-{id}/report/), [Sizes](#{link}-sizes))",
+                url = manifest.url
+            )?;
+        }
+
+        writeln!(o)?;
     }
 
-    writeln!(o)?;
     writeln!(
         o,
         "Below you'll also find [size comparisons](#size-comparisons)."
@@ -171,6 +181,13 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
     };
 
     println!("Writing: {}", report.display());
+
+    if let Some(dir) = report.parent() {
+        if !dir.is_dir() {
+            fs::create_dir_all(dir).with_context(|| dir.display().to_string())?;
+        }
+    }
+
     fs::write(report, o.as_bytes())?;
     Ok(())
 }
@@ -178,7 +195,6 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
 fn build_report<'a>(
     a: &Args,
     bins: &Bins<'a>,
-    run_bench: bool,
     filter: Option<&str>,
 ) -> Result<Vec<(&'a Group, HashMap<&'a str, String>)>> {
     if !bins.paths.images.is_dir() {
@@ -190,7 +206,7 @@ fn build_report<'a>(
 
     let mut ran_benchmarks = false;
 
-    if run_bench || !done_path.exists() {
+    if !done_path.exists() {
         let mut args = vec!["--bench"];
 
         if a.quick {
@@ -632,7 +648,8 @@ struct Estimates {
     mean: Sample,
     median: Sample,
     median_abs_dev: Sample,
-    slope: Sample,
+    #[serde(default)]
+    slope: Option<Sample>,
     std_dev: Sample,
 }
 
