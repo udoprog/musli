@@ -73,6 +73,7 @@ features = [
     "musli-storage",
     "musli-packed",
     "musli-value",
+    "bincode1",
     "bincode-serde",
     "bincode-derive",
     "rmp-serde",
@@ -269,13 +270,17 @@ musli_value = """
 miniserde = """
 `miniserde` only supports allocated serialization (to `String`), and only supported deserialization from `&str` which if treated as opaque data would need to be validated as UTF-8.
 """
+bincode1 = """
+Version 1 of bincode serialization.
+"""
 bincode_serde = """
-bincode deserialization is shifting away from serde, and the serde implementation does not support borrowing from the input.
+bincode 2 is shifting away from serde, and the serde implementation does not support borrowing from its input.
 """
 
 [crate_footnotes]
 bson = ["bson"]
 musli_value = ["musli_value"]
+bincode1 = ["bincode1"]
 bincode_serde = ["bincode_serde"]
 
 [size_footnotes]

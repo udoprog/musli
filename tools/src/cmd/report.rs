@@ -14,7 +14,7 @@ use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 
 use crate::bins::{BinArgs, Binary, Bins};
 use crate::manifest::{Group, Kind, Link, ReportEnv};
-use crate::{print_command, Manifest, Report, ReportRef, SharedArgs, REPO};
+use crate::{command, Manifest, Report, ReportRef, SharedArgs, REPO};
 
 #[derive(Default, Parser)]
 pub(crate) struct Args {
@@ -53,10 +53,10 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
     for b in &bins {
         println!("Sanity checking: {}", b.report.title);
 
-        b.fuzz()?
+        b.tests()?
             .run(&["--iter", "1"], &[])
-            .context("Fuzz check failed")?;
-        // Test benches binaries.
+            .context("Sanity check failed")?;
+
         b.comparison()?.run(&[], &[])?;
     }
 
@@ -91,7 +91,7 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
     if !args.no_size {
         for bins in &bins {
             println!("Sizing: {}", bins.report.title);
-            let size_set = collect_size_sets(bins.fuzz()?).context("Collecting size sets")?;
+            let size_set = collect_size_sets(bins.tests()?).context("Collecting size sets")?;
             size_sets.push((bins.report, size_set));
         }
     }
@@ -594,13 +594,13 @@ fn copy_svg(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
-/// Collect size sets from the fuzz command.
+/// Collect size sets from the tests command.
 fn collect_size_sets(path: Binary<'_>) -> Result<Vec<SizeSet>> {
     let mut child = path.command();
     child.stdout(Stdio::piped());
     child.arg("--size");
 
-    print_command(&child);
+    command::print(&child);
 
     let mut child = child.spawn()?;
 

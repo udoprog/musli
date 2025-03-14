@@ -53,7 +53,7 @@ pub mod musli_packed {
     const ENCODING: Encoding<OPTIONS, Packed> = Encoding::new().with_options().with_mode();
 
     pub fn buffer() -> Vec<u8> {
-        vec![0u8; 2 << 20]
+        vec![0u8; 2 << 23]
     }
 
     pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T) -> Result<&'buf [u8], Error>

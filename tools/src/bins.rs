@@ -8,8 +8,8 @@ use std::process::Command;
 use anyhow::{anyhow, ensure, Context, Result};
 use clap::Parser;
 
+use crate::command;
 use crate::manifest::ReportRef;
-use crate::print_command;
 use crate::tests;
 
 #[derive(Default, Parser)]
@@ -17,9 +17,9 @@ pub(crate) struct BinArgs {
     /// Build new and clean up test binaries after running.
     #[arg(long)]
     clean: bool,
-    /// Don't build test binaries in release mode.
+    /// Build binaries in release mode.
     #[arg(long)]
-    no_release: bool,
+    release: bool,
 }
 
 /// Build binaries.
@@ -34,7 +34,7 @@ impl<'a> Bins<'a> {
         output: &'a Path,
         target: &'a Path,
         report: ReportRef<'a>,
-        bins: &BinArgs,
+        args: &'a BinArgs,
     ) -> Result<Self> {
         Ok(Self {
             paths: Paths::new(output, &report.id),
@@ -42,20 +42,19 @@ impl<'a> Bins<'a> {
             bins: InteriorBins {
                 binaries: target.join("tools"),
                 report,
-                clean: bins.clean || bins.no_release,
-                no_release: bins.no_release,
-                fuzz: RefCell::new(None),
+                args,
+                tests: RefCell::new(None),
                 comparison: RefCell::new(None),
             },
         })
     }
 
-    pub(crate) fn fuzz(&self) -> Result<Binary<'_>> {
+    pub(crate) fn tests(&self) -> Result<Binary<'_>> {
         self.bins.build()?;
 
-        let path = Ref::filter_map(self.bins.fuzz.borrow(), |f| f.as_deref())
+        let path = Ref::filter_map(self.bins.tests.borrow(), |f| f.as_deref())
             .ok()
-            .context("Missing `fuzz` binary")?;
+            .context("Missing tests binary")?;
 
         Ok(Binary {
             path,
@@ -68,7 +67,7 @@ impl<'a> Bins<'a> {
 
         let path = Ref::filter_map(self.bins.comparison.borrow(), |f| f.as_deref())
             .ok()
-            .context("Missing `comparison` binary")?;
+            .context("Missing comparison binary")?;
 
         Ok(Binary {
             path,
@@ -106,10 +105,9 @@ impl Binary<'_> {
             command.env(*key, *value);
         }
 
-        print_command(&command);
+        command::print(&command);
 
         let status = command.status()?;
-
         ensure!(status.success(), "Command failed: {status}");
         Ok(())
     }
@@ -132,70 +130,81 @@ impl Paths {
     }
 }
 
-struct Build {
-    fuzz: PathBuf,
-    comparison: PathBuf,
-}
-
 struct InteriorBins<'a> {
     binaries: PathBuf,
     report: ReportRef<'a>,
-    clean: bool,
-    no_release: bool,
-    fuzz: RefCell<Option<PathBuf>>,
+    args: &'a BinArgs,
+    tests: RefCell<Option<PathBuf>>,
     comparison: RefCell<Option<PathBuf>>,
 }
 
 impl InteriorBins<'_> {
     fn build(&self) -> Result<()> {
-        fn shuffle(path: &mut PathBuf, to: &Path) -> Result<()> {
-            fs::rename(&*path, to)
-                .with_context(|| anyhow!("{} to {}", path.display(), to.display()))?;
-            to.clone_into(path);
-            Ok(())
+        fn rename(path: &Path, to: &Path) -> Result<()> {
+            fs::rename(path, to).with_context(|| anyhow!("{} to {}", path.display(), to.display()))
         }
 
-        if self.fuzz.borrow().is_some() && self.comparison.borrow().is_some() {
+        if self.tests.borrow().is_some() && self.comparison.borrow().is_some() {
             return Ok(());
         }
 
-        if !self.binaries.is_dir() {
-            fs::create_dir_all(&self.binaries)
-                .with_context(|| anyhow!("{}", self.binaries.display()))?;
+        let binaries = self.binaries.join(if self.args.release {
+            "release"
+        } else {
+            "debug"
+        });
+
+        let to_comparison = binaries.join(format!("comparison-{}{}", self.report.id, EXE_SUFFIX));
+        let to_tests = binaries.join(format!("tests-{}{}", self.report.id, EXE_SUFFIX));
+
+        if !binaries.is_dir() {
+            fs::create_dir_all(&binaries).with_context(|| anyhow!("{}", binaries.display()))?;
         }
 
-        let to_comparison = self
-            .binaries
-            .join(format!("comparison-{}{}", self.report.id, EXE_SUFFIX));
-
-        let to_fuzz = self
-            .binaries
-            .join(format!("fuzz-{}{}", self.report.id, EXE_SUFFIX));
-
-        let rebuild = self.clean || self.no_release;
-
-        if rebuild || !(to_comparison.is_file() && to_fuzz.is_file()) {
-            let mut built =
-                build_commands(!self.no_release, self.report).context("Building bench binaries")?;
-
-            shuffle(&mut built.comparison, &to_comparison)?;
-            shuffle(&mut built.fuzz, &to_fuzz)?;
+        if self.args.clean {
+            for f in fs::read_dir(&binaries)? {
+                let f = f?;
+                _ = fs::remove_file(f.path());
+            }
         }
 
+        let head = self.args.release.then_some("--release");
+
+        let build = tests::build(
+            self.report,
+            "build",
+            head.into_iter().chain(["--benches"]),
+            None::<OsString>,
+            false,
+        )?;
+
+        ensure!(build.report(), "Build failed");
+
+        let tests = build
+            .bin("bin", "tests")
+            .with_context(|| "missing tests binary")?;
+
+        let comparison = build
+            .bin("bench", "comparison")
+            .context("missing comparison binary")?;
+
+        rename(&comparison, &to_comparison)?;
+        rename(&tests, &to_tests)?;
+
+        println!("Tests: {}", to_tests.display());
         println!("Comparison: {}", to_comparison.display());
-        println!("Fuzz: {}", to_fuzz.display());
 
         *self.comparison.borrow_mut() = Some(to_comparison);
-        *self.fuzz.borrow_mut() = Some(to_fuzz);
+        *self.tests.borrow_mut() = Some(to_tests);
         Ok(())
     }
 }
 
 impl Drop for InteriorBins<'_> {
     fn drop(&mut self) {
-        if self.clean {
-            if let Some(fuzz) = self.fuzz.take() {
-                _ = fs::remove_file(fuzz);
+        if self.args.clean {
+            if let Some(tests) = self.tests.take() {
+                _ = fs::remove_file(tests);
             }
 
             if let Some(comparison) = self.comparison.take() {
@@ -203,29 +212,4 @@ impl Drop for InteriorBins<'_> {
             }
         }
     }
-}
-
-/// Build commands.
-fn build_commands(release: bool, report: ReportRef<'_>) -> Result<Build> {
-    let head = release.then_some("--release");
-
-    let build = tests::build(
-        report,
-        "build",
-        head.into_iter().chain(["--benches"]),
-        None::<OsString>,
-        false,
-    )?;
-
-    ensure!(build.report(), "Build failed");
-
-    let fuzz = build
-        .bin("bin", "fuzz")
-        .with_context(|| "missing fuzz binary")?;
-
-    let comparison = build
-        .bin("bench", "comparison")
-        .context("missing comparison binary")?;
-
-    Ok(Build { fuzz, comparison })
 }

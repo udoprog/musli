@@ -32,6 +32,38 @@ pub mod serde_json {
     }
 }
 
+#[cfg(feature = "bincode1")]
+#[crate::benchmarker]
+pub mod bincode1 {
+    use alloc::vec::Vec;
+
+    use bincode1::{deserialize, serialize_into, Error};
+    use serde::{Deserialize, Serialize};
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: Serialize,
+    {
+        serialize_into(&mut *buf, value)?;
+        Ok(buf.as_slice())
+    }
+
+    pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
+    where
+        T: Deserialize<'buf>,
+    {
+        deserialize(buf)
+    }
+}
+
 #[cfg(feature = "bincode-serde")]
 #[crate::benchmarker]
 pub mod bincode_serde {

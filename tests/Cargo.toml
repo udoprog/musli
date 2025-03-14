@@ -24,7 +24,7 @@ std = ["musli?/std", "serde?/std", "musli-zerocopy?/std", "rand/std", "serde_jso
 alloc = ["musli?/alloc", "musli-zerocopy?/alloc", "bincode?/alloc"]
 verbose = ["musli?/verbose"]
 extra = ["rkyv", "dlhn", "serde_cbor"]
-full = ["rmp-serde", "bincode-serde", "bincode-derive", "postcard", "musli-json", "serde_json", "bitcode", "bitcode-derive"]
+full = ["rmp-serde", "bincode1", "bincode-serde", "bincode-derive", "postcard", "musli-json", "serde_json", "bitcode", "bitcode-derive"]
 text = ["musli-json", "serde_json"]
 simdutf8 = ["musli?/simdutf8"]
 parse-full = ["musli?/parse-full"]
@@ -62,6 +62,7 @@ no-binary-equality = []
 serde = ["dep:serde", "bitcode?/serde"]
 epserde = ["dep:epserde"]
 serde_json = ["dep:serde_json", "serde"]
+bincode1 = ["dep:bincode1", "serde"]
 bincode-serde = ["dep:bincode", "serde"]
 bincode-derive = ["dep:bincode", "bincode?/derive"]
 rmp-serde = ["dep:rmp-serde", "serde"]
@@ -84,6 +85,7 @@ anyhow = "1.0.81"
 serde = { version = "1.0.197", default-features = false, optional = true, features = ["derive"] }
 rand = { version = "0.9.0", default-features = false, features = ["alloc", "std_rng"] }
 rmp-serde = { version = "1.1.2", optional = true }
+bincode1 = { package = "bincode", version = "1.0.0", default-features = false, optional = true, features = [] }
 bincode = { version = "2.0.1", default-features = false, optional = true, features = ["serde"] }
 serde_json = { version = "1.0.114", default-features = false, features = ["float_roundtrip"], optional = true }
 serde_cbor = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
