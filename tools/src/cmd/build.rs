@@ -12,11 +12,11 @@ pub(crate) struct Args {
     remaining: Vec<OsString>,
 }
 
-pub(crate) fn entry(a: &Args, manifest: &Manifest) -> Result<()> {
+pub(crate) fn entry(args: &Args, manifest: &Manifest) -> Result<()> {
     let mut ok = true;
 
-    for report in manifest.reports(&a.shared) {
-        let build = tests::build(report, "build", [], &a.remaining[..], true)?;
+    for report in manifest.reports(&args.shared) {
+        let build = tests::build(report, "build", [], &args.remaining[..], true)?;
         ok |= build.report();
     }
 

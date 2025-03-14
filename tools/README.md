@@ -13,7 +13,7 @@ This obviously takes a long time, but will walk through all feature combinations
 and generate a report:
 
 ```sh
-cargo run -p tools -- report
+cargo run -p tools -- report --release
 ```
 
 > If you want the faster version for testing, add `--quick`.
@@ -29,8 +29,8 @@ cargo run -p tools -- bench
 
 #### Running clippy
 
-This will run clippy ant sanity check the configuration, one for each report.
+This will run clippy and sanity check the configuration, one for each report.
 
 ```sh
-cargo run -p tools -- bench
+cargo run -p tools -- clippy
 ```

@@ -2,15 +2,13 @@
 
 mod bins;
 mod cmd;
+mod command;
 mod manifest;
 mod tests;
 
 use std::env;
-use std::ffi::OsStr;
-use std::fmt::Write;
-use std::fs::{self};
+use std::fs;
 use std::path::PathBuf;
-use std::process::Command;
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
@@ -99,54 +97,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-fn build_cargo(
-    report: ReportRef<'_>,
-    command: impl AsRef<OsStr>,
-    head: impl IntoIterator<Item: AsRef<OsStr>>,
-    remaining: impl IntoIterator<Item: AsRef<OsStr>, IntoIter: ExactSizeIterator>,
-) -> Result<Command> {
-    let mut child = Command::new("cargo");
-
-    child.arg(command).args(["-p", "tests"]).args(head);
-
-    for env in &report.env {
-        child.env(&env.key, &env.value);
-    }
-
-    let features = report.cargo_features();
-
-    child.args(["--no-default-features", "--features", &features]);
-
-    let remaining = remaining.into_iter();
-
-    if remaining.len() > 0 {
-        child.arg("--");
-        child.args(remaining);
-    }
-
-    Ok(child)
-}
-
-fn print_command(child: &Command) {
-    let program = child.get_program().to_string_lossy();
-
-    let args = child
-        .get_args()
-        .map(|args| args.to_string_lossy())
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    let mut e = String::new();
-
-    if child.get_envs().next().is_some() {
-        for (key, value) in child.get_envs() {
-            if let Some(value) = value {
-                _ = write!(e, "{}={} ", key.to_string_lossy(), value.to_string_lossy());
-            }
-        }
-    }
-
-    println!("{e}{program} {args}");
 }

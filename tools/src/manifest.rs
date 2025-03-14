@@ -43,7 +43,7 @@ impl Manifest {
         target: &'a Path,
         output: &'a Path,
         shared: &SharedArgs,
-        bins: &BinArgs,
+        bins: &'a BinArgs,
     ) -> Result<Vec<Bins<'a>>> {
         let mut out = Vec::new();
 

@@ -3,7 +3,7 @@ use std::ffi::OsString;
 use anyhow::{ensure, Result};
 use clap::Parser;
 
-use crate::{build_cargo, print_command, Manifest, SharedArgs};
+use crate::{command, Manifest, SharedArgs};
 
 #[derive(Parser)]
 pub(crate) struct Args {
@@ -12,12 +12,12 @@ pub(crate) struct Args {
     remaining: Vec<OsString>,
 }
 
-pub(crate) fn entry(a: &Args, manifest: &Manifest) -> Result<()> {
+pub(crate) fn entry(args: &Args, manifest: &Manifest) -> Result<()> {
     let mut ok = true;
 
-    for report in manifest.reports(&a.shared) {
-        let mut child = build_cargo(report, "bench", None::<OsString>, &a.remaining[..])?;
-        print_command(&child);
+    for report in manifest.reports(&args.shared) {
+        let mut child = command::cargo(report, "bench", None::<OsString>, &args.remaining[..])?;
+        command::print(&child);
         ok &= child.status()?.success();
     }
 

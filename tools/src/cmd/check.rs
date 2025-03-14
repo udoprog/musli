@@ -23,10 +23,10 @@ pub(crate) fn entry(a: &Args, manifest: &Manifest, target: &Path, output: &Path)
     for b in &bins {
         println!("Sanity checking: {}", b.report.title);
 
-        b.fuzz()?
+        b.tests()?
             .run(&["--iter", "1"], &[])
-            .context("Fuzz check failed")?;
-        // Test benches binaries.
+            .context("Sanity check failed")?;
+
         b.comparison()?.run(&[], &[])?;
     }
 

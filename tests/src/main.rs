@@ -93,7 +93,9 @@ fn main() -> Result<()> {
             "-h" | "--help" => {
                 println!("Available options:");
                 println!(
-                    " --iter <count>  - Perform the <count> number of iterations when fuzzing, (default: {})", ITER.get());
+                    " --iter <count>  - Run the given number of iterations (default: {})",
+                    ITER.get()
+                );
                 println!(" --random        - Feed each framework randomly generated.");
                 println!(
                     " --size          - Construct random data structures and print their sizes."

@@ -7,7 +7,7 @@ use std::process::{ExitStatus, Stdio};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use crate::{build_cargo, print_command, ReportRef};
+use crate::{command, ReportRef};
 
 pub(crate) struct CustomBuild<'a> {
     pub(crate) status: ExitStatus,
@@ -55,15 +55,15 @@ impl CustomBuild<'_> {
 
     /// Fetch a built binary that matches the given kind and name.
     pub(crate) fn bin(&self, kind: &str, name: &str) -> Option<PathBuf> {
-        let mut bins = Vec::new();
+        let mut last = None;
 
         for (k, n, path) in &self.all {
             if k == kind && n == name {
-                bins.push(path.clone());
+                last = Some(path.clone());
             }
         }
 
-        bins.pop()
+        last
     }
 }
 
@@ -81,7 +81,7 @@ pub(crate) fn build<'a>(
     remaining: impl IntoIterator<Item: AsRef<OsStr>, IntoIter: ExactSizeIterator>,
     print: bool,
 ) -> Result<CustomBuild> {
-    let mut child = build_cargo(
+    let mut child = command::cargo(
         report,
         command,
         head.into_iter().chain(["--message-format=json"]),
@@ -90,7 +90,7 @@ pub(crate) fn build<'a>(
 
     child.stdout(Stdio::piped());
 
-    print_command(&child);
+    command::print(&child);
 
     let mut child = child.spawn()?;
 
