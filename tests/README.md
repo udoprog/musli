@@ -58,12 +58,25 @@ Just beware that enabling certain dependencies limits the models being used.
 
 <br>
 
-## Potential security issues discovered by this crate
+## Potential security issues reported through this crate
 
 * `dlhn`: Allocating and initializing large arrays based on untrusted input
   (DoS): [dlhn#11](https://github.com/otake84/dlhn/issues/11).
 * `rkyv`: Undefined Behavior: stacked borrows violation
   [rkyv#436](https://github.com/rkyv/rkyv/issues/436).
+* `bincode`: bincode 2 overallocates on untrusted inputs [bincode#764](https://github.com/bincode-org/bincode/issues/764)[^bincode-alloc].
+
+[^bincode-alloc]: Note that upstream sees this as an enhancement, while I
+    consider this a security issue. It affects the default configuration of
+    bincode and the mitigation proposed should be in place to protect any
+    configuration.
+
+<br>
+
+## Other issues discovered by this crate
+
+* `bincode`: bincode_derive does not like generic parameters with defaults: [bincode#763](https://github.com/bincode-org/bincode/issues/763)
+* `simd_json`: Incomplete serialization for zero-element tuple variant: [simd_json#416](https://github.com/simd-lite/simd-json/issues/416).
 
 <br>
 
