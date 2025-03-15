@@ -25,7 +25,7 @@ alloc = ["musli?/alloc", "musli-zerocopy?/alloc", "bincode?/alloc"]
 verbose = ["musli?/verbose"]
 extra = ["rkyv", "dlhn", "serde_cbor"]
 full = ["rmp-serde", "bincode1", "bincode-serde", "bincode-derive", "postcard", "musli-json", "serde_json", "bitcode", "bitcode-derive"]
-text = ["musli-json", "serde_json"]
+text = ["musli-json", "serde_json", "simd-json"]
 simdutf8 = ["musli?/simdutf8"]
 parse-full = ["musli?/parse-full"]
 musli-wire = ["musli/wire"]
@@ -75,6 +75,7 @@ bitcode = ["dep:bitcode", "serde"]
 bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
 miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"]
 speedy = ["dep:speedy", "no-isize", "no-cstring"]
+simd-json = ["dep:simd-json", "serde"]
 
 [dependencies]
 musli = { path = "../crates/musli", version = "0.0.128", default-features = false, optional = true, features = [] }
@@ -98,6 +99,7 @@ zerocopy = { version = "0.8.13", default-features = false, optional = true, feat
 miniserde = { version = "0.1.38", default-features = false, optional = true }
 speedy = { version = "0.8.7", optional = true }
 epserde = { version = "0.8.0", default-features = false, optional = true, features = ["derive"] }
+simd-json = { version = "0.14.3", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }

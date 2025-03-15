@@ -40,9 +40,9 @@ fn main() -> Result<()> {
         tests::init_statics();
     }
 
-    let root = env::var_os("CARGO_MANIFEST_DIR")
-        .map(|path| PathBuf::from(path).join("..").join(".."))
-        .unwrap_or_else(|| PathBuf::from("."));
+    let target = env::var_os("CARGO_TARGET_DIR")
+        .map(|path| PathBuf::from(path).join("musli"))
+        .unwrap_or_else(|| PathBuf::from("target").join("musli"));
 
     let mut it = std::env::args().skip(1);
 
@@ -203,7 +203,13 @@ fn main() -> Result<()> {
                         }
 
                         if save {
-                            save_decode(&mut o, &root, verbose, bytes.as_slice(), format_args!("{n}_{}", stringify!($framework)))?;
+                            save_file(
+                                &mut o,
+                                &target,
+                                verbose,
+                                bytes.as_slice(),
+                                format_args!("{}_{}_{n}_decode", stringify!($framework), stringify!($name))
+                            )?;
                         }
 
                         match utils::$framework::decode::<$ty>(bytes.as_slice()) {
@@ -299,9 +305,15 @@ fn main() -> Result<()> {
                                 }
                             };
 
-                            if let Some(bytes) = out.as_bytes() {
-                                if save {
-                                    save_decode(&mut o, &root, verbose, bytes, format_args!("{index}_{}", stringify!($framework)))?;
+                            if save {
+                                if let Some(bytes) = out.as_bytes() {
+                                    save_file(
+                                        &mut o,
+                                        &target,
+                                        verbose,
+                                        bytes,
+                                        format_args!("{}_{}_{n}_{index}_decode", stringify!($framework), stringify!($name))
+                                    )?;
                                 }
                             }
 
@@ -313,8 +325,13 @@ fn main() -> Result<()> {
                                     writeln!(o, "{index}: error during decode: {error}")?;
 
                                     if let Some(bytes) = out.as_bytes() {
-                                        let path = root.join("target").join(format!("{}_error.bin", stringify!($framework)));
-                                        fs::write(&path, bytes).with_context(|| path.display().to_string())?;
+                                        let path = save_file(
+                                            &mut o,
+                                            &target,
+                                            verbose,
+                                            bytes,
+                                            format_args!("{}_{}_{n}_{index}_error", stringify!($framework), stringify!($name))
+                                        )?;
                                         writeln!(o, "{index}: failing structure written to {}", path.display())?;
                                     }
 
@@ -379,22 +396,28 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn save_decode<W>(
+fn save_file<W>(
     o: &mut W,
-    root: &Path,
+    target: &Path,
     verbose: bool,
     bytes: &[u8],
     name: impl fmt::Display,
-) -> Result<()>
+) -> Result<PathBuf>
 where
     W: ?Sized + Write,
 {
-    let path = root.join("target").join(format!("{}_decode.bin", name));
+    let path = target.join(format!("{}.bin", name));
 
     if verbose {
         writeln!(o, "Saving: {}", path.display())?;
     }
 
+    if let Some(dir) = path.parent() {
+        if !dir.is_dir() {
+            fs::create_dir_all(dir).with_context(|| path.display().to_string())?;
+        }
+    }
+
     fs::write(&path, bytes).with_context(|| path.display().to_string())?;
-    Ok(())
+    Ok(path)
 }
