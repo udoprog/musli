@@ -29,9 +29,9 @@ Below you'll also find [size comparisons](#size-comparisons).
 
 ## System Information
 
-**CPU:** Intel(R) Celeron(R) CPU J3455 @ 1.50GHz 2196MHz
+**CPU:** Intel(R) Core(TM) i9-9900K CPU @ 3.60GHz 4743MHz
 
-**Memory:** 8155MB
+**Memory:** 67317MB
 
 ## Reports
 
@@ -70,6 +70,7 @@ they support the same set of features in what types of data they can represent.
 | `dec/primitives/musli_value`[^musli_value] | **397.21ns** ± 0.43ns | 396.43ns &mdash; 398.11ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_value/report/) |
 | `dec/primitives/musli_wire` | **865.50ns** ± 0.82ns | 864.14ns &mdash; 867.32ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/musli_wire/report/) |
 | `dec/primitives/postcard` | **267.33ns** ± 0.18ns | 267.00ns &mdash; 267.71ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/postcard/report/) |
+| `dec/primitives/serde_bincode` | **38.60ns** ± 0.25ns | 38.25ns &mdash; 38.96ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/serde_bincode/report/) |
 | `dec/primitives/serde_bitcode` | **1.26μs** ± 2.01ns | 1.25μs &mdash; 1.26μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/serde_bitcode/report/) |
 | `dec/primitives/serde_rmp` | **321.46ns** ± 0.30ns | 320.92ns &mdash; 322.09ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_primitives/serde_rmp/report/) |
 
@@ -98,6 +99,7 @@ they support the same set of features in what types of data they can represent.
 | `enc/primitives/musli_value`[^musli_value] | **1.15μs** ± 0.67ns | 1.15μs &mdash; 1.16μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_value/report/) |
 | `enc/primitives/musli_wire` | **834.98ns** ± 1.54ns | 832.47ns &mdash; 838.39ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/musli_wire/report/) |
 | `enc/primitives/postcard` | **432.13ns** ± 0.50ns | 431.26ns &mdash; 433.21ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/postcard/report/) |
+| `enc/primitives/serde_bincode` | **31.23ns** ± 0.34ns | 30.74ns &mdash; 31.72ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/serde_bincode/report/) |
 | `enc/primitives/serde_bitcode` | **3.69μs** ± 4.18ns | 3.68μs &mdash; 3.70μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/serde_bitcode/report/) |
 | `enc/primitives/serde_rmp` | **250.00ns** ± 0.30ns | 249.48ns &mdash; 250.63ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_primitives/serde_rmp/report/) |
 
@@ -241,6 +243,7 @@ they support the same set of features in what types of data they can represent.
 | `dec/large/musli_value`[^musli_value] | **72.79μs** ± 101.28ns | 72.63μs &mdash; 73.02μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_value/report/) |
 | `dec/large/musli_wire` | **172.44μs** ± 197.48ns | 172.14μs &mdash; 172.89μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/musli_wire/report/) |
 | `dec/large/postcard` | **71.25μs** ± 69.73ns | 71.14μs &mdash; 71.41μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/postcard/report/) |
+| `dec/large/serde_bincode` | **13.45μs** ± 20.38ns | 13.42μs &mdash; 13.47μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/serde_bincode/report/) |
 | `dec/large/serde_bitcode` | **81.76μs** ± 92.60ns | 81.59μs &mdash; 81.95μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/serde_bitcode/report/) |
 | `dec/large/serde_rmp` | **120.33μs** ± 116.69ns | 120.12μs &mdash; 120.58μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_large/serde_rmp/report/) |
 
@@ -269,6 +272,7 @@ they support the same set of features in what types of data they can represent.
 | `enc/large/musli_value`[^musli_value] | **304.98μs** ± 556.16ns | 304.07μs &mdash; 306.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_value/report/) |
 | `enc/large/musli_wire` | **105.11μs** ± 69.98ns | 104.98μs &mdash; 105.26μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/musli_wire/report/) |
 | `enc/large/postcard` | **72.14μs** ± 86.12ns | 71.99μs &mdash; 72.32μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/postcard/report/) |
+| `enc/large/serde_bincode` | **4.88μs** ± 14.98ns | 4.86μs &mdash; 4.90μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/serde_bincode/report/) |
 | `enc/large/serde_bitcode` | **94.91μs** ± 90.42ns | 94.74μs &mdash; 95.09μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/serde_bitcode/report/) |
 | `enc/large/serde_rmp` | **62.53μs** ± 75.76ns | 62.39μs &mdash; 62.69μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_large/serde_rmp/report/) |
 
@@ -298,6 +302,7 @@ they support the same set of features in what types of data they can represent.
 | `dec/allocated/musli_value`[^musli_value] | **1.83μs** ± 1.66ns | 1.82μs &mdash; 1.83μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_value/report/) |
 | `dec/allocated/musli_wire` | **3.11μs** ± 3.05ns | 3.10μs &mdash; 3.11μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/musli_wire/report/) |
 | `dec/allocated/postcard` | **3.21μs** ± 2.58ns | 3.21μs &mdash; 3.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/postcard/report/) |
+| `dec/allocated/serde_bincode` | **899.32ns** ± 0.77ns | 898.22ns &mdash; 900.42ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/serde_bincode/report/) |
 | `dec/allocated/serde_bitcode` | **5.76μs** ± 8.08ns | 5.74μs &mdash; 5.77μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/serde_bitcode/report/) |
 | `dec/allocated/serde_rmp` | **4.02μs** ± 6.82ns | 4.01μs &mdash; 4.03μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_allocated/serde_rmp/report/) |
 
@@ -326,6 +331,7 @@ they support the same set of features in what types of data they can represent.
 | `enc/allocated/musli_value`[^musli_value] | **2.58μs** ± 3.52ns | 2.58μs &mdash; 2.59μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_value/report/) |
 | `enc/allocated/musli_wire` | **976.63ns** ± 1.20ns | 974.50ns &mdash; 979.18ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/musli_wire/report/) |
 | `enc/allocated/postcard` | **1.21μs** ± 1.72ns | 1.21μs &mdash; 1.22μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/postcard/report/) |
+| `enc/allocated/serde_bincode` | **96.63ns** ± 0.38ns | 96.09ns &mdash; 97.17ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/serde_bincode/report/) |
 | `enc/allocated/serde_bitcode` | **7.68μs** ± 8.62ns | 7.67μs &mdash; 7.70μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/serde_bitcode/report/) |
 | `enc/allocated/serde_rmp` | **739.90ns** ± 0.73ns | 738.69ns &mdash; 741.52ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_allocated/serde_rmp/report/) |
 
@@ -354,6 +360,7 @@ they support the same set of features in what types of data they can represent.
 | `dec/mesh/musli_value`[^musli_value] | **2.26μs** ± 2.46ns | 2.26μs &mdash; 2.27μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_value/report/) |
 | `dec/mesh/musli_wire` | **5.70μs** ± 6.24ns | 5.69μs &mdash; 5.71μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/musli_wire/report/) |
 | `dec/mesh/postcard` | **408.36ns** ± 0.38ns | 407.69ns &mdash; 409.15ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/postcard/report/) |
+| `dec/mesh/serde_bincode` | **505.72ns** ± 4.05ns | 499.99ns &mdash; 511.44ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/serde_bincode/report/) |
 | `dec/mesh/serde_bitcode` | **3.57μs** ± 34.68ns | 3.50μs &mdash; 3.64μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/serde_bitcode/report/) |
 | `dec/mesh/serde_rmp` | **2.88μs** ± 2.04ns | 2.88μs &mdash; 2.89μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/dec_mesh/serde_rmp/report/) |
 
@@ -381,6 +388,7 @@ they support the same set of features in what types of data they can represent.
 | `enc/mesh/musli_value`[^musli_value] | **17.44μs** ± 25.46ns | 17.40μs &mdash; 17.50μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_value/report/) |
 | `enc/mesh/musli_wire` | **4.72μs** ± 4.05ns | 4.71μs &mdash; 4.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/musli_wire/report/) |
 | `enc/mesh/postcard` | **385.83ns** ± 0.45ns | 385.05ns &mdash; 386.79ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/postcard/report/) |
+| `enc/mesh/serde_bincode` | **309.01ns** ± 0.16ns | 308.79ns &mdash; 309.23ns | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/serde_bincode/report/) |
 | `enc/mesh/serde_bitcode` | **4.72μs** ± 5.57ns | 4.71μs &mdash; 4.73μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/serde_bitcode/report/) |
 | `enc/mesh/serde_rmp` | **1.59μs** ± 1.66ns | 1.58μs &mdash; 1.59μs | [Report 📓](https://udoprog.github.io/musli/benchmarks/criterion-full/enc_mesh/serde_rmp/report/) |
 
