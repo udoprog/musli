@@ -200,5 +200,7 @@ fn main() {
 
     benches();
 
-    Criterion::default().configure_from_args().final_summary();
+    if std::env::var_os("MUSLI_FINAL_SUMMARY").map_or(true, |value| value != "no") {
+        Criterion::default().configure_from_args().final_summary();
+    }
 }

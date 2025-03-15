@@ -95,7 +95,9 @@ description = [
 features = [
     "musli-json",
     "serde_json",
-    "simd-json",
+    # We don't support not timing a mutable buffer and there is a bug.
+    # See: https://github.com/simd-lite/simd-json/issues/416
+    # "simd-json",
     "simdutf8",
 ]
 expected = [
@@ -249,7 +251,9 @@ description = [
 features = [
     "musli-json",
     "serde_json",
-    "simd-json",
+    # We don't support not timing a mutable buffer and there is a bug.
+    # See: https://github.com/simd-lite/simd-json/issues/416
+    # "simd-json",
     "miniserde",
 ]
 expected = [
