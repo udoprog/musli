@@ -32,6 +32,40 @@ pub mod serde_json {
     }
 }
 
+#[cfg(feature = "simd-json")]
+#[crate::benchmarker]
+pub mod simd_json {
+    use alloc::vec::Vec;
+
+    use serde::de::DeserializeOwned;
+    use serde::Serialize;
+    use simd_json::{from_slice, to_writer, Error};
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: Serialize,
+    {
+        to_writer(&mut *buf, value)?;
+        Ok(buf)
+    }
+
+    pub fn decode<T>(buf: &[u8]) -> Result<T, Error>
+    where
+        T: DeserializeOwned,
+    {
+        let mut buf = buf.to_vec();
+        from_slice(buf.as_mut_slice())
+    }
+}
+
 #[cfg(feature = "bincode1")]
 #[crate::benchmarker]
 pub mod bincode1 {
