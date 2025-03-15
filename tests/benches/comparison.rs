@@ -190,15 +190,17 @@ fn criterion_benchmark(c: &mut Criterion) {
     tests::types!(setup);
 }
 
-criterion::criterion_group!(benches, criterion_benchmark);
-
 fn main() {
     // SAFETY: This is only called once at the beginning of the program.
     unsafe {
         tests::init_statics();
     }
 
-    benches();
+    let mut c = Criterion::default().configure_from_args();
 
-    Criterion::default().configure_from_args().final_summary();
+    criterion_benchmark(&mut c);
+
+    if std::env::var_os("MUSLI_FINAL_SUMMARY").is_none_or(|value| value != "no") {
+        c.final_summary();
+    }
 }

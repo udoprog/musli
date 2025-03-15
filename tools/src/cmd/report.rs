@@ -9,6 +9,7 @@ use std::process::Stdio;
 
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use clap::Parser;
+use criterion::Criterion;
 use serde::{Deserialize, Serialize};
 use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 
@@ -218,19 +219,23 @@ fn build_report<'a>(
             args.push(filter);
         }
 
-        let comparison_env = [(
-            OsStr::new("CRITERION_HOME"),
-            bins.paths.criterion_output.as_os_str(),
-        )];
+        // Disable final summary since we do it here.
+        let env = [
+            (
+                OsStr::new("CRITERION_HOME"),
+                bins.paths.criterion_output.as_os_str(),
+            ),
+            (OsStr::new("MUSLI_FINAL_SUMMARY"), OsStr::new("no")),
+        ];
 
-        bins.comparison()?.run(&args, &comparison_env[..])?;
+        bins.comparison()?.run(&args, &env[..])?;
         ran_benchmarks = true;
     }
 
-    if !bins.paths.criterion_output.is_dir() {
-        fs::create_dir_all(&bins.paths.criterion_output)
-            .with_context(|| anyhow!("{}", bins.paths.criterion_output.display()))?;
-    }
+    // Generate all needed graphics and reports.
+    Criterion::default()
+        .output_directory(&bins.paths.criterion_output)
+        .final_summary();
 
     let mut output_plots = Vec::new();
 
