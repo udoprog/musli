@@ -9,7 +9,7 @@ pub(crate) fn cargo(
     report: ReportRef<'_>,
     command: impl AsRef<OsStr>,
     head: impl IntoIterator<Item: AsRef<OsStr>>,
-    remaining: impl IntoIterator<Item: AsRef<OsStr>, IntoIter: ExactSizeIterator>,
+    remaining: impl IntoIterator<Item: AsRef<OsStr>>,
 ) -> Result<Command> {
     let mut child = Command::new("cargo");
 
@@ -23,11 +23,12 @@ pub(crate) fn cargo(
 
     child.args(["--no-default-features", "--features", &features]);
 
-    let remaining = remaining.into_iter();
+    let mut it = remaining.into_iter();
 
-    if remaining.len() > 0 {
+    if let Some(first) = it.next() {
         child.arg("--");
-        child.args(remaining);
+        child.arg(first);
+        child.args(it);
     }
 
     Ok(child)

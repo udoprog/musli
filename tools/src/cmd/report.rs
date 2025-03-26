@@ -52,51 +52,46 @@ pub(crate) struct Args {
 pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Path) -> Result<()> {
     let bins = manifest.bins(target, output, &args.shared, &args.bins)?;
 
-    let mut built_reports = Vec::new();
     let mut size_sets = Vec::new();
 
     if !args.no_bench {
-        for b in &bins {
-            b.comparison()?.run(&[], &[])?;
+        for bins in &bins {
+            println!("{}: Testing comparison benchmark", bins.report.title);
+            bins.comparison()?.run(&[], &[])?;
         }
 
-        let mut errored = Vec::new();
+        let mut errored = 0usize;
 
         for bins in &bins {
-            println!("Building: {}", bins.report.title);
+            println!("{}: Benchmarking", bins.report.title);
 
-            match build_report(args, bins, args.filter.as_deref()) {
-                Ok(group_plots) => {
-                    built_reports.push((bins, group_plots));
-                }
-                Err(error) => {
-                    errored.push((bins.report, error));
+            if let Err(error) = build_report(args, bins, args.filter.as_deref()) {
+                errored += 1;
+
+                println!("{}: Failed benchmark", bins.report.title);
+
+                for error in error.chain() {
+                    println!("  Caused by: {error}");
                 }
             }
         }
 
-        if !errored.is_empty() {
-            for (report, error) in &errored {
-                println!("Failed to build report: {}", report.title);
-
-                for error in error.chain() {
-                    println!("Caused by: {error}");
-                }
-            }
-
-            bail!("{} builds failed", errored.len());
+        if errored > 0 {
+            bail!("{errored} builds failed");
         }
     }
 
     if !args.no_size {
-        for b in &bins {
-            b.tests()?
+        for bins in &bins {
+            println!("{}: Testing fuzz tool", bins.report.title);
+
+            bins.tests()?
                 .run(&["--iter", "1"], &[])
                 .context("Sanity check failed")?;
         }
 
         for bins in &bins {
-            println!("Sizing: {}", bins.report.title);
+            println!("{}: Sizing", bins.report.title);
             let size_set = collect_size_sets(bins.tests()?).context("Collecting size sets")?;
             size_sets.push((bins.report, size_set));
         }
@@ -132,10 +127,16 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
 
     writeln!(o)?;
 
-    if !built_reports.is_empty() {
+    let mut reports = Vec::new();
+
+    for bins in &bins {
+        reports.push(output_plots(bins)?);
+    }
+
+    if !reports.is_empty() {
         writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
 
-        for (bins, _) in &built_reports {
+        for bins in &bins {
             let Report {
                 id, title, link, ..
             } = &*bins.report;
@@ -157,7 +158,7 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
     writeln!(o)?;
 
     render_system_info(&mut o)?;
-    render_reports(&mut o, args, manifest, built_reports, &mut used_footnotes)?;
+    render_reports(&mut o, args, manifest, &bins, &reports, &mut used_footnotes)?;
     size_comparisons(&mut o, manifest, size_sets, &mut used_footnotes)?;
 
     if !used_footnotes.is_empty() {
@@ -193,11 +194,7 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
     Ok(())
 }
 
-fn build_report<'a>(
-    a: &Args,
-    bins: &Bins<'a>,
-    filter: Option<&str>,
-) -> Result<Vec<(&'a Group, HashMap<&'a str, String>)>> {
+fn build_report(a: &Args, bins: &Bins<'_>, filter: Option<&str>) -> Result<()> {
     if !bins.paths.images.is_dir() {
         fs::create_dir_all(&bins.paths.images)
             .with_context(|| anyhow!("{}", bins.paths.images.display()))?;
@@ -237,6 +234,14 @@ fn build_report<'a>(
         .output_directory(&bins.paths.criterion_output)
         .final_summary();
 
+    if ran_benchmarks {
+        fs::File::create(&done_path).with_context(|| done_path.display().to_string())?;
+    }
+
+    Ok(())
+}
+
+fn output_plots<'a>(bins: &Bins<'a>) -> Result<Vec<(&'a Group, HashMap<&'a str, String>)>> {
     let mut output_plots = Vec::new();
 
     for g @ Group { id: group, .. } in &bins.report.manifest.groups {
@@ -266,10 +271,6 @@ fn build_report<'a>(
         output_plots.push((g, plots));
     }
 
-    if ran_benchmarks {
-        fs::File::create(&done_path).with_context(|| done_path.display().to_string())?;
-    }
-
     Ok(output_plots)
 }
 
@@ -277,7 +278,8 @@ fn render_reports<'a, O>(
     o: &mut O,
     args: &Args,
     manifest: &'a Manifest,
-    reports: Vec<(&Bins<'_>, Vec<(&Group, HashMap<&str, String>)>)>,
+    bins: &[Bins<'_>],
+    reports: &[Vec<(&Group, HashMap<&str, String>)>],
     used_footnotes: &mut BTreeSet<&'a str>,
 ) -> Result<()>
 where
@@ -288,7 +290,7 @@ where
     writeln!(o, "## Reports")?;
     writeln!(o)?;
 
-    for (bins @ &Bins { report, .. }, group_plots) in reports {
+    for (bins @ &Bins { report, .. }, group_plots) in bins.iter().zip(reports) {
         writeln!(o, "### {}", report.title)?;
         render_preamble(o, report)?;
 

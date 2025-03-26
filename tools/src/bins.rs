@@ -154,8 +154,8 @@ impl InteriorBins<'_> {
             "debug"
         });
 
-        let to_comparison = binaries.join(format!("comparison-{}{}", self.report.id, EXE_SUFFIX));
-        let to_tests = binaries.join(format!("tests-{}{}", self.report.id, EXE_SUFFIX));
+        let to_comparison = binaries.join(format!("comparison-{}{EXE_SUFFIX}", self.report.id));
+        let to_tests = binaries.join(format!("tests-{}{EXE_SUFFIX}", self.report.id));
 
         if !binaries.is_dir() {
             fs::create_dir_all(&binaries).with_context(|| anyhow!("{}", binaries.display()))?;

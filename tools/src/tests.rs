@@ -78,7 +78,7 @@ pub(crate) fn build<'a>(
     report: ReportRef<'_>,
     command: impl AsRef<OsStr>,
     head: impl IntoIterator<Item = &'a str>,
-    remaining: impl IntoIterator<Item: AsRef<OsStr>, IntoIter: ExactSizeIterator>,
+    remaining: impl IntoIterator<Item: AsRef<OsStr>>,
     print: bool,
 ) -> Result<CustomBuild> {
     let mut child = command::cargo(
