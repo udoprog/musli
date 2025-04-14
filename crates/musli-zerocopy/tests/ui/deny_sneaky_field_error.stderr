@@ -9,16 +9,22 @@ error[E0027]: pattern does not mention field `sneaky_field`
    |
 help: include the missing field in the pattern
    |
-15 |     field, sneaky_field }
-   |          ~~~~~~~~~~~~~~~~
+15 -     field: u32,
+16 - }
+15 +     field, sneaky_field }
+   |
 help: if you don't care about this missing field, you can explicitly ignore it
    |
-15 |     field, sneaky_field: _ }
-   |          ~~~~~~~~~~~~~~~~~~~
+15 -     field: u32,
+16 - }
+15 +     field, sneaky_field: _ }
+   |
 help: or always ignore missing fields here
    |
-15 |     field, .. }
-   |          ~~~~~~
+15 -     field: u32,
+16 - }
+15 +     field, .. }
+   |
 
 error[E0063]: missing field `sneaky_field` in initializer of `SneakyNamed`
   --> tests/ui/deny_sneaky_field_error.rs:11:10
@@ -67,16 +73,22 @@ error[E0027]: pattern does not mention field `sneaky_field`
    |
 help: include the missing field in the pattern
    |
-40 |         field, sneaky_field },
-   |              ~~~~~~~~~~~~~~~~
+40 -         field: u32,
+41 -     },
+40 +         field, sneaky_field },
+   |
 help: if you don't care about this missing field, you can explicitly ignore it
    |
-40 |         field, sneaky_field: _ },
-   |              ~~~~~~~~~~~~~~~~~~~
+40 -         field: u32,
+41 -     },
+40 +         field, sneaky_field: _ },
+   |
 help: or always ignore missing fields here
    |
-40 |         field, .. },
-   |              ~~~~~~
+40 -         field: u32,
+41 -     },
+40 +         field, .. },
+   |
 
 error: pattern requires `..` due to inaccessible fields
   --> tests/ui/deny_sneaky_field_error.rs:35:10
