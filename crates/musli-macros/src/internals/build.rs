@@ -806,8 +806,8 @@ pub(crate) fn existing_bounds(bounds: &[(Span, MusliBound)]) -> HashSet<syn::Ide
     let mut idents = HashSet::new();
 
     for (_, bound) in bounds {
-        let ident = match bound {
-            MusliBound::Excluded(ident) => ident.clone(),
+        let path = match bound {
+            MusliBound::Excluded(path) => path,
             MusliBound::Predicate(predicate) => {
                 let syn::WherePredicate::Type(predicate) = predicate else {
                     continue;
@@ -817,15 +817,15 @@ pub(crate) fn existing_bounds(bounds: &[(Span, MusliBound)]) -> HashSet<syn::Ide
                     continue;
                 };
 
-                let Some(ident) = ty.path.get_ident() else {
-                    continue;
-                };
-
-                ident.clone()
+                &ty.path
             }
         };
 
-        idents.insert(ident);
+        let Some(ident) = path.get_ident() else {
+            continue;
+        };
+
+        idents.insert(ident.clone());
     }
 
     idents

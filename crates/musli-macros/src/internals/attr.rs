@@ -4,6 +4,7 @@ use std::mem;
 
 use proc_macro2::Span;
 use quote::ToTokens;
+use syn::ext::IdentExt;
 use syn::meta::ParseNestedMeta;
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
@@ -549,7 +550,7 @@ fn parse_bound_types(
 }
 
 pub(crate) enum MusliBound {
-    Excluded(syn::Ident),
+    Excluded(syn::Path),
     Predicate(syn::WherePredicate),
 }
 
@@ -566,21 +567,20 @@ impl MusliBound {
 impl Parse for MusliBound {
     #[inline]
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let Some(ident) = input.parse::<Option<syn::Ident>>()? else {
+        if !(input.peek(syn::Ident::peek_any) || input.peek(Token![::])) {
             return Ok(MusliBound::Predicate(input.parse()?));
-        };
+        }
+
+        let path = input.parse::<syn::Path>()?;
 
         let Some(colon) = input.parse::<Option<Token![:]>>()? else {
-            return Ok(MusliBound::Excluded(ident));
+            return Ok(MusliBound::Excluded(path));
         };
 
         Ok(MusliBound::Predicate(syn::WherePredicate::Type(
             syn::PredicateType {
                 lifetimes: None,
-                bounded_ty: syn::Type::Path(syn::TypePath {
-                    qself: None,
-                    path: syn::Path::from(syn::PathSegment::from(ident)),
-                }),
+                bounded_ty: syn::Type::Path(syn::TypePath { qself: None, path }),
                 colon_token: colon,
                 bounds: input.parse_terminated(syn::TypeParamBound::parse, Token![+])?,
             },
