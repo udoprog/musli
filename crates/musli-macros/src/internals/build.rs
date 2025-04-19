@@ -802,30 +802,15 @@ fn determine_name_method(ty: &syn::Type) -> (NameMethod, Option<NameAll>) {
 }
 
 /// Extract existing ident bounds which are present, so that the default type bounds can be excluded on this basis.
-pub(crate) fn existing_bounds(bounds: &[(Span, MusliBound)]) -> HashSet<syn::Ident> {
+pub(crate) fn existing_bounds(bounds: &[(Span, MusliBound)]) -> HashSet<&syn::Ident> {
     let mut idents = HashSet::new();
 
     for (_, bound) in bounds {
-        let path = match bound {
-            MusliBound::Excluded(path) => path,
-            MusliBound::Predicate(predicate) => {
-                let syn::WherePredicate::Type(predicate) = predicate else {
-                    continue;
-                };
-
-                let syn::Type::Path(ty) = &predicate.bounded_ty else {
-                    continue;
-                };
-
-                &ty.path
-            }
-        };
-
-        let Some(ident) = path.get_ident() else {
+        let Some(ident) = bound.as_ident() else {
             continue;
         };
 
-        idents.insert(ident.clone());
+        idents.insert(ident);
     }
 
     idents

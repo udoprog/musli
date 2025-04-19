@@ -6,7 +6,8 @@ use proc_macro2::Span;
 use quote::ToTokens;
 use syn::ext::IdentExt;
 use syn::meta::ParseNestedMeta;
-use syn::parse::{Parse, ParseStream};
+use syn::parse::Parse;
+use syn::parse::ParseStream;
 use syn::spanned::Spanned;
 use syn::Token;
 
@@ -555,6 +556,25 @@ pub(crate) enum MusliBound {
 }
 
 impl MusliBound {
+    pub(crate) fn as_ident(&self) -> Option<&syn::Ident> {
+        let path = match self {
+            MusliBound::Excluded(path) => path,
+            MusliBound::Predicate(predicate) => {
+                let syn::WherePredicate::Type(predicate) = predicate else {
+                    return None;
+                };
+
+                let syn::Type::Path(ty) = &predicate.bounded_ty else {
+                    return None;
+                };
+
+                &ty.path
+            }
+        };
+
+        path.get_ident()
+    }
+
     #[inline]
     pub(crate) fn as_predicate(&self) -> Option<&syn::WherePredicate> {
         match self {
@@ -566,25 +586,24 @@ impl MusliBound {
 
 impl Parse for MusliBound {
     #[inline]
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        if !(input.peek(syn::Ident::peek_any) || input.peek(Token![::])) {
-            return Ok(MusliBound::Predicate(input.parse()?));
-        }
+    fn parse(outer: ParseStream) -> syn::Result<Self> {
+        let input = outer.fork();
 
-        let path = input.parse::<syn::Path>()?;
+        'fallback: {
+            if !input.peek(syn::Ident::peek_any) && !input.peek(Token![::]) {
+                break 'fallback;
+            }
 
-        let Some(colon) = input.parse::<Option<Token![:]>>()? else {
-            return Ok(MusliBound::Excluded(path));
+            _ = input.parse::<syn::Path>()?;
+
+            if input.peek(Token![:]) {
+                break 'fallback;
+            }
+
+            return Ok(MusliBound::Excluded(outer.parse()?));
         };
 
-        Ok(MusliBound::Predicate(syn::WherePredicate::Type(
-            syn::PredicateType {
-                lifetimes: None,
-                bounded_ty: syn::Type::Path(syn::TypePath { qself: None, path }),
-                colon_token: colon,
-                bounds: input.parse_terminated(syn::TypeParamBound::parse, Token![+])?,
-            },
-        )))
+        Ok(MusliBound::Predicate(outer.parse()?))
     }
 }
 
