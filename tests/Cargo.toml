@@ -78,8 +78,8 @@ speedy = ["dep:speedy", "no-isize", "no-cstring"]
 simd-json = ["dep:simd-json", "serde"]
 
 [dependencies]
-musli = { path = "../crates/musli", version = "0.0.129", default-features = false, optional = true, features = [] }
-musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.0.129", default-features = false, features = [], optional = true }
+musli = { path = "../crates/musli", version = "0.0.130", default-features = false, optional = true, features = [] }
+musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.0.130", default-features = false, features = [], optional = true }
 tests-macros = { path = "../tests-macros" }
 
 anyhow = "1.0.81"
