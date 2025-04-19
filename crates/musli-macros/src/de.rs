@@ -3,7 +3,7 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::Token;
 
-use crate::expander::{Name, NameMethod, StructKind};
+use crate::expander::{Name, NameMethod, StructKind, UnsizedMethod};
 use crate::internals::apply;
 use crate::internals::attr::{EnumTagging, Packing};
 use crate::internals::build::{self, Body, Build, BuildData, Enum, Field, Variant};
@@ -893,7 +893,6 @@ fn decode_variant_name<'a>(
     let Ctxt { ctx_var, .. } = *cx;
 
     let Tokens {
-        decoder_t,
         fmt,
         option,
         result,
@@ -902,8 +901,6 @@ fn decode_variant_name<'a>(
         variant_decoder_t,
         ..
     } = b.tokens;
-
-    let value_var = b.cx.ident("value");
 
     let type_name = en.name.value;
 
@@ -953,19 +950,7 @@ fn decode_variant_name<'a>(
                 variants.push(variant);
             }
 
-            let arms = variants.iter().map(|o| o.as_arm(b));
-
-            let visit_type = &en.name.ty;
-            let method = method.as_method_name();
-
-            decode_name = quote! {
-                #decoder_t::#method(#variant_decoder_var, |#value_var: &#visit_type| {
-                    #result::Ok(match #value_var {
-                        #(#arms,)*
-                        _ => #option::None,
-                    })
-                })
-            };
+            decode_name = decode_unsized(b, &variants, method, &en.name, variant_decoder_var);
 
             let fmt_debug = variants.iter().map(|o| {
                 let variant = &o.variant;
@@ -1110,7 +1095,6 @@ fn decode_tagged(
     let struct_decoder_var = b.cx.ident("struct_decoder");
     let struct_hint_static = b.cx.ident("STRUCT_HINT");
     let type_decoder_var = b.cx.ident("type_decoder");
-    let value_var = b.cx.ident("value");
     let static_name_var = b.cx.ident("FIELD_NAME");
     let static_name_type = st.name.ty();
 
@@ -1234,10 +1218,7 @@ fn decode_tagged(
 
             let decode_t_decode = &b.decode_t_decode;
 
-            decode_tag = quote! {
-                #decode_t_decode(#struct_decoder_var)?
-            };
-
+            decode_tag = quote!(#decode_t_decode(#struct_decoder_var));
             name_type = st.name.ty.clone();
         }
         NameMethod::Unsized(method) => {
@@ -1285,27 +1266,15 @@ fn decode_tagged(
                 body = skip_field;
             }
 
-            let arms = outputs.iter().map(|o| o.as_arm(b));
-
-            let visit_type = &st.name.ty;
-            let method = method.as_method_name();
-
-            decode_tag = quote! {
-                #decoder_t::#method(#struct_decoder_var, |#value_var: &#visit_type| {
-                    #result::Ok(match #value_var {
-                        #(#arms,)*
-                        _ => #option::None,
-                    })
-                })?
-            };
-
-            let variants = outputs.iter().map(|o| &o.variant);
+            decode_tag = decode_unsized(b, &outputs, method, &st.name, &struct_decoder_var);
 
             let fmt_debug = outputs.iter().map(|o| {
                 let variant = &o.variant;
-                let tag = o.name;
-                quote!(#output_type::#variant => #fmt::Debug::fmt(&#tag, f))
+                let name = o.name;
+                quote!(#output_type::#variant => #fmt::Debug::fmt(&#name, f))
             });
+
+            let variants = outputs.iter().map(|o| &o.variant);
 
             output_enum = quote! {
                 enum #output_type {
@@ -1355,7 +1324,7 @@ fn decode_tagged(
             while let #option::Some(mut #struct_decoder_var) = #map_decoder_t::decode_entry(#type_decoder_var)? {
                 let #name_var: #name_type = {
                     let #struct_decoder_var = #entry_decoder_t::decode_key(&mut #struct_decoder_var)?;
-                    #decode_tag
+                    #decode_tag?
                 };
 
                 #body
@@ -1365,6 +1334,52 @@ fn decode_tagged(
             #result::Ok(#path { #(#assigns,)* })
         })?
     }})
+}
+
+fn decode_unsized(
+    b: &Build<'_>,
+    outputs: &[NameVariant<'_>],
+    method: UnsizedMethod,
+    name: &Name<'_, syn::LitStr>,
+    decoder_var: &Ident,
+) -> TokenStream {
+    let arms = outputs.iter().map(|o| {
+        let Tokens { option, .. } = b.tokens;
+
+        let path = &o.path;
+        let arm = sized_arm(b, o.pattern, o.name);
+
+        let pat = &arm.pat;
+        let binding = &arm.binding;
+
+        let cond = arm.cond.map(|_| {
+            let name = o.name;
+            quote!(if *#binding == #name)
+        });
+
+        quote!(#pat #cond => #option::Some(#path))
+    });
+
+    let visit_type = &name.ty;
+    let method = method.as_method_name();
+
+    let Tokens {
+        decoder_t,
+        option,
+        result,
+        ..
+    } = b.tokens;
+
+    let value_var = b.cx.ident("value");
+
+    quote! {
+        #decoder_t::#method(#decoder_var, |#value_var: &#visit_type| {
+            #result::Ok(match #value_var {
+                #(#arms,)*
+                _ => #option::None,
+            })
+        })
+    }
 }
 
 /// Decode a transparent value.
@@ -1523,34 +1538,6 @@ pub(crate) struct NameVariant<'a> {
     name: &'a syn::Expr,
     /// The pattern being matched.
     pattern: Option<&'a syn::Pat>,
-}
-
-impl NameVariant<'_> {
-    /// Generate the pattern for this output.
-    pub(crate) fn as_arm(&self, b: &Build<'_>) -> syn::Arm {
-        let Tokens { option, .. } = b.tokens;
-
-        let path = &self.path;
-        let arm = sized_arm(b, self.pattern, self.name);
-
-        let binding = &arm.binding;
-
-        syn::Arm {
-            attrs: Vec::new(),
-            pat: arm.pat,
-            guard: arm.cond.map(|_| {
-                let name = self.name;
-
-                (
-                    <Token![if]>::default(),
-                    syn::parse_quote!(*#binding == #name),
-                )
-            }),
-            fat_arrow_token: <Token![=>]>::default(),
-            body: Box::new(syn::parse_quote!(#option::Some(#path))),
-            comma: None,
-        }
-    }
 }
 
 fn unsized_arm<'a>(
