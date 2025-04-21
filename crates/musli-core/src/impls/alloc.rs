@@ -104,22 +104,6 @@ where
     }
 }
 
-impl<'de, M, A, T> Decode<'de, M, A> for Box<[T]>
-where
-    A: Allocator,
-    T: Decode<'de, M, A>,
-{
-    const IS_BITWISE_DECODE: bool = false;
-
-    #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    where
-        D: Decoder<'de, Mode = M, Allocator = A>,
-    {
-        Ok(decoder.decode::<Vec<T>>()?.into())
-    }
-}
-
 macro_rules! cow {
     (
         $encode:ident :: $encode_fn:ident,
@@ -718,6 +702,22 @@ macro_rules! smart_pointer {
                     D: Decoder<'de, Mode = M, Allocator = A>,
                 {
                     Ok($ty::new(decoder.decode()?))
+                }
+            }
+
+            impl<'de, M, A, T> Decode<'de, M, A> for $ty<[T]>
+            where
+                A: Allocator,
+                T: Decode<'de, M, A>,
+            {
+                const IS_BITWISE_DECODE: bool = false;
+
+                #[inline]
+                fn decode<D>(decoder: D) -> Result<Self, D::Error>
+                where
+                    D: Decoder<'de, Mode = M, Allocator = A>,
+                {
+                    Ok($ty::from(Vec::<T>::decode(decoder)?))
                 }
             }
 
