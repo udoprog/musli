@@ -144,6 +144,23 @@ jobs:
     - run: cargo check -p musli --no-default-features --features ${{matrix.base}},simdutf8
     - run: cargo check -p musli --no-default-features --features ${{matrix.base}},parse-full
 
+  crate_features:
+    needs: [rustfmt, clippy]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+        - musli-axum
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - run: cargo build -p ${{matrix.crate}} --no-default-features
+    - run: cargo build -p ${{matrix.crate}} --no-default-features --features alloc
+    - run: cargo build -p ${{matrix.crate}} --no-default-features --features std
+
   recursive:
     runs-on: ubuntu-latest
     steps:
