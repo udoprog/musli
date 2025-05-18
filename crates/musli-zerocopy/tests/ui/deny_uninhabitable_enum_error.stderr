@@ -1,8 +1,8 @@
 error[E0084]: unsupported representation for zero-variant enum
- --> tests/ui/deny_uninhabitable_enum_error.rs:4:1
+ --> tests/ui/deny_uninhabitable_enum_error.rs:4:8
   |
 4 | #[repr(u8)]
-  | ^^^^^^^^^^^
+  |        ^^
 5 | enum Uninhabitable {}
   | ------------------ zero-variant enum
 
