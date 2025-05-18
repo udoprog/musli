@@ -60,11 +60,11 @@ pub(crate) enum EnumTagging<'a> {
     /// Only the tag is encoded.
     Empty,
     /// The type is internally tagged by the field given by the expression.
-    Internal { tag: Name<'a, syn::Expr> },
+    Internal { tag: Box<Name<'a, syn::Expr>> },
     /// An enumerator is adjacently tagged.
     Adjacent {
-        tag: Name<'a, syn::Expr>,
-        content: Name<'a, syn::Expr>,
+        tag: Box<Name<'a, syn::Expr>>,
+        content: Box<Name<'a, syn::Expr>>,
     },
 }
 
@@ -335,17 +335,17 @@ impl TypeAttr {
                 );
 
                 EnumTagging::Adjacent {
-                    tag,
-                    content: Name {
+                    tag: Box::new(tag),
+                    content: Box::new(Name {
                         span: name_span,
                         value: content_value,
                         ty,
                         method,
                         format_with: self.content_format_with(mode),
-                    },
+                    }),
                 }
             }
-            _ => EnumTagging::Internal { tag },
+            _ => EnumTagging::Internal { tag: Box::new(tag) },
         };
 
         Some(enum_tagging)
@@ -551,8 +551,8 @@ fn parse_bound_types(
 }
 
 pub(crate) enum MusliBound {
-    Excluded(syn::Path),
-    Predicate(syn::WherePredicate),
+    Excluded(Box<syn::Path>),
+    Predicate(Box<syn::WherePredicate>),
 }
 
 impl MusliBound {
@@ -560,7 +560,7 @@ impl MusliBound {
         let path = match self {
             MusliBound::Excluded(path) => path,
             MusliBound::Predicate(predicate) => {
-                let syn::WherePredicate::Type(predicate) = predicate else {
+                let syn::WherePredicate::Type(predicate) = &**predicate else {
                     return None;
                 };
 

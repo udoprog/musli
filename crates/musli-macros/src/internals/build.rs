@@ -59,8 +59,8 @@ impl Build<'_> {
 
 /// Build model for enums and structs.
 pub(crate) enum BuildData<'a> {
-    Struct(Body<'a>),
-    Enum(Enum<'a>),
+    Struct(Box<Body<'a>>),
+    Enum(Box<Enum<'a>>),
 }
 
 impl BuildData<'_> {
@@ -363,8 +363,12 @@ pub(crate) fn setup<'a>(
     p: Parameters,
 ) -> Result<Build<'a>> {
     let data = match &e.data {
-        Data::Struct(data) => BuildData::Struct(setup_struct(e, &mode, data, &p.allocator_ident)),
-        Data::Enum(data) => BuildData::Enum(setup_enum(e, &mode, data, &p.allocator_ident)),
+        Data::Struct(data) => {
+            BuildData::Struct(Box::new(setup_struct(e, &mode, data, &p.allocator_ident)))
+        }
+        Data::Enum(data) => {
+            BuildData::Enum(Box::new(setup_enum(e, &mode, data, &p.allocator_ident)))
+        }
         Data::Union => {
             e.cx.error_span(e.input.ident.span(), "musli: not supported for unions");
             return Err(());

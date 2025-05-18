@@ -39,7 +39,7 @@ impl<A> ContextError<A> for std::io::Error {
     where
         T: 'static + Send + Sync + Error,
     {
-        std::io::Error::new(std::io::ErrorKind::Other, message)
+        std::io::Error::other(message)
     }
 
     #[inline]
@@ -47,7 +47,7 @@ impl<A> ContextError<A> for std::io::Error {
     where
         T: fmt::Display,
     {
-        std::io::Error::new(std::io::ErrorKind::Other, std::format!("{message}"))
+        std::io::Error::other(std::format!("{message}"))
     }
 }
 

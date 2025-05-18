@@ -245,7 +245,7 @@ fn output_plots<'a>(bins: &Bins<'a>) -> Result<Vec<(&'a Group, HashMap<&'a str, 
     let mut output_plots = Vec::new();
 
     for g @ Group { id: group, .. } in &bins.report.manifest.groups {
-        if !bins.report.only.is_empty() && !bins.report.only.iter().any(|o| *o == *group) {
+        if !bins.report.only.is_empty() && !bins.report.only.contains(group) {
             continue;
         }
 
