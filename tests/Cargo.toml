@@ -10,6 +10,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 autobenches = false
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(disabled)'] }
+
 [[bench]]
 name = "comparison"
 harness = false
@@ -76,6 +79,8 @@ bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
 miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"]
 speedy = ["dep:speedy", "no-isize", "no-cstring"]
 simd-json = ["dep:simd-json", "serde"]
+facet = ["dep:facet", "no-cstring"]
+facet-json = ["dep:facet-json", "facet", "no-128"]
 
 [dependencies]
 musli = { path = "../crates/musli", version = "0.0.131", default-features = false, optional = true, features = [] }
@@ -100,6 +105,8 @@ miniserde = { version = "0.1.38", default-features = false, optional = true }
 speedy = { version = "0.8.7", optional = true }
 epserde = { version = "0.8.0", default-features = false, optional = true, features = ["derive"] }
 simd-json = { version = "0.15.1", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
+facet = { version = "0.27.12", default-features = false, optional = true, features = ["alloc", "std", "tuples-12"] }
+facet-json = { version = "0.24.13", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.6.0", features = ["html_reports"] }

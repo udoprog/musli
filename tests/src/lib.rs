@@ -170,6 +170,8 @@ macro_rules! feature_matrix {
         $call!(miniserde $(, $($tt)*)*);
         #[cfg(feature = "speedy")]
         $call!(speedy $(, $($tt)*)*);
+        #[cfg(feature = "facet-json")]
+        $call!(facet_json $(, $($tt)*)*);
     };
 }
 
