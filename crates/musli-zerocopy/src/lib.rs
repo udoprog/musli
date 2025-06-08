@@ -529,7 +529,6 @@
 #![allow(clippy::module_inception)]
 #![allow(clippy::enum_variant_names)]
 #![deny(missing_docs)]
-#![cfg_attr(all(musli_nightly), feature(repr128))]
 #![cfg_attr(all(musli_nightly), allow(incomplete_features))]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 
