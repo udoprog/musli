@@ -80,7 +80,7 @@ pub(crate) fn build<'a>(
     head: impl IntoIterator<Item = &'a str>,
     remaining: impl IntoIterator<Item: AsRef<OsStr>>,
     print: bool,
-) -> Result<CustomBuild> {
+) -> Result<CustomBuild<'_>> {
     let mut child = command::cargo(
         report,
         command,
