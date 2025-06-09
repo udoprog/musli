@@ -1,4 +1,5 @@
 use std::mem::take;
+use std::slice;
 
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
@@ -173,11 +174,25 @@ impl Benchmarker {
             ));
         };
 
-        let (encode_generics, lifetime) = mangle_encode_lifetimes(&encode_fn);
+        let encode_lifetime = find_buf_param(&encode_fn, None);
+        let decode_lifetime = find_buf_param(&decode_fn, encode_lifetime.map(|p| &p.lifetime));
 
-        let type_lt = match &lifetime {
-            Some(param) => param.lifetime.clone(),
-            None => syn::parse_quote!('__buf),
+        let mut extra_lts = Vec::new();
+        let mut extra_markers = Vec::new();
+
+        let (buf_lt, buf_param) = match decode_lifetime.or(encode_lifetime) {
+            Some(param) => {
+                for lt in param.bounds.iter() {
+                    extra_lts.push(lt.clone());
+                    extra_markers.push(syn::Ident::new(
+                        &format!("_{}", lt.ident),
+                        lt.span(),
+                    ))
+                }
+
+                (param.lifetime.clone(), param.clone())
+            }
+            None => (syn::parse_quote!('__buf), syn::parse_quote!('__buf)),
         };
 
         if let Some(decode_fn) = public_decode_mangling(&decode_fn, &decode_args) {
@@ -209,9 +224,9 @@ impl Benchmarker {
         let provider_ty = providers.iter().map(|p| &p.ty);
 
         new_content.push(syn::parse_quote! {
-            #visibility struct State<#type_lt> {
-                buffer: &#type_lt mut #buffer_ty,
-                #(#provider_field: &#type_lt mut #provider_ty,)*
+            #visibility struct State<#buf_lt> {
+                buffer: &#buf_lt mut #buffer_ty,
+                #(#provider_field: &#buf_lt mut #provider_ty,)*
             }
         });
 
@@ -219,10 +234,11 @@ impl Benchmarker {
         let provider_ty = providers.iter().map(|p| &p.ty);
 
         new_content.push(syn::parse_quote! {
-            #visibility struct EncodeState<#type_lt> {
+            #visibility struct EncodeState<#buf_param, #(#extra_lts,)*> {
                 buffer: #encode_return,
-                #(#provider_field: &#type_lt mut #provider_ty,)*
-                _marker: ::core::marker::PhantomData<&#type_lt ()>,
+                #(#provider_field: &#buf_lt mut #provider_ty,)*
+                _buf: ::core::marker::PhantomData<&#buf_lt ()>,
+                #(#extra_markers: ::core::marker::PhantomData<&#extra_lts ()>,)*
             }
         });
 
@@ -274,8 +290,7 @@ impl Benchmarker {
             let reset_inner = &reset_fn.sig.ident;
             let (size_hint, value) = reset_idents(&reset_args);
             let reset_args = convert_arguments(reset_args, ReferenceType::Encode);
-            let (reset_generics, reset_param) =
-                mangle_reset_lifetimes(&reset_fn, lifetime.as_ref());
+            let (reset_generics, reset_param) = mangle_reset_lifetimes(&reset_fn, encode_lifetime);
             let mut reset_item_fn = reset_fn.clone();
             reset_item_fn.sig.inputs =
                 syn::parse_quote!(&mut self, #size_hint: usize, #value: &#reset_param);
@@ -297,13 +312,26 @@ impl Benchmarker {
         let encode_args = convert_arguments(encode_args, ReferenceType::Encode);
         let (provided_field, provided_expr) = convert_provided(&providers);
 
+        let encode_generics = without_lifetime(
+            &encode_fn,
+            encode_lifetime
+                .as_ref()
+                .map(|p| slice::from_ref(&p.lifetime))
+                .unwrap_or(&[]),
+        );
+
         let mut encode_inner = syn::PathSegment::from(encode_fn.sig.ident.clone());
         encode_inner.arguments = generics_to_path_arguments(&encode_generics);
+
+        let empty_lts = extra_lts
+            .iter()
+            .map(|_| syn::Lifetime::new("'_", Span::call_site()));
 
         let mut encode_item_fn = encode_fn.clone();
         encode_item_fn.sig.generics = encode_generics;
         encode_item_fn.sig.inputs = syn::parse_quote!(&mut self, value: &T);
-        encode_item_fn.sig.output = syn::parse_quote!(-> Result<EncodeState<'_>, #encode_error>);
+        encode_item_fn.sig.output =
+            syn::parse_quote!(-> Result<EncodeState<'_, #(#empty_lts,)*>, #encode_error>);
         encode_item_fn.block = syn::parse_quote! {
             {
                 #encode_fn
@@ -311,7 +339,8 @@ impl Benchmarker {
                 Ok(EncodeState {
                     buffer: #encode_inner(#encode_args)?,
                     #(#provided_field: #provided_expr,)*
-                    _marker: ::core::marker::PhantomData,
+                    _buf: ::core::marker::PhantomData,
+                    #(#extra_markers: ::core::marker::PhantomData,)*
                 })
             }
         };
@@ -331,7 +360,8 @@ impl Benchmarker {
         decode_inner.arguments = generics_to_path_arguments(&decode_fn.sig.generics);
 
         decode_item_fn.sig.inputs = syn::parse_quote!(&mut self);
-        decode_item_fn.sig.generics = mangle_decode_lifetimes(&decode_fn, lifetime.as_ref());
+        decode_item_fn.sig.generics =
+            mangle_decode_lifetimes(&decode_fn, encode_lifetime, &extra_lts);
         decode_item_fn.block = syn::parse_quote! {
             {
                 #decode_fn
@@ -367,7 +397,7 @@ impl Benchmarker {
         };
 
         new_content.push(syn::parse_quote! {
-            impl<'buf> EncodeState<'buf> {
+            impl<#buf_param, #(#extra_lts,)*> EncodeState<#buf_lt, #(#extra_lts,)*> {
                 #decode_item_fn
 
                 #as_bytes_fn
@@ -509,22 +539,26 @@ fn convert_provided(providers: &[Provider]) -> (Vec<syn::Ident>, Vec<syn::Expr>)
 }
 
 /// Extract lifetimes in encode function calls so they can be moved to the struct definition.
-fn mangle_encode_lifetimes(item_fn: &syn::ItemFn) -> (syn::Generics, Option<syn::LifetimeParam>) {
-    let mut generics = item_fn.sig.generics.clone();
+fn find_buf_param<'item>(
+    item_fn: &'item syn::ItemFn,
+    found: Option<&syn::Lifetime>,
+) -> Option<&'item syn::LifetimeParam> {
     let mut lifetime = None;
 
-    for p in take(&mut generics.params) {
+    for p in &item_fn.sig.generics.params {
         match p {
-            syn::GenericParam::Lifetime(lt) if lifetime.is_none() => {
-                lifetime = Some(lt);
+            syn::GenericParam::Lifetime(p) if lifetime.is_none() => {
+                if found.is_some_and(|lt| *lt != p.lifetime) {
+                    continue;
+                }
+
+                lifetime = Some(p);
             }
-            p => {
-                generics.params.push(p);
-            }
+            _ => {}
         }
     }
 
-    (generics, lifetime)
+    lifetime
 }
 
 /// Extract lifetimes in reset function calls so they can be moved to the struct definition.
@@ -574,6 +608,7 @@ fn mangle_reset_lifetimes(
 fn mangle_decode_lifetimes(
     item_fn: &syn::ItemFn,
     lifetime: Option<&syn::LifetimeParam>,
+    extra_lts: &[syn::Lifetime],
 ) -> syn::Generics {
     let mut generics = item_fn.sig.generics.clone();
 
@@ -581,6 +616,31 @@ fn mangle_decode_lifetimes(
         match p {
             syn::GenericParam::Lifetime(lt) => {
                 if lifetime.is_some_and(|p| p.lifetime == lt.lifetime) {
+                    continue;
+                }
+
+                if extra_lts.iter().any(|l| l.ident == lt.lifetime.ident) {
+                    continue;
+                }
+
+                generics.params.push(syn::GenericParam::Lifetime(lt));
+            }
+            p => {
+                generics.params.push(p);
+            }
+        }
+    }
+
+    generics
+}
+
+fn without_lifetime(item_fn: &syn::ItemFn, filter_lts: &[syn::Lifetime]) -> syn::Generics {
+    let mut generics = item_fn.sig.generics.clone();
+
+    for p in take(&mut generics.params) {
+        match p {
+            syn::GenericParam::Lifetime(lt) => {
+                if filter_lts.iter().any(|l| l.ident == lt.lifetime.ident) {
                     continue;
                 }
 
