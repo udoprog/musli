@@ -52,7 +52,8 @@ pub(crate) struct Args {
 pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Path) -> Result<()> {
     let bins = manifest.bins(target, output, &args.shared, &args.bins)?;
 
-    let mut size_sets = Vec::new();
+    let mut sizes = Vec::new();
+    let mut binary_sizes = Vec::new();
 
     if !args.no_bench {
         for bins in &bins {
@@ -92,8 +93,14 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
 
         for bins in &bins {
             println!("{}: Sizing", bins.report.title);
+            let tests = bins.tests()?;
+
+            if let Ok(m) = fs::metadata(tests.path()) {
+                binary_sizes.push((bins.report, m.len()));
+            }
+
             let size_set = collect_size_sets(bins.tests()?).context("Collecting size sets")?;
-            size_sets.push((bins.report, size_set));
+            sizes.push((bins.report, size_set));
         }
     }
 
@@ -159,7 +166,8 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
 
     render_system_info(&mut o)?;
     render_reports(&mut o, args, manifest, &bins, &reports, &mut used_footnotes)?;
-    size_comparisons(&mut o, manifest, size_sets, &mut used_footnotes)?;
+    size_comparisons(&mut o, manifest, sizes, &mut used_footnotes)?;
+    binary_size_comparisons(&mut o, binary_sizes)?;
 
     if !used_footnotes.is_empty() {
         writeln!(o)?;
@@ -539,6 +547,24 @@ where
         writeln!(o)?;
     }
 
+    Ok(())
+}
+
+fn binary_size_comparisons<W>(o: &mut W, size_sets: Vec<(ReportRef<'_>, u64)>) -> Result<()>
+where
+    W: Write,
+{
+    writeln!(o, "## Binary sizes")?;
+    writeln!(o)?;
+
+    writeln!(o, "| report | size in bytes |")?;
+    writeln!(o, "| ------ | ------------- |")?;
+
+    for (report, size) in size_sets {
+        writeln!(o, "| {} | {size} |", report.title)?;
+    }
+
+    writeln!(o)?;
     Ok(())
 }
 
