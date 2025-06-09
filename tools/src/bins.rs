@@ -93,6 +93,11 @@ impl Binary<'_> {
         command
     }
 
+    /// Get the path to the binary.
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+
     /// Run the given binary with the specified set of arguments.
     pub(crate) fn run(&self, args: &[&str], env: &[(&OsStr, &OsStr)]) -> Result<()> {
         let mut command = self.command();
