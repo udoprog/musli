@@ -18,3 +18,7 @@ default-members = [
     "tests-macros",
     "tools",
 ]
+
+[patch.crates-io]
+facet = { git = "https://github.com/facet-rs/facet" }
+facet-json = { git = "https://github.com/facet-rs/facet" }
