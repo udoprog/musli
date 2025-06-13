@@ -184,10 +184,7 @@ impl Benchmarker {
             Some(param) => {
                 for lt in param.bounds.iter() {
                     extra_lts.push(lt.clone());
-                    extra_markers.push(syn::Ident::new(
-                        &format!("_{}", lt.ident),
-                        lt.span(),
-                    ))
+                    extra_markers.push(syn::Ident::new(&format!("_{}", lt.ident), lt.span()))
                 }
 
                 (param.lifetime.clone(), param.clone())

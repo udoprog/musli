@@ -200,7 +200,7 @@ description = [
     "",
     "Note that `zerocopy` only supports packed primitives, so we're only comparing with that suite.",
 ]
-title = "Müsli vs zerocopy"
+title = "Müsli vs ZeroCopy"
 features = ["musli-zerocopy", "zerocopy"]
 expected = []
 only = ["packed"]
