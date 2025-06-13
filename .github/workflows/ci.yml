@@ -49,14 +49,27 @@ jobs:
       env:
         RUSTFLAGS: --cfg loom
 
-  tests_clippy:
+  tools_clippy:
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -D warnings
     needs: features
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
-    - run: cargo run -p tools -- clippy -- -D warnings
+    - run: cargo run -p tools -- clippy
+
+  tools_check:
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -D warnings
+    needs: features
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+    - run: cargo run -p tools -- check
 
   no_std:
     runs-on: ${{matrix.os}}
@@ -86,7 +99,7 @@ jobs:
     - run: cargo build --tests --all-features
 
   fuzz:
-    needs: [msrv, test, loom, tests_clippy, features, recursive]
+    needs: [msrv, test, loom, tools_clippy, tools_check, features, recursive]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -96,7 +109,7 @@ jobs:
     - run: cargo run -p tests --features test -- --random
 
   miri:
-    needs: [msrv, test, tests_clippy, features, recursive]
+    needs: [msrv, test, tools_clippy, tools_check, features, recursive]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
