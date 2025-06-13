@@ -1,8 +1,8 @@
 //! Functions to parse floating-point numbers.
 
 use crate::dec2flt::common::{is_8digits, ByteSlice};
+use crate::dec2flt::decimal::Decimal;
 use crate::dec2flt::float::RawFloat;
-use crate::dec2flt::number::Number;
 
 const MIN_19DIGIT_INT: u64 = 100_0000_0000_0000_0000;
 
@@ -51,9 +51,7 @@ fn try_parse_19digits(s_ref: &mut &[u8], x: &mut u64) {
     let mut s = *s_ref;
 
     while *x < MIN_19DIGIT_INT {
-        // FIXME: Can't use s.split_first() here yet,
-        // see https://github.com/rust-lang/rust/issues/109328
-        if let [c, s_next @ ..] = s {
+        if let Some((c, s_next)) = s.split_first() {
             let digit = c.wrapping_sub(b'0');
 
             if digit < 10 {
@@ -106,7 +104,7 @@ fn parse_scientific(s_ref: &mut &[u8]) -> Option<i64> {
 ///
 /// This creates a representation of the float as the
 /// significant digits and the decimal exponent.
-pub fn parse_partial_number(mut s: &[u8]) -> Option<(Number, usize)> {
+pub(crate) fn parse_partial_number(mut s: &[u8]) -> Option<(Decimal, usize)> {
     debug_assert!(!s.is_empty());
 
     // parse initial digits before dot
@@ -153,7 +151,7 @@ pub fn parse_partial_number(mut s: &[u8]) -> Option<(Number, usize)> {
     // handle uncommon case with many digits
     if n_digits <= 19 {
         return Some((
-            Number {
+            Decimal {
                 exponent,
                 mantissa,
                 negative: false,
@@ -194,7 +192,7 @@ pub fn parse_partial_number(mut s: &[u8]) -> Option<(Number, usize)> {
     }
 
     Some((
-        Number {
+        Decimal {
             exponent,
             mantissa,
             negative: false,
