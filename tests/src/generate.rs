@@ -27,6 +27,8 @@ options! {
     static STRING_RANGE: Range<usize> = 4..32, 2..16;
     #[cfg(any(feature = "std", feature = "alloc"))]
     static MAP_RANGE: Range<usize> = 10..20, 1..3;
+    #[cfg(any(feature = "std", feature = "alloc"))]
+    static SET_RANGE: Range<usize> = 10..20, 1..3;
     #[cfg(feature = "alloc")]
     static VEC_RANGE: Range<usize> = 10..20, 1..3;
 }
@@ -193,7 +195,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.get())
+        Self::generate_range(rng, SET_RANGE.get())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self
@@ -250,7 +252,7 @@ where
     where
         T: rand::Rng,
     {
-        Self::generate_range(rng, MAP_RANGE.get())
+        Self::generate_range(rng, SET_RANGE.get())
     }
 
     fn generate_range<T>(rng: &mut T, range: Range<usize>) -> Self

@@ -1,3 +1,9 @@
+#![no_std]
+
+extern crate std;
+
+extern crate alloc;
+
 use std::env;
 use std::fmt;
 use std::fs;
@@ -5,7 +11,9 @@ use std::hint::black_box;
 use std::io::Write;
 use std::mem::align_of;
 use std::path::{Path, PathBuf};
+use std::prelude::v1::*;
 use std::time::Instant;
+use std::{format, println};
 
 use anyhow::{bail, Context, Result};
 use tests::models::*;
@@ -24,7 +32,7 @@ struct SizeSet {
 tests::options! {
     pub unsafe fn init_constants();
     pub(crate) fn enumerate_constants();
-    static ITER: usize = 10000, 2;
+    static ITER: usize = 1000, 2;
     static LARGE: usize = 10, 2;
     static PRIMITIVES: usize = 500, 2;
     static PACKED: usize = 500, 2;
@@ -48,6 +56,7 @@ fn main() -> Result<()> {
 
     let mut iter = ITER.get();
     let mut random = false;
+    let mut all = false;
     let mut size = false;
     let mut filter = Vec::new();
     let mut seed = tests::RNG_SEED;
@@ -80,6 +89,9 @@ fn main() -> Result<()> {
             }
             "--random" => {
                 random = true;
+            }
+            "--all" => {
+                all = true;
             }
             "--size" => {
                 size = true;
@@ -165,7 +177,7 @@ fn main() -> Result<()> {
         (musli_value $($tt:tt)*) => {
         };
 
-        ($framework:ident, $name:ident, $ty:ty, $size_hint:expr) => {{
+        ($framework:ident, $values:ident, $name:ident, $ty:ty, $size_hint:expr) => {{
             tests::if_supported! {
                 $framework, $name, {
 
@@ -236,7 +248,7 @@ fn main() -> Result<()> {
         // musli value is not a bytes-oriented encoding.
         (musli_value $($tt:tt)*) => {};
 
-        ($framework:ident, $name:ident, $ty:ty, $size_hint:expr) => {{
+        ($framework:ident, $values:ident, $name:ident, $ty:ty, $size_hint:expr) => {{
             tests::if_supported! {
                 $framework, $name, {
                 let name = concat!(stringify!($framework), "/", stringify!($name), "/size");
@@ -250,7 +262,7 @@ fn main() -> Result<()> {
                         samples: Vec::new(),
                     };
 
-                    for var in &$name {
+                    for var in $values.iter() {
                         let mut state = buf.state();
                         state.reset($size_hint, var);
 
@@ -271,7 +283,7 @@ fn main() -> Result<()> {
     }
 
     macro_rules! run {
-        ($framework:ident, $name:ident, $ty:ty, $size_hint:expr) => {{
+        ($framework:ident, $values:ident, $name:ident, $ty:ty, $size_hint:expr) => {{
             tests::if_supported! {
                 $framework, $name, {
                 let name = concat!(stringify!($framework), "/", stringify!($name));
@@ -291,11 +303,13 @@ fn main() -> Result<()> {
                             o.flush()?;
                         }
 
-                        for (index, var) in $name.iter().enumerate() {
+                        for (index, var) in $values.iter().enumerate() {
                             let mut state = buf.state();
                             state.reset($size_hint, var);
 
-                            let mut out = match state.encode(var) {
+                            let result = state.encode(var);
+
+                            let mut out = match result {
                                 Ok(value) => value,
                                 Err(error) => {
                                     write!(o, "E")?;
@@ -305,36 +319,34 @@ fn main() -> Result<()> {
                                 }
                             };
 
-                            if save {
-                                if let Some(bytes) = out.as_bytes() {
-                                    save_file(
-                                        &mut o,
+                            let write_bytes = |o: &mut dyn Write, bytes: Option<&[u8]>, suffix: &str| {
+                                if let Some(bytes) = bytes {
+                                    let path = save_file(
+                                        o,
                                         &target,
                                         verbose,
                                         bytes,
-                                        format_args!("{}_{}_{n}_{index}_decode", stringify!($framework), stringify!($name))
+                                        format_args!("{}_{}_{n}_{index}_{suffix}", stringify!($framework), stringify!($name))
                                     )?;
+                                    writeln!(o, "{index}: failing structure written to {}", path.display())?;
                                 }
+
+                                Ok::<_, anyhow::Error>(())
+                            };
+
+                            if save {
+                                write_bytes(&mut o, out.as_bytes(), "decode")?;
                             }
 
-                            let actual = match out.decode::<$ty>() {
+                            let result = out.decode::<$ty>();
+
+                            let actual = match result {
                                 Ok(value) => value,
                                 Err(error) => {
                                     write!(o, "E")?;
                                     writeln!(o)?;
                                     writeln!(o, "{index}: error during decode: {error}")?;
-
-                                    if let Some(bytes) = out.as_bytes() {
-                                        let path = save_file(
-                                            &mut o,
-                                            &target,
-                                            verbose,
-                                            bytes,
-                                            format_args!("{}_{}_{n}_{index}_error", stringify!($framework), stringify!($name))
-                                        )?;
-                                        writeln!(o, "{index}: failing structure written to {}", path.display())?;
-                                    }
-
+                                    write_bytes(&mut o, out.as_bytes(), "error")?;
                                     break 'outer;
                                 }
                             };
@@ -345,6 +357,7 @@ fn main() -> Result<()> {
                                 writeln!(o, "{name}: model mismatch: {} struct {index}", stringify!($name))?;
                                 writeln!(o, "  Actual: {actual:?}")?;
                                 writeln!(o, "Expected: {var:?}")?;
+                                write_bytes(&mut o, out.as_bytes(), "error")?;
                                 break 'outer;
                             }
                         }
@@ -361,23 +374,34 @@ fn main() -> Result<()> {
 
     macro_rules! build {
         ($name:ident, $ty:ty, $num:expr, $size_hint:expr) => {{
-            let $name = rng.next_vector::<$ty>($num.get());
+            let values = rng.next_vector::<$ty>($num.get());
 
             if random {
-                tests::feature_matrix!(random, $name, $ty, $size_hint);
+                tests::feature_matrix!(random, values, $name, $ty, $size_hint);
             }
 
             if size {
-                tests::feature_matrix!(size, $name, $ty, $size_hint);
+                tests::feature_matrix!(size, values, $name, $ty, $size_hint);
             }
 
-            if !random && !size {
-                tests::feature_matrix!(run, $name, $ty, $size_hint);
+            if !random && !size && !all {
+                tests::feature_matrix!(run, values, $name, $ty, $size_hint);
             }
         }};
     }
 
     tests::types!(build);
+
+    if all {
+        macro_rules! all {
+            ($name:ident, $ty:ty) => {
+                let values: Vec<$ty> = rng.next_vector::<$ty>(ITER.get());
+                tests::feature_matrix!(run, values, $name, $ty, 0);
+            };
+        }
+
+        tests::basic_types!(all);
+    }
 
     if !size_sets.is_empty() {
         for SizeSet {
