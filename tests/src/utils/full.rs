@@ -389,3 +389,38 @@ pub mod facet_json {
         facet_json::from_slice(buf)
     }
 }
+
+#[cfg(feature = "facet-msgpack")]
+#[crate::benchmarker]
+pub mod facet_msgpack {
+    use core::fmt;
+
+    use alloc::vec::Vec;
+
+    use facet::Facet;
+
+    #[derive(Debug)]
+    pub struct Error;
+
+    impl fmt::Display for Error {
+        #[inline]
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "Serialization error")
+        }
+    }
+
+    pub fn encode<T>(value: &T) -> Result<Vec<u8>, Error>
+    where
+        T: for<'a> Facet<'a>,
+    {
+        let data = facet_msgpack::to_vec(value);
+        Ok(data)
+    }
+
+    pub fn decode<T>(buf: &[u8]) -> Result<T, facet_msgpack::DecodeError<'_>>
+    where
+        T: Facet<'static>,
+    {
+        facet_msgpack::from_slice(buf)
+    }
+}

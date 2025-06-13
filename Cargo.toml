@@ -22,3 +22,4 @@ default-members = [
 [patch.crates-io]
 facet = { git = "https://github.com/facet-rs/facet" }
 facet-json = { git = "https://github.com/facet-rs/facet" }
+facet-msgpack = { git = "https://github.com/facet-rs/facet" }

@@ -81,6 +81,7 @@ speedy = ["dep:speedy", "no-isize", "no-cstring"]
 simd-json = ["dep:simd-json", "serde"]
 facet = ["dep:facet", "no-cstring"]
 facet-json = ["dep:facet-json", "facet", "no-128"]
+facet-msgpack = ["dep:facet-msgpack", "facet", "no-128"]
 
 [dependencies]
 musli = { path = "../crates/musli", version = "0.0.131", default-features = false, optional = true, features = [] }
@@ -107,6 +108,7 @@ epserde = { version = "0.8.0", default-features = false, optional = true, featur
 simd-json = { version = "0.15.1", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
 facet = { version = "0.27.12", default-features = false, optional = true, features = ["alloc", "std", "tuples-12"] }
 facet-json = { version = "0.24.13", optional = true }
+facet-msgpack = { version = "0.25.13", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.6.0", features = ["html_reports"] }
