@@ -102,4 +102,4 @@ epserde = { version = "0.8.0", default-features = false, optional = true, featur
 simd-json = { version = "0.14.3", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
 
 [dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports"] }
+criterion = { version = "0.6.0", features = ["html_reports"] }
