@@ -212,6 +212,32 @@ macro_rules! types {
     };
 }
 
+#[macro_export]
+macro_rules! basic_types {
+    ($call:path) => {
+        $call!(u8, u8);
+        $call!(u16, u16);
+        $call!(u32, u32);
+        $call!(u64, u64);
+        $call!(u128, u128);
+        $call!(i8, i8);
+        $call!(i16, i16);
+        $call!(i32, i32);
+        $call!(i64, i64);
+        $call!(i128, i128);
+        $call!(f32, f32);
+        $call!(f64, f64);
+        $call!(char, char);
+        $call!(string, ::alloc::string::String);
+        $call!(vec_u32, ::alloc::vec::Vec<u32>);
+        $call!(vec_char, ::alloc::vec::Vec<char>);
+        $call!(hash_map_string_u32, ::std::collections::HashMap<String, u32>);
+        $call!(hash_map_u32_u32, ::std::collections::HashMap<u32, u32>);
+        $call!(hash_set_string, ::std::collections::HashSet<String>);
+        $call!(hash_set_u32, ::std::collections::HashSet<u32>);
+    };
+}
+
 /// Build common RNG with custom seed.
 pub fn rng_with_seed(seed: u64) -> generate::Rng {
     generate::Rng::from_seed(seed)
