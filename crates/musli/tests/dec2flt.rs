@@ -2,24 +2,13 @@
 #![allow(clippy::excessive_precision)]
 #![allow(clippy::approx_constant)]
 
-use dec2flt::RawFloat;
-
-#[derive(Debug, PartialEq)]
-struct ParseFloatError;
-
-#[inline]
-fn dec2flt<F: RawFloat>(s: &str) -> Result<F, ParseFloatError> {
-    let (f, len) = dec2flt::dec2flt::<F>(s.as_bytes()).ok_or(ParseFloatError)?;
-
-    if len == s.len() {
-        Ok(f)
-    } else {
-        Err(ParseFloatError)
-    }
-}
-
 #[path = "../src/dec2flt/mod.rs"]
 mod dec2flt;
+
+#[path = "dec2flt/decimal.rs"]
+mod decimal;
+#[path = "dec2flt/decimal_seq.rs"]
+mod decimal_seq;
 #[path = "dec2flt/float.rs"]
 mod float;
 #[path = "dec2flt/lemire.rs"]
@@ -39,12 +28,30 @@ macro_rules! test_literal {
             format!("{:?}", x64),
             format!("{:e}", x64),
         ];
+
         for input in inputs {
-            assert_eq!(input.parse(), Ok(x64));
-            assert_eq!(input.parse(), Ok(x32));
+            assert_eq!(
+                dec2flt::dec2flt(&input).map(|(n, _)| n),
+                Some(x64),
+                "failed f64 {input}"
+            );
+            assert_eq!(
+                dec2flt::dec2flt(&input).map(|(n, _)| n),
+                Some(x32),
+                "failed f32 {input}"
+            );
+
             let neg_input = format!("-{input}");
-            assert_eq!(neg_input.parse(), Ok(-x64));
-            assert_eq!(neg_input.parse(), Ok(-x32));
+            assert_eq!(
+                dec2flt::dec2flt(&neg_input).map(|(n, _)| n),
+                Some(-x64),
+                "failed f64 {neg_input}"
+            );
+            assert_eq!(
+                dec2flt::dec2flt(&neg_input).map(|(n, _)| n),
+                Some(-x32),
+                "failed f32 {neg_input}"
+            );
         }
     }};
 }
@@ -109,6 +116,8 @@ fn fast_path_correct() {
     test_literal!(1.448997445238699);
 }
 
+// FIXME(f16_f128): remove gates once tests work on all targets
+
 #[test]
 fn lonely_dot() {
     assert!(".".parse::<f32>().is_err());
@@ -123,8 +132,8 @@ fn exponentiated_dot() {
 
 #[test]
 fn lonely_sign() {
-    assert!("+".parse::<f32>().is_err());
-    assert!("-".parse::<f64>().is_err());
+    assert!("-".parse::<f32>().is_err());
+    assert!("+".parse::<f64>().is_err());
 }
 
 #[test]
@@ -136,21 +145,30 @@ fn whitespace() {
 #[test]
 fn nan() {
     assert!("NaN".parse::<f32>().unwrap().is_nan());
+    assert!("-NaN".parse::<f32>().unwrap().is_nan());
+
     assert!("NaN".parse::<f64>().unwrap().is_nan());
+    assert!("-NaN".parse::<f64>().unwrap().is_nan());
 }
 
 #[test]
 fn inf() {
-    assert_eq!("inf".parse(), Ok(f64::INFINITY));
-    assert_eq!("-inf".parse(), Ok(f64::NEG_INFINITY));
     assert_eq!("inf".parse(), Ok(f32::INFINITY));
     assert_eq!("-inf".parse(), Ok(f32::NEG_INFINITY));
+
+    assert_eq!("inf".parse(), Ok(f64::INFINITY));
+    assert_eq!("-inf".parse(), Ok(f64::NEG_INFINITY));
 }
 
 #[test]
 fn massive_exponent() {
+    let max = i32::MAX;
+    assert_eq!(format!("1e{max}000").parse(), Ok(f32::INFINITY));
+    assert_eq!(format!("1e-{max}000").parse(), Ok(0.0f32));
+    assert_eq!(format!("1e{max}000").parse(), Ok(f32::INFINITY));
+
     let max = i64::MAX;
     assert_eq!(format!("1e{max}000").parse(), Ok(f64::INFINITY));
-    assert_eq!(format!("1e-{max}000").parse(), Ok(0.0));
+    assert_eq!(format!("1e-{max}000").parse(), Ok(0.0f64));
     assert_eq!(format!("1e{max}000").parse(), Ok(f64::INFINITY));
 }

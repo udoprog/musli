@@ -36,7 +36,7 @@ pub fn compute_float<F: RawFloat>(q: i64, mut w: u64) -> BiasedFp {
     // Normalize our significant digits, so the most-significant bit is set.
     let lz = w.leading_zeros();
     w <<= lz;
-    let (lo, hi) = compute_product_approx(q, w, F::MANTISSA_EXPLICIT_BITS + 3);
+    let (lo, hi) = compute_product_approx(q, w, F::SIG_BITS as usize + 3);
     if lo == 0xFFFF_FFFF_FFFF_FFFF {
         // If we have failed to approximate w x 5^-q with our 128-bit value.
         // Since the addition of 1 could lead to an overflow which could then
@@ -59,8 +59,8 @@ pub fn compute_float<F: RawFloat>(q: i64, mut w: u64) -> BiasedFp {
         }
     }
     let upperbit = (hi >> 63) as i32;
-    let mut mantissa = hi >> (upperbit + 64 - F::MANTISSA_EXPLICIT_BITS as i32 - 3);
-    let mut power2 = power(q as i32) + upperbit - lz as i32 - F::MINIMUM_EXPONENT;
+    let mut mantissa = hi >> (upperbit + 64 - F::SIG_BITS as i32 - 3);
+    let mut power2 = power(q as i32) + upperbit - lz as i32 - F::EXP_MIN + 1;
     if power2 <= 0 {
         if -power2 + 1 >= 64 {
             // Have more than 64 bits below the minimum exponent, must be 0.
@@ -70,10 +70,10 @@ pub fn compute_float<F: RawFloat>(q: i64, mut w: u64) -> BiasedFp {
         mantissa >>= -power2 + 1;
         mantissa += mantissa & 1;
         mantissa >>= 1;
-        power2 = (mantissa >= (1_u64 << F::MANTISSA_EXPLICIT_BITS)) as i32;
+        power2 = (mantissa >= (1_u64 << F::SIG_BITS)) as i32;
         return BiasedFp {
-            f: mantissa,
-            e: power2,
+            m: mantissa,
+            p_biased: power2,
         };
     }
     // Need to handle rounding ties. Normally, we need to round up,
@@ -90,8 +90,8 @@ pub fn compute_float<F: RawFloat>(q: i64, mut w: u64) -> BiasedFp {
     if lo <= 1
         && q >= F::MIN_EXPONENT_ROUND_TO_EVEN as i64
         && q <= F::MAX_EXPONENT_ROUND_TO_EVEN as i64
-        && mantissa & 3 == 1
-        && (mantissa << (upperbit + 64 - F::MANTISSA_EXPLICIT_BITS as i32 - 3)) == hi
+        && mantissa & 0b11 == 0b01
+        && (mantissa << (upperbit + 64 - F::SIG_BITS as i32 - 3)) == hi
     {
         // Zero the lowest bit, so we don't round up.
         mantissa &= !1_u64;
@@ -99,22 +99,22 @@ pub fn compute_float<F: RawFloat>(q: i64, mut w: u64) -> BiasedFp {
     // Round-to-even, then shift the significant digits into place.
     mantissa += mantissa & 1;
     mantissa >>= 1;
-    if mantissa >= (2_u64 << F::MANTISSA_EXPLICIT_BITS) {
+    if mantissa >= (2_u64 << F::SIG_BITS) {
         // Rounding up overflowed, so the carry bit is set. Set the
         // mantissa to 1 (only the implicit, hidden bit is set) and
         // increase the exponent.
-        mantissa = 1_u64 << F::MANTISSA_EXPLICIT_BITS;
+        mantissa = 1_u64 << F::SIG_BITS;
         power2 += 1;
     }
     // Zero out the hidden bit.
-    mantissa &= !(1_u64 << F::MANTISSA_EXPLICIT_BITS);
+    mantissa &= !(1_u64 << F::SIG_BITS);
     if power2 >= F::INFINITE_POWER {
         // Exponent is above largest normal value, must be infinite.
         return fp_inf;
     }
     BiasedFp {
-        f: mantissa,
-        e: power2,
+        m: mantissa,
+        p_biased: power2,
     }
 }
 
@@ -161,7 +161,7 @@ fn compute_product_approx(q: i64, w: u64, precision: usize) -> (u64, u64) {
         // Need to do a second multiplication to get better precision
         // for the lower product. This will always be exact
         // where q is < 55, since 5^55 < 2^128. If this wraps,
-        // then we need to need to round up the hi product.
+        // then we need to round up the hi product.
         let (_, second_hi) = full_multiplication(w, hi5);
         first_lo = first_lo.wrapping_add(second_hi);
         if second_hi > first_lo {
