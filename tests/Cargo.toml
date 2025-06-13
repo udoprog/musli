@@ -92,14 +92,14 @@ serde_json = { version = "1.0.114", default-features = false, features = ["float
 serde_cbor = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
 dlhn = { version = "0.1.6", default-features = false, optional = true }
 bitcode = { version = "0.6.0", default-features = false, optional = true, features = ["std"] }
-rkyv = { version = "0.8.9", default-features = false, optional = true, features = ["bytecheck"] }
+rkyv = { version = "0.8.10", default-features = false, optional = true, features = ["bytecheck"] }
 postcard = { version = "1.0.8",  default-features = false, optional = true }
 bson = { version = "2.14.0", default-features = false, optional = true }
 zerocopy = { version = "0.8.13", default-features = false, optional = true, features = ["derive"] }
 miniserde = { version = "0.1.38", default-features = false, optional = true }
 speedy = { version = "0.8.7", optional = true }
 epserde = { version = "0.8.0", default-features = false, optional = true, features = ["derive"] }
-simd-json = { version = "0.14.3", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
+simd-json = { version = "0.15.1", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
 
 [dev-dependencies]
 criterion = { version = "0.6.0", features = ["html_reports"] }

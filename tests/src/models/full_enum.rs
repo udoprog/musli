@@ -51,7 +51,7 @@ pub enum FullEnum {
     feature = "rkyv",
     any(not(feature = "no-empty"), not(feature = "no-nonunit-variant"))
 ))]
-impl PartialEq<FullEnum> for &ArchivedMediumEnum {
+impl PartialEq<FullEnum> for &ArchivedFullEnum {
     #[inline]
     fn eq(&self, other: &FullEnum) -> bool {
         *other == **self
