@@ -57,19 +57,19 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
 
     if !args.no_bench {
         for bins in &bins {
-            println!("{}: Testing comparison benchmark", bins.report.title);
+            println!("{}: Testing comparison benchmark", bins.report.id);
             bins.comparison()?.run(&[], &[])?;
         }
 
         let mut errored = 0usize;
 
         for bins in &bins {
-            println!("{}: Benchmarking", bins.report.title);
+            println!("{}: Benchmarking", bins.report.id);
 
             if let Err(error) = build_report(args, bins, args.filter.as_deref()) {
                 errored += 1;
 
-                println!("{}: Failed benchmark", bins.report.title);
+                println!("{}: Failed benchmark", bins.report.id);
 
                 for error in error.chain() {
                     println!("  Caused by: {error}");
@@ -84,7 +84,7 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
 
     if !args.no_size {
         for bins in &bins {
-            println!("{}: Testing fuzz tool", bins.report.title);
+            println!("{}: Testing fuzz tool", bins.report.id);
 
             bins.tests()?
                 .run(&["--iter", "1"], &[])
@@ -92,7 +92,7 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
         }
 
         for bins in &bins {
-            println!("{}: Sizing", bins.report.title);
+            println!("{}: Sizing", bins.report.id);
             let tests = bins.tests()?;
 
             if let Ok(m) = fs::metadata(tests.path()) {
