@@ -18,7 +18,7 @@ jobs:
     needs: features
     steps:
     - uses: actions/checkout@v4
-    - uses: dtolnay/rust-toolchain@1.81
+    - uses: dtolnay/rust-toolchain@1.82
     - uses: Swatinem/rust-cache@v2
     - run: cargo build -p musli --features test
 
