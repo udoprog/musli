@@ -172,6 +172,8 @@ macro_rules! feature_matrix {
         $call!(speedy $(, $($tt)*)*);
         #[cfg(feature = "facet-json")]
         $call!(facet_json $(, $($tt)*)*);
+        #[cfg(feature = "facet-msgpack")]
+        $call!(facet_msgpack $(, $($tt)*)*);
     };
 }
 
