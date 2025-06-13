@@ -21,7 +21,7 @@ pub(crate) fn entry(a: &Args, manifest: &Manifest, target: &Path, output: &Path)
     let bins = manifest.bins(target, output, &a.shared, &a.bin)?;
 
     for b in &bins {
-        println!("Sanity checking: {}", b.report.title);
+        println!("{}: Sanity checking", b.report.id);
 
         b.tests()?
             .run(&["--iter", "1"], &[])
