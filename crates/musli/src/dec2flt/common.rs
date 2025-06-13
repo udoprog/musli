@@ -2,30 +2,30 @@
 
 /// Helper methods to process immutable bytes.
 pub(crate) trait ByteSlice {
-    /// Read 8 bytes as a 64-bit integer in little-endian order.
+    /// Reads 8 bytes as a 64-bit integer in little-endian order.
     fn read_u64(&self) -> u64;
 
-    /// Write a 64-bit integer as 8 bytes in little-endian order.
+    /// Writes a 64-bit integer as 8 bytes in little-endian order.
     fn write_u64(&mut self, value: u64);
 
-    /// Calculate the offset of a slice from another.
+    /// Calculate the difference in length between two slices.
     fn offset_from(&self, other: &Self) -> isize;
 
     /// Iteratively parse and consume digits from bytes.
-    /// Returns the same bytes with consumed digits being
-    /// elided.
+    ///
+    /// Returns the same bytes with consumed digits being elided. Breaks on invalid digits.
     fn parse_digits(&self, func: impl FnMut(u8)) -> &Self;
 }
 
 impl ByteSlice for [u8] {
-    #[inline] // inlining this is crucial to remove bound checks
+    #[inline(always)] // inlining this is crucial to remove bound checks
     fn read_u64(&self) -> u64 {
         let mut tmp = [0; 8];
         tmp.copy_from_slice(&self[..8]);
         u64::from_le_bytes(tmp)
     }
 
-    #[inline] // inlining this is crucial to remove bound checks
+    #[inline(always)] // inlining this is crucial to remove bound checks
     fn write_u64(&mut self, value: u64) {
         self[..8].copy_from_slice(&value.to_le_bytes())
     }
@@ -39,13 +39,11 @@ impl ByteSlice for [u8] {
     fn parse_digits(&self, mut func: impl FnMut(u8)) -> &Self {
         let mut s = self;
 
-        // FIXME: Can't use s.split_first() here yet,
-        // see https://github.com/rust-lang/rust/issues/109328
-        while let [c, s_next @ ..] = s {
+        while let Some((c, rest)) = s.split_first() {
             let c = c.wrapping_sub(b'0');
             if c < 10 {
                 func(c);
-                s = s_next;
+                s = rest;
             } else {
                 break;
             }
@@ -55,7 +53,9 @@ impl ByteSlice for [u8] {
     }
 }
 
-/// Determine if 8 bytes are all decimal digits.
+/// Determine if all characters in an 8-byte byte string (represented as a `u64`) are all decimal
+/// digits.
+///
 /// This does not care about the order in which the bytes were loaded.
 pub(crate) fn is_8digits(v: u64) -> bool {
     let a = v.wrapping_add(0x4646_4646_4646_4646);
@@ -63,19 +63,20 @@ pub(crate) fn is_8digits(v: u64) -> bool {
     (a | b) & 0x8080_8080_8080_8080 == 0
 }
 
-/// A custom 64-bit floating point type, representing `f * 2^e`.
-/// e is biased, so it be directly shifted into the exponent bits.
+/// A custom 64-bit floating point type, representing `m * 2^p`.
+/// p is biased, so it be directly shifted into the exponent bits.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct BiasedFp {
     /// The significant digits.
-    pub f: u64,
+    pub m: u64,
     /// The biased, binary exponent.
-    pub e: i32,
+    pub p_biased: i32,
 }
 
 impl BiasedFp {
+    /// Represent `0 ^ p`
     #[inline]
-    pub const fn zero_pow2(e: i32) -> Self {
-        Self { f: 0, e }
+    pub const fn zero_pow2(p_biased: i32) -> Self {
+        Self { m: 0, p_biased }
     }
 }

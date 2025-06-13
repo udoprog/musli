@@ -3,8 +3,8 @@
 //! # Problem statement
 //!
 //! We are given a decimal string such as `12.34e56`. This string consists of integral (`12`),
-//! fractional (`34`), and exponent (`56`) parts. All parts are optional and interpreted as zero
-//! when missing.
+//! fractional (`34`), and exponent (`56`) parts. All parts are optional and interpreted as a
+//! default value (1 or 0) when missing.
 //!
 //! We seek the IEEE 754 floating point number that is closest to the exact value of the decimal
 //! string. It is well-known that many decimal strings do not have terminating representations in
@@ -34,7 +34,7 @@
 //! a large-decimal representation, shifting the digits into range, calculating
 //! the upper significant bits and exactly round to the nearest representation.
 //!
-//! Another aspect that needs attention is the `RawFloat` trait by which almost all functions
+//! Another aspect that needs attention is the ``RawFloat`` trait by which almost all functions
 //! are parametrized. One might think that it's enough to parse to `f64` and cast the result to
 //! `f32`. Unfortunately this is not the world we live in, and this has nothing to do with using
 //! base two or half-to-even rounding.
@@ -58,7 +58,7 @@
 //!
 //! There are unit tests but they are woefully inadequate at ensuring correctness, they only cover
 //! a small percentage of possible errors. Far more extensive tests are located in the directory
-//! `src/etc/test-float-parse` as a Python script.
+//! `src/tools/test-float-parse` as a Rust program.
 //!
 //! A note on integer overflow: Many parts of this file perform arithmetic with the decimal
 //! exponent `e`. Primarily, we shift the decimal point around: Before the first decimal digit,
@@ -67,47 +67,64 @@
 //! "such that the exponent +/- the number of decimal digits fits into a 64 bit integer".
 //! Larger exponents are accepted, but we don't do arithmetic with them, they are immediately
 //! turned into {positive,negative} {zero,infinity}.
+//!
+//! # Notation
+//!
+//! This module uses the same notation as the Lemire paper:
+//!
+//! - `m`: binary mantissa; always nonnegative
+//! - `p`: binary exponent; a signed integer
+//! - `w`: decimal significand; always nonnegative
+//! - `q`: decimal exponent; a signed integer
+//!
+//! This gives `m * 2^p` for the binary floating-point number, with `w * 10^q` as the decimal
+//! equivalent.
 
 // This was copied and adapted from
-// https://github.com/rust-lang/rust/tree/9ac33d9c33741fc24a2ff4a177e72f31b9dc775f/library/core/src/num/dec2flt
+// https://github.com/rust-lang/rust/tree/015c7770ec0ffdba9ff03f1861144a827497f8ca/library/core/src/num/dec2flt
 //
-// Copyright 2014-2024 The Rust Project Developers
+// Copyright 2014-2025 The Rust Project Developers
 //
 // Under the MIT License.
 
-#![doc(hidden)]
-#![allow(clippy::manual_range_contains)]
-#![allow(clippy::let_unit_value)]
-
 use self::common::BiasedFp;
-pub(crate) use self::float::RawFloat;
+use self::float::RawFloat;
 use self::lemire::compute_float;
 use self::parse::{parse_inf_nan, parse_partial_number};
 use self::slow::parse_long_mantissa;
 
 mod common;
-mod decimal;
+pub mod decimal;
+pub mod decimal_seq;
 mod fpu;
 mod slow;
 mod table;
+
 // float is used in flt2dec, and all are used in unit tests.
-pub(crate) mod float;
-pub(crate) mod lemire;
-pub(crate) mod number;
-pub(crate) mod parse;
+pub mod float;
+pub mod lemire;
+pub mod parse;
 
 /// Converts a `BiasedFp` to the closest machine float type.
-fn biased_fp_to_float<T: RawFloat>(x: BiasedFp) -> T {
-    let mut word = x.f;
-    word |= (x.e as u64) << T::MANTISSA_EXPLICIT_BITS;
-    T::from_u64_bits(word)
+fn biased_fp_to_float<F: RawFloat>(x: BiasedFp) -> F {
+    let mut word = x.m;
+    word |= (x.p_biased as u64) << F::SIG_BITS;
+    F::from_u64_bits(word)
 }
 
 /// Converts a decimal string into a floating point number.
-#[inline(never)]
-pub(crate) fn dec2flt<F: RawFloat>(mut s: &[u8]) -> Option<(F, usize)> {
-    let &c = s.first()?;
+#[inline(always)] // Will be inlined into a function with `#[inline(never)]`, see above
+pub fn dec2flt<F>(s: &(impl ?Sized + AsRef<[u8]>)) -> Option<(F, usize)>
+where
+    F: RawFloat,
+{
+    let mut s = s.as_ref();
     let mut count = 0;
+    let c = if let Some(&c) = s.first() {
+        c
+    } else {
+        return None;
+    };
     let negative = c == b'-';
     if c == b'-' || c == b'+' {
         s = &s[1..];
@@ -118,14 +135,14 @@ pub(crate) fn dec2flt<F: RawFloat>(mut s: &[u8]) -> Option<(F, usize)> {
     }
 
     let Some((mut num, rest)) = parse_partial_number(s) else {
-        let (f, rest) = parse_inf_nan(s, negative)?;
+        let (value, rest) = parse_inf_nan(s, negative)?;
         count += rest;
-        return Some((f, count));
+        return Some((value, count));
     };
 
     count += rest;
-
     num.negative = negative;
+
     if let Some(value) = num.try_fast_path::<F>() {
         return Some((value, count));
     }
@@ -135,12 +152,15 @@ pub(crate) fn dec2flt<F: RawFloat>(mut s: &[u8]) -> Option<(F, usize)> {
     // redundantly using the Eisel-Lemire algorithm if it was unable to
     // correctly round on the first pass.
     let mut fp = compute_float::<F>(num.exponent, num.mantissa);
-    if num.many_digits && fp.e >= 0 && fp != compute_float::<F>(num.exponent, num.mantissa + 1) {
-        fp.e = -1;
+    if num.many_digits
+        && fp.p_biased >= 0
+        && fp != compute_float::<F>(num.exponent, num.mantissa + 1)
+    {
+        fp.p_biased = -1;
     }
     // Unable to correctly round the float using the Eisel-Lemire algorithm.
     // Fallback to a slower, but always correct algorithm.
-    if fp.e < 0 {
+    if fp.p_biased < 0 {
         fp = parse_long_mantissa::<F>(s);
     }
 
