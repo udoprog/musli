@@ -22,11 +22,11 @@ use crate::generate::Generate;
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "facet", derive(facet::Facet))]
+#[cfg_attr(feature = "facet", repr(C))]
 pub enum FullEnum {
     #[cfg(not(feature = "no-empty"))]
     Empty,
-    #[cfg(not(feature = "no-nonunit-variant"))]
-    EmptyTuple(),
     #[cfg_attr(feature = "musli", musli(transparent))]
     #[cfg(not(feature = "no-nonunit-variant"))]
     NewType(u64),
@@ -43,6 +43,8 @@ pub enum FullEnum {
         primitives: super::Primitives,
         b: u64,
     },
+    #[cfg(not(any(feature = "no-nonunit-variant", feature = "facet")))]
+    EmptyTuple(),
     #[cfg(not(feature = "no-nonunit-variant"))]
     EmptyStruct {},
 }
