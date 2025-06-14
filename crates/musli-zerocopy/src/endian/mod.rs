@@ -2,11 +2,23 @@
 
 /// A macro that picks which `$expr` to evaluate to based on if the current
 /// `#[cfg(target_endian = "..")]` matches `$endian` and optionally
-/// #[cfg(target_pointer_width = "..")] matches `$pointer_width`.
+/// `#[cfg(target_pointer_width = "..")]` matches `$pointer_width`.
 ///
 /// A fallback branch is supported with `_ => $expr`.
 ///
 /// # Examples
+///
+/// ```
+/// use musli_zerocopy::endian;
+///
+/// // Evaluates to 1 on little-endian and 2 on big-endian platforms.
+/// let value = endian::pick!("little" => 1, "big" => 2);
+/// // Evaluates to 1 on little-endian 64-bit and 2 on other platforms.
+/// let value_64 = endian::pick!("little" / "64" => 1, _ => 2);
+/// ```
+///
+/// Bigger example showcasing an archive header with the same data using two
+/// headers, and how [`pick!`] can be used to pick between them.
 ///
 /// ```no_run
 /// use musli_zerocopy::{endian, ByteOrder, Endian, Ref, ZeroCopy};
@@ -30,12 +42,10 @@
 ///
 /// let header: Header = todo!();
 /// let data: Ref<Data> = endian::pick!("big" => header.big, "little" => header.little);
-/// // Example using fallback:
-/// let data: Ref<Data> = endian::pick!("big" => header.big, _ => header.little);
 /// ```
 ///
-/// Note that this evaluates to a private type in case the current endianness is
-/// not covered:
+/// Note that this evaluates to a private type named `UnsupportedEndian` in case
+/// the current endianness is not covered:
 ///
 /// ```compile_fail
 /// #[cfg(target_endian = "little")]
@@ -73,7 +83,7 @@ macro_rules! __pick_fallback {
 
 /// A macro that matches `$expr` to its associated `$pat` if the current
 /// `#[cfg(target_endian = "..")]` matches `$endian` and optionally
-/// #[cfg(target_pointer_width = "..")] matches `$pointer_width`.
+/// `#[cfg(target_pointer_width = "..")]` matches `$pointer_width`.
 ///
 /// Note that if running on a platform which is not covered, the result will
 /// always be `false`:
@@ -81,39 +91,34 @@ macro_rules! __pick_fallback {
 /// ```
 /// use musli_zerocopy::endian;
 ///
-/// #[derive(Debug, PartialEq)]
-/// enum Endian { Little, Big }
+/// enum Enum { First, Second }
 ///
-/// let e = endian::pick!("little" => Endian::Little, "big" => Endian::Big);
+/// let e = endian::pick!("little" => Enum::First, "big" => Enum::Second);
+/// let cond: u32 = 1;
 ///
 /// #[cfg(target_endian = "little")]
-/// assert!(!endian::matches!(e, "big" => Big));
+/// {
+///     assert!(endian::matches!(e, "little" => Enum::First | Enum::Second));
+///     assert!(!endian::matches!(e, "big" => Enum::Second));
+///     assert!(!endian::matches!(e, "little" => Enum::First if cond == 2, "big" => Enum::Second));
+/// }
+///
 /// #[cfg(target_endian = "big")]
-/// assert!(!endian::matches!(e, "little" => Little));
-/// ```
-///
-/// # Examples
-///
-/// ```
-/// use musli_zerocopy::endian;
-///
-/// #[derive(Debug, PartialEq)]
-/// enum Endian { Little, Big }
-///
-/// let e = endian::pick!("little" => Endian::Little, "big" => Endian::Big);
-///
-/// assert!(endian::matches!(e, "little" => Endian::Little, "big" => Endian::Big));
+/// {
+///     assert!(endian::matches!(e, "big" => Enum::First | Enum::Second));
+///     assert!(!endian::matches!(e, "little" => Enum::First));
+///     assert!(!endian::matches!(e, "big" => Enum::Second if cond == 2, "little" => Enum::First));
+/// }
 /// ```
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __matches {
-    ($expr:expr, $($endian:literal $(/ $pointer_width:literal)? => $pat:pat),+ $(,)?) => {
+    ($expr:expr, $($endian:literal $(/ $pointer_width:literal)? => $pat:pat_param $(| $pat_second:pat_param)* $(if $cond:expr)?),+ $(,)?) => {
         match $expr {
             $(
                 #[cfg(all(target_endian = $endian $(, target_pointer_width = $pointer_width)*))]
-                value => matches!(value, $pat),
+                $pat $(| $pat_second)* $(if $cond)* => true,
             )*
-            #[cfg(not(any($(all(target_endian = $endian $(, target_pointer_width = $pointer_width)*)),*)))]
             _ => false,
         }
     };
