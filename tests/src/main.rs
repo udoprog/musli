@@ -63,6 +63,7 @@ fn main() -> Result<()> {
     let mut alignment = ALIGNMENT;
     let mut verbose = false;
     let mut save = false;
+    let mut decode = Vec::new();
 
     while let Some(arg) = it.next() {
         match arg.as_str() {
@@ -95,6 +96,17 @@ fn main() -> Result<()> {
             }
             "--size" => {
                 size = true;
+            }
+            "--decode" => {
+                let id = it
+                    .next()
+                    .context("missing `id` argument for `--decode <id> <path>`")?;
+
+                let path = it
+                    .next()
+                    .context("missing `path` argument for `--decode <id> <path>`")?;
+
+                decode.push((id.to_owned(), PathBuf::from(path)));
             }
             "--verbose" => {
                 verbose = true;
@@ -384,7 +396,7 @@ fn main() -> Result<()> {
                 tests::feature_matrix!(size, values, $name, $ty, $size_hint);
             }
 
-            if !random && !size && !all {
+            if !random && !size && !all && decode.is_empty() {
                 tests::feature_matrix!(run, values, $name, $ty, $size_hint);
             }
         }};
@@ -401,6 +413,40 @@ fn main() -> Result<()> {
         }
 
         tests::basic_types!(all);
+    }
+
+    for (what, path) in decode {
+        let contents = fs::read(&path).with_context(|| format!("{}", path.display()))?;
+
+        macro_rules! decode_inner {
+            ($ident:ident, $ty:ty, $framework:ident) => {
+                if stringify!($ident) == what
+                    && utils::$framework::is_enabled()
+                    && condition(stringify!($framework))
+                {
+                    match utils::$framework::decode::<$ty>(contents.as_slice()) {
+                        Ok(value) => {
+                            writeln!(o, "{value:?}")?;
+                        }
+                        Err(error) => {
+                            writeln!(o, "error during decode: {error}")?;
+                        }
+                    }
+                }
+            };
+        }
+
+        macro_rules! decode {
+            ($framework:ident, $name:ident) => {
+                tests::if_supported! {
+                    $framework, $name, {
+                        tests::basic_types!(decode_inner, $framework);
+                    }
+                }
+            };
+        }
+
+        tests::feature_matrix!(decode, decode);
     }
 
     if !size_sets.is_empty() {

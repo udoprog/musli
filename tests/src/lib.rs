@@ -224,36 +224,36 @@ macro_rules! types {
 
 #[macro_export]
 macro_rules! basic_types {
-    ($call:path) => {
-        $call!(u8, u8);
-        $call!(u16, u16);
-        $call!(u32, u32);
-        $call!(u64, u64);
-        $call!(u128, u128);
-        $call!(i8, i8);
-        $call!(i16, i16);
-        $call!(i32, i32);
-        $call!(i64, i64);
-        $call!(i128, i128);
-        $call!(f32, f32);
-        $call!(f64, f64);
-        $call!(char, char);
-        $call!(string, ::alloc::string::String);
+    ($call:path $(, $($tt:tt)*)?) => {
+        $call!(u8, u8 $(, $($tt)*)*);
+        $call!(u16, u16 $(, $($tt)*)*);
+        $call!(u32, u32 $(, $($tt)*)*);
+        $call!(u64, u64 $(, $($tt)*)*);
+        $call!(u128, u128 $(, $($tt)*)*);
+        $call!(i8, i8 $(, $($tt)*)*);
+        $call!(i16, i16 $(, $($tt)*)*);
+        $call!(i32, i32 $(, $($tt)*)*);
+        $call!(i64, i64 $(, $($tt)*)*);
+        $call!(i128, i128 $(, $($tt)*)*);
+        $call!(f32, f32 $(, $($tt)*)*);
+        $call!(f64, f64 $(, $($tt)*)*);
+        $call!(char, char $(, $($tt)*)*);
+        $call!(string, ::alloc::string::String $(, $($tt)*)*);
         #[cfg(not(feature = "no-cstring"))]
-        $call!(c_string, ::alloc::ffi::CString);
-        $call!(vec_u32, ::alloc::vec::Vec<u32>);
-        $call!(vec_char, ::alloc::vec::Vec<char>);
+        $call!(c_string, ::alloc::ffi::CString $(, $($tt)*)*);
+        $call!(vec_u32, ::alloc::vec::Vec<u32> $(, $($tt)*)*);
+        $call!(vec_char, ::alloc::vec::Vec<char> $(, $($tt)*)*);
         #[cfg(not(feature = "no-map"))]
-        $call!(hash_map_string_u32, ::std::collections::HashMap<String, u32>);
+        $call!(hash_map_string_u32, ::std::collections::HashMap<String, u32> $(, $($tt)*)*);
         #[cfg(not(feature = "no-map"))]
-        $call!(btree_map_string_u32, ::std::collections::BTreeMap<String, u32>);
+        $call!(btree_map_string_u32, ::std::collections::BTreeMap<String, u32> $(, $($tt)*)*);
         #[cfg(not(any(feature = "no-map", feature = "no-number-key")))]
-        $call!(hash_map_u32_u32, ::std::collections::HashMap<u32, u32>);
+        $call!(hash_map_u32_u32, ::std::collections::HashMap<u32, u32> $(, $($tt)*)*);
         #[cfg(not(any(feature = "no-map", feature = "no-number-key")))]
-        $call!(hash_map_u32_u32, ::std::collections::BTreeMap<u32, u32>);
-        $call!(hash_set_string, ::std::collections::HashSet<String>);
-        $call!(hash_set_u32, ::std::collections::HashSet<u32>);
-        $call!(btree_set_u32, ::std::collections::BTreeSet<u32>);
+        $call!(hash_map_u32_u32, ::std::collections::BTreeMap<u32, u32> $(, $($tt)*)*);
+        $call!(hash_set_string, ::std::collections::HashSet<String> $(, $($tt)*)*);
+        $call!(hash_set_u32, ::std::collections::HashSet<u32> $(, $($tt)*)*);
+        $call!(btree_set_u32, ::std::collections::BTreeSet<u32> $(, $($tt)*)*);
     };
 }
 
