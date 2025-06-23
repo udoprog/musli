@@ -80,7 +80,7 @@ miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-s
 speedy = ["dep:speedy", "no-isize", "no-cstring"]
 simd-json = ["dep:simd-json", "serde"]
 facet = ["dep:facet", "no-cstring"]
-facet-json = ["dep:facet-json", "facet", "no-128"]
+facet-json = ["dep:facet-json", "facet", "no-128", "no-number-key"]
 facet-msgpack = ["dep:facet-msgpack", "facet", "no-128"]
 
 [dependencies]
