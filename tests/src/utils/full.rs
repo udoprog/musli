@@ -344,3 +344,83 @@ pub mod derive_bitcode {
         decode_buf.decode(buf)
     }
 }
+
+#[cfg(feature = "facet-json")]
+#[crate::benchmarker]
+pub mod facet_json {
+    use core::fmt;
+
+    use alloc::vec::Vec;
+
+    use facet::Facet;
+
+    #[derive(Debug)]
+    pub struct Error;
+
+    impl fmt::Display for Error {
+        #[inline]
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "Serialization error")
+        }
+    }
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: for<'facet> Facet<'facet>,
+    {
+        facet_json::to_writer(value, &mut *buf).map_err(|_| Error)?;
+        Ok(buf)
+    }
+
+    pub fn decode<'buf: 'facet, 'facet, 'shape, T>(
+        buf: &'buf [u8],
+    ) -> Result<T, facet_json::DeserError<'buf, 'shape>>
+    where
+        T: Facet<'facet>,
+    {
+        facet_json::from_slice(buf)
+    }
+}
+
+#[cfg(feature = "facet-msgpack")]
+#[crate::benchmarker]
+pub mod facet_msgpack {
+    use core::fmt;
+
+    use alloc::vec::Vec;
+
+    use facet::Facet;
+
+    #[derive(Debug)]
+    pub struct Error;
+
+    impl fmt::Display for Error {
+        #[inline]
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "Serialization error")
+        }
+    }
+
+    pub fn encode<T>(value: &T) -> Result<Vec<u8>, Error>
+    where
+        T: for<'a> Facet<'a>,
+    {
+        let data = facet_msgpack::to_vec(value);
+        Ok(data)
+    }
+
+    pub fn decode<T>(buf: &[u8]) -> Result<T, facet_msgpack::DecodeError<'_>>
+    where
+        T: Facet<'static>,
+    {
+        facet_msgpack::from_slice(buf)
+    }
+}

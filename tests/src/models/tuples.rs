@@ -6,6 +6,7 @@ use crate::generate::Generate;
 #[cfg_attr(feature = "bitcode-derive", derive(bitcode::Encode, bitcode::Decode))]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "facet", derive(facet::Facet))]
 pub struct Tuples {
     u0: (),
     u1: (bool,),

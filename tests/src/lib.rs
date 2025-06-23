@@ -70,8 +70,18 @@ pub trait Parse: Sized + self::sealed::Sealed {
 impl Parse for ::core::ops::Range<usize> {
     #[inline]
     fn parse(input: &str) -> Option<Self> {
-        let (from, to) = input.split_once("..")?;
-        Some(from.parse().ok()?..to.parse().ok()?)
+        if let Some((from, to)) = input.split_once("..=") {
+            let from = from.parse().ok()?;
+            let to: usize = to.parse().ok()?;
+            return Some(from..(to + 1));
+        }
+
+        if let Some((from, to)) = input.split_once("..") {
+            return Some(from.parse().ok()?..to.parse().ok()?);
+        }
+
+        let value: usize = input.parse().ok()?;
+        Some(value..(value + 1))
     }
 }
 
@@ -170,6 +180,10 @@ macro_rules! feature_matrix {
         $call!(miniserde $(, $($tt)*)*);
         #[cfg(feature = "speedy")]
         $call!(speedy $(, $($tt)*)*);
+        #[cfg(feature = "facet-json")]
+        $call!(facet_json $(, $($tt)*)*);
+        #[cfg(feature = "facet-msgpack")]
+        $call!(facet_msgpack $(, $($tt)*)*);
     };
 }
 
@@ -209,6 +223,41 @@ macro_rules! types {
         $call!(full_enum, FullEnum, FULL_ENUM, 1000);
         #[cfg(feature = "alloc")]
         $call!(mesh, Mesh, MESHES, 1000);
+    };
+}
+
+#[macro_export]
+macro_rules! basic_types {
+    ($call:path $(, $($tt:tt)*)?) => {
+        $call!(u8, u8 $(, $($tt)*)*);
+        $call!(u16, u16 $(, $($tt)*)*);
+        $call!(u32, u32 $(, $($tt)*)*);
+        $call!(u64, u64 $(, $($tt)*)*);
+        $call!(u128, u128 $(, $($tt)*)*);
+        $call!(i8, i8 $(, $($tt)*)*);
+        $call!(i16, i16 $(, $($tt)*)*);
+        $call!(i32, i32 $(, $($tt)*)*);
+        $call!(i64, i64 $(, $($tt)*)*);
+        $call!(i128, i128 $(, $($tt)*)*);
+        $call!(f32, f32 $(, $($tt)*)*);
+        $call!(f64, f64 $(, $($tt)*)*);
+        $call!(char, char $(, $($tt)*)*);
+        $call!(string, ::alloc::string::String $(, $($tt)*)*);
+        #[cfg(not(feature = "no-cstring"))]
+        $call!(c_string, ::alloc::ffi::CString $(, $($tt)*)*);
+        $call!(vec_u32, ::alloc::vec::Vec<u32> $(, $($tt)*)*);
+        $call!(vec_char, ::alloc::vec::Vec<char> $(, $($tt)*)*);
+        #[cfg(not(feature = "no-map"))]
+        $call!(hash_map_string_u32, ::std::collections::HashMap<String, u32> $(, $($tt)*)*);
+        #[cfg(not(feature = "no-map"))]
+        $call!(btree_map_string_u32, ::std::collections::BTreeMap<String, u32> $(, $($tt)*)*);
+        #[cfg(not(any(feature = "no-map", feature = "no-number-key")))]
+        $call!(hash_map_u32_u32, ::std::collections::HashMap<u32, u32> $(, $($tt)*)*);
+        #[cfg(not(any(feature = "no-map", feature = "no-number-key")))]
+        $call!(hash_map_u32_u32, ::std::collections::BTreeMap<u32, u32> $(, $($tt)*)*);
+        $call!(hash_set_string, ::std::collections::HashSet<String> $(, $($tt)*)*);
+        $call!(hash_set_u32, ::std::collections::HashSet<u32> $(, $($tt)*)*);
+        $call!(btree_set_u32, ::std::collections::BTreeSet<u32> $(, $($tt)*)*);
     };
 }
 

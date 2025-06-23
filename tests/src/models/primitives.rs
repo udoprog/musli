@@ -18,6 +18,7 @@ use crate::generate::Generate;
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 #[cfg_attr(feature = "epserde", derive(Copy, epserde::Epserde), zero_copy)]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "facet", derive(facet::Facet))]
 pub struct Primitives {
     boolean: bool,
     #[cfg(not(feature = "no-char"))]

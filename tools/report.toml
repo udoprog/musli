@@ -257,6 +257,23 @@ expected = [
     "musli", "serde", "miniserde", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"
 ]
 
+
+[[reports]]
+id = "facet"
+title = "Facet"
+link = "facet"
+description = [
+    "An experimental reflection-based framework.",
+]
+features = [
+    "musli-json",
+    "facet-json",
+    "serde_json",
+]
+expected = [
+    "musli", "serde", "facet", "no-128", "no-cstring"
+]
+
 [footnotes]
 incomplete = """
 These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result.
