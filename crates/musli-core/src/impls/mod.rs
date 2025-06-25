@@ -7,10 +7,12 @@ mod net;
 mod range;
 mod tuples;
 
+#[cfg(feature = "std")]
+use core::any::TypeId;
 use core::ffi::CStr;
 use core::num::{
     NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize, NonZeroU128,
-    NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, Wrapping,
+    NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, Saturating, Wrapping,
 };
 use core::{fmt, marker};
 
@@ -19,15 +21,83 @@ use crate::de::{
     UnsizedVisitor, VariantDecoder,
 };
 use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder, SequenceEncoder, VariantEncoder};
+#[cfg(feature = "std")]
+use crate::mode::Text;
 use crate::{Allocator, Context};
 
 /// Platform tag used by certain platform-specific implementations.
 #[cfg(feature = "std")]
-#[derive(Encode, Decode)]
-#[musli(crate)]
 enum PlatformTag {
     Unix,
     Windows,
+}
+
+#[cfg(feature = "std")]
+impl<M> Encode<M> for PlatformTag
+where
+    M: 'static,
+{
+    type Encode = Self;
+
+    const IS_BITWISE_ENCODE: bool = false;
+
+    #[inline]
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    where
+        E: Encoder<Mode = M>,
+    {
+        if TypeId::of::<M>() == TypeId::of::<Text>() {
+            match self {
+                PlatformTag::Unix => encoder.encode("unix"),
+                PlatformTag::Windows => encoder.encode("windows"),
+            }
+        } else {
+            // For binary encoding, we use the tag as a single byte.
+            let tag = match self {
+                PlatformTag::Unix => 0,
+                PlatformTag::Windows => 1,
+            };
+
+            encoder.encode_u8(tag)
+        }
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'de, M, A> Decode<'de, M, A> for PlatformTag
+where
+    M: 'static,
+    A: Allocator,
+{
+    // Unit is always packed, since it is a ZST.
+    const IS_BITWISE_DECODE: bool = true;
+
+    #[inline]
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Allocator = A>,
+    {
+        let cx = decoder.cx();
+
+        if TypeId::of::<M>() == TypeId::of::<Text>() {
+            decoder.decode_unsized(|value: &str| match value {
+                "unix" => Ok(PlatformTag::Unix),
+                "windows" => Ok(PlatformTag::Windows),
+                _ => Err(cx.message(format_args!("Unsupported platform tag `{value}`",))),
+            })
+        } else {
+            match decoder.decode_u8()? {
+                0 => Ok(PlatformTag::Unix),
+                1 => Ok(PlatformTag::Windows),
+                _ => Err(cx.message("Unsupported platform tag")),
+            }
+        }
+    }
 }
 
 impl<M> Encode<M> for () {
@@ -118,6 +188,28 @@ macro_rules! atomic_impl {
                     D: Decoder<'de>,
                 {
                     decoder.decode().map(Self::new)
+                }
+            }
+
+            #[cfg(target_has_atomic = $size)]
+            impl<M> Encode<M> for core::sync::atomic::$ty {
+                const IS_BITWISE_ENCODE: bool = false;
+
+                type Encode = Self;
+
+                #[inline]
+                fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+                where
+                    E: Encoder,
+                {
+                    use core::sync::atomic::Ordering::Relaxed;
+
+                    self.load(Relaxed).encode(encoder)
+                }
+
+                #[inline]
+                fn as_encode(&self) -> &Self::Encode {
+                    self
                 }
             }
         )*
@@ -790,6 +882,44 @@ where
         D: Decoder<'de, Mode = M, Allocator = A>,
     {
         Ok(Wrapping(decoder.decode()?))
+    }
+}
+
+impl<T, M> Encode<M> for Saturating<T>
+where
+    T: Encode<M>,
+{
+    const IS_BITWISE_ENCODE: bool = T::IS_BITWISE_ENCODE;
+
+    type Encode = Self;
+
+    #[inline]
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    where
+        E: Encoder<Mode = M>,
+    {
+        self.0.encode(encoder)
+    }
+
+    #[inline]
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
+}
+
+impl<'de, M, T, A> Decode<'de, M, A> for Saturating<T>
+where
+    T: Decode<'de, M, A>,
+    A: Allocator,
+{
+    const IS_BITWISE_DECODE: bool = T::IS_BITWISE_DECODE;
+
+    #[inline]
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Mode = M, Allocator = A>,
+    {
+        Ok(Saturating(decoder.decode()?))
     }
 }
 

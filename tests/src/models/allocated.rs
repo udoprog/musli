@@ -1,12 +1,12 @@
-#[cfg(all(feature = "std", not(feature = "no-map")))]
+#[cfg(all(feature = "std", not(feature = "no-alloc-map")))]
 use std::collections::HashMap;
-#[cfg(all(feature = "std", not(feature = "no-set")))]
+#[cfg(all(feature = "std", not(feature = "no-alloc-set")))]
 use std::collections::HashSet;
 
-#[cfg(not(feature = "no-btree"))]
+#[cfg(not(feature = "no-alloc-btree"))]
 use alloc::collections::{BTreeMap, BTreeSet};
 
-#[cfg(not(feature = "no-cstring"))]
+#[cfg(not(feature = "no-cstr"))]
 use alloc::ffi::CString;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -37,55 +37,46 @@ pub struct Allocated {
     bytes: Vec<u8>,
     #[cfg(all(
         feature = "std",
-        not(feature = "no-map"),
+        not(feature = "no-alloc-map"),
         not(feature = "no-number-key")
     ))]
     #[generate(range = super::SMALL_FIELDS.get())]
     number_map: HashMap<u32, u64>,
     #[cfg(all(
         feature = "std",
-        not(feature = "no-map"),
-        not(feature = "no-string-key")
+        not(feature = "no-alloc-map"),
+        not(feature = "no-str-key")
     ))]
     #[generate(range = super::SMALL_FIELDS.get())]
     string_map: HashMap<String, u64>,
     #[generate(range = super::SMALL_FIELDS.get())]
-    #[cfg(all(feature = "std", not(feature = "no-set")))]
+    #[cfg(all(feature = "std", not(feature = "no-alloc-set")))]
     number_set: HashSet<u32>,
     #[generate(range = super::SMALL_FIELDS.get())]
     #[cfg(all(
         feature = "std",
-        not(feature = "no-set"),
-        not(feature = "no-string-set")
+        not(feature = "no-alloc-set"),
+        not(feature = "no-str-set")
     ))]
     string_set: HashSet<String>,
-    #[cfg(all(not(feature = "no-btree"), not(feature = "no-number-key")))]
+    #[cfg(all(not(feature = "no-alloc-btree"), not(feature = "no-number-key")))]
     #[generate(range = super::SMALL_FIELDS.get())]
     number_btree: BTreeMap<u32, u64>,
-    #[cfg(not(feature = "no-btree"))]
+    #[cfg(not(feature = "no-alloc-btree"))]
     #[generate(range = super::SMALL_FIELDS.get())]
     string_btree: BTreeMap<String, u64>,
-    #[cfg(not(feature = "no-btree"))]
+    #[cfg(not(feature = "no-alloc-btree"))]
     #[generate(range = super::SMALL_FIELDS.get())]
     number_btree_set: BTreeSet<u32>,
-    #[cfg(not(feature = "no-btree"))]
+    #[cfg(not(feature = "no-alloc-btree"))]
     #[generate(range = super::SMALL_FIELDS.get())]
     string_btree_set: BTreeSet<String>,
-    #[cfg(not(feature = "no-cstring"))]
+    #[cfg(not(feature = "no-cstr"))]
     c_string: CString,
 }
 
-#[cfg(feature = "rkyv")]
-impl PartialEq<Allocated> for &ArchivedAllocated {
-    #[inline]
-    fn eq(&self, other: &Allocated) -> bool {
-        *other == **self
-    }
-}
-
-impl PartialEq<Allocated> for &Allocated {
-    #[inline]
-    fn eq(&self, other: &Allocated) -> bool {
-        *other == **self
-    }
+crate::local_deref_sized! {
+    Allocated,
+    #[cfg(feature = "rkyv")]
+    ArchivedAllocated,
 }

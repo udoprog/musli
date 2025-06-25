@@ -32,12 +32,9 @@ where
     }
 }
 
-#[cfg(feature = "rkyv")]
-impl PartialEq<Mesh> for &ArchivedMesh {
-    #[inline]
-    fn eq(&self, other: &Mesh) -> bool {
-        *other == **self
-    }
+crate::local_deref_sized! {
+    {T} Mesh<T> where T: AsRef<[Triangle]>,
+    #[cfg(feature = "rkyv")] ArchivedMesh,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Generate)]

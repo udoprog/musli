@@ -131,13 +131,41 @@ pub(crate) fn build<'a>(
                 }
 
                 let mut expected = report.expected_features();
-
                 let mut unexpected = BTreeSet::new();
+                let mut used = BTreeSet::new();
 
-                for feature in &a.features {
-                    if !expected.remove(feature.as_str()) {
-                        unexpected.insert(feature.clone());
+                for original in &a.features {
+                    let mut feature = original.as_str();
+
+                    let expected = loop {
+                        if feature.is_empty() || feature == "no" {
+                            break None;
+                        }
+
+                        if expected.contains(feature) {
+                            break Some(feature);
+                        }
+
+                        if !feature.starts_with("no-") {
+                            break None;
+                        }
+
+                        let Some((f, _)) = feature.rsplit_once('-') else {
+                            break None;
+                        };
+
+                        feature = f;
+                    };
+
+                    if let Some(expected) = expected {
+                        used.insert(expected);
+                    } else {
+                        unexpected.insert(original.clone());
                     }
+                }
+
+                for used in used {
+                    expected.remove(used);
                 }
 
                 if !expected.is_empty() {

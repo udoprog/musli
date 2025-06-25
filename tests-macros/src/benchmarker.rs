@@ -798,10 +798,12 @@ fn public_decode_mangling(decode_fn: &syn::ItemFn, arguments: &[Argument]) -> Op
 
     let mut new_inputs = Punctuated::new();
     let mut inner_arguments = Punctuated::<syn::Expr, Token![,]>::new();
+    let mut needs_b = false;
 
     for (a, i) in arguments.iter().zip(&decode_fn.sig.inputs) {
         match a {
             Argument::Provided(ident) => {
+                needs_b = true;
                 inner_arguments.push(syn::parse_quote!(&mut b.#ident));
                 continue;
             }
@@ -832,13 +834,15 @@ fn public_decode_mangling(decode_fn: &syn::ItemFn, arguments: &[Argument]) -> Op
     let mut inner_fn_ident = syn::PathSegment::from(decode_fn.sig.ident.clone());
     inner_fn_ident.arguments = generics_to_path_arguments(&decode_fn.sig.generics);
 
+    let needs_b = needs_b.then(|| quote::quote!(let mut b = new();));
+
     let mut outer_fn = decode_fn.clone();
     outer_fn.sig.inputs = new_inputs;
     outer_fn.block = syn::parse_quote! {
         {
             #decode_fn
 
-            let mut b = new();
+            #needs_b;
             #inner_fn_ident(#inner_arguments)
         }
     };

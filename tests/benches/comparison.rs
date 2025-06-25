@@ -89,9 +89,9 @@ fn criterion_benchmark(c: &mut Criterion) {
                         };
 
                         #[cfg(not(feature = "no-binary-equality"))]
-                        assert_eq!(
-                            actual,
-                            *value,
+                        tests::assert_eq!(
+                            &actual,
+                            value,
                             "{} / {}: roundtrip encoding of value[{index}] should be equal",
                             stringify!($framework),
                             stringify!($name)
@@ -174,7 +174,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                                 state.reset($size_hint, value);
                                 let mut out = black_box(state.encode(value).unwrap());
                                 let actual = black_box(out.decode::<$ty>().unwrap());
-                                debug_assert_eq!(actual, *value);
+                                tests::debug_assert_eq!(&actual, value);
                                 black_box(actual);
                             }
                         });
