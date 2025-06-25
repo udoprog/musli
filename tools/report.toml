@@ -10,22 +10,48 @@ branch = "gh-pages"
 common = ["no-rt", "std", "alloc"]
 
 [missing_features]
-u64 = "Format is limited to the bounds of signed 64-bit integers."
-"128" = "128-bit integers are not supported."
-newtype = "Newtype variants are not supported."
-empty = "Empty variants are not supported."
-string-set = "String sets like `HashSet<String>` are not supported."
-string-key = "Maps with strings as keys like `HashMap<String, T>` are not supported."
-number-key = "Maps with numerical keys like `HashMap<u32, T>` are not supported."
-tuple = "Tuples like `(u32, u32)` are not supported."
-cstring = "`CString`'s are not supported."
-usize = "`usize` types are not supported."
-isize = "`isize` types are not supported."
-set = "Sets like `HashSet<T>` are not supported."
-map = "Maps like `MashMap<K, V>` are not supported."
-nonunit-variant = "Only empty unit variants are supported."
-char = "Character types like `char` are not supported."
-binary-equality = "Values are not preserved exactly when serialized and deserialized. Such as floating point values, even when they are exact."
+no-atomic = "Atomic types like `AtomicU32` are not supported."
+no-atomic-bool = "The `AtomicBool` type is not supported."
+no-atomic-isize = "The `AtomicIsize` type is not supported."
+no-atomic-usize = "The `AtomicUsize` type is not supported."
+no-binary-equality = "Values are not preserved exactly when serialized and deserialized. Such as floating point values, even when they are exact."
+no-bool = "Boolean types are not supported."
+no-char = "Character types like `char` are not supported."
+no-cstr = "`CString`'s are not supported."
+no-empty = "Empty variants are not supported."
+no-i128 = "128-bit signed integers are not supported."
+no-isize = "Pointed-sized `isize` types are not supported."
+no-alloc-map = "Maps like `MashMap<K, V>` are not supported."
+no-newtype = "Newtype variants are not supported."
+no-nonunit-variant = "Only empty unit variants are supported."
+no-number-key = "Maps with numerical keys like `HashMap<u32, T>` are not supported."
+no-osstr = "`OsString`'s are not supported."
+no-path = "Path types `PathBuf` or `Box<Path>` are not supported."
+no-saturating = "The `Saturating<T>` numerical wrapper is not supported."
+no-alloc-set = "Sets like `HashSet<T>` are not supported."
+no-str = "String types are not supported."
+no-str-key = "Maps with strings as keys like `HashMap<String, T>` are not supported."
+no-str-set = "String sets like `HashSet<String>` are not supported."
+no-tuple = "Tuples like `(u32, u32)` are not supported."
+no-u128 = "128-bit unsigned integers are not supported."
+no-u64 = "Format is limited to the bounds of signed 64-bit integers."
+no-unsized = "Unsized contained types like `Box<str>` or `Rc<str>` are not supported."
+no-unsized-box = "Boxed unsized values like `Box<str>` are not supported."
+no-unsized-cstr = "Reference counted unsized containers of `CStr` like `Rc<CStr>` are not supported."
+no-unsized-osstr = "Reference counted unsized containers of `OsStr` like `Rc<OsStr>` are not supported."
+no-unsized-path = "Reference counted unsized containers of `Path` like `Rc<Path>` are not supported."
+no-unsized-rc = "Reference counted unsized containers like `Rc<str>` are not supported."
+no-unsized-str = "Reference counted unsized containers of `str` like `Rc<str>` are not supported."
+no-usize = "Pointed-sized `usize` types are not supported."
+no-wrapping = "The `Wrapping<T>` numerical wrapper is not supported."
+no-nonzero = "The `NonZero*` wrapper types are not supported."
+no-nonzero-u8 = "The `NonZeroU8` wrapper type is not supported."
+no-nonzero-u16 = "The `NonZeroU16` wrapper type is not supported."
+no-nonzero-u32 = "The `NonZeroU32` wrapper type is not supported."
+no-nonzero-u64 = "The `NonZeroU64` wrapper type is not supported."
+no-nonzero-u128 = "The `NonZeroU128` wrapper type is not supported."
+no-nonzero-usize = "The `NonZeroUsize` wrapper type is not supported."
+no-nonzero-signed = "The `NonZeroI*` signed wrapper types are not supported."
 
 [[kinds]]
 id = "dec"
@@ -75,7 +101,6 @@ features = [
     "musli-value",
     "bincode1",
     "bincode-serde",
-    "bincode-derive",
     "rmp-serde",
     "postcard",
     "bitcode",
@@ -83,6 +108,31 @@ features = [
 ]
 expected = [
     "musli", "serde"
+]
+
+[[reports]]
+id = "bincode"
+title = "Features supported by bincode (derive)"
+link = "bincode"
+description = [
+    "These frameworks are limited to the features supported by bincode (derive).",
+]
+features = [
+    "musli-wire",
+    "musli-descriptive",
+    "musli-storage",
+    "musli-packed",
+    "musli-value",
+    "bincode-derive",
+]
+expected = [
+    "musli",
+    "no-cstr",
+    "no-osstr",
+    "no-saturating",
+    "no-unsized-cstr",
+    "no-unsized-osstr",
+    "no-unsized-path",
 ]
 
 [[reports]]
@@ -99,7 +149,8 @@ features = [
     "simdutf8",
 ]
 expected = [
-    "musli", "serde",
+    "musli",
+    "serde",
 ]
 
 [[reports]]
@@ -122,8 +173,17 @@ features = [
     "simdutf8",
 ]
 expected = [
-    "musli", "serde",
-    "no-128", "no-map",
+    "musli",
+    "serde",
+    "no-i128",
+    "no-alloc-map",
+    "no-nonzero-i128",
+    "no-nonzero-u128",
+    "no-saturating-i128",
+    "no-saturating-u128",
+    "no-u128",
+    "no-wrapping-i128",
+    "no-wrapping-u128",
 ]
 
 [[reports]]
@@ -143,8 +203,29 @@ features = [
 ]
 expected = [
     "musli",
+    "no-alloc-binaryheap",
+    "no-alloc-vecdeque",
+    "no-atomic-bool",
+    "no-atomic-isize",
+    "no-atomic-usize",
+    "no-cstr",
     "no-isize",
-    "no-cstring",
+    "no-nonzero-i128",
+    "no-nonzero-isize",
+    "no-nonzero-signed",
+    "no-nonzero-u128",
+    "no-nonzero-u16",
+    "no-nonzero-u64",
+    "no-nonzero-u8",
+    "no-nonzero-usize",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-unsized-cstr",
+    "no-unsized-osstr",
+    "no-unsized-path",
+    "no-unsized-rc",
+    "no-wrapping",
 ]
 
 [[reports]]
@@ -164,6 +245,21 @@ features = [
 ]
 expected = [
     "musli",
+    "no-alloc-binaryheap",
+    "no-alloc-btree",
+    "no-alloc-map",
+    "no-alloc-set",
+    "no-alloc-vecdeque",
+    "no-atomic",
+    "no-cstr",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-unsized-cstr",
+    "no-unsized-osstr",
+    "no-unsized-path",
+    "no-unsized-rc",
+    "no-wrapping",
 ]
 only = ["primitives", "packed", "mesh"]
 
@@ -175,7 +271,7 @@ description = """
 """
 
 [[reports]]
-id = "zerocopy-rkyv"
+id = "rkyv"
 title = "Müsli vs rkyv"
 link = "müsli-vs-rkyv"
 description = [
@@ -185,12 +281,28 @@ description = [
 ]
 features = ["musli-zerocopy", "rkyv"]
 expected = [
-    "no-cstring", "no-map", "no-set", "no-tuple", "no-usize", "no-isize",
+    "no-alloc",
+    "no-atomic",
+    "no-cstr",
+    "no-isize",
+    "no-nonzero-isize",
+    "no-nonzero-usize",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-str",
+    "no-tuple",
+    "no-unsized-cstr",
+    "no-unsized-osstr",
+    "no-unsized-path",
+    "no-unsized-str",
+    "no-usize",
+    "no-wrapping",
 ]
 only = ["primitives", "packed"]
 
 [[reports]]
-id = "zerocopy-zerocopy"
+id = "zerocopy"
 link = "müsli-vs-zerocopy"
 description = [
     "Compares [`musli-zerocopy`] with [`zerocopy`].",
@@ -199,7 +311,19 @@ description = [
 ]
 title = "Müsli vs ZeroCopy"
 features = ["musli-zerocopy", "zerocopy"]
-expected = []
+expected = [
+    "no-alloc",
+    "no-atomic",
+    "no-bool",
+    "no-char",
+    "no-cstr",
+    "no-nonzero",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-str",
+    "no-unsized",
+]
 only = ["packed"]
 
 [[reports]]
@@ -217,7 +341,13 @@ features = [
     "bitcode-derive",
 ]
 expected = [
-    "musli", "no-cstring",
+    "musli",
+    "no-cstr",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-unsized",
+    "no-wrapping",
 ]
 
 [[reports]]
@@ -235,7 +365,23 @@ features = [
     "bson",
 ]
 expected = [
-    "musli", "serde", "no-128", "no-u64", "no-empty", "no-number-key"
+    "musli",
+    "serde",
+    "no-atomic-u64",
+    "no-empty",
+    "no-i128",
+    "no-nonzero-i128",
+    "no-nonzero-u128",
+    "no-nonzero-u64",
+    "no-number-key",
+    "no-saturating-i128",
+    "no-saturating-u128",
+    "no-saturating-u64",
+    "no-u128",
+    "no-u64",
+    "no-wrapping-i128",
+    "no-wrapping-u128",
+    "no-wrapping-u64",
 ]
 
 [[reports]]
@@ -254,7 +400,28 @@ features = [
     "miniserde",
 ]
 expected = [
-    "musli", "serde", "miniserde", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"
+    "miniserde",
+    "musli",
+    "serde",
+    "no-alloc-binaryheap",
+    "no-alloc-btree",
+    "no-alloc-map",
+    "no-alloc-set",
+    "no-alloc-vecdeque",
+    "no-atomic",
+    "no-binary-equality",
+    "no-char",
+    "no-cstr",
+    "no-i128",
+    "no-nonunit-variant",
+    "no-nonzero",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-tuple",
+    "no-u128",
+    "no-unsized",
+    "no-wrapping",
 ]
 
 [footnotes]

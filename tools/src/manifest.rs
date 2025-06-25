@@ -15,7 +15,7 @@ pub(crate) struct Manifest {
     #[serde(default)]
     pub(crate) header: Vec<String>,
     #[serde(default)]
-    pub(crate) common: Vec<String>,
+    common: Vec<String>,
     pub(crate) url: String,
     pub(crate) branch: String,
     #[serde(default)]
@@ -92,26 +92,30 @@ pub(crate) struct ReportRef<'a> {
 impl ReportRef<'_> {
     /// Get the cargo features string to build this report.
     pub(crate) fn cargo_features(&self) -> String {
-        self.manifest
+        let features = self
+            .manifest
             .common
             .iter()
             .chain(self.report.features.iter())
             .map(String::as_str)
-            .collect::<Vec<_>>()
-            .join(",")
+            .collect::<Vec<_>>();
+
+        features.join(",")
     }
 
     /// Get a collection of expected features for this report.
     ///
     /// These are the features that *should* be reported in a build.
     pub(crate) fn expected_features(&self) -> BTreeSet<&str> {
-        self.report
+        let iter = self
+            .report
             .features
             .iter()
             .chain(&self.report.expected)
             .chain(&self.manifest.common)
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>()
+            .map(String::as_str);
+
+        iter.collect()
     }
 }
 

@@ -26,13 +26,13 @@ pub struct Primitives {
     unsigned16: u16,
     unsigned32: u32,
     unsigned64: u64,
-    #[cfg(not(feature = "no-128"))]
+    #[cfg(not(feature = "no-u128"))]
     unsigned128: u128,
     signed8: i8,
     signed16: i16,
     signed32: i32,
     signed64: i64,
-    #[cfg(not(feature = "no-128"))]
+    #[cfg(not(feature = "no-i128"))]
     signed128: i128,
     #[cfg(not(feature = "no-usize"))]
     unsignedsize: usize,
@@ -44,17 +44,8 @@ pub struct Primitives {
     float64: f64,
 }
 
-#[cfg(feature = "rkyv")]
-impl PartialEq<Primitives> for &ArchivedPrimitives {
-    #[inline]
-    fn eq(&self, other: &Primitives) -> bool {
-        *other == **self
-    }
-}
-
-impl PartialEq<Primitives> for &Primitives {
-    #[inline]
-    fn eq(&self, other: &Primitives) -> bool {
-        *other == **self
-    }
+crate::local_deref_sized! {
+    Primitives,
+    #[cfg(feature = "rkyv")]
+    ArchivedPrimitives,
 }

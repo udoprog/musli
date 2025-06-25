@@ -577,17 +577,19 @@ where
     let missing = report
         .expected
         .iter()
-        .flat_map(|f| f.strip_prefix("no-"))
+        .filter(|f| f.starts_with("no-"))
         .collect::<Vec<_>>();
 
     if !missing.is_empty() {
         writeln!(o, "> **Missing features:**")?;
 
         for feature in missing {
+            let name = feature.trim_start_matches("no-");
+
             if let Some(description) = report.manifest.missing_features.get(feature) {
-                writeln!(o, "> - `{feature}` - {description}")?;
+                writeln!(o, "> - `{name}` - {description}")?;
             } else {
-                writeln!(o, "> - `{feature}`")?;
+                writeln!(o, "> - `{name}`")?;
             }
         }
 

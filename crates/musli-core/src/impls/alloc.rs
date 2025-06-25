@@ -104,6 +104,36 @@ where
     }
 }
 
+impl<'de, M, A> Decode<'de, M, A> for Rc<str>
+where
+    A: Allocator,
+{
+    const IS_BITWISE_DECODE: bool = false;
+
+    #[inline]
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Mode = M>,
+    {
+        Ok(decoder.decode::<String>()?.into())
+    }
+}
+
+impl<'de, M, A> Decode<'de, M, A> for Arc<str>
+where
+    A: Allocator,
+{
+    const IS_BITWISE_DECODE: bool = false;
+
+    #[inline]
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Mode = M>,
+    {
+        Ok(decoder.decode::<String>()?.into())
+    }
+}
+
 macro_rules! cow {
     (
         $encode:ident :: $encode_fn:ident,

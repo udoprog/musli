@@ -27,9 +27,6 @@ pub struct Tuples {
     i6: (bool, i8, i32, i64, f32, f64),
 }
 
-impl PartialEq<Tuples> for &Tuples {
-    #[inline]
-    fn eq(&self, other: &Tuples) -> bool {
-        *other == **self
-    }
+crate::local_deref_sized! {
+    Tuples,
 }

@@ -20,12 +20,9 @@ harness = false
 
 [features]
 default = ["std", "alloc"]
-std = ["musli?/std", "serde?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std", "epserde?/std", "bincode?/std"]
-alloc = ["musli?/alloc", "musli-zerocopy?/alloc", "bincode?/alloc"]
+std = ["musli?/std", "serde?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std", "epserde?/std", "bincode?/std", "epserde?/std"]
+alloc = ["serde?/alloc", "musli?/alloc", "musli-zerocopy?/alloc", "bincode?/alloc", "epserde?/alloc", "rkyv?/alloc"]
 verbose = ["musli?/verbose"]
-extra = ["rkyv", "dlhn", "serde_cbor"]
-full = ["rmp-serde", "bincode1", "bincode-serde", "bincode-derive", "postcard", "musli-json", "serde_json", "bitcode", "bitcode-derive"]
-text = ["musli-json", "serde_json", "simd-json"]
 simdutf8 = ["musli?/simdutf8"]
 parse-full = ["musli?/parse-full"]
 musli-wire = ["musli/wire"]
@@ -34,48 +31,303 @@ musli-storage = ["musli/storage"]
 musli-packed = ["musli/storage"]
 musli-json = ["musli/json"]
 musli-value = ["musli/value"]
-musli-zerocopy = ["dep:musli-zerocopy"]
+musli-zerocopy = [
+    "dep:musli-zerocopy",
+    "no-alloc",
+    "no-atomic",
+    "no-cstr",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-str",
+]
 test = ["simdutf8", "musli-wire", "musli-storage", "musli-packed", "musli-descriptive", "musli-json", "musli-value"]
 # skips rt benchmarks
 no-rt = []
 
-no-usize = ["no-isize"]
-no-isize = []
-no-float = []
-no-cstring = []
-no-map = []
-no-set = []
-no-string-key = []
-no-number-key = []
-no-btree = []
-no-vec = []
-no-tuple = []
-no-128 = []
-# Maximum integer bound is limited to i64.
-no-u64 = []
-no-empty = []
-no-string-set = []
-no-nonunit-variant = []
-no-char = []
+no-alloc = [
+    "no-alloc-binaryheap",
+    "no-alloc-btree",
+    "no-alloc-map",
+    "no-alloc-set",
+    "no-alloc-vec",
+    "no-alloc-vecdeque",
+]
+no-alloc-binaryheap = []
+no-alloc-btree = []
+no-alloc-map = []
+no-alloc-set = []
+no-alloc-vec = []
+no-alloc-vecdeque = []
+no-atomic = [
+    "no-atomic-bool",
+    "no-atomic-u64",
+    "no-atomic-usize",
+    "no-atomic-isize",
+]
+no-atomic-bool = []
+no-atomic-u64 = []
+no-atomic-usize = ["no-atomic-isize"]
+no-atomic-isize = []
 no-binary-equality = []
+no-bool = ["no-atomic-bool"]
+no-char = []
+no-cstr = ["no-unsized-cstr"]
+no-empty = []
+no-float = []
+no-i128 = [
+    "no-saturating-i128",
+    "no-wrapping-i128",
+    "no-nonzero-i128",
+]
+no-isize = [
+    "no-saturating-isize",
+    "no-wrapping-isize",
+    "no-atomic-isize",
+    "no-nonzero-isize",
+]
+no-nonunit-variant = []
+no-number-key = []
+no-osstr = ["no-unsized-osstr"]
+no-path = ["no-unsized-path"]
+no-saturating = [
+    "no-saturating-u64",
+    "no-saturating-u128",
+    "no-saturating-usize",
+    "no-saturating-i128",
+    "no-saturating-isize",
+]
+no-saturating-u64 = []
+no-saturating-u128 = []
+no-saturating-usize = []
+no-saturating-i128 = []
+no-saturating-isize = []
+no-str = ["no-unsized-str"]
+no-str-key = []
+no-str-set = []
+no-tuple = []
+no-u128 = [
+    "no-i128",
+    "no-saturating-u128",
+    "no-wrapping-u128",
+    "no-nonzero-u128",
+]
+no-u64 = [
+    "no-saturating-u64",
+    "no-wrapping-u64",
+    "no-nonzero-u64",
+    "no-atomic-u64",
+]
+no-unsized = [
+    "no-unsized-box",
+    "no-unsized-cstr",
+    "no-unsized-osstr",
+    "no-unsized-path",
+    "no-unsized-rc",
+    "no-unsized-str",
+]
+no-unsized-box = []
+no-unsized-cstr = []
+no-unsized-osstr = []
+no-unsized-path = []
+no-unsized-rc = []
+no-unsized-str = []
+no-usize = [
+    "no-isize",
+    "no-atomic-usize",
+    "no-wrapping-usize",
+    "no-nonzero-usize",
+]
+no-wrapping = [
+    "no-wrapping-u64",
+    "no-wrapping-u128",
+    "no-wrapping-i128",
+    "no-wrapping-usize",
+    "no-wrapping-isize",
+]
+no-wrapping-u64 = []
+no-wrapping-u128 = []
+no-wrapping-i128 = []
+no-wrapping-usize = []
+no-wrapping-isize = []
+no-nonzero = [
+    "no-nonzero-signed",
+    "no-nonzero-u8",
+    "no-nonzero-u16",
+    "no-nonzero-u32",
+    "no-nonzero-u64",
+    "no-nonzero-u128",
+    "no-nonzero-usize",
+    "no-nonzero-i128",
+]
+no-nonzero-signed = ["no-nonzero-isize", "no-nonzero-i128"]
+no-nonzero-u128 = []
+no-nonzero-u16 = []
+no-nonzero-u32 = []
+no-nonzero-u64 = []
+no-nonzero-u8 = []
+no-nonzero-usize = []
+no-nonzero-i128 = []
+no-nonzero-isize = []
 
-serde = ["dep:serde", "bitcode?/serde"]
-epserde = ["dep:epserde"]
-serde_json = ["dep:serde_json", "serde"]
-bincode1 = ["dep:bincode1", "serde"]
-bincode-serde = ["dep:bincode", "serde"]
-bincode-derive = ["dep:bincode", "bincode?/derive"]
-rmp-serde = ["dep:rmp-serde", "serde"]
-postcard = ["dep:postcard", "serde"]
-rkyv = ["dep:rkyv", "no-usize", "no-tuple", "no-cstring", "no-map", "no-set"]
-bson = ["dep:bson", "serde", "no-128", "no-u64", "no-number-key", "no-empty"]
-serde_cbor = ["dep:serde_cbor", "serde", "no-128", "no-map"]
-dlhn = ["dep:dlhn", "serde", "no-128", "no-map"]
-bitcode = ["dep:bitcode", "serde"]
-bitcode-derive = ["dep:bitcode", "bitcode?/derive", "no-cstring"]
-miniserde = ["dep:miniserde", "alloc", "no-cstring", "no-btree", "no-map", "no-set", "no-nonunit-variant", "no-128", "no-char", "no-tuple", "no-binary-equality"]
-speedy = ["dep:speedy", "no-isize", "no-cstring"]
-simd-json = ["dep:simd-json", "serde"]
+serde = [
+    "dep:serde",
+    "bitcode?/serde",
+]
+epserde = [
+    "dep:epserde",
+    "no-alloc-binaryheap",
+    "no-alloc-btree",
+    "no-alloc-map",
+    "no-alloc-set",
+    "no-alloc-vecdeque",
+    "no-atomic",
+    "no-cstr",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-unsized-rc",
+    "no-wrapping",
+]
+serde_json = [
+    "dep:serde_json",
+    "serde",
+]
+bincode1 = [
+    "dep:bincode1",
+    "serde",
+]
+bincode-serde = [
+    "dep:bincode",
+    "serde",
+]
+bincode-derive = [
+    "dep:bincode",
+    "bincode?/derive",
+    "no-cstr",
+    "no-osstr",
+    "no-saturating",
+    "no-unsized-path",
+]
+rmp-serde = [
+    "dep:rmp-serde",
+    "serde",
+]
+postcard = [
+    "dep:postcard",
+    "serde",
+]
+rkyv = [
+    "dep:rkyv",
+    "no-atomic",
+    "no-alloc-btree",
+    "no-cstr",
+    "no-alloc-map",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-alloc-set",
+    "no-tuple",
+    "no-unsized-osstr",
+    "no-unsized-path",
+    "no-usize",
+    "no-wrapping",
+]
+bson = [
+    "dep:bson",
+    "serde",
+    "no-empty",
+    "no-number-key",
+    "no-u128",
+    "no-u64",
+]
+serde_cbor = [
+    "dep:serde_cbor",
+    "serde",
+    "no-alloc-map",
+    "no-u128",
+]
+dlhn = [
+    "dep:dlhn",
+    "serde",
+    "no-alloc-map",
+    "no-u128",
+]
+bitcode = [
+    "dep:bitcode",
+    "serde",
+]
+bitcode-derive = [
+    "dep:bitcode",
+    "bitcode?/derive",
+    "no-cstr",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-unsized",
+    "no-wrapping",
+]
+miniserde = [
+    "dep:miniserde",
+    "alloc",
+    "no-atomic",
+    "no-binary-equality",
+    "no-alloc-btree",
+    "no-alloc-binaryheap",
+    "no-alloc-vecdeque",
+    "no-char",
+    "no-cstr",
+    "no-alloc-map",
+    "no-nonunit-variant",
+    "no-nonzero",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-alloc-set",
+    "no-tuple",
+    "no-u128",
+    "no-unsized",
+    "no-wrapping",
+]
+speedy = [
+    "dep:speedy",
+    "no-alloc-binaryheap",
+    "no-alloc-vecdeque",
+    "no-atomic-bool",
+    "no-atomic-usize",
+    "no-cstr",
+    "no-isize",
+    "no-nonzero-signed",
+    "no-nonzero-u128",
+    "no-nonzero-u16",
+    "no-nonzero-u64",
+    "no-nonzero-u8",
+    "no-nonzero-usize",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-unsized-rc",
+    "no-wrapping",
+]
+simd-json = [
+    "dep:simd-json",
+    "serde",
+]
+zerocopy = [
+    "dep:zerocopy",
+    "no-alloc",
+    "no-atomic",
+    "no-bool",
+    "no-char",
+    "no-cstr",
+    "no-nonzero",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-str",
+    "no-unsized-box",
+    "no-unsized-rc",
+]
 
 [dependencies]
 musli = { path = "../crates/musli", version = "0.0.131", default-features = false, optional = true, features = [] }
@@ -83,7 +335,7 @@ musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.0.131", defau
 tests-macros = { path = "../tests-macros" }
 
 anyhow = "1.0.81"
-serde = { version = "1.0.197", default-features = false, optional = true, features = ["derive"] }
+serde = { version = "1.0.197", default-features = false, optional = true, features = ["derive", "rc"] }
 rand = { version = "0.9.0", default-features = false, features = ["alloc", "std_rng"] }
 rmp-serde = { version = "1.1.2", optional = true }
 bincode1 = { package = "bincode", version = "1.0.0", default-features = false, optional = true, features = [] }

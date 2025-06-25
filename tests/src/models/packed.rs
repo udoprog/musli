@@ -32,7 +32,7 @@ pub struct Packed {
     unsigned16: u16,
     unsigned32: u32,
     unsigned64: u64,
-    #[cfg(not(feature = "no-128"))]
+    #[cfg(not(feature = "no-u128"))]
     unsigned128: u128,
     signed8: i8,
     #[cfg_attr(feature = "musli", musli(bytes))]
@@ -40,7 +40,7 @@ pub struct Packed {
     signed16: i16,
     signed32: i32,
     signed64: i64,
-    #[cfg(not(feature = "no-128"))]
+    #[cfg(not(feature = "no-i128"))]
     signed128: i128,
     #[cfg(not(feature = "no-usize"))]
     unsignedsize: usize,
@@ -52,17 +52,8 @@ pub struct Packed {
     float64: f64,
 }
 
-#[cfg(feature = "rkyv")]
-impl PartialEq<Packed> for &ArchivedPacked {
-    #[inline]
-    fn eq(&self, other: &Packed) -> bool {
-        *other == **self
-    }
-}
-
-impl PartialEq<Packed> for &Packed {
-    #[inline]
-    fn eq(&self, other: &Packed) -> bool {
-        *other == **self
-    }
+crate::local_deref_sized! {
+    Packed,
+    #[cfg(feature = "rkyv")]
+    ArchivedPacked,
 }

@@ -33,6 +33,8 @@ enum Cmd {
     Bench(cmd::bench::Args),
     /// Run `cargo clippy` with over all supported feature configurations.
     Clippy(cmd::clippy::Args),
+    /// Run the built test commands.
+    Run(cmd::run::Args),
     /// Run `cargo build` with over all supported feature configurations.
     Build(cmd::build::Args),
     /// Perform a basic check.
@@ -87,6 +89,9 @@ fn main() -> Result<()> {
         }
         Cmd::Clippy(a) => {
             cmd::clippy::entry(&a, &manifest)?;
+        }
+        Cmd::Run(a) => {
+            cmd::run::entry(&a, &manifest)?;
         }
         Cmd::Build(a) => {
             cmd::build::entry(&a, &manifest)?;
