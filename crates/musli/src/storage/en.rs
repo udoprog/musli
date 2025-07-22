@@ -585,16 +585,14 @@ where
 /// The caller must ensure that the format in use is compatible with the native
 /// format of the slice.
 #[inline]
-unsafe fn encode_packed_len_slices<W, C, I, T, M>(
-    mut writer: W,
+unsafe fn encode_packed_len_slices<C, T, M>(
+    mut writer: impl Writer,
     cx: C,
     len: usize,
-    slices: I,
+    slices: impl IntoIterator<Item: AsRef<[T]>>,
 ) -> Result<(), C::Error>
 where
-    W: Writer,
     C: Context,
-    I: IntoIterator<Item: AsRef<[T]>>,
     T: Encode<M>,
 {
     let len = len.to_ne_bytes();
@@ -624,13 +622,12 @@ where
 /// The caller must ensure that the format in use is compatible with the native
 /// format of the slice.
 #[inline]
-unsafe fn encode_packed_slice<W, C, T, M>(
-    mut writer: W,
+unsafe fn encode_packed_slice<C, T, M>(
+    mut writer: impl Writer,
     cx: C,
     slice: impl AsRef<[T]>,
 ) -> Result<(), C::Error>
 where
-    W: Writer,
     C: Context,
     T: Encode<M>,
 {
@@ -656,15 +653,13 @@ where
 /// The caller must ensure that the format in use is compatible with the native
 /// format of the slice.
 #[inline]
-unsafe fn encode_packed_slices<W, C, I, T, M>(
-    mut writer: W,
+unsafe fn encode_packed_slices<C, T, M>(
+    mut writer: impl Writer,
     cx: C,
-    slices: I,
+    slices: impl IntoIterator<Item: AsRef<[T]>>,
 ) -> Result<(), C::Error>
 where
-    W: Writer,
     C: Context,
-    I: IntoIterator<Item: AsRef<[T]>>,
     T: Encode<M>,
 {
     if size_of::<T>() > 0 {
