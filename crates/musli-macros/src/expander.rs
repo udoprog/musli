@@ -426,7 +426,7 @@ pub(crate) fn expand_name(
 /// Ensure that the given integer is usize-suffixed so that it is treated as the
 /// appropriate type.
 pub(crate) fn usize_suffixed(index: usize, span: Span) -> syn::LitInt {
-    syn::LitInt::new(&format!("{}usize", index), span)
+    syn::LitInt::new(&format!("{index}usize"), span)
 }
 
 impl Taggable for FieldData<'_> {

@@ -41,8 +41,7 @@ where
         }
         NumberKind::Unsigned | NumberKind::Float => Ok(value),
         kind => Err(cx.message(format_args!(
-            "Expected signed or unsigned number, got {:?}",
-            kind
+            "Expected signed or unsigned number, got {kind:?}"
         ))),
     }
 }
@@ -109,8 +108,7 @@ where
             Ok(value)
         }
         kind => Err(cx.message(format_args!(
-            "Expected signed or unsigned number, got {:?}",
-            kind
+            "Expected signed or unsigned number, got {kind:?}"
         ))),
     }
 }
