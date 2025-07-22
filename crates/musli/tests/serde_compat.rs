@@ -98,8 +98,7 @@ mod value {
         assert_eq! {
             value1,
             value3,
-            "Serde decoding is incorrect\nBytes: {:?}",
-            encoded2,
+            "Serde decoding is incorrect\nBytes: {encoded2:?}",
         };
     }
 }

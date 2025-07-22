@@ -67,7 +67,7 @@ impl Ctxt<'_> {
     }
 
     fn save_file(&mut self, bytes: &[u8], name: impl fmt::Display) -> Result<PathBuf> {
-        let path = self.target.join(format!("{}.bin", name));
+        let path = self.target.join(format!("{name}.bin"));
 
         if self.verbose {
             writeln!(self.o, "Saving: {}", path.display())?;
@@ -198,8 +198,7 @@ fn main() -> Result<()> {
                 )?;
                 writeln!(
                     cx,
-                    " --align <align> - Use the specified random seed (default: {}).",
-                    ALIGNMENT
+                    " --align <align> - Use the specified random seed (default: {ALIGNMENT})."
                 )?;
                 writeln!(
                     cx,

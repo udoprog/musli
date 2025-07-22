@@ -795,7 +795,7 @@ where
                         level += 1;
                     }
 
-                    write!(f, "[{}]", key)?;
+                    write!(f, "[{key}]")?;
                     has_field = true;
                 }
             }
