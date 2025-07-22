@@ -77,8 +77,7 @@ where
 
             if tag != Tag::new(Kind::Prefix, bytes) {
                 return Err(cx.message(format_args!(
-                    "Expected fixed {} bytes prefix tag, but got {tag:?}",
-                    bytes
+                    "Expected fixed {bytes} bytes prefix tag, but got {tag:?}"
                 )));
             }
 

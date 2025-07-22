@@ -377,7 +377,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                 let types = &output.types;
 
                 let discriminant_const =
-                    syn::Ident::new(&format!("DISCRIMINANT{}", index), variant.ident.span());
+                    syn::Ident::new(&format!("DISCRIMINANT{index}"), variant.ident.span());
 
                 discriminant_consts.push(discriminant_const.clone());
 

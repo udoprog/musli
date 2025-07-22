@@ -27,16 +27,16 @@ fn test_simple_json_encoding() {
     }];
 
     let out = CONFIG.to_string(&expected).unwrap();
-    println!("{}", out);
+    println!("{out}");
     let actual: Vec<SimpleJsonStruct<'_>> = CONFIG.from_slice(out.as_bytes()).unwrap();
     assert_eq!(expected, actual);
 
     let out = musli::json::to_string(&expected).unwrap();
-    println!("{}", out);
+    println!("{out}");
     let actual: Vec<SimpleJsonStruct<'_>> = musli::json::from_slice(out.as_bytes()).unwrap();
     assert_eq!(expected, actual);
 
     let value: musli::value::Value<_> = musli::json::from_slice(b"10.00001e-121").unwrap();
-    println!("{:?}", value);
+    println!("{value:?}");
     // assert_eq!(expected, actual);
 }
