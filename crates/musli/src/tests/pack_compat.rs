@@ -3,8 +3,8 @@
 use crate::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-#[musli(crate)]
-pub struct Inner;
+#[musli(crate, packed)]
+struct Inner;
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(crate, packed)]
@@ -64,6 +64,11 @@ const fn array<const N: usize>() -> [u8; N] {
 }
 
 fn test_length<const N: usize, const L: usize>() {
+    crate::macros::assert_roundtrip_eq! {
+        upgrade_stable,
+        Inner,
+    };
+
     crate::macros::assert_roundtrip_eq! {
         upgrade_stable,
         PackedCompat {

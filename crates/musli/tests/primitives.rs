@@ -4,9 +4,6 @@ use musli::compat::Sequence;
 use musli::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
-pub struct Inner;
-
-#[derive(Debug, PartialEq, Encode, Decode)]
 pub struct Primitives {
     pub bool_field: bool,
     pub char_field: char,

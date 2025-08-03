@@ -77,6 +77,21 @@ fn skip() {
         json = r#"{}"#,
     );
 
+    musli::macros::assert_decode_eq!(
+        full,
+        EnumSkipped::Struct {
+            skip: 10,
+            skip_default: 52,
+            complex_field: Some(Inner { a: 3, b: 4 }),
+        },
+        EnumSkipped::Struct {
+            skip: 0,
+            skip_default: 42,
+            complex_field: Some(Inner { a: 1, b: 2 }),
+        },
+        json = r#"{"Struct":{}}"#,
+    );
+
     musli::macros::assert_roundtrip_eq!(
         full,
         TupleSkipped(0, 42, Some(Inner { a: 1, b: 2 }),),
@@ -88,5 +103,12 @@ fn skip() {
         TupleSkipped(10, 52, Some(Inner { a: 3, b: 4 }),),
         TupleSkipped(0, 42, Some(Inner { a: 1, b: 2 }),),
         json = r#"{}"#,
+    );
+
+    musli::macros::assert_decode_eq!(
+        full,
+        EnumSkipped::Tuple(10, 52, Some(Inner { a: 3, b: 4 }),),
+        EnumSkipped::Tuple(0, 42, Some(Inner { a: 1, b: 2 }),),
+        json = r#"{"Tuple":{}}"#,
     );
 }
