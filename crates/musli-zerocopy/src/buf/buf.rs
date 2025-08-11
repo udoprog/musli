@@ -112,8 +112,7 @@ impl Buf {
     ///
     /// # Panics
     ///
-    /// Panics if `align` is not a power of two or if the size of the buffer is
-    /// larger than [`max_capacity_for_align(align)`].
+    /// Panics if `align` is not a power of two.
     ///
     /// # Examples
     ///
