@@ -481,7 +481,7 @@
 //! ```
 //!
 //! The [`Size`] you've specified during construction of an [`OwnedBuf`] will
-//! then carry into any pointers it return:
+//! then carry into any pointers it returns:
 //!
 //! ```
 //! use musli_zerocopy::{DefaultAlignment, OwnedBuf, Ref, ZeroCopy};

@@ -431,7 +431,7 @@ let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
 ```
 
 The [`Size`] you've specified during construction of an [`OwnedBuf`] will
-then carry into any pointers it return:
+then carry into any pointers it returns:
 
 ```rust
 use musli_zerocopy::{DefaultAlignment, OwnedBuf, Ref, ZeroCopy};
