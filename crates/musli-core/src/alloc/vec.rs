@@ -350,14 +350,14 @@ where
     ///     assert_eq!(a.as_slice(), b"");
     ///     a.extend_from_slice(b"Hello")?;
     ///     assert_eq!(a.as_slice(), b"Hello");
-    ///     a.as_slice_mut().make_ascii_uppercase();
+    ///     a.as_mut_slice().make_ascii_uppercase();
     ///     assert_eq!(a.as_slice(), b"HELLO");
     ///     Ok::<_, AllocError>(())
     /// });
     /// # Ok::<_, musli::alloc::AllocError>(())
     /// ```
     #[inline]
-    pub fn as_slice_mut(&mut self) -> &mut [T] {
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
         // SAFETY: We know that the buffer is initialized up to `self.len`.
         unsafe { slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len) }
     }
@@ -578,7 +578,7 @@ where
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.as_slice_mut()
+        self.as_mut_slice()
     }
 }
 

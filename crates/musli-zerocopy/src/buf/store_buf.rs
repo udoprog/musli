@@ -93,7 +93,7 @@ pub trait StoreBuf: self::sealed::Sealed {
 
     /// Get a mutable slice.
     #[doc(hidden)]
-    fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
+    unsafe fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
     where
         I: SliceIndex<[u8]>;
 
@@ -103,5 +103,5 @@ pub trait StoreBuf: self::sealed::Sealed {
 
     /// Get the underlying buffer mutably.
     #[doc(hidden)]
-    fn as_mut_buf(&mut self) -> &mut Buf;
+    unsafe fn as_mut_buf(&mut self) -> &mut Buf;
 }
