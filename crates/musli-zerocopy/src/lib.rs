@@ -94,10 +94,8 @@
 //!   be vulnerable to malicious dictionary files.
 //!
 //! [^padded]: This is on zerocopy's roadmap, but it fundamentally doesn't play
-//!     well with the central `FromBytes` / `ToBytes` pair of traits
-//!
+//!     well with the central `FromBytes` / `ToBytes` pair of traits.
 //! [^zeroes]: [FromBytes extends FromZeros](https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html)
-//!
 //! [^dictionary]: <https://github.com/udoprog/jpv/blob/main/crates/lib/src/database.rs>
 //!
 //! <br>
@@ -209,24 +207,29 @@
 //! Later when we want to use the type, we take the buffer we've generated and
 //! include it somewhere else.
 //!
-//! There's a few pieces of data (lets call it DNA) we need to have to read a
+//! There's a bit of information (let's call it DNA) we need to have to read a
 //! type back from a raw buffer:
-//! * The *alignment* of the buffer. Which you can read through the
-//!   [`requested()`]. On the receiving end we need to ensure that the buffer
-//!   follow this alignment. Dynamically this can be achieved by loading the
-//!   buffer using [`aligned_buf(bytes, align)`]. Other tricks include embedding
-//!   a static buffer inside of an aligned newtype which we'll showcase below.
-//!   Networked applications might simply agree to use a particular alignment up
-//!   front. This alignment has to be compatible with the types being coerced.
+//! * The *alignment* of the buffer. Which you can read through [`requested()`].
+//!   On the receiving end we need to ensure that the buffer follow this
+//!   alignment. Dynamically this can be achieved by loading the buffer using
+//!   [`aligned_buf(bytes, align)`]. Networked applications might simply agree
+//!   to use a particular alignment up front which equals the largest possible
+//!   alignment of data that are exchanged. This alignment has to be compatible
+//!   with the types being coerced. Note that alignment requirements might
+//!   differ from one architecture to another[^alignment], so simply picking a
+//!   value like 16 (which is a typical max value for [`max_align_t`]) might be
+//!   appropriate.
 //! * The *endianness* of the machine which produced the buffer. Any numerical
 //!   elements will in native endian ordering, so they would have to be adjusted
-//!   on the read side if it differ.
+//!   on the receiver if they differ.
 //! * The type definition which is being read which implements [`ZeroCopy`].
 //!   This is `Custom` above. The [`ZeroCopy`] derive ensures that we can safely
 //!   coerce a buffer into a reference of the type. The data might at worst be
 //!   garbled, but we can never do anything unsound while using safe APIs.
 //! * The offset at where the [`ZeroCopy`] structure is read. To read a
 //!   structure we combine a pointer and a type into a [`Ref`] instance.
+//!
+//! [^alignment]: <https://github.com/udoprog/musli/issues/284>
 //!
 //! If the goal is to both produce and read the buffer on the same system
 //! certain assumptions can be made. And if those assumptions turn out to be
@@ -509,6 +512,7 @@
 //! [`benchmarks`]: https://udoprog.github.io/musli/benchmarks/
 //! [`ByteOrder`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.ByteOrder.html
 //! [`hashbrown` crate]: https://docs.rs/phf
+//! [`max_align_t`]: https://en.cppreference.com/w/cpp/types/max_align_t.html
 //! [`OwnedBuf::with_size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_size
 //! [`OwnedBuf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
 //! [`phf` crate]: https://docs.rs/phf
