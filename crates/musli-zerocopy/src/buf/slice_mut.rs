@@ -1,7 +1,7 @@
 use core::borrow::Borrow;
 use core::marker::PhantomData;
 use core::mem::{align_of, size_of, size_of_val, ManuallyDrop};
-use core::ops::{Deref, DerefMut};
+use core::ops::Deref;
 use core::ptr::NonNull;
 use core::slice::{self, SliceIndex};
 
@@ -318,6 +318,40 @@ where
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
+    }
+
+    /// Access the buffer mutably.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::SliceMut;
+    ///
+    /// let mut buf = [0; 1024];
+    /// let mut buf = SliceMut::new(&mut buf);
+    /// let slice = buf.store_unsized("hello world");
+    ///
+    /// // SAFETY: We don't manipulate the underlying buffer in a way which leaves uninitialized data.
+    /// let mut buf = unsafe { buf.as_mut_buf() };
+    ///
+    /// buf.load_mut(slice)?.make_ascii_uppercase();
+    /// assert_eq!(buf.load(slice)?, "HELLO WORLD");
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    ///
+    /// # Safety
+    ///
+    /// Since this allows the underlying buffer to be mutated, depending on how
+    /// the buffer is used it might result in undefined bit-patterns like
+    /// padding bytes being written to it. The caller must ensure this is not
+    /// done with the structures being written by for example calling
+    /// [`ZeroCopy::initialize_padding()`] after the contents of the buffer is
+    /// modified.
+    ///
+    /// See [`Buf::new_mut`] for more information.
+    #[inline]
+    pub unsafe fn as_mut_buf(&mut self) -> &mut Buf {
+        Buf::new_mut(self.as_mut_slice())
     }
 
     /// Store an uninitialized value.
@@ -917,17 +951,6 @@ where
     }
 }
 
-impl<E, O> DerefMut for SliceMut<'_, E, O>
-where
-    E: ByteOrder,
-    O: Size,
-{
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        Buf::new_mut(self.as_mut_slice())
-    }
-}
-
 impl<E, O> AsRef<Buf> for SliceMut<'_, E, O>
 where
     E: ByteOrder,
@@ -951,34 +974,6 @@ where
     /// ```
     #[inline]
     fn as_ref(&self) -> &Buf {
-        self
-    }
-}
-
-impl<E, O> AsMut<Buf> for SliceMut<'_, E, O>
-where
-    E: ByteOrder,
-    O: Size,
-{
-    /// Trivial `AsMut<Buf>` implementation for `SliceMut<O>`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::SliceMut;
-    ///
-    /// let mut buf = [0; 1024];
-    /// let mut buf = SliceMut::new(&mut buf);
-    /// let slice = buf.store_unsized("hello world");
-    ///
-    /// let mut buf = buf.as_mut();
-    ///
-    /// buf.load_mut(slice)?.make_ascii_uppercase();
-    /// assert_eq!(buf.load(slice)?, "HELLO WORLD");
-    /// # Ok::<_, musli_zerocopy::Error>(())
-    /// ```
-    #[inline]
-    fn as_mut(&mut self) -> &mut Buf {
         self
     }
 }
@@ -1039,7 +1034,10 @@ where
     where
         T: ZeroCopy,
     {
-        Buf::swap(self, a, b)
+        // SAFETY: Since we are swapping two locations which have the same type
+        // `T`, it does not affect the initialized state of the buffer.
+        let buf = unsafe { self.as_mut_buf() };
+        Buf::swap(buf, a, b)
     }
 
     #[inline]
@@ -1074,11 +1072,11 @@ where
     }
 
     #[inline]
-    fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
+    unsafe fn get_mut<I>(&mut self, index: I) -> Option<&mut I::Output>
     where
         I: SliceIndex<[u8]>,
     {
-        Buf::get_mut(self, index)
+        SliceMut::as_mut_buf(self).get_mut(index)
     }
 
     #[inline]
@@ -1087,7 +1085,7 @@ where
     }
 
     #[inline]
-    fn as_mut_buf(&mut self) -> &mut Buf {
-        self
+    unsafe fn as_mut_buf(&mut self) -> &mut Buf {
+        SliceMut::as_mut_buf(self)
     }
 }

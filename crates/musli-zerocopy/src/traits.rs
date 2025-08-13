@@ -357,7 +357,12 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 ///
 /// # #[cfg(target_endian = "little")]
 /// assert_eq!(&bytes[..], &[1, 0, 0, 0, 42, 0, 0, 0]);
-/// Weapon::from_bytes_mut(&mut bytes[..])?.damage += 10;
+///
+/// // SAFETY: Modifying a field of a u32 does not leave any uninitialized space.
+/// unsafe {
+///     Weapon::from_bytes_mut(bytes.as_mut_slice())?.damage += 10;
+/// }
+///
 /// # #[cfg(target_endian = "little")]
 /// assert_eq!(&bytes[..], &[1, 0, 0, 0, 52, 0, 0, 0]);
 /// # Ok::<_, musli_zerocopy::Error>(())
@@ -560,13 +565,27 @@ pub unsafe trait ZeroCopy: Sized {
     /// let mut buf = OwnedBuf::new();
     /// buf.extend_from_slice(&1u32.to_ne_bytes());
     ///
-    /// *u32::from_bytes_mut(&mut buf[..])? += 10;
+    /// // SAFETY: Writing a u32 does not leave any uninitialized space.
+    /// unsafe {
+    ///     *u32::from_bytes_mut(buf.as_mut_slice())? += 10;
+    /// }
     ///
     /// assert_eq!(*u32::from_bytes(&buf[..])?, 11);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    ///
+    /// # Safety
+    ///
+    /// Since this allows the underlying buffer to be mutated, depending on how
+    /// the buffer is used it might result in undefined bit-patterns like
+    /// padding bytes being written to it. The caller must ensure this is not
+    /// done with the structures being written by for example calling
+    /// [`ZeroCopy::initialize_padding()`] after the contents of the buffer is
+    /// modified.
+    ///
+    /// See [`Buf::new_mut`] for more information.
     #[inline]
-    fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Self, Error> {
+    unsafe fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Self, Error> {
         Buf::new_mut(bytes).load_at_mut::<Self>(0)
     }
 

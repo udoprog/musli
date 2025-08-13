@@ -168,18 +168,17 @@ where
 
     let hash_state = {
         buf.align_in_place();
-        crate::phf::generator::generate_hash(
-            buf.as_mut_buf(),
-            &entries,
-            &displacements,
-            &map,
-            access,
-        )?
+
+        // SAFETY: The internal structures are all padded to avoid uninitialized
+        // data.
+        let buf = unsafe { buf.as_mut_buf() };
+
+        crate::phf::generator::generate_hash(buf, &entries, &displacements, &map, access)?
     };
 
     for (from, a) in map.iter().enumerate() {
         loop {
-            let to = *buf.as_mut_buf().load(a)?;
+            let to = *buf.as_buf().load(a)?;
 
             if from != to {
                 buf.swap(entries.at(from), entries.at(to))?;

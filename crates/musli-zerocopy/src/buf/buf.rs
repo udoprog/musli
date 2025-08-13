@@ -63,15 +63,51 @@ impl Buf {
     ///
     /// let mut bytes: [u8; 12] = *b"Hello World!";
     ///
-    /// let buf = Buf::new_mut(&mut bytes[..]);
+    /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
+    /// let buf = unsafe { Buf::new_mut(&mut bytes[..]) };
     /// let unsize = Ref::<str>::with_metadata(0, 12);
     ///
     /// buf.load_mut(unsize)?.make_ascii_uppercase();
     /// assert_eq!(buf.load(unsize)?, "HELLO WORLD!");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    ///
+    /// # Safety
+    ///
+    /// Since this allows the underlying buffer to be mutated, depending on how
+    /// the buffer is used it might result in undefined bit-patterns like
+    /// padding bytes being written to it. The caller must ensure this is not
+    /// done with the structures being written by for example calling
+    /// [`ZeroCopy::initialize_padding()`] after the contents of the buffer is
+    /// modified.
+    ///
+    /// This can happen if a structure which includes padding is written to a
+    /// buffer (See [musli#283]):
+    ///
+    /// [musli#283]: https://github.com/udoprog/musli/issues/283
+    ///
+    /// ```no_run
+    /// use musli_zerocopy::{Buf, ZeroCopy};
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Example {
+    ///     a: u8,
+    ///     b: u32,
+    /// }
+    ///
+    /// #[repr(align(8))]
+    /// struct Align([u8; 16]);
+    ///
+    /// let mut bytes = Align([0xff; 16]);
+    /// let buf = unsafe { Buf::new_mut(&mut bytes.0) };
+    /// *buf.load_at_mut::<Example>(0)? = Example { a: 1, b: 2 };
+    ///
+    /// // `bytes` now contains uninitialized data from the padding in `Example`.
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     #[inline]
-    pub fn new_mut(data: &mut [u8]) -> &mut Buf {
+    pub unsafe fn new_mut(data: &mut [u8]) -> &mut Buf {
         // SAFETY: The struct is repr(transparent) over [u8].
         unsafe { &mut *(data as *mut [u8] as *mut Self) }
     }
@@ -280,7 +316,8 @@ impl Buf {
     ///
     /// let mut bytes: [u8; 12] = *b"Hello World!";
     ///
-    /// let buf = Buf::new_mut(&mut bytes[..]);
+    /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
+    /// let buf = unsafe { Buf::new_mut(&mut bytes[..]) };
     ///
     /// if let Some(bytes) = buf.get_mut(..) {
     ///     bytes.make_ascii_uppercase();
@@ -377,7 +414,10 @@ impl Buf {
     /// buf.store(&1u32);
     /// buf.store(&2u32);
     ///
-    /// *buf.load_at_mut::<u32>(0)? += 10;
+    /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
+    /// unsafe {
+    ///     *buf.as_mut_buf().load_at_mut::<u32>(0)? += 10;
+    /// }
     ///
     /// assert_eq!(buf.load_at::<u32>(0)?, &11u32);
     /// assert_eq!(buf.load_at::<u32>(4)?, &2u32);
@@ -436,7 +476,8 @@ impl Buf {
     /// let first = buf.store_unsized("first");
     /// let second = buf.store_unsized("second");
     ///
-    /// let buf = buf.as_mut();
+    /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
+    /// let buf = unsafe { buf.as_mut_buf() };
     ///
     /// buf.load_mut(first)?.make_ascii_uppercase();
     ///
@@ -784,7 +825,8 @@ impl Buf {
     /// use musli_zerocopy::{Buf, Ref};
     ///
     /// let mut buf = [0, 1, 2, 3];
-    /// let mut buf = Buf::new_mut(&mut buf);
+    /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
+    /// let mut buf = unsafe { Buf::new_mut(&mut buf) };
     ///
     /// let mut a = Ref::<u32>::new(0);
     /// let mut b = Ref::<u32>::new(4);
@@ -798,7 +840,8 @@ impl Buf {
     /// use musli_zerocopy::{Buf, Ref};
     ///
     /// let mut buf: [u8; 12] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-    /// let mut buf = Buf::new_mut(&mut buf);
+    /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
+    /// let mut buf = unsafe { Buf::new_mut(&mut buf) };
     ///
     /// let mut a = Ref::<u32>::new(2);
     /// let mut b = Ref::<u32>::new(6);
@@ -815,7 +858,8 @@ impl Buf {
     /// use musli_zerocopy::{Buf, Ref};
     ///
     /// let mut buf: [u8; 7] = [0, 1, 2, 3, 4, 5, 7];
-    /// let mut buf = Buf::new_mut(&mut buf);
+    /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
+    /// let mut buf = unsafe { Buf::new_mut(&mut buf) };
     ///
     /// let mut a = Ref::<u32>::new(1);
     /// let mut b = Ref::<u32>::new(2);
@@ -1043,7 +1087,8 @@ impl AsMut<Buf> for Buf {
     /// use musli_zerocopy::Buf;
     ///
     /// let mut bytes = *b"Hello World!";
-    /// let buf = Buf::new_mut(&mut bytes[..]);
+    /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
+    /// let buf = unsafe { Buf::new_mut(&mut bytes[..]) };
     /// let buf = buf.as_mut();
     ///
     /// buf[..5].make_ascii_uppercase();
@@ -1092,7 +1137,8 @@ where
 /// use musli_zerocopy::Buf;
 ///
 /// let mut bytes = *b"Hello World!";
-/// let mut buf = Buf::new_mut(&mut bytes[..]);
+/// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
+/// let mut buf = unsafe { Buf::new_mut(&mut bytes[..]) };
 ///
 /// buf[..5].make_ascii_uppercase();
 ///

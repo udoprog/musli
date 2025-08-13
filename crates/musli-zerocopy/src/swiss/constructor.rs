@@ -147,7 +147,11 @@ where
 
         let end = start + size_of::<T>();
 
-        let Some(slice) = self.buf.get_mut(start..end) else {
+        // SAFETY: The accessed data is a slice of u8's, which cannot be
+        // incorrectly initialized locally.
+        let slice = unsafe { self.buf.get_mut(start..end) };
+
+        let Some(slice) = slice else {
             panic!("Missing bucket at range {start}..{end}");
         };
 
@@ -359,7 +363,11 @@ where
 
         let offset = self.ctrl_ptr + index;
 
-        let Some(ctrl) = self.buf.get_mut(offset) else {
+        // SAFETY: The control bytes are u8's, which cannot be incorrectly
+        // initialized.
+        let ctrl = unsafe { self.buf.get_mut(offset) };
+
+        let Some(ctrl) = ctrl else {
             panic!("Missing control byte at {offset}");
         };
 
