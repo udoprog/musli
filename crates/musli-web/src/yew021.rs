@@ -631,40 +631,60 @@ struct RawPacket {
 }
 
 /// A packet of data.
-pub struct Packet<T>
-where
-    T: api::Marker,
-{
+pub struct Packet<T> {
     raw: RawPacket,
     _marker: PhantomData<T>,
 }
 
 impl<T> Packet<T>
 where
-    T: api::Marker,
+    T: api::Endpoint,
 {
     /// Handle a broadcast packet.
-    pub fn decode<C, F>(&self, ctx: &Context<C>, f: F)
-    where
-        F: FnOnce(T::Type<'_>),
-        C: Component<Message: From<Error>>,
-    {
+    pub fn decode(
+        &self,
+        ctx: &Context<impl Component<Message: From<Error>>>,
+    ) -> Option<T::Response<'_>> {
         let Some(bytes) = self.raw.body.get(self.raw.at..) else {
-            ctx.link()
-                .send_message(C::Message::from(Error::new(ErrorKind::Overflow(
-                    self.raw.at,
-                    self.raw.body.len(),
-                ))));
-            return;
+            ctx.link().send_message(Error::new(ErrorKind::Overflow(
+                self.raw.at,
+                self.raw.body.len(),
+            )));
+            return None;
         };
 
         match musli::storage::from_slice(bytes) {
-            Ok(value) => {
-                f(value);
-            }
+            Ok(value) => Some(value),
             Err(error) => {
-                ctx.link()
-                    .send_message(C::Message::from(Error::from(error)));
+                ctx.link().send_message(Error::from(error));
+                None
+            }
+        }
+    }
+}
+
+impl<T> Packet<T>
+where
+    T: api::BroadcastEndpoint,
+{
+    /// Handle a broadcast packet.
+    pub fn decode_broadcast(
+        &self,
+        ctx: &Context<impl Component<Message: From<Error>>>,
+    ) -> Option<T::Broadcast<'_>> {
+        let Some(bytes) = self.raw.body.get(self.raw.at..) else {
+            ctx.link().send_message(Error::new(ErrorKind::Overflow(
+                self.raw.at,
+                self.raw.body.len(),
+            )));
+            return None;
+        };
+
+        match musli::storage::from_slice(bytes) {
+            Ok(value) => Some(value),
+            Err(error) => {
+                ctx.link().send_message(Error::from(error));
+                None
             }
         }
     }
@@ -684,9 +704,9 @@ impl Handle {
     /// If the handle is dropped, the request is cancelled.
     pub fn request<T>(
         &self,
-        ctx: &Context<impl Component<Message: From<Packet<T::Marker>> + From<Error>>>,
+        ctx: &Context<impl Component<Message: From<Packet<T::Endpoint>> + From<Error>>>,
         request: T,
-    ) -> Request<T::Marker>
+    ) -> Request<T::Endpoint>
     where
         T: api::Request,
     {
@@ -727,7 +747,7 @@ impl Handle {
             header: api::RequestHeader {
                 index,
                 serial,
-                kind: T::KIND,
+                kind: <T::Endpoint as api::Endpoint>::KIND,
             },
             body,
         });
@@ -748,7 +768,7 @@ impl Handle {
         ctx: &Context<impl Component<Message: From<Packet<T>> + From<Error>>>,
     ) -> Listener<T>
     where
-        T: api::Broadcast,
+        T: api::BroadcastEndpoint,
     {
         let mut broadcasts = RefMut::map(self.shared.mutable.borrow_mut(), |m| &mut m.broadcasts);
 

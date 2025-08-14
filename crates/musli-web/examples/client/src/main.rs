@@ -110,16 +110,16 @@ impl Component for App {
                 true
             }
             Msg::HelloResponse(packet) => {
-                packet.decode(ctx, |response| {
+                if let Some(response) = packet.decode(ctx) {
                     self.response = response.message.to_owned();
-                });
+                }
 
                 true
             }
             Msg::Tick(packet) => {
-                packet.decode(ctx, |tick| {
+                if let Some(tick) = packet.decode_broadcast(ctx) {
                     self.tick = tick.tick;
-                });
+                }
 
                 true
             }
