@@ -12,7 +12,8 @@ pub struct HelloResponse<'de> {
 }
 
 #[derive(Encode, Decode)]
-pub struct TickBroadcast {
+pub struct TickBody<'de> {
+    pub message: &'de str,
     pub tick: u32,
 }
 
@@ -23,6 +24,6 @@ api::define! {
     }
 
     broadcast Tick {
-        body = TickBroadcast;
+        body<'de> = TickBody<'de>;
     }
 }
