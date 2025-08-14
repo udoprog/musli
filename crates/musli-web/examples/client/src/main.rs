@@ -34,20 +34,6 @@ impl From<ws::Msg> for Msg {
     }
 }
 
-impl From<ws::Packet<api::Hello>> for Msg {
-    #[inline]
-    fn from(packet: ws::Packet<api::Hello>) -> Self {
-        Msg::HelloResponse(packet)
-    }
-}
-
-impl From<ws::Packet<api::Tick>> for Msg {
-    #[inline]
-    fn from(packet: ws::Packet<api::Tick>) -> Self {
-        Msg::Tick(packet)
-    }
-}
-
 struct App {
     service: ws::Service<Self>,
     handle: ws::Handle,
@@ -67,9 +53,9 @@ impl Component for App {
             ws::Service::new(ctx, ws::Connect::location_with_path(String::from("/ws")));
         let input = NodeRef::default();
 
-        service.connect(ctx);
+        service.connect();
 
-        let listen = handle.listen::<api::Tick>(ctx);
+        let listen = handle.listen(ctx, Msg::Tick);
 
         Self {
             service,
@@ -89,7 +75,7 @@ impl Component for App {
                 false
             }
             Msg::WebSocket(msg) => {
-                self.service.update(ctx, msg);
+                self.service.update(msg);
                 false
             }
             Msg::Send => {
@@ -105,6 +91,7 @@ impl Component for App {
                     api::HelloRequest {
                         message: value.as_str(),
                     },
+                    Msg::HelloResponse,
                 );
 
                 true

@@ -31,18 +31,18 @@ macro_rules! __define {
         }
     };
 
-    (@inner broadcast $broadcast:ident {
+    (@inner broadcast $listener:ident {
         body<$body_lt:lifetime> = $body:ty;
     }) => {
-        pub enum $broadcast {}
+        pub enum $listener {}
 
-        impl $crate::api::BroadcastEndpoint for $broadcast {
-            const KIND: &'static str = stringify!($broadcast);
+        impl $crate::api::Listener for $listener {
+            const KIND: &'static str = stringify!($listener);
             type Broadcast<$body_lt> = $body;
         }
 
         impl<$body_lt>  $crate::api::Broadcast<$body_lt> for $body {
-            type Endpoint = $broadcast;
+            type Endpoint = $listener;
         }
     }
 }
@@ -107,7 +107,7 @@ pub trait Endpoint {
     type Response<'de>: Response<'de, Endpoint = Self>;
 }
 
-pub trait BroadcastEndpoint {
+pub trait Listener {
     /// The kind of the response.
     const KIND: &'static str;
 
@@ -139,7 +139,7 @@ where
     Self: Encode<Binary> + Decode<'de, Binary, System>,
 {
     /// The endpoint related to the broadcast.
-    type Endpoint: BroadcastEndpoint<Broadcast<'de> = Self>;
+    type Endpoint: Listener<Broadcast<'de> = Self>;
 }
 
 /// A request header.

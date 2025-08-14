@@ -21,7 +21,7 @@ use wasm_bindgen02::closure::Closure;
 use wasm_bindgen02::{JsCast, JsValue};
 use web_sys03::js_sys::{ArrayBuffer, Uint8Array};
 use web_sys03::{window, BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket};
-use yew021::html::ImplicitClone;
+use yew021::html::{ImplicitClone, Scope};
 use yew021::{Component, Context};
 
 use crate::api;
@@ -165,9 +165,11 @@ impl Connect {
 
     /// Connect to the same location with a custom path.
     #[inline]
-    pub fn location_with_path(path: String) -> Self {
+    pub fn location_with_path(path: impl AsRef<str>) -> Self {
         Self {
-            kind: ConnectKind::Location { path: Some(path) },
+            kind: ConnectKind::Location {
+                path: Some(String::from(path.as_ref())),
+            },
         }
     }
 
@@ -181,7 +183,11 @@ impl Connect {
 }
 
 /// The WebSocket service.
-pub struct Service<C> {
+pub struct Service<C>
+where
+    C: Component,
+{
+    link: Scope<C>,
     connect: Connect,
     shared: Rc<Shared>,
     socket: Option<WebSocket>,
@@ -261,6 +267,7 @@ where
         };
 
         let this = Self {
+            link: ctx.link().clone(),
             connect,
             shared: shared.clone(),
             socket: None,
@@ -380,7 +387,7 @@ where
         (now - at) >= 250.0
     }
 
-    fn set_closed(&mut self, ctx: &Context<C>) {
+    fn set_closed(&mut self) {
         log::trace!(
             "Set closed timeout={}, opened={:?}",
             self.timeout,
@@ -396,7 +403,7 @@ where
         }
 
         self.opened = None;
-        self.reconnect(ctx);
+        self.reconnect();
         self.emit_state_change(State::Closed);
     }
 
@@ -413,14 +420,14 @@ where
     }
 
     /// Handle an update message.
-    pub fn update(&mut self, ctx: &Context<C>, message: Msg) {
+    pub fn update(&mut self, message: Msg) {
         match message.kind {
             MsgKind::Reconnect => {
                 log::trace!("Reconnect");
 
                 if let Err(error) = self.inner_connect() {
-                    ctx.link().send_message(error);
-                    self.inner_reconnect(ctx);
+                    self.link.send_message(error);
+                    self.inner_reconnect();
                 }
             }
             MsgKind::Open => {
@@ -431,22 +438,22 @@ where
 
                 for request in buffer {
                     if let Err(error) = self.send_client_request(request) {
-                        ctx.link().send_message(error);
+                        self.link.send_message(error);
                     }
                 }
             }
             MsgKind::Close(e) => {
                 log::trace!("Close: {} ({})", e.code(), e.reason());
-                self.set_closed(ctx);
+                self.set_closed();
             }
             MsgKind::Message(e) => {
                 if let Err(error) = self.message(e) {
-                    ctx.link().send_message(error);
+                    self.link.send_message(error);
                 }
             }
             MsgKind::Error(e) => {
                 log::error!("{}", e.message());
-                self.set_closed(ctx);
+                self.set_closed();
             }
             MsgKind::ClientRequest(request) => {
                 if self.opened.is_none() {
@@ -455,20 +462,20 @@ where
                 }
 
                 if let Err(error) = self.send_client_request(request) {
-                    ctx.link().send_message(error);
+                    self.link.send_message(error);
                 }
             }
         }
     }
 
-    pub(crate) fn reconnect(&mut self, ctx: &Context<C>) {
+    pub(crate) fn reconnect(&mut self) {
         if let Some(old) = self.socket.take() {
             if let Err(error) = old.close() {
-                ctx.link().send_message(Error::from(error));
+                self.link.send_message(Error::from(error));
             }
         }
 
-        let link = ctx.link().clone();
+        let link = self.link.clone();
 
         self._timeout = Some(Timeout::new(self.timeout, move || {
             link.send_message(Msg::new(MsgKind::Reconnect));
@@ -476,10 +483,10 @@ where
     }
 
     /// Attempt to establish a websocket connection.
-    pub fn connect(&mut self, ctx: &Context<C>) {
+    pub fn connect(&mut self) {
         if let Err(error) = self.inner_connect() {
-            ctx.link().send_message(error);
-            self.inner_reconnect(ctx);
+            self.link.send_message(error);
+            self.inner_reconnect();
         }
     }
 
@@ -538,8 +545,8 @@ where
         Ok(())
     }
 
-    fn inner_reconnect(&mut self, ctx: &Context<C>) {
-        let link = ctx.link().clone();
+    fn inner_reconnect(&mut self) {
+        let link = self.link.clone();
 
         self._timeout = Some(Timeout::new(1000, move || {
             link.send_message(Msg::new(MsgKind::Reconnect));
@@ -665,7 +672,7 @@ where
 
 impl<T> Packet<T>
 where
-    T: api::BroadcastEndpoint,
+    T: api::Listener,
 {
     /// Handle a broadcast packet.
     pub fn decode_broadcast(
@@ -702,13 +709,15 @@ impl Handle {
     /// Returns a handle for the request.
     ///
     /// If the handle is dropped, the request is cancelled.
-    pub fn request<T>(
+    pub fn request<T, C>(
         &self,
-        ctx: &Context<impl Component<Message: From<Packet<T::Endpoint>> + From<Error>>>,
+        ctx: &Context<C>,
         request: T,
+        f: impl Fn(Packet<T::Endpoint>) -> C::Message + 'static,
     ) -> Request<T::Endpoint>
     where
         T: api::Request,
+        C: Component<Message: From<Error>>,
     {
         let body = match musli::storage::to_vec(&request) {
             Ok(body) => body,
@@ -734,10 +743,10 @@ impl Handle {
                     }
                 };
 
-                link.send_message(Packet {
+                link.send_message(f(Packet {
                     raw,
                     _marker: PhantomData,
-                });
+                }));
             }),
         };
 
@@ -763,12 +772,14 @@ impl Handle {
     /// Returns a handle for the broadcasts.
     ///
     /// If the handle is dropped, the listener is cancelled.
-    pub fn listen<T>(
+    pub fn listen<T, C>(
         &self,
-        ctx: &Context<impl Component<Message: From<Packet<T>> + From<Error>>>,
+        ctx: &Context<C>,
+        f: impl Fn(Packet<T>) -> C::Message + 'static,
     ) -> Listener<T>
     where
-        T: api::BroadcastEndpoint,
+        T: api::Listener,
+        C: Component<Message: From<Error>>,
     {
         let mut broadcasts = RefMut::map(self.shared.mutable.borrow_mut(), |m| &mut m.broadcasts);
 
@@ -776,10 +787,10 @@ impl Handle {
         let link = ctx.link().clone();
 
         let index = slots.insert(Box::new(move |raw| {
-            link.send_message(Packet {
+            link.send_message(f(Packet {
                 raw,
                 _marker: PhantomData,
-            });
+            }));
         }));
 
         Listener {
@@ -791,16 +802,17 @@ impl Handle {
     }
 
     /// Listen for state changes to the underlying connection.
-    pub fn state_changes<C>(&self, ctx: &Context<C>) -> StateListener
+    pub fn state_changes<C>(
+        &self,
+        ctx: &Context<C>,
+        f: impl Fn(State) -> C::Message + 'static,
+    ) -> StateListener
     where
-        C: Component<Message: From<State>>,
+        C: Component,
     {
         let link = ctx.link().clone();
         let mut state = RefMut::map(self.shared.mutable.borrow_mut(), |m| &mut m.state_changes);
-
-        let index = state.insert(Box::new(move |state| {
-            link.send_message(C::Message::from(state))
-        }));
+        let index = state.insert(Box::new(move |state| link.send_message(f(state))));
 
         StateListener {
             index,

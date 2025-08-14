@@ -379,7 +379,7 @@ where
         this.buf.write(api::ResponseHeader {
             index: 0,
             serial: 0,
-            broadcast: Some(<T::Endpoint as api::BroadcastEndpoint>::KIND),
+            broadcast: Some(<T::Endpoint as api::Listener>::KIND),
             error: None,
         })?;
 
