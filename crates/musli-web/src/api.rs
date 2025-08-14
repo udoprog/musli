@@ -5,91 +5,141 @@ use musli::mode::Binary;
 use musli::{Decode, Encode};
 
 #[macro_export]
-macro_rules! __lifetime {
-    ($lt:lifetime) => { $lt };
-    () => { '__de };
-}
-
 #[doc(hidden)]
-pub use __lifetime as lifetime;
-
-#[macro_export]
-macro_rules! __marker {
-    ($lt:lifetime, $ty:ty) => {
-        type Type<$lt> = $ty;
-    };
-    (, $ty:ty) => {
-        $crate::api::marker!('__de, $name, $ty);
-    };
-}
-
-#[doc(hidden)]
-pub use __marker as marker;
-
-#[macro_export]
 macro_rules! __define {
-    (
-        $(
-            endpoint $endpoint:ident {
-                request $(<$request_lt:lifetime>)? = $request:ty;
-                response $(<$response_lt:lifetime>)? = $response:ty;
-            }
-        )*
-
-        $(
-            broadcast $broadcast:ident {
-                body $(<$body_lt:lifetime>)? = $body:ty;
-            }
-        )*
-    ) => {
-        $(
-            pub enum $endpoint {}
-
-            impl $crate::api::Marker for $endpoint {
-                $crate::api::marker!($($response_lt)*, $response);
-            }
-
-            impl $(<$request_lt>)* $crate::api::Request for $request {
-                const KIND: &'static str = stringify!($endpoint);
-                type Marker = $endpoint;
-            }
-        )*
-
-        $(
-            pub enum $broadcast {}
-
-            impl $crate::api::Broadcast for $broadcast {
-                const KIND: &'static str = stringify!($broadcast);
-            }
-
-            impl $crate::api::Marker for $broadcast {
-                $crate::api::marker!($($body_lt)*, $body);
-            }
-        )*
+    ($($what:ident $endpoint:ident { $($tt:tt)* })*) => {
+        $($crate::api::define!(@inner $what $endpoint { $($tt)* });)*
     };
+
+    (@inner endpoint $endpoint:ident {
+        request $(<$request_lt:lifetime>)? = $request:ty;
+        response<$response_lt:lifetime> = $response:ty;
+    }) => {
+        pub enum $endpoint {}
+
+        impl $crate::api::Endpoint for $endpoint {
+            const KIND: &'static str = stringify!($endpoint);
+            type Response<$response_lt> = $response;
+        }
+
+        impl $(<$request_lt>)* $crate::api::Request for $request {
+            type Endpoint = $endpoint;
+        }
+
+        impl<$response_lt> $crate::api::Response<$response_lt> for $response {
+            type Endpoint = $endpoint;
+        }
+    };
+
+    (@inner broadcast $broadcast:ident {
+        body<$body_lt:lifetime> = $body:ty;
+    }) => {
+        pub enum $broadcast {}
+
+        impl $crate::api::BroadcastEndpoint for $broadcast {
+            const KIND: &'static str = stringify!($broadcast);
+            type Broadcast<$body_lt> = $body;
+        }
+
+        impl<$body_lt>  $crate::api::Broadcast<$body_lt> for $body {
+            type Endpoint = $broadcast;
+        }
+    }
 }
 
+/// Define API types.
+///
+/// Defining an `endpoint` causes a type to be generated which is a marker type
+/// for the endpoint, which binds together the request and response types.
+///
+/// Defining a broadcast simply associated a broadcast with a marker type.
+///
+/// The marker type is used with the various types used when interacting with an
+/// API endpoint or broadcast, such as:
+///
+/// * [`yew021::Request<T>`] where `T: Endpoint`.
+/// * [`yew021::Listener<T>`] where `T: BroadcastEndpoint`.
+///
+/// [`yew021::Request<T>`]: crate::yew021::Request
+/// [`yew021::Listener<T>`]: crate::yew021::Listener
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Decode, Encode};
+/// use musli_web::api;
+///
+/// #[derive(Encode, Decode)]
+/// pub struct HelloRequest<'de> {
+///     pub message: &'de str,
+/// }
+///
+/// #[derive(Encode, Decode)]
+/// pub struct HelloResponse<'de> {
+///     pub message: &'de str,
+/// }
+///
+/// #[derive(Encode, Decode)]
+/// pub struct TickBody<'de> {
+///     pub message: &'de str,
+///     pub tick: u32,
+/// }
+///
+/// api::define! {
+///     endpoint Hello {
+///         request<'de> = HelloRequest<'de>;
+///         response<'de> = HelloResponse<'de>;
+///     }
+///
+///     broadcast Tick {
+///         body<'de> = TickBody<'de>;
+///     }
+/// }
+/// ```
+#[doc(inline)]
 pub use __define as define;
 
-/// A marker indicating a decodable type.
-pub trait Marker: 'static {
-    /// The type that can be decoded.
-    type Type<'de>: Decode<'de, Binary, System>;
-}
-
-/// Trait governing requests.
-pub trait Request: Encode<Binary> {
-    /// The kind of the request.
+pub trait Endpoint {
+    /// The kind of the response.
     const KIND: &'static str;
 
-    /// Type acting as a token for the response.
-    type Marker: Marker;
+    /// The response type related to the endpoint.
+    type Response<'de>: Response<'de, Endpoint = Self>;
+}
+
+pub trait BroadcastEndpoint {
+    /// The kind of the response.
+    const KIND: &'static str;
+
+    /// The response type related to the endpoint.
+    type Broadcast<'de>: Broadcast<'de, Endpoint = Self>;
+}
+
+/// A marker indicating a response type.
+pub trait Response<'de>
+where
+    Self: Decode<'de, Binary, System>,
+{
+    /// The endpoint related to the response.
+    type Endpoint: Endpoint;
+}
+
+/// A marker indicating a request type.
+pub trait Request
+where
+    Self: Encode<Binary>,
+{
+    /// The endpoint related to the request.
+    type Endpoint: Endpoint;
 }
 
 /// A broadcast type marker.
-pub trait Broadcast: Marker {
-    /// The kind of the broadcast being subscribed to.
-    const KIND: &'static str;
+pub trait Broadcast<'de>
+where
+    Self: Encode<Binary> + Decode<'de, Binary, System>,
+{
+    /// The endpoint related to the broadcast.
+    type Endpoint: BroadcastEndpoint<Broadcast<'de> = Self>;
 }
 
 /// A request header.

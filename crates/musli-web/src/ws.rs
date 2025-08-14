@@ -370,17 +370,16 @@ where
     }
 
     /// Send a broadcast message on the server.
-    pub async fn broadcast<T>(self: Pin<&mut Self>, message: T::Type<'_>) -> Result<(), Error>
+    pub async fn broadcast<'de, T>(self: Pin<&mut Self>, message: T) -> Result<(), Error>
     where
-        T: api::Broadcast,
-        for<'de> T::Type<'de>: Encode<Binary>,
+        T: api::Broadcast<'de>,
     {
         let this = unsafe { Pin::get_unchecked_mut(self) };
 
         this.buf.write(api::ResponseHeader {
             index: 0,
             serial: 0,
-            broadcast: Some(T::KIND),
+            broadcast: Some(<T::Endpoint as api::BroadcastEndpoint>::KIND),
             error: None,
         })?;
 

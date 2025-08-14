@@ -17,7 +17,7 @@ use axum::extract::State;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::any;
-use musli_web::api::Request;
+use musli_web::api::Endpoint;
 use musli_web::{axum08, ws};
 use tokio::sync::broadcast::Sender;
 use tokio::time::{self, Duration};
@@ -41,7 +41,7 @@ impl ws::Handler for MyHandler {
         tracing::info!("Handling: {kind}");
 
         match kind {
-            api::HelloRequest::KIND => {
+            api::Hello::KIND => {
                 let Some(request) = incoming.read::<api::HelloRequest<'_>>() else {
                     return Ok(());
                 };
@@ -72,7 +72,7 @@ async fn handler(ws: WebSocketUpgrade, State(sender): State<Sender<Broadcast>>) 
 
                     let result = match message {
                         Broadcast::Tick { tick } => {
-                            server.as_mut().broadcast::<api::Tick>(api::TickBody { message: "tick", tick }).await
+                            server.as_mut().broadcast(api::TickBody { message: "tick", tick }).await
                         },
                     };
 
