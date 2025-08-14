@@ -15,12 +15,10 @@ pub use __lifetime as lifetime;
 
 #[macro_export]
 macro_rules! __marker {
-    ($lt:lifetime, $name:ident, $ty:ty) => {
-        impl $crate::api::Marker for $name {
-            type Type<$lt> = $ty;
-        }
+    ($lt:lifetime, $ty:ty) => {
+        type Type<$lt> = $ty;
     };
-    (, $name:ident, $ty:ty) => {
+    (, $ty:ty) => {
         $crate::api::marker!('__de, $name, $ty);
     };
 }
@@ -47,7 +45,9 @@ macro_rules! __define {
         $(
             pub enum $endpoint {}
 
-            $crate::api::marker!($($response_lt)*, $endpoint, $response);
+            impl $crate::api::Marker for $endpoint {
+                $crate::api::marker!($($response_lt)*, $response);
+            }
 
             impl $(<$request_lt>)* $crate::api::Request for $request {
                 const KIND: &'static str = stringify!($endpoint);
@@ -62,7 +62,9 @@ macro_rules! __define {
                 const KIND: &'static str = stringify!($broadcast);
             }
 
-            $crate::api::marker!($($body_lt)*, $broadcast, $body);
+            impl $crate::api::Marker for $broadcast {
+                $crate::api::marker!($($body_lt)*, $body);
+            }
         )*
     };
 }
