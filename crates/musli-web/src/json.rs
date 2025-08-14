@@ -9,12 +9,12 @@ use axum_core05::response as response05;
 use bytes::{BufMut, Bytes, BytesMut};
 use http::header::{self, HeaderValue};
 use http::{HeaderMap, StatusCode};
+use musli::Encode;
 use musli::alloc::System;
 use musli::context::ErrorMarker;
 use musli::de::DecodeOwned;
 use musli::json::Encoding;
 use musli::mode::Text;
-use musli::Encode;
 
 const ENCODING: Encoding = Encoding::new();
 

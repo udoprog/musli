@@ -5,8 +5,8 @@
 use bytes::Bytes;
 use tokio_stream::StreamExt;
 
-use axum08::extract::ws::{CloseFrame, Message, WebSocket};
 use axum_core05::Error;
+use axum08::extract::ws::{CloseFrame, Message, WebSocket};
 
 use crate::ws::{self, Handler, Server, ServerImplementation, Socket};
 

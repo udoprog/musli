@@ -13,14 +13,14 @@ use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use std::collections::{hash_map, HashMap};
+use std::collections::{HashMap, hash_map};
 
 use gloo_timers03::callback::Timeout;
 use slab::Slab;
 use wasm_bindgen02::closure::Closure;
 use wasm_bindgen02::{JsCast, JsValue};
 use web_sys03::js_sys::{ArrayBuffer, Uint8Array};
-use web_sys03::{window, BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket};
+use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, window};
 use yew021::html::{ImplicitClone, Scope};
 use yew021::{Component, Context};
 
@@ -346,11 +346,9 @@ where
 
                 let requests = Ref::map(self.shared.mutable.borrow(), |m| &m.requests);
 
-                let Some(pending) = requests.get(header.index as usize) else {
-                    return Err("Header index out of bound".into());
-                };
-
-                if pending.serial == header.serial {
+                if let Some(pending) = requests.get(header.index as usize)
+                    && pending.serial == header.serial
+                {
                     if let Some(error) = header.error {
                         (pending.callback)(Err(Error::from(error)));
                     } else {
@@ -469,10 +467,10 @@ where
     }
 
     pub(crate) fn reconnect(&mut self) {
-        if let Some(old) = self.socket.take() {
-            if let Err(error) = old.close() {
-                self.link.send_message(Error::from(error));
-            }
+        if let Some(old) = self.socket.take()
+            && let Err(error) = old.close()
+        {
+            self.link.send_message(Error::from(error));
         }
 
         let link = self.link.clone();
@@ -513,7 +511,7 @@ where
                     other => {
                         return Err(Error::from(format!(
                             "Same host connection is not supported for protocol `{other}`"
-                        )))
+                        )));
                     }
                 };
 

@@ -2,7 +2,7 @@
 name = "musli-web"
 version = "0.0.132"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
-edition = "2021"
+edition = "2024"
 description = """
 Types for integrating Müsli with websocket frameworks.
 """
