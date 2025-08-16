@@ -780,7 +780,7 @@ impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, Global> {
         use core::ptr::NonNull;
 
         // SAFETY: We know that the vector was allocated as expected using the
-        // system allocator.
+        // global allocator.
         unsafe {
             let mut value = ManuallyDrop::new(value);
             let ptr = NonNull::new_unchecked(value.as_mut_ptr());
