@@ -51,8 +51,8 @@ impl Global {
     /// Caller must ensure that the allocation comes from the same system
     /// allocator and is correctly initialized per its parameters.
     #[inline]
-    pub(crate) unsafe fn slice_from_raw_parts<T>(data: NonNull<T>, size: usize) -> SystemAlloc<T> {
-        SystemAlloc { data, size }
+    pub(crate) unsafe fn slice_from_raw_parts<T>(data: NonNull<T>, size: usize) -> GlobalAlloc<T> {
+        GlobalAlloc { data, size }
     }
 }
 
@@ -66,11 +66,11 @@ impl Default for Global {
 unsafe impl Allocator for Global {
     const IS_SYSTEM: bool = true;
 
-    type Alloc<T> = SystemAlloc<T>;
+    type Alloc<T> = GlobalAlloc<T>;
 
     #[inline]
     fn alloc<T>(self, value: T) -> Result<Self::Alloc<T>, AllocError> {
-        let mut raw = SystemAlloc::<T>::alloc()?;
+        let mut raw = GlobalAlloc::<T>::alloc()?;
 
         if size_of::<T>() != 0 {
             // SAFETY: The above ensures the data has been allocated.
@@ -84,19 +84,19 @@ unsafe impl Allocator for Global {
 
     #[inline]
     fn alloc_empty<T>(self) -> Self::Alloc<T> {
-        SystemAlloc::DANGLING
+        GlobalAlloc::DANGLING
     }
 }
 
 /// A vector-backed allocation.
-pub struct SystemAlloc<T> {
+pub struct GlobalAlloc<T> {
     /// Pointer to the allocated region.
     data: NonNull<T>,
     /// The size in number of `T` elements in the region.
     size: usize,
 }
 
-impl<T> SystemAlloc<T> {
+impl<T> GlobalAlloc<T> {
     /// Reallocate the region to the given capacity.
     ///
     /// # Safety
@@ -126,10 +126,10 @@ impl<T> SystemAlloc<T> {
     }
 }
 
-unsafe impl<T> Send for SystemAlloc<T> where T: Send {}
-unsafe impl<T> Sync for SystemAlloc<T> where T: Sync {}
+unsafe impl<T> Send for GlobalAlloc<T> where T: Send {}
+unsafe impl<T> Sync for GlobalAlloc<T> where T: Sync {}
 
-impl<T> Alloc<T> for SystemAlloc<T> {
+impl<T> Alloc<T> for GlobalAlloc<T> {
     #[inline]
     fn as_ptr(&self) -> *const T {
         self.data.as_ptr().cast_const().cast()
@@ -175,7 +175,7 @@ impl<T> Alloc<T> for SystemAlloc<T> {
     }
 }
 
-impl<T> SystemAlloc<T> {
+impl<T> GlobalAlloc<T> {
     const MIN_NON_ZERO_CAP: usize = if size_of::<T>() == 1 {
         8
     } else if size_of::<T>() <= 1024 {
@@ -264,7 +264,7 @@ impl<T> SystemAlloc<T> {
     }
 }
 
-impl<T> Drop for SystemAlloc<T> {
+impl<T> Drop for GlobalAlloc<T> {
     #[inline]
     fn drop(&mut self) {
         self.free();

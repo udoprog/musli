@@ -90,7 +90,7 @@ pub use musli_core::alloc::{Alloc, AllocError, Allocator, Box, Disabled, String,
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]
-pub use musli_core::alloc::{Global, SystemAlloc};
+pub use musli_core::alloc::{Global, GlobalAlloc};
 
 mod slice;
 #[doc(inline)]
