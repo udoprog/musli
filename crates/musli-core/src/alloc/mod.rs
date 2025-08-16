@@ -17,10 +17,10 @@ mod allocator;
 pub use self::allocator::Allocator;
 
 #[cfg(feature = "alloc")]
-mod system;
+mod global;
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub use self::system::{System, SystemAlloc};
+pub use self::global::{System, SystemAlloc};
 
 mod disabled;
 #[doc(inline)]
