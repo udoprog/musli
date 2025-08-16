@@ -4,19 +4,19 @@ use super::{Alloc, AllocError};
 ///
 /// # Safety
 ///
-/// Setting `IS_SYSTEM` to `true` has safety implications, since it determines
+/// Setting `IS_GLOBAL` to `true` has safety implications, since it determines
 /// whether the allocation can be safely converted into a standard container or
 /// not.
 pub unsafe trait Allocator: Copy {
     /// Whether the allocations returned by this allocatore is backed by the
-    /// system allocator or not.
+    /// global allocator or not.
     ///
     /// # Safety
     ///
     /// Setting this to `true` has safety implications, since it determines
     /// whether the allocation can be safely converted into a standard container
     /// or not.
-    const IS_SYSTEM: bool;
+    const IS_GLOBAL: bool;
 
     /// A raw allocation from the allocator.
     type Alloc<T>: Alloc<T>;

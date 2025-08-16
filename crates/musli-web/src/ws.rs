@@ -7,7 +7,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use bytes::Bytes;
-use musli::alloc::System;
+use musli::alloc::Global;
 use musli::mode::Binary;
 use musli::reader::SliceReader;
 use musli::storage;
@@ -508,7 +508,7 @@ impl<'de> Incoming<'de> {
     #[inline]
     pub fn read<T>(&mut self) -> Option<T>
     where
-        T: Decode<'de, Binary, System>,
+        T: Decode<'de, Binary, Global>,
     {
         match storage::decode(&mut self.reader) {
             Ok(value) => Some(value),

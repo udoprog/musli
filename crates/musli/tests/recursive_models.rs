@@ -10,7 +10,7 @@
 //!  = help: consider increasing the recursion limit by adding a `#![recursion_limit = "256"]` attribute to your crate (`recursive_models`)
 //! ```
 
-use musli::alloc::System;
+use musli::alloc::Global;
 use musli::de::DecodeOwned;
 use musli::mode::Binary;
 use musli::{Decode, Encode};
@@ -24,7 +24,7 @@ where
 
 pub(crate) fn decode<T>(buf: &[u8]) -> musli::storage::Result<T>
 where
-    T: DecodeOwned<Binary, System>,
+    T: DecodeOwned<Binary, Global>,
 {
     musli::storage::from_slice(buf)
 }

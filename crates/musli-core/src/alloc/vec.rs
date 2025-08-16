@@ -10,7 +10,7 @@ use crate::de::{DecodeBytes, UnsizedVisitor};
 use crate::{Context, Decoder};
 
 #[cfg(feature = "alloc")]
-use super::System;
+use super::Global;
 use super::{Alloc, AllocError, Allocator, Disabled};
 
 /// A Müsli-allocated contiguous growable array type, written as `Vec<T>`, short
@@ -73,7 +73,7 @@ where
     /// Coerce into a std vector.
     #[cfg(feature = "alloc")]
     pub fn into_std(self) -> Result<rust_alloc::vec::Vec<T>, Self> {
-        if !A::IS_SYSTEM {
+        if !A::IS_GLOBAL {
             return Err(self);
         }
 
@@ -760,7 +760,7 @@ where
 }
 
 /// Conversion from a std [`Vec`][std-vec] to a Müsli-allocated [`Vec`] in the
-/// [`System`] allocator.
+/// [`Global`] allocator.
 ///
 /// [std-vec]: rust_alloc::vec::Vec
 ///
@@ -774,20 +774,20 @@ where
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, System> {
+impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, Global> {
     #[inline]
     fn from(value: rust_alloc::vec::Vec<T>) -> Self {
         use core::ptr::NonNull;
 
         // SAFETY: We know that the vector was allocated as expected using the
-        // system allocator.
+        // global allocator.
         unsafe {
             let mut value = ManuallyDrop::new(value);
             let ptr = NonNull::new_unchecked(value.as_mut_ptr());
             let len = value.len();
             let cap = value.capacity();
 
-            let buf = System::slice_from_raw_parts(ptr, cap);
+            let buf = Global::slice_from_raw_parts(ptr, cap);
             Vec::from_raw_parts(buf, len)
         }
     }

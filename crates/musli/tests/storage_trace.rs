@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use musli::alloc::System;
+use musli::alloc::Global;
 use musli::context;
 use musli::{Decode, Encode};
 

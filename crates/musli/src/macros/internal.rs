@@ -237,7 +237,7 @@ macro_rules! bare_encoding {
         pub fn decode<'de, R, T>(reader: R) -> Result<T, Error>
         where
             R: $reader_trait<'de>,
-            T: Decode<'de, $mode, System>,
+            T: Decode<'de, $mode, Global>,
         {
             $default.decode(reader)
         }
@@ -273,7 +273,7 @@ macro_rules! bare_encoding {
         #[inline]
         pub fn from_slice<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
         where
-            T: Decode<'de, $mode, System>,
+            T: Decode<'de, $mode, Global>,
         {
             $default.from_slice(bytes)
         }
@@ -552,7 +552,7 @@ macro_rules! encoding_impls {
         pub fn decode<'de, R, T>(self, reader: R) -> Result<T, Error>
         where
             R: $reader_trait<'de>,
-            T: Decode<'de, $mode, System>,
+            T: Decode<'de, $mode, Global>,
         {
             let cx = $crate::context::new().with_error();
             self.decode_with(&cx, reader)
@@ -591,7 +591,7 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn from_slice<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
         where
-            T: Decode<'de, $mode, System>,
+            T: Decode<'de, $mode, Global>,
         {
             let cx = $crate::context::new().with_error();
             self.from_slice_with(&cx, bytes)
@@ -607,7 +607,7 @@ macro_rules! encoding_impls {
         #[inline]
         pub fn from_str<'de, T>(self, string: &'de str) -> Result<T, Error>
         where
-            T: Decode<'de, M, System>,
+            T: Decode<'de, M, Global>,
         {
             self.from_slice(string.as_bytes())
         }
@@ -625,7 +625,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::alloc::System;
+        /// use musli::alloc::Global;
         /// use musli::context;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -678,7 +678,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::alloc::System;
+        /// use musli::alloc::Global;
         /// use musli::context;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -736,7 +736,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::alloc::System;
+        /// use musli::alloc::Global;
         /// use musli::context;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -785,7 +785,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode, FixedBytes};
-        /// use musli::alloc::System;
+        /// use musli::alloc::Global;
         /// use musli::context;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -834,7 +834,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::alloc::System;
+        /// use musli::alloc::Global;
         /// use musli::context;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -886,7 +886,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::alloc::System;
+        /// use musli::alloc::Global;
         /// use musli::context;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -936,7 +936,7 @@ macro_rules! encoding_impls {
         ///
         /// ```
         /// use musli::{Decode, Encode};
-        /// use musli::alloc::System;
+        /// use musli::alloc::Global;
         /// use musli::context;
         #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
         #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
@@ -998,7 +998,7 @@ macro_rules! implement_error {
     ) => {
         $(#[$($meta)*])*
         #[cfg(feature = "alloc")]
-        pub struct $id<A = $crate::alloc::System>
+        pub struct $id<A = $crate::alloc::Global>
         where
             A: $crate::Allocator,
         {
@@ -1112,7 +1112,7 @@ macro_rules! implement_error {
         #[cfg(feature = "alloc")]
         const _: () = {
             const fn assert_send_sync<T: Send + Sync>() {}
-            assert_send_sync::<$id<$crate::alloc::System>>();
+            assert_send_sync::<$id<$crate::alloc::Global>>();
         };
     };
 }
