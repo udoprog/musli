@@ -9,7 +9,7 @@ use super::{Alloc, AllocError};
 /// not.
 pub unsafe trait Allocator: Copy {
     /// Whether the allocations returned by this allocatore is backed by the
-    /// system allocator or not.
+    /// global allocator or not.
     ///
     /// # Safety
     ///
