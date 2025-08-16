@@ -7,11 +7,9 @@ use rust_alloc::alloc;
 
 use super::{Alloc, AllocError, Allocator};
 
-/// System buffer that can be used in combination with an [`Allocator`].
+/// Global buffer that can be used in combination with an [`Allocator`].
 ///
-/// This uses the [`System`] allocator.
-///
-/// [`System` allocator]: https://doc.rust-lang.org/std/alloc/struct.System.html
+/// This uses the global allocator.
 ///
 /// # Examples
 ///
@@ -38,7 +36,7 @@ use super::{Alloc, AllocError, Allocator};
 pub struct Global;
 
 impl Global {
-    /// Construct a new system allocator.
+    /// Construct a new global allocator.
     #[inline]
     pub const fn new() -> Self {
         Self
@@ -48,7 +46,7 @@ impl Global {
     ///
     /// # Safety
     ///
-    /// Caller must ensure that the allocation comes from the same system
+    /// Caller must ensure that the allocation comes from the same global
     /// allocator and is correctly initialized per its parameters.
     #[inline]
     pub(crate) unsafe fn slice_from_raw_parts<T>(data: NonNull<T>, size: usize) -> GlobalAlloc<T> {
