@@ -73,7 +73,7 @@ where
     /// Coerce into a std vector.
     #[cfg(feature = "alloc")]
     pub fn into_std(self) -> Result<rust_alloc::vec::Vec<T>, Self> {
-        if !A::IS_SYSTEM {
+        if !A::IS_GLOBAL {
             return Err(self);
         }
 

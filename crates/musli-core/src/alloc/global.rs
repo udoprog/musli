@@ -64,7 +64,7 @@ impl Default for Global {
 }
 
 unsafe impl Allocator for Global {
-    const IS_SYSTEM: bool = true;
+    const IS_GLOBAL: bool = true;
 
     type Alloc<T> = GlobalAlloc<T>;
 
