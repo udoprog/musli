@@ -1,10 +1,10 @@
-use super::{Allocator, ArrayBuffer, Slice, System, Vec};
+use super::{Allocator, ArrayBuffer, Global, Slice, Vec};
 
 macro_rules! test_for_each {
-    ($system:ident, $stack:ident, $inner:ident) => {
+    ($global:ident, $stack:ident, $inner:ident) => {
         #[test]
-        fn $system() {
-            let alloc = System::new();
+        fn $global() {
+            let alloc = Global::new();
             $inner(alloc);
         }
 
@@ -105,6 +105,6 @@ where
     assert_eq!(a.as_slice(), b.as_slice());
 }
 
-test_for_each!(system_basic, stack_basic, basic_allocations);
-test_for_each!(system_grow, stack_grow, grow_allocations);
-test_for_each!(system_zst, stack_zst, zst_allocations);
+test_for_each!(global_basic, stack_basic, basic_allocations);
+test_for_each!(global_grow, stack_grow, grow_allocations);
+test_for_each!(global_zst, stack_zst, zst_allocations);

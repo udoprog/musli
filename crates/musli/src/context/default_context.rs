@@ -2,7 +2,7 @@ use core::error::Error;
 use core::fmt;
 
 #[cfg(feature = "alloc")]
-use crate::alloc::System;
+use crate::alloc::Global;
 use crate::{Allocator, Context};
 
 use super::{
@@ -13,11 +13,11 @@ use super::{
 /// The default context which uses an allocator to track the location of errors.
 ///
 /// This is typically constructed using [`new`] and by default uses the
-/// [`System`] allocator to allocate memory. To customized the allocator to use
+/// [`Global`] allocator to allocate memory. To customized the allocator to use
 /// [`new_in`] can be used during construction.
 ///
 /// The default constructor is only available when the `alloc` feature is
-/// enabled, and will use the [`System`] allocator.
+/// enabled, and will use the [`Global`] allocator.
 ///
 /// [`new`]: super::new
 /// [`new_in`]: super::new_in
@@ -32,12 +32,12 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl DefaultContext<System, NoTrace, Ignore> {
-    /// Construct the default context which uses the [`System`] allocator for
+impl DefaultContext<Global, NoTrace, Ignore> {
+    /// Construct the default context which uses the [`Global`] allocator for
     /// memory.
     #[inline]
     pub(super) fn new() -> Self {
-        Self::new_in(System::new())
+        Self::new_in(Global::new())
     }
 }
 
@@ -59,7 +59,7 @@ where
 }
 
 #[cfg(feature = "alloc")]
-impl Default for DefaultContext<System, NoTrace, Ignore> {
+impl Default for DefaultContext<Global, NoTrace, Ignore> {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -106,7 +106,7 @@ where
     ///
     /// ```
     /// use musli::{Decode, Encode};
-    /// use musli::alloc::System;
+    /// use musli::alloc::Global;
     /// use musli::context;
     /// use musli::json::{Encoding, Error};
     ///
@@ -154,7 +154,7 @@ where
     ///
     /// ```
     /// use musli::{Decode, Encode};
-    /// use musli::alloc::System;
+    /// use musli::alloc::Global;
     /// use musli::context;
     /// use musli::json::{Encoding, Error};
     ///

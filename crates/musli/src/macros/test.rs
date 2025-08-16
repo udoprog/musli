@@ -16,7 +16,7 @@ macro_rules! test_fns {
         #[cfg(feature = "alloc")]
         pub fn rt<T, M>(value: T) -> T
         where
-            T: $crate::en::Encode<M> + $crate::de::DecodeOwned<M, $crate::alloc::System>,
+            T: $crate::en::Encode<M> + $crate::de::DecodeOwned<M, $crate::alloc::Global>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
             M: 'static,
         {
@@ -100,7 +100,7 @@ macro_rules! test_fns {
         where
             T: $crate::en::Encode<M>,
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
-            U: $crate::de::Decode<'de, M, $crate::alloc::System>,
+            U: $crate::de::Decode<'de, M, $crate::alloc::Global>,
             U: ::core::fmt::Debug + ::core::cmp::PartialEq,
             M: 'static,
         {
@@ -445,7 +445,7 @@ pub use __test_matrix;
 pub mod support {
     pub use rust_alloc::vec::Vec;
 
-    use crate::alloc::System;
+    use crate::alloc::Global;
     use crate::mode::Binary;
     use crate::value::{self, Value};
     use crate::{Decode, Encode};
@@ -453,7 +453,7 @@ pub mod support {
     #[track_caller]
     pub fn musli_value_rt<T>(expected: T)
     where
-        T: Encode<Binary> + for<'de> Decode<'de, Binary, System>,
+        T: Encode<Binary> + for<'de> Decode<'de, Binary, Global>,
         T: PartialEq + core::fmt::Debug,
     {
         let value: Value<_> = value::encode(&expected).expect("value: Encoding should succeed");

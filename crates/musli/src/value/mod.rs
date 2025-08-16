@@ -26,7 +26,7 @@ pub use error::Error;
 
 use crate::alloc::Allocator;
 #[cfg(feature = "alloc")]
-use crate::alloc::System;
+use crate::alloc::Global;
 #[cfg(feature = "alloc")]
 use crate::mode::Binary;
 #[cfg(feature = "alloc")]
@@ -41,7 +41,7 @@ const OPTIONS: Options = crate::options::new().build();
 /// mode.
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub fn encode<T>(value: T) -> Result<Value<System>, Error>
+pub fn encode<T>(value: T) -> Result<Value<Global>, Error>
 where
     T: Encode<Binary>,
 {
@@ -59,7 +59,7 @@ where
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub fn decode<'de, T>(value: &'de Value<impl Allocator>) -> Result<T, Error>
 where
-    T: Decode<'de, Binary, System>,
+    T: Decode<'de, Binary, Global>,
 {
     use crate::de::Decoder;
     let cx = crate::context::new().with_error();

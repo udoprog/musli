@@ -347,7 +347,7 @@
 //! * *Use a packed format*. This doesn't allow for any upgrades, but we avoid
 //!   paying the overhead of serializing field identifiers.
 //! * *Use the [`Slice` allocator]*. This avoids all heap allocations using the
-//!   system allocator. While the system allocator is quite efficient and
+//!   global allocator. While the global allocator is quite efficient and
 //!   normally shouldn't be avoided, the slice allocator is a fixed-slab
 //!   allocator. The tradeoff here is that we will error in case we run out of
 //!   memory, but we only need to use the allocator if the types being
@@ -361,7 +361,7 @@
 //! We achieve this through the following methods:
 //!
 //! ```
-//! use musli::alloc::{Allocator, System};
+//! use musli::alloc::{Allocator, Global};
 //! use musli::context::{self, ErrorMarker as Error};
 //! use musli::options::{self, Float, Integer, Width, Options};
 //! use musli::storage::Encoding;

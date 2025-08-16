@@ -1,10 +1,10 @@
 use core::marker::PhantomData;
 
 use super::{Alloc, AllocError, Allocator};
+#[cfg(feature = "alloc")]
+use super::{Global, GlobalAlloc};
 #[cfg(not(feature = "alloc"))]
 use super::{Slice, SliceAlloc};
-#[cfg(feature = "alloc")]
-use super::{System, SystemAlloc};
 
 /// The default stack buffer size for the default allocator provided through
 /// [`default()`].
@@ -54,7 +54,7 @@ macro_rules! implement {
 }
 
 #[cfg(feature = "alloc")]
-implement!(DefaultAllocator, System, SystemAlloc<T>, SystemAlloc<T>);
+implement!(DefaultAllocator, Global, SystemAlloc<T>, GlobalAlloc<T>);
 
 #[cfg(not(feature = "alloc"))]
 implement!(
@@ -66,10 +66,10 @@ implement!(
 
 unsafe impl<'a, const BUF: usize> Allocator for &'a DefaultAllocator<'_, BUF> {
     #[cfg(feature = "alloc")]
-    const IS_SYSTEM: bool = true;
+    const IS_GLOBAL: bool = true;
 
     #[cfg(not(feature = "alloc"))]
-    const IS_SYSTEM: bool = false;
+    const IS_GLOBAL: bool = false;
 
     type Alloc<T> = DefaultAlloc<'a, T, BUF>;
 

@@ -175,7 +175,7 @@ impl<'a> Slice<'a> {
 }
 
 unsafe impl<'a> Allocator for &'a Slice<'_> {
-    const IS_SYSTEM: bool = false;
+    const IS_GLOBAL: bool = false;
 
     type Alloc<T> = SliceAlloc<'a, T>;
 

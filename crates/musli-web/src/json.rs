@@ -10,7 +10,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use http::header::{self, HeaderValue};
 use http::{HeaderMap, StatusCode};
 use musli::Encode;
-use musli::alloc::System;
+use musli::alloc::Global;
 use musli::context::ErrorMarker;
 use musli::de::DecodeOwned;
 use musli::json::Encoding;
@@ -87,7 +87,7 @@ pub struct Json<T>(pub T);
 #[cfg(feature = "axum-core05")]
 impl<T, S> extract05::FromRequest<S> for Json<T>
 where
-    T: DecodeOwned<Text, System>,
+    T: DecodeOwned<Text, Global>,
     S: Send + Sync,
 {
     type Rejection = JsonRejection;
@@ -163,7 +163,7 @@ where
 
 impl<T> Json<T>
 where
-    T: DecodeOwned<Text, System>,
+    T: DecodeOwned<Text, Global>,
 {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<Self, JsonRejection> {

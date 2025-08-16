@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use musli::alloc::System;
+use musli::alloc::Global;
 use musli::context;
 use musli::{Decode, Encode};
 
