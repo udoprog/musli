@@ -1,8 +1,7 @@
 //! Allocation support for [Müsli].
 //!
 //! This crate contains two types of allocators:
-//! * The [`Global`] allocator, which uses the system allocation facilities.
-//!   Particularly [`std::alloc::System`].
+//! * The [`Global`] allocator, which uses the global allocation facilities.
 //! * The [`Slice`] allocator, which can allocate buffers from a fixed-size
 //!   slice.
 //!
@@ -75,7 +74,6 @@
 //! ```
 //!
 //! [Müsli]: <https://docs.rs/musli>
-//! [`std::alloc::System`]: https://doc.rust-lang.org/std/alloc/struct.System.html
 
 #[cfg(test)]
 mod tests;
