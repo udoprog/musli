@@ -1,7 +1,7 @@
 use core::marker;
 
 #[cfg(feature = "alloc")]
-use crate::alloc::System;
+use crate::alloc::Global;
 use crate::mode::Binary;
 use crate::options;
 use crate::{Context, Decode, Encode, IntoReader, IntoWriter, Options};

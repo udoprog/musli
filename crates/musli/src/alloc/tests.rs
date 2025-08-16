@@ -1,10 +1,10 @@
-use super::{Allocator, ArrayBuffer, Slice, System, Vec};
+use super::{Allocator, ArrayBuffer, Global, Slice, Vec};
 
 macro_rules! test_for_each {
     ($system:ident, $stack:ident, $inner:ident) => {
         #[test]
         fn $system() {
-            let alloc = System::new();
+            let alloc = Global::new();
             $inner(alloc);
         }
 

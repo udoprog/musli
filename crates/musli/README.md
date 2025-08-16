@@ -350,7 +350,7 @@ The tradeoffs we will be showcasing to achieve speed here are:
 We achieve this through the following methods:
 
 ```rust
-use musli::alloc::{Allocator, System};
+use musli::alloc::{Allocator, Global};
 use musli::context::{self, ErrorMarker as Error};
 use musli::options::{self, Float, Integer, Width, Options};
 use musli::storage::Encoding;

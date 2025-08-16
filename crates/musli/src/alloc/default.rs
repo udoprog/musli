@@ -4,7 +4,7 @@ use super::{Alloc, AllocError, Allocator};
 #[cfg(not(feature = "alloc"))]
 use super::{Slice, SliceAlloc};
 #[cfg(feature = "alloc")]
-use super::{System, SystemAlloc};
+use super::{Global, SystemAlloc};
 
 /// The default stack buffer size for the default allocator provided through
 /// [`default()`].
@@ -54,7 +54,7 @@ macro_rules! implement {
 }
 
 #[cfg(feature = "alloc")]
-implement!(DefaultAllocator, System, SystemAlloc<T>, SystemAlloc<T>);
+implement!(DefaultAllocator, Global, SystemAlloc<T>, SystemAlloc<T>);
 
 #[cfg(not(feature = "alloc"))]
 implement!(

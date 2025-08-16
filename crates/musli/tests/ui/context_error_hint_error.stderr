@@ -2,7 +2,7 @@ error[E0277]: `ContextError` must be implemented for `MyError`, or any error typ
   --> tests/ui/context_error_hint_error.rs:15:45
    |
 15 |     let _cx = context::new().with_capture::<MyError>();
-   |                              ------------   ^^^^^^^ the trait `ContextError<musli::alloc::System>` is not implemented for `MyError`
+   |                              ------------   ^^^^^^^ the trait `ContextError<musli::alloc::Global>` is not implemented for `MyError`
    |                              |
    |                              required by a bound introduced by this call
    |

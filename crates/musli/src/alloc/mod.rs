@@ -1,7 +1,7 @@
 //! Allocation support for [Müsli].
 //!
 //! This crate contains two types of allocators:
-//! * The [`System`] allocator, which uses the system allocation facilities.
+//! * The [`Global`] allocator, which uses the system allocation facilities.
 //!   Particularly [`std::alloc::System`].
 //! * The [`Slice`] allocator, which can allocate buffers from a fixed-size
 //!   slice.
@@ -90,7 +90,7 @@ pub use musli_core::alloc::{Alloc, AllocError, Allocator, Box, Disabled, String,
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]
-pub use musli_core::alloc::{System, SystemAlloc};
+pub use musli_core::alloc::{Global, SystemAlloc};
 
 mod slice;
 #[doc(inline)]
@@ -107,7 +107,7 @@ pub use self::slice_buffer::SliceBuffer;
 /// This is useful if you want to write application which are agnostic to
 /// whether the `alloc` feature is or isn't enabled.
 ///
-/// * If the `alloc` feature is enabled, this is the [`System`] allocator.
+/// * If the `alloc` feature is enabled, this is the [`Global`] allocator.
 /// * If the `alloc` feature is disabled, this is the [`Slice`] allocator with
 ///   [`DEFAULT_ARRAY_BUFFER`] bytes allocated on the stack. The second
 ///   parameters allows for this to be tweaked.
@@ -195,7 +195,7 @@ pub fn with_buffer<const BUF: usize, O>(body: impl FnOnce(&DefaultAllocator<'_, 
 fn default_allocator_impl<const BUF: usize, O>(
     body: impl FnOnce(&DefaultAllocator<'_, BUF>) -> O,
 ) -> O {
-    let alloc = DefaultAllocator::new(System::new());
+    let alloc = DefaultAllocator::new(Global::new());
     body(&alloc)
 }
 

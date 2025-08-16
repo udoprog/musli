@@ -16,9 +16,9 @@ use super::{Alloc, AllocError, Allocator};
 /// # Examples
 ///
 /// ```
-/// use musli::alloc::{System, Vec};
+/// use musli::alloc::{Global, Vec};
 ///
-/// let alloc = System::new();
+/// let alloc = Global::new();
 ///
 /// let mut buf1 = Vec::new_in(alloc);
 /// let mut buf2 = Vec::new_in(alloc);
@@ -35,9 +35,9 @@ use super::{Alloc, AllocError, Allocator};
 /// ```
 #[derive(Clone, Copy)]
 #[non_exhaustive]
-pub struct System;
+pub struct Global;
 
-impl System {
+impl Global {
     /// Construct a new system allocator.
     #[inline]
     pub const fn new() -> Self {
@@ -56,14 +56,14 @@ impl System {
     }
 }
 
-impl Default for System {
+impl Default for Global {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-unsafe impl Allocator for System {
+unsafe impl Allocator for Global {
     const IS_SYSTEM: bool = true;
 
     type Alloc<T> = SystemAlloc<T>;

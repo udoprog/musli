@@ -20,7 +20,7 @@ pub use self::allocator::Allocator;
 mod global;
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub use self::global::{System, SystemAlloc};
+pub use self::global::{Global, SystemAlloc};
 
 mod disabled;
 #[doc(inline)]

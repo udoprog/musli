@@ -6,7 +6,7 @@ use rust_alloc::string::String;
 use rust_alloc::vec::Vec;
 
 #[cfg(feature = "alloc")]
-use crate::alloc::System;
+use crate::alloc::Global;
 use crate::mode::Text;
 use crate::{Context, Decode, Encode, IntoWriter};
 
@@ -87,7 +87,7 @@ where
 #[inline]
 pub fn from_str<'de, T>(string: &'de str) -> Result<T, Error>
 where
-    T: Decode<'de, Text, System>,
+    T: Decode<'de, Text, Global>,
 {
     DEFAULT.from_str(string)
 }
@@ -232,7 +232,7 @@ where
     /// ```
     /// use musli::{Decode, Encode};
     /// use musli::json;
-    /// use musli::alloc::System;
+    /// use musli::alloc::Global;
     /// # use musli::json::Error;
     ///
     /// const ENCODING: json::Encoding = json::Encoding::new();
