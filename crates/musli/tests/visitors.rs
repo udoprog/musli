@@ -1,6 +1,6 @@
 use std::fmt;
 
-use musli::alloc::System;
+use musli::alloc::Global;
 use musli::de::UnsizedVisitor;
 use musli::value::Value;
 use musli::{Allocator, Context, Decode, Decoder};
@@ -56,7 +56,7 @@ fn bytes_reference() {
         }
     );
 
-    let value: Value<System> = Value::Number(42u32.into());
+    let value: Value<Global> = Value::Number(42u32.into());
 
     assert_eq!(
         musli::value::decode::<BytesReference>(&value)
@@ -115,7 +115,7 @@ fn string_reference() {
         StringReference { data: "Hello!" }
     );
 
-    let value: Value<System> = Value::Number(42u32.into());
+    let value: Value<Global> = Value::Number(42u32.into());
 
     assert_eq!(
         musli::value::decode::<StringReference>(&value)

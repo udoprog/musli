@@ -1,6 +1,6 @@
 //! Shared traits for defining API types.
 
-use musli::alloc::System;
+use musli::alloc::Global;
 use musli::mode::Binary;
 use musli::{Decode, Encode};
 
@@ -118,7 +118,7 @@ pub trait Listener {
 /// A marker indicating a response type.
 pub trait Response<'de>
 where
-    Self: Decode<'de, Binary, System>,
+    Self: Decode<'de, Binary, Global>,
 {
     /// The endpoint related to the response.
     type Endpoint: Endpoint;
@@ -136,7 +136,7 @@ where
 /// A broadcast type marker.
 pub trait Broadcast<'de>
 where
-    Self: Encode<Binary> + Decode<'de, Binary, System>,
+    Self: Encode<Binary> + Decode<'de, Binary, Global>,
 {
     /// The endpoint related to the broadcast.
     type Endpoint: Listener<Broadcast<'de> = Self>;

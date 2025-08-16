@@ -26,10 +26,10 @@ mod context_error;
 pub use self::context_error::ContextError;
 
 #[cfg(feature = "alloc")]
-use crate::alloc::System;
+use crate::alloc::Global;
 use crate::Allocator;
 
-/// Construct a new default context using the [`System`] allocator.
+/// Construct a new default context using the [`Global`] allocator.
 ///
 /// # Examples
 ///
@@ -48,7 +48,7 @@ use crate::Allocator;
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[inline]
-pub fn new() -> DefaultContext<System, NoTrace, Ignore> {
+pub fn new() -> DefaultContext<Global, NoTrace, Ignore> {
     DefaultContext::new()
 }
 

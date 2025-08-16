@@ -17,10 +17,20 @@ mod allocator;
 pub use self::allocator::Allocator;
 
 #[cfg(feature = "alloc")]
-mod system;
+mod global;
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub use self::system::{System, SystemAlloc};
+pub use self::global::{Global, GlobalAlloc};
+
+#[doc(hidden)]
+#[cfg(feature = "alloc")]
+#[deprecated = "`System` has been renamed to `Global`"]
+pub type System = Global;
+
+#[doc(hidden)]
+#[cfg(feature = "alloc")]
+#[deprecated = "`SystemAlloc` has been renamed to `GlobalAlloc`"]
+pub type SystemAlloc<T> = GlobalAlloc<T>;
 
 mod disabled;
 #[doc(inline)]

@@ -27,7 +27,7 @@ where
     T: DeserializeOwned;
 
 mod value {
-    use musli::alloc::System;
+    use musli::alloc::Global;
 
     use super::*;
 
@@ -38,7 +38,7 @@ mod value {
             + fmt::Debug
             + Generate
             + Encode<Binary>
-            + DecodeOwned<Binary, System>
+            + DecodeOwned<Binary, Global>
             + Serialize
             + DeserializeOwned,
     {
@@ -51,7 +51,7 @@ mod value {
         T: Eq
             + fmt::Debug
             + Encode<Binary>
-            + DecodeOwned<Binary, System>
+            + DecodeOwned<Binary, Global>
             + Serialize
             + DeserializeOwned,
     {
@@ -106,14 +106,14 @@ mod value {
 macro_rules! tester {
     ($module:ident, $mode:ty $(,)?) => {
         mod $module {
-            use musli::alloc::System;
+            use musli::alloc::Global;
 
             use super::*;
 
             #[track_caller]
             pub(super) fn random<T>(module: &str)
             where
-                T: Encode<$mode> + DecodeOwned<$mode, System>,
+                T: Encode<$mode> + DecodeOwned<$mode, Global>,
                 T: Eq + fmt::Debug + Generate + Serialize + DeserializeOwned,
             {
                 guided(module, <T as Generate>::generate);
@@ -122,7 +122,7 @@ macro_rules! tester {
             #[track_caller]
             pub(super) fn guided<T>(module: &str, value: fn(&mut Rng) -> T)
             where
-                T: Encode<$mode> + DecodeOwned<$mode, System>,
+                T: Encode<$mode> + DecodeOwned<$mode, Global>,
                 T: Eq + fmt::Debug + Serialize + DeserializeOwned,
             {
                 macro_rules! do_try {

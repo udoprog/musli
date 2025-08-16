@@ -3,7 +3,7 @@
 pub mod musli_json {
     use alloc::vec::Vec;
 
-    use musli::alloc::System;
+    use musli::alloc::Global;
     use musli::json::Encoding;
     use musli::json::Error;
     use musli::mode::Text;
@@ -29,7 +29,7 @@ pub mod musli_json {
 
     pub fn decode<'buf, T>(buffer: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, Text, System>,
+        T: Decode<'buf, Text, Global>,
     {
         ENCODING.from_slice(buffer)
     }
@@ -41,7 +41,7 @@ pub mod musli_packed {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use musli::alloc::System;
+    use musli::alloc::Global;
     use musli::context::{self, ErrorMarker as Error};
     use musli::options::{self, Options};
     use musli::storage::Encoding;
@@ -69,7 +69,7 @@ pub mod musli_packed {
 
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, Packed, System>,
+        T: Decode<'buf, Packed, Global>,
     {
         let cx = context::new();
         ENCODING.from_slice_with(&cx, buf)
@@ -81,7 +81,7 @@ pub mod musli_packed {
 pub mod musli_storage {
     use alloc::vec::Vec;
 
-    use musli::alloc::System;
+    use musli::alloc::Global;
     use musli::mode::Binary;
     use musli::options::{self, Options};
     use musli::storage::{Encoding, Error};
@@ -108,7 +108,7 @@ pub mod musli_storage {
 
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, Binary, System>,
+        T: Decode<'buf, Binary, Global>,
     {
         ENCODING.from_slice(buf)
     }
@@ -119,7 +119,7 @@ pub mod musli_storage {
 pub mod musli_wire {
     use alloc::vec::Vec;
 
-    use musli::alloc::System;
+    use musli::alloc::Global;
     use musli::mode::Binary;
     use musli::wire::Encoding;
     use musli::wire::Error;
@@ -145,7 +145,7 @@ pub mod musli_wire {
 
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, Binary, System>,
+        T: Decode<'buf, Binary, Global>,
     {
         ENCODING.from_slice(buf)
     }
@@ -156,7 +156,7 @@ pub mod musli_wire {
 pub mod musli_descriptive {
     use alloc::vec::Vec;
 
-    use musli::alloc::System;
+    use musli::alloc::Global;
     use musli::descriptive::Encoding;
     use musli::descriptive::Error;
     use musli::mode::Binary;
@@ -182,7 +182,7 @@ pub mod musli_descriptive {
 
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, Error>
     where
-        T: Decode<'buf, Binary, System>,
+        T: Decode<'buf, Binary, Global>,
     {
         ENCODING.from_slice(buf)
     }
@@ -191,21 +191,21 @@ pub mod musli_descriptive {
 #[cfg(feature = "musli-value")]
 #[crate::benchmarker(as_bytes_disabled)]
 pub mod musli_value {
-    use musli::alloc::System;
+    use musli::alloc::Global;
     use musli::mode::Binary;
     use musli::value::Value;
     use musli::{Decode, Encode};
 
-    pub fn encode<T>(value: &T) -> Result<Value<System>, musli::value::Error>
+    pub fn encode<T>(value: &T) -> Result<Value<Global>, musli::value::Error>
     where
         T: Encode<Binary>,
     {
         musli::value::encode(value)
     }
 
-    pub fn decode<T>(buf: &Value<System>) -> Result<T, musli::value::Error>
+    pub fn decode<T>(buf: &Value<Global>) -> Result<T, musli::value::Error>
     where
-        for<'a> T: Decode<'a, Binary, System>,
+        for<'a> T: Decode<'a, Binary, Global>,
     {
         musli::value::decode(buf)
     }

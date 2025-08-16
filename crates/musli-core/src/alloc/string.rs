@@ -12,7 +12,7 @@ use crate::de::UnsizedVisitor;
 use crate::{Context, Decode, Decoder, Encode, Encoder};
 
 #[cfg(feature = "alloc")]
-use super::System;
+use super::Global;
 use super::{AllocError, Allocator, Vec};
 
 /// Collect a string into a string buffer.
@@ -622,7 +622,7 @@ impl_eq! { String<A>, &'a str }
 impl_eq! { Cow<'a, str>, String<A> }
 
 /// Conversion from a std [`String`][std-string] to a Müsli-allocated [`String`]
-/// in the [`System`] allocator.
+/// in the [`Global`] allocator.
 ///
 /// [std-string]: rust_alloc::string::String
 ///
@@ -636,7 +636,7 @@ impl_eq! { Cow<'a, str>, String<A> }
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl From<rust_alloc::string::String> for String<System> {
+impl From<rust_alloc::string::String> for String<Global> {
     #[inline]
     fn from(value: rust_alloc::string::String) -> Self {
         Self {
