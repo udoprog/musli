@@ -25,10 +25,6 @@ macro_rules! __define {
         impl $(<$request_lt>)* $crate::api::Request for $request {
             type Endpoint = $endpoint;
         }
-
-        impl<$response_lt> $crate::api::Response<$response_lt> for $response {
-            type Endpoint = $endpoint;
-        }
     };
 
     (@inner broadcast $listener:ident {
@@ -104,7 +100,7 @@ pub trait Endpoint {
     const KIND: &'static str;
 
     /// The response type related to the endpoint.
-    type Response<'de>: Response<'de, Endpoint = Self>;
+    type Response<'de>: Decode<'de, Binary, System>;
 }
 
 pub trait Listener {
@@ -113,15 +109,6 @@ pub trait Listener {
 
     /// The response type related to the endpoint.
     type Broadcast<'de>: Broadcast<'de, Endpoint = Self>;
-}
-
-/// A marker indicating a response type.
-pub trait Response<'de>
-where
-    Self: Decode<'de, Binary, System>,
-{
-    /// The endpoint related to the response.
-    type Endpoint: Endpoint;
 }
 
 /// A marker indicating a request type.
