@@ -7,6 +7,29 @@ use crate::Context;
 use super::{SliceOverflow, Writer};
 
 /// A writer into a slice.
+///
+/// This is typically created by using a mutable slice as a writer through
+/// the [`IntoWriter`] trait.
+///
+/// [`IntoWriter`]: crate::writer::IntoWriter
+///
+/// # Examples
+///
+/// ```
+/// use musli::writer::{IntoWriter, Writer};
+/// use musli::context;
+///
+/// let mut buffer = [0u8; 10];
+/// let mut writer = buffer.as_mut_slice().into_writer();
+/// let cx = context::new();
+///
+/// writer.write_bytes(&cx, b"Hello")?;
+/// let remaining = writer.finish(&cx)?;
+///
+/// assert_eq!(&buffer[..5], b"Hello");
+/// assert_eq!(remaining, 5); // 5 bytes remaining in the 10-byte buffer
+/// # Ok::<_, musli::context::ErrorMarker>(())
+/// ```
 pub struct SliceMutWriter<'a> {
     start: NonNull<u8>,
     end: NonNull<u8>,

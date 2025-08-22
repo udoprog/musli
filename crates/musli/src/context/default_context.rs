@@ -80,6 +80,15 @@ where
     /// Tracing requires the configured allocator to work, if for example the
     /// [`Disabled`] allocator was in use, no diagnostics would be collected.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::context;
+    ///
+    /// let cx = context::new().with_trace();
+    /// // Use cx for encoding/decoding to get detailed error information
+    /// ```
+    ///
     /// [`report`]: DefaultContext::report
     /// [`errors`]: DefaultContext::errors
     /// [`Disabled`]: crate::alloc::Disabled
@@ -268,12 +277,32 @@ where
     E: ContextError<A>,
 {
     /// Unwrap the error marker or panic if there is no error.
+    ///
+    /// # Examples
+    ///
+    /// ```should_panic
+    /// use musli::context;
+    ///
+    /// let cx = context::new().with_capture::<String>();
+    /// // This will panic since no error has been captured
+    /// let error = cx.unwrap();
+    /// ```
     #[inline]
     pub fn unwrap(&self) -> E {
         self.capture.unwrap()
     }
 
     /// Coerce a captured error into a result.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::context;
+    ///
+    /// let cx = context::new().with_capture::<String>();
+    /// let result = cx.result();
+    /// assert!(result.is_ok());
+    /// ```
     #[inline]
     pub fn result(&self) -> Result<(), E> {
         self.capture.result()

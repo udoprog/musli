@@ -9,6 +9,37 @@ use crate::Allocator;
 /// Provides ergonomic access to the serialization context.
 ///
 /// This is used to among other things report diagnostics.
+///
+/// # Examples
+///
+/// ```
+/// use musli::context;
+/// use musli::json::Encoding;
+/// use musli::{Encode, Decode};
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let cx = context::new().with_trace();
+/// let encoding = Encoding::new();
+/// let mut data = Vec::new();
+/// encoding.encode_with(&cx, &mut data, &Person {
+///     name: "Aristotle".to_string(),
+///     age: 61,
+/// })?;
+/// let person: Person = encoding.from_slice_with(&cx, &data)?;
+/// assert_eq!(person.name, "Aristotle");
+/// assert_eq!(person.age, 61);
+///
+/// // Now try to decode invalid data and inspect the error report:
+/// let err = encoding.from_str_with::<_, Person>(&cx, "not valid json").unwrap_err();
+/// let report = cx.report();
+/// println!("{report}");
+/// # Ok::<_, musli::context::ErrorMarker>(())
+/// ```
 pub trait Context: Copy {
     /// Error produced by the context.
     type Error;

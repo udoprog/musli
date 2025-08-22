@@ -124,6 +124,18 @@ impl<'a> Slice<'a> {
     ///
     /// See [type-level documentation][Slice] for more information.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::{ArrayBuffer, Slice, Vec};
+    ///
+    /// let mut buf = ArrayBuffer::new();
+    /// let alloc = Slice::new(&mut buf);
+    /// let mut vec = Vec::new_in(&alloc);
+    /// vec.push(42u32).unwrap();
+    /// assert_eq!(vec.as_slice(), &[42]);
+    /// ```
+    ///
     /// # Panics
     ///
     /// This panics if called with a buffer larger than `2^31` bytes.

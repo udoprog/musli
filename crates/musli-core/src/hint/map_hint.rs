@@ -9,6 +9,31 @@ mod sealed {
 }
 
 /// A size hint passed in when encoding or decoding a map.
+///
+/// # Examples
+///
+/// ```
+/// use musli_core::hint::MapHint;
+///
+/// fn get_map_size<H>(hint: H) -> Option<usize>
+/// where
+///     H: MapHint,
+/// {
+///     hint.get()
+/// }
+///
+/// // Known size hint
+/// let size = get_map_size(5usize);
+/// assert_eq!(size, Some(5));
+///
+/// // Optional size hint with value
+/// let size = get_map_size(Some(3usize));
+/// assert_eq!(size, Some(3));
+///
+/// // Optional size hint without value
+/// let size = get_map_size(None::<usize>);
+/// assert_eq!(size, None);
+/// ```
 pub trait MapHint: Sized + self::sealed::Sealed {
     /// Get an optional map hint.
     fn get(self) -> Option<usize>;

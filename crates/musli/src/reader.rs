@@ -330,6 +330,16 @@ unsafe impl Sync for SliceReader<'_> {}
 
 impl<'de> SliceReader<'de> {
     /// Construct a new instance around the specified slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::reader::SliceReader;
+    ///
+    /// let data = &[1, 2, 3, 4];
+    /// let reader = SliceReader::new(data);
+    /// assert_eq!(reader.as_slice(), &[1, 2, 3, 4]);
+    /// ```
     #[inline]
     pub fn new(slice: &'de [u8]) -> Self {
         Self {
@@ -501,7 +511,34 @@ where
 
 /// Limit the number of bytes that can be read out of a reader to the specified limit.
 ///
+/// This type wraps another reader and ensures that no more than a specified number
+/// of bytes can be read from it. This is useful for implementing bounded reads
+/// in serialization contexts.
+///
 /// Constructed through [Reader::limit].
+///
+/// # Examples
+///
+/// ```
+/// use musli::Context;
+/// use musli::reader::{Reader, SliceReader};
+///
+/// let cx = musli::context::new();
+/// let data = &[1, 2, 3, 4, 5];
+/// let mut reader = SliceReader::new(data);
+/// let mut limited = reader.limit(3);
+///
+/// // Can read from the limited reader
+/// let byte = limited.read_byte(&cx)?;
+/// assert_eq!(byte, 1);
+/// assert_eq!(limited.remaining(), 2);
+///
+/// // Read two more bytes
+/// limited.read_byte(&cx)?;
+/// limited.read_byte(&cx)?;
+/// assert_eq!(limited.remaining(), 0);
+/// # Ok::<_, musli::context::ErrorMarker>(())
+/// ```
 pub struct Limit<R> {
     remaining: usize,
     reader: R,
@@ -509,6 +546,21 @@ pub struct Limit<R> {
 
 impl<R> Limit<R> {
     /// Get the remaining data in the limited reader.
+    ///
+    /// Returns the number of bytes that can still be read from this limited reader
+    /// before the limit is reached.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::reader::{Reader, SliceReader};
+    ///
+    /// let data = &[1, 2, 3, 4, 5];
+    /// let mut reader = SliceReader::new(data);
+    /// let limited = reader.limit(3);
+    ///
+    /// assert_eq!(limited.remaining(), 3);
+    /// ```
     #[inline]
     pub fn remaining(&self) -> usize {
         self.remaining

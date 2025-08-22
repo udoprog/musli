@@ -39,6 +39,22 @@ const OPTIONS: Options = crate::options::new().build();
 
 /// Encode something that implements [Encode] into a [Value] in the [`Binary`]
 /// mode.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Encode, value};
+///
+/// #[derive(Encode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let person = Person { name: "Alice".to_string(), age: 30 };
+/// let value = value::encode(person)?;
+/// # Ok::<_, value::Error>(())
+/// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub fn encode<T>(value: T) -> Result<Value<Global>, Error>
@@ -55,6 +71,24 @@ where
 
 /// Decode a [Value] into a type which implements [Decode] in the [`Binary`]
 /// mode.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Encode, Decode, value};
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let original = Person { name: "Alice".to_string(), age: 30 };
+/// let encoded = value::encode(&original)?;
+/// let decoded: Person = value::decode(&encoded)?;
+/// assert_eq!(original, decoded);
+/// # Ok::<_, value::Error>(())
+/// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub fn decode<'de, T>(value: &'de Value<impl Allocator>) -> Result<T, Error>
@@ -68,6 +102,25 @@ where
 
 /// Decode a [Value] into a type which implements [Decode] using a custom
 /// context in the [`Binary`] mode.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{context, Encode, Decode, value};
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let cx = context::new();
+/// let original = Person { name: "Alice".to_string(), age: 30 };
+/// let encoded = value::encode(&original).unwrap();
+/// let decoded: Person = value::decode_with::<_, _, musli::mode::Binary>(&cx, &encoded)?;
+/// assert_eq!(original, decoded);
+/// # Ok::<_, musli::context::ErrorMarker>(())
+/// ```
 pub fn decode_with<'de, C, T, M>(cx: C, value: &'de Value<impl Allocator>) -> Result<T, C::Error>
 where
     C: crate::Context,
