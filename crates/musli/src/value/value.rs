@@ -16,10 +16,47 @@ use crate::{Allocator, Context, Options};
 use super::de::ValueDecoder;
 use super::type_hint::{NumberHint, TypeHint};
 
-/// A dynamic value capable of representing any [Müsli] type whether it be
-/// complex or simple.
+/// This is a type-erased value which can be deserialized from any [Müsli]
+/// supported type.
+///
+/// It's primarily used to store or cache values for more complex processing,
+/// but can also be used to store any value in-memory.
 ///
 /// [Müsli]: https://github.com/udoprog/musli
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Encode, value};
+/// use musli::value::Value;
+///
+/// #[derive(Encode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let person = Person { name: "Alice".to_string(), age: 30 };
+/// let value = value::encode(person)?;
+///
+/// assert!(matches!(value, Value::Map(..)));
+/// # Ok::<_, value::Error>(())
+/// ```
+///
+/// Building a value directly:
+///
+/// ```
+/// use musli::alloc::{Global, Vec};
+/// use musli::value::Value;
+///
+/// let alloc = Global::new();
+///
+/// // Create a map value
+/// let entries = Vec::new_in(alloc);
+/// let value: Value<Global> = Value::Map(entries);
+///
+/// assert!(matches!(value, Value::Map(..)));
+/// ```
 #[non_exhaustive]
 pub enum Value<A>
 where
@@ -54,6 +91,18 @@ where
 {
     /// Construct a [`IntoValueDecoder`] implementation out of the current
     /// value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{context, value};
+    /// use musli::mode::Binary;
+    ///
+    /// let cx = context::new();
+    /// let value = value::encode(42u32)?;
+    /// let decoder = value.into_decoder::<0, _, Binary>(&cx);
+    /// # Ok::<_, value::Error>(())
+    /// ```
     #[inline]
     pub fn into_decoder<const OPT: Options, C, M>(self, cx: C) -> IntoValueDecoder<OPT, C, A, M>
     where
@@ -63,6 +112,18 @@ where
     }
 
     /// Construct a [`AsValueDecoder`] implementation out of the current value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{context, value};
+    /// use musli::mode::Binary;
+    ///
+    /// let cx = context::new();
+    /// let value = value::encode(42u32)?;
+    /// let decoder = value.as_decoder::<0, _, Binary>(&cx);
+    /// # Ok::<_, value::Error>(())
+    /// ```
     #[inline]
     pub fn as_decoder<const OPT: Options, C, M>(&self, cx: C) -> AsValueDecoder<'_, OPT, C, A, M>
     where
@@ -161,6 +222,20 @@ where
     }
 }
 
+/// A dynamic number value.
+///
+/// This can represent any of the primitive number types in Rust.
+/// Used internally by the Value enum to store numeric data.
+///
+/// # Examples
+///
+/// ```
+/// use musli::value::Value;
+/// use musli::alloc::Global;
+///
+/// let value: Value<Global> = Value::Number(42u32.into());
+/// # let _ = value;
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[non_exhaustive]
 pub enum Number {
@@ -583,6 +658,22 @@ where
     M: 'static,
 {
     /// Construct a new buffered value decoder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Context};
+    /// use musli::options::{self, Options};
+    /// use musli::value::{Value, IntoValueDecoder};
+    /// use musli::alloc::Global;
+    ///
+    /// const OPTIONS: Options = options::new().build();
+    ///
+    /// let alloc = Global::new();
+    /// let cx = musli::context::new();
+    /// let value: Value<Global> = Value::Unit;
+    /// let decoder = IntoValueDecoder::<OPTIONS, _, _, ()>::new(&cx, value);
+    /// ```
     #[inline]
     pub fn new(cx: C, value: Value<A>) -> Self {
         Self {
@@ -633,6 +724,22 @@ where
     M: 'static,
 {
     /// Construct a new buffered value decoder.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Allocator, Context};
+    /// use musli::options::{self, Options};
+    /// use musli::value::{Value, AsValueDecoder};
+    /// use musli::alloc::Global;
+    ///
+    /// const OPTIONS: Options = options::new().build();
+    ///
+    /// let alloc = Global::new();
+    /// let cx = musli::context::new();
+    /// let value: Value<Global> = Value::Unit;
+    /// let decoder = AsValueDecoder::<OPTIONS, _, _, ()>::new(&cx, &value);
+    /// ```
     #[inline]
     pub fn new(cx: C, value: &'de Value<A>) -> Self {
         Self {

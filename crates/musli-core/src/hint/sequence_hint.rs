@@ -8,6 +8,31 @@ mod sealed {
 }
 
 /// A size hint passed in when encoding or decoding a sequence.
+///
+/// # Examples
+///
+/// ```
+/// use musli_core::hint::SequenceHint;
+///
+/// fn get_sequence_size<H>(hint: H) -> Option<usize>
+/// where
+///     H: SequenceHint,
+/// {
+///     hint.get()
+/// }
+///
+/// // Known size hint
+/// let size = get_sequence_size(10usize);
+/// assert_eq!(size, Some(10));
+///
+/// // Optional size hint with value
+/// let size = get_sequence_size(Some(7usize));
+/// assert_eq!(size, Some(7));
+///
+/// // Optional size hint without value
+/// let size = get_sequence_size(None::<usize>);
+/// assert_eq!(size, None);
+/// ```
 pub trait SequenceHint: Sized + self::sealed::Sealed {
     /// Get an optional sequence hint.
     fn get(self) -> Option<usize>;

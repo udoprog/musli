@@ -595,6 +595,22 @@ use crate::mode::Binary;
 /// See the [help section for `#[musli(packed)]`][help] for more information.
 ///
 /// [help]: crate::_help::derives#muslipacked
+///
+/// # Examples
+///
+/// ```
+/// use musli::{is_bitwise_encode, Encode, Decode};
+///
+/// #[derive(Encode, Decode)]
+/// #[musli(packed)]
+/// struct Color {
+///     red: u32,
+///     green: u32,
+///     blue: u32,
+/// }
+///
+/// assert!(is_bitwise_encode::<Color>());
+/// ```
 #[inline]
 pub const fn is_bitwise_encode<T>() -> bool
 where
@@ -610,6 +626,22 @@ where
 /// See the [help section for `#[musli(packed)]`][help] for more information.
 ///
 /// [help]: crate::_help::derives#muslipacked
+///
+/// # Examples
+///
+/// ```
+/// use musli::{is_bitwise_decode, Encode, Decode};
+///
+/// #[derive(Encode, Decode)]
+/// #[musli(packed)]
+/// struct Color {
+///     red: u32,
+///     green: u32,
+///     blue: u32,
+/// }
+///
+/// assert!(is_bitwise_decode::<Color>());
+/// ```
 #[inline]
 pub const fn is_bitwise_decode<T>() -> bool
 where

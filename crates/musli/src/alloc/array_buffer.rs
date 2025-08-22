@@ -18,6 +18,15 @@ pub struct ArrayBuffer<const N: usize = DEFAULT_ARRAY_BUFFER> {
 impl ArrayBuffer {
     /// Construct a new buffer with the default size of
     /// [`DEFAULT_ARRAY_BUFFER`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::ArrayBuffer;
+    ///
+    /// let buffer = ArrayBuffer::new();
+    /// assert_eq!(buffer.len(), 4096);
+    /// ```
     pub const fn new() -> Self {
         Self::with_size()
     }
@@ -32,6 +41,15 @@ impl Default for ArrayBuffer {
 
 impl<const N: usize> ArrayBuffer<N> {
     /// Construct a new buffer with a custom size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::ArrayBuffer;
+    ///
+    /// let buffer = ArrayBuffer::<1024>::with_size();
+    /// assert_eq!(buffer.len(), 1024);
+    /// ```
     pub const fn with_size() -> Self {
         Self {
             // SAFETY: This is safe to initialize, since it's just an array of

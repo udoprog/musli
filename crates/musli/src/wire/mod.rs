@@ -103,6 +103,28 @@ mod tag;
 pub mod test;
 
 /// Convenient result alias for use with `musli::wire`.
+///
+/// # Examples
+///
+/// ```
+/// use musli::wire::{self, Result};
+/// use musli::{Encode, Decode};
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Data {
+///     value: u32,
+/// }
+///
+/// fn wire_roundtrip(data: &Data) -> Result<Data> {
+///     let bytes = wire::to_vec(data)?;
+///     wire::from_slice(&bytes)
+/// }
+///
+/// let original = Data { value: 42 };
+/// let decoded = wire_roundtrip(&original)?;
+/// assert_eq!(original, decoded);
+/// # Ok::<_, musli::wire::Error>(())
+/// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub type Result<T, E = Error> = core::result::Result<T, E>;

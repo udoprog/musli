@@ -52,6 +52,32 @@ mod parser;
 pub mod test;
 
 /// Convenient result alias for use with `musli::json`.
+///
+/// # Examples
+///
+/// ```
+/// use musli::json::{self, Result};
+/// use musli::{Encode, Decode};
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// fn json_roundtrip(person: &Person) -> Result<Person> {
+///     let json_string = json::to_string(person)?;
+///     json::from_str(&json_string)
+/// }
+///
+/// let original = Person {
+///     name: "Alice".to_string(),
+///     age: 30
+/// };
+/// let decoded = json_roundtrip(&original)?;
+/// assert_eq!(original, decoded);
+/// # Ok::<_, musli::json::Error>(())
+/// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub type Result<T, E = Error> = core::result::Result<T, E>;

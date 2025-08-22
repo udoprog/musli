@@ -32,4 +32,4 @@ verbose = ["musli-macros/verbose"]
 musli-macros = { version = "=0.0.134", path = "../musli-macros", features = [] }
 
 [dev-dependencies]
-musli = { version = "=0.0.134", path = "../musli" }
+musli = { version = "=0.0.134", path = "../musli", features = ["json"] }

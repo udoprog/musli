@@ -10,6 +10,14 @@ const DEFAULT: Options = (ByteOrder::Little as Options) << BYTEORDER_BIT;
 /// Start building new options.
 ///
 /// Call [`Builder::build`] to construct them.
+///
+/// # Examples
+///
+/// ```
+/// use musli::options::{self, Integer, Options};
+///
+/// const OPTIONS: Options = options::new().integer(Integer::Fixed).build();
+/// ```
 #[inline]
 pub const fn new() -> Builder {
     Builder(DEFAULT)
@@ -18,6 +26,15 @@ pub const fn new() -> Builder {
 /// Construct a [`Builder`] from the raw underlying value of an [`Options`].
 ///
 /// This can be used to modify a value at compile time.
+///
+/// # Examples
+///
+/// ```
+/// use musli::options::{self, Float, Options};
+///
+/// const BASE: Options = options::new().build();
+/// const MODIFIED: Options = options::from_raw(BASE).float(Float::Fixed).build();
+/// ```
 #[inline]
 pub const fn from_raw(value: Options) -> Builder {
     Builder(value)
@@ -334,6 +351,20 @@ pub(crate) const fn is_native_fixed<const OPT: Options>() -> bool {
 }
 
 /// Integer serialization mode.
+///
+/// # Examples
+///
+/// ```
+/// use musli::options::{self, Integer};
+///
+/// const OPTIONS_VARIABLE: musli::options::Options = options::new()
+///     .integer(Integer::Variable)
+///     .build();
+///
+/// const OPTIONS_FIXED: musli::options::Options = options::new()
+///     .integer(Integer::Fixed)
+///     .build();
+/// ```
 #[derive(Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[non_exhaustive]
@@ -349,6 +380,24 @@ impl Integer {
 }
 
 /// Float serialization mode.
+///
+/// # Examples
+///
+/// ```
+/// use musli::options::{self, Float};
+///
+/// const OPTIONS_INTEGER: musli::options::Options = options::new()
+///     .float(Float::Integer)
+///     .build();
+///
+/// const OPTIONS_VARIABLE: musli::options::Options = options::new()
+///     .float(Float::Variable)
+///     .build();
+///
+/// const OPTIONS_FIXED: musli::options::Options = options::new()
+///     .float(Float::Fixed)
+///     .build();
+/// ```
 #[derive(Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[non_exhaustive]
@@ -373,6 +422,24 @@ impl Float {
 ///
 /// By default, this is the [`ByteOrder::NATIVE`] byte order of the target
 /// platform.
+///
+/// # Examples
+///
+/// ```
+/// use musli::options::{self, ByteOrder};
+///
+/// const OPTIONS_LITTLE: musli::options::Options = options::new()
+///     .byte_order(ByteOrder::Little)
+///     .build();
+///
+/// const OPTIONS_BIG: musli::options::Options = options::new()
+///     .byte_order(ByteOrder::Big)
+///     .build();
+///
+/// const OPTIONS_NATIVE: musli::options::Options = options::new()
+///     .byte_order(ByteOrder::NATIVE)
+///     .build();
+/// ```
 #[derive(Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[non_exhaustive]
@@ -403,6 +470,24 @@ impl ByteOrder {
     /// This is the same as [`Big`].
     ///
     /// [`Big`]: ByteOrder::Big
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::options::{self, ByteOrder};
+    /// use musli::packed::Encoding;
+    ///
+    /// // Configure network byte order (big endian) for cross-platform compatibility
+    /// const OPTIONS: musli::options::Options = options::new()
+    ///     .byte_order(ByteOrder::NETWORK)
+    ///     .build();
+    ///
+    /// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
+    /// let data = CONFIG.to_vec(&0x1234u16)?;
+    /// let decoded: u16 = CONFIG.from_slice(&data)?;
+    /// assert_eq!(decoded, 0x1234);
+    /// # Ok::<_, musli::packed::Error>(())
+    /// ```
     pub const NETWORK: Self = Self::Big;
 }
 
@@ -441,6 +526,26 @@ macro_rules! width_arm {
 pub(crate) use width_arm;
 
 /// The width of a numerical type.
+///
+/// # Examples
+///
+/// ```
+/// use musli::options::{self, Width, Integer};
+/// use musli::packed::Encoding;
+///
+/// // Configure encoding to use variable integer encoding
+/// const OPTIONS: musli::options::Options = options::new()
+///     .integer(Integer::Variable)
+///     .build();
+///
+/// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
+///
+/// // Variable encoding is more efficient for small numbers
+/// let data = CONFIG.to_vec(&42u32)?;
+/// let decoded: u32 = CONFIG.from_slice(&data)?;
+/// assert_eq!(decoded, 42);
+/// # Ok::<_, musli::packed::Error>(())
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 #[non_exhaustive]
@@ -472,6 +577,27 @@ impl Width {
     /// The native width.
     ///
     /// This is the width of the target platform's native integer type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::options::{self, Width};
+    /// use musli::packed::Encoding;
+    ///
+    /// // Use native pointer width for platform-optimized encoding
+    /// const OPTIONS: musli::options::Options = options::new()
+    ///     .pointer(Width::NATIVE)
+    ///     .build();
+    ///
+    /// const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
+    ///
+    /// // Encode a usize value using native width
+    /// let value: usize = 42;
+    /// let data = CONFIG.to_vec(&value)?;
+    /// let decoded: usize = CONFIG.from_slice(&data)?;
+    /// assert_eq!(value, decoded);
+    /// # Ok::<_, musli::packed::Error>(())
+    /// ```
     pub const NATIVE: Self = const {
         if cfg!(target_pointer_width = "64") {
             Self::U64

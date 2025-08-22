@@ -23,6 +23,16 @@ pub struct FixedBytes<const N: usize> {
 
 impl<const N: usize> FixedBytes<N> {
     /// Construct a new fixed bytes array storage.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let mut buffer = FixedBytes::<128>::new();
+    /// assert_eq!(buffer.len(), 0);
+    /// assert!(buffer.is_empty());
+    /// ```
     #[inline]
     pub const fn new() -> Self {
         Self {
@@ -33,6 +43,27 @@ impl<const N: usize> FixedBytes<N> {
     }
 
     /// Construct a fixed bytes while asserting that the given runtime capacity isn't violated.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let buffer = FixedBytes::<128>::with_capacity(64);
+    /// assert_eq!(buffer.len(), 0);
+    /// assert_eq!(buffer.remaining(), 128);
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the requested capacity is larger than `N`.
+    ///
+    /// ```should_panic
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// // This will panic
+    /// let _buffer = FixedBytes::<10>::with_capacity(20);
+    /// ```
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         assert!(
@@ -43,30 +74,95 @@ impl<const N: usize> FixedBytes<N> {
     }
 
     /// Get the length of the collection.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let mut buffer = FixedBytes::<10>::new();
+    /// assert_eq!(buffer.len(), 0);
+    /// buffer.push(42);
+    /// assert_eq!(buffer.len(), 1);
+    /// ```
     #[inline]
     pub const fn len(&self) -> usize {
         self.init
     }
 
-    /// Test if the current container is empty.
+    /// Check if the current container is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let mut buffer = FixedBytes::<10>::new();
+    /// assert!(buffer.is_empty());
+    /// buffer.push(42);
+    /// assert!(!buffer.is_empty());
+    /// ```
     #[inline]
     pub const fn is_empty(&self) -> bool {
         self.init == 0
     }
 
     /// Clear the [FixedBytes] container.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let mut buffer = FixedBytes::<10>::new();
+    /// buffer.push(42);
+    /// assert_eq!(buffer.len(), 1);
+    ///
+    /// buffer.clear();
+    /// assert_eq!(buffer.len(), 0);
+    /// assert!(buffer.is_empty());
+    /// ```
     #[inline]
     pub fn clear(&mut self) {
         self.init = 0;
     }
 
     /// Get the remaining capacity of the [FixedBytes].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let mut buffer = FixedBytes::<10>::new();
+    /// assert_eq!(buffer.remaining(), 10);
+    ///
+    /// buffer.push(42);
+    /// assert_eq!(buffer.remaining(), 9);
+    /// ```
     #[inline]
     pub const fn remaining(&self) -> usize {
         N.saturating_sub(self.init)
     }
 
     /// Coerce into the underlying bytes if all of them have been initialized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// // Converting a full buffer returns the complete array
+    /// let mut buffer = FixedBytes::<3>::new();
+    /// buffer.extend_from_slice(&[1, 2, 3]);
+    ///
+    /// let bytes = buffer.into_bytes().expect("Buffer should be full");
+    /// assert_eq!(bytes, [1, 2, 3]);
+    ///
+    /// // Partial buffers cannot be converted to arrays
+    /// let partial_buffer = FixedBytes::<3>::new();
+    /// assert_eq!(partial_buffer.into_bytes(), None);
+    /// ```
     #[inline]
     pub fn into_bytes(self) -> Option<[u8; N]> {
         if self.init == N {
@@ -82,6 +178,18 @@ impl<const N: usize> FixedBytes<N> {
     }
 
     /// Coerce into the slice of initialized memory which is present.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let mut buffer = FixedBytes::<10>::new();
+    /// buffer.extend_from_slice(&[1, 2, 3]);
+    ///
+    /// let slice = buffer.as_slice();
+    /// assert_eq!(slice, &[1, 2, 3]);
+    /// ```
     #[inline]
     pub fn as_slice(&self) -> &[u8] {
         if self.init == 0 {
@@ -94,6 +202,19 @@ impl<const N: usize> FixedBytes<N> {
     }
 
     /// Coerce into the mutable slice of initialized memory which is present.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let mut buffer = FixedBytes::<10>::new();
+    /// buffer.extend_from_slice(&[1, 2, 3]);
+    ///
+    /// let slice = buffer.as_mut_slice();
+    /// slice[0] = 42;
+    /// assert_eq!(buffer.as_slice(), &[42, 2, 3]);
+    /// ```
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         if self.init == 0 {
@@ -106,6 +227,21 @@ impl<const N: usize> FixedBytes<N> {
     }
 
     /// Try and push a single byte.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let mut buffer = FixedBytes::<3>::new();
+    /// assert!(buffer.push(1));
+    /// assert!(buffer.push(2));
+    /// assert!(buffer.push(3));
+    /// // Buffer is full
+    /// assert!(!buffer.push(4));
+    ///
+    /// assert_eq!(buffer.as_slice(), &[1, 2, 3]);
+    /// ```
     #[inline]
     pub fn push(&mut self, value: u8) -> bool {
         if N.saturating_sub(self.init) == 0 {
@@ -125,6 +261,20 @@ impl<const N: usize> FixedBytes<N> {
     }
 
     /// Try and extend from the given slice.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let mut buffer = FixedBytes::<10>::new();
+    /// assert!(buffer.extend_from_slice(&[1, 2, 3]));
+    /// assert!(buffer.extend_from_slice(&[4, 5]));
+    /// // Would exceed capacity
+    /// assert!(!buffer.extend_from_slice(&[6, 7, 8, 9, 10, 11]));
+    ///
+    /// assert_eq!(buffer.as_slice(), &[1, 2, 3, 4, 5]);
+    /// ```
     #[inline]
     pub fn extend_from_slice(&mut self, source: &[u8]) -> bool {
         if source.len() > N.saturating_sub(self.init) {
@@ -141,6 +291,26 @@ impl<const N: usize> FixedBytes<N> {
     }
 
     /// Try and extend from the given slice.
+    /// Write bytes to the buffer using a context for error handling.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::context;
+    /// use musli::fixed::FixedBytes;
+    ///
+    /// let cx = context::new();
+    ///
+    /// // Writing a few bytes to a buffer with capacity succeeds
+    /// let mut buffer = FixedBytes::<10>::new();
+    /// buffer.write_bytes(&cx, &[1, 2, 3]).unwrap();
+    /// assert_eq!(buffer.as_slice(), &[1, 2, 3]);
+    ///
+    /// // Writing more data than the buffer capacity fails
+    /// let mut small_buffer = FixedBytes::<2>::new();
+    /// let result = small_buffer.write_bytes(&cx, &[1, 2, 3]);
+    /// assert!(result.is_err());
+    /// ```
     #[inline]
     pub fn write_bytes<C>(&mut self, cx: C, source: &[u8]) -> Result<(), C::Error>
     where

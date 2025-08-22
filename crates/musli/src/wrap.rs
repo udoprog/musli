@@ -14,6 +14,15 @@ use crate::Context;
 ///
 /// [`Reader`]: crate::reader::Reader
 /// [`Writer`]: crate::writer::Writer
+///
+/// # Examples
+///
+/// ```
+/// use musli::wrap;
+///
+/// let buffer: Vec<u8> = Vec::new();
+/// let wrapped = wrap::wrap(buffer);
+/// ```
 pub struct Wrap<T> {
     #[cfg_attr(not(feature = "std"), allow(unused))]
     inner: T,
@@ -23,6 +32,15 @@ pub struct Wrap<T> {
 ///
 /// [`Reader`]: crate::reader::Reader
 /// [`Writer`]: crate::writer::Writer
+///
+/// # Examples
+///
+/// ```
+/// use musli::wrap;
+///
+/// let buffer: Vec<u8> = Vec::new();
+/// let wrapped = wrap::wrap(buffer);
+/// ```
 #[inline]
 pub fn wrap<T>(inner: T) -> Wrap<T> {
     Wrap { inner }

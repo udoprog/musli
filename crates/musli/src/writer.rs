@@ -23,6 +23,23 @@ mod sealed {
 }
 
 /// Coerce a type into a [`Writer`].
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Context, IntoWriter, Writer};
+/// use musli::context;
+///
+/// let mut buffer = Vec::new();
+/// let mut writer = (&mut buffer).into_writer();
+/// let cx = context::new();
+///
+/// writer.write_bytes(&cx, b"Hello")?;
+/// writer.finish(&cx)?;
+///
+/// assert_eq!(buffer, b"Hello");
+/// # Ok::<_, musli::context::ErrorMarker>(())
+/// ```
 pub trait IntoWriter
 where
     Self: self::sealed::Sealed,
@@ -38,6 +55,32 @@ where
 }
 
 /// The trait governing how a writer works.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Context, Writer};
+/// use musli::context;
+///
+/// // Example using Writer as a trait bound
+/// fn write_greeting<W, C>(mut writer: W, cx: C) -> Result<W::Ok, C::Error>
+/// where
+///     W: Writer,
+///     C: Context,
+/// {
+///     writer.write_bytes(cx, b"Hello")?;
+///     writer.write_byte(cx, b' ')?;
+///     writer.write_bytes(cx, b"World")?;
+///     writer.finish(cx)
+/// }
+///
+/// let mut writer = Vec::new();
+/// let cx = context::new();
+///
+/// write_greeting(&mut writer, &cx)?;
+/// assert_eq!(writer, b"Hello World");
+/// # Ok::<_, context::ErrorMarker>(())
+/// ```
 pub trait Writer {
     /// The value returned from writing the value.
     type Ok;
@@ -62,14 +105,56 @@ pub trait Writer {
         C: Context;
 
     /// Reborrow the current type.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Writer};
+    /// use musli::context;
+    ///
+    /// let mut writer = Vec::new();
+    /// let cx = context::new();
+    ///
+    /// {
+    ///     let mut borrowed = writer.borrow_mut();
+    ///     borrowed.write_bytes(&cx, b"Hello")?;
+    /// }
+    ///
+    /// writer.write_bytes(&cx, b" World")?;
+    /// writer.finish(&cx)?;
+    /// assert_eq!(writer, b"Hello World");
+    /// # Ok::<_, musli::context::ErrorMarker>(())
+    /// ```
     fn borrow_mut(&mut self) -> Self::Mut<'_>;
 
     /// Write a buffer to the current writer.
+    ///
+    /// This method is used internally to write a musli Vec buffer to the writer.
+    /// Most users will use [`write_bytes`] instead.
+    ///
+    /// [`write_bytes`]: Writer::write_bytes
     fn extend<C>(&mut self, cx: C, buffer: Vec<u8, C::Allocator>) -> Result<(), C::Error>
     where
         C: Context;
 
     /// Write bytes to the current writer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Context, Writer};
+    /// use musli::context;
+    ///
+    /// let mut writer = Vec::new();
+    /// let cx = context::new();
+    ///
+    /// writer.write_bytes(&cx, b"Hello")?;
+    /// writer.write_bytes(&cx, b" ")?;
+    /// writer.write_bytes(&cx, b"World")?;
+    /// writer.finish(&cx)?;
+    /// assert_eq!(writer, b"Hello World");
+    /// # Ok::<_, musli::context::ErrorMarker>(())
+    /// ```
     fn write_bytes<C>(&mut self, cx: C, bytes: &[u8]) -> Result<(), C::Error>
     where
         C: Context;
@@ -219,6 +304,15 @@ where
     A: Allocator,
 {
     /// Construct a new buffer writer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::Global;
+    /// use musli::writer::BufWriter;
+    ///
+    /// let writer = BufWriter::new(Global::new());
+    /// ```
     pub fn new(alloc: A) -> Self {
         Self {
             buf: Vec::new_in(alloc),
@@ -226,6 +320,17 @@ where
     }
 
     /// Coerce into inner buffer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::Global;
+    /// use musli::writer::BufWriter;
+    ///
+    /// let writer = BufWriter::new(Global::new());
+    /// let buffer = writer.into_inner();
+    /// assert!(buffer.is_empty());
+    /// ```
     pub fn into_inner(self) -> Vec<u8, A> {
         self.buf
     }

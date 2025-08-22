@@ -80,6 +80,32 @@ mod error;
 pub mod test;
 
 /// Convenient result alias for use with `musli::storage`.
+///
+/// # Examples
+///
+/// ```
+/// use musli::packed::{self, Result};
+/// use musli::{Encode, Decode};
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Item {
+///     id: u32,
+///     name: String,
+/// }
+///
+/// fn packed_roundtrip(item: &Item) -> Result<Item> {
+///     let bytes = packed::to_vec(item)?;
+///     packed::from_slice(&bytes)
+/// }
+///
+/// let original = Item {
+///     id: 1,
+///     name: "Test".to_string(),
+/// };
+/// let decoded = packed_roundtrip(&original)?;
+/// assert_eq!(original, decoded);
+/// # Ok::<_, musli::packed::Error>(())
+/// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub type Result<T, E = Error> = core::result::Result<T, E>;

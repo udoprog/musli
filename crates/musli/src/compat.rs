@@ -19,6 +19,15 @@ pub struct Sequence<T>(pub T);
 
 impl<T> Sequence<T> {
     /// Construct a new sequence wrapper.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::compat::Sequence;
+    ///
+    /// let wrapped = Sequence::new(42);
+    /// assert_eq!(wrapped.0, 42);
+    /// ```
     #[inline]
     pub const fn new(value: T) -> Self {
         Self(value)
