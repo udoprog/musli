@@ -34,15 +34,17 @@
 //! cd examples/server && cargo run
 //! ```
 //!
-//! [`api`]: <https://github.com/udoprog/musli/crates/musli-web/examples/api/>
+//! [`api`]: <https://github.com/udoprog/musli/tree/main/crates/musli-web/examples/api/>
 //! [`axum`]: <https://github.com/tokio-rs/axum>
-//! [`client`]: <https://github.com/udoprog/musli/crates/musli-web/examples/client/>
+//! [`client`]: <https://github.com/udoprog/musli/tree/main/crates/musli-web/examples/client/>
 //! [`Json`]: <https://docs.rs/musli-web/latest/musli-web/Json.struct.html>
-//! [`server`]: <https://github.com/udoprog/musli/crates/musli-web/examples/server/>
+//! [`server`]: <https://github.com/udoprog/musli/tree/main/crates/musli-web/examples/server/>
+//! [`ws::Server`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html
 //! [`yew`]: <https://yew.rs>
 //! [Müsli]: <https://github.com/udoprog/musli>
 
 #![no_std]
+#![cfg_attr(doc_cfg, feature(doc_cfg))]
 
 #[cfg(feature = "std")]
 extern crate std;
@@ -50,19 +52,29 @@ extern crate std;
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(feature = "axum08")]
+mod buf;
+#[cfg(feature = "axum08")]
+use self::buf::Buf;
+
 #[cfg(all(feature = "json", feature = "alloc"))]
 mod json;
 #[cfg(all(feature = "json", feature = "alloc"))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "json", feature = "alloc"))))]
 pub use self::json::Json;
 
 #[cfg(feature = "api")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]
 pub mod api;
 
 #[cfg(feature = "axum08")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "axum08")))]
 pub mod axum08;
 
 #[cfg(feature = "yew021")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "yew021")))]
 pub mod yew021;
 
 #[cfg(feature = "ws")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "ws")))]
 pub mod ws;

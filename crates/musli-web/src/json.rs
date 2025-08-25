@@ -50,6 +50,7 @@ impl From<rejection05::BytesRejection> for JsonRejection {
 }
 
 #[cfg(feature = "axum-core05")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "axum-core05")))]
 impl response05::IntoResponse for JsonRejection {
     fn into_response(self) -> response05::Response {
         let status;
@@ -85,6 +86,7 @@ impl response05::IntoResponse for JsonRejection {
 pub struct Json<T>(pub T);
 
 #[cfg(feature = "axum-core05")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "axum-core05")))]
 impl<T, S> extract05::FromRequest<S> for Json<T>
 where
     T: DecodeOwned<Text, Global>,
@@ -128,6 +130,7 @@ fn json_content_type(headers: &HeaderMap) -> bool {
 }
 
 #[cfg(feature = "axum-core05")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "axum-core05")))]
 impl<T> response05::IntoResponse for Json<T>
 where
     T: Encode<Text>,

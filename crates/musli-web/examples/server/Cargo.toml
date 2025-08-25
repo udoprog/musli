@@ -1,11 +1,11 @@
 [package]
-name = "ws-server-example"
+name = "musli-web-server-example"
 edition = "2024"
 publish = false
 
 [dependencies]
 musli-web = { path = "../..", features = ["axum08"] }
-api = { package = "ws-api-example", path = "../api" }
+api = { package = "musli-web-api-example", path = "../api" }
 
 anyhow = "1.0.99"
 axum = { version = "0.8.4", features = ["ws"] }

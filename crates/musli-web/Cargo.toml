@@ -14,12 +14,19 @@ license = "MIT OR Apache-2.0"
 keywords = ["framework", "http", "web"]
 categories = ["asynchronous", "network-programming", "web-programming::http-server"]
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "doc_cfg", "--generate-link-to-definition"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(doc_cfg, loom)'] }
+
 [features]
 default = ["alloc", "std"]
 alloc = ["musli?/alloc"]
 std = ["musli?/std"]
 api = ["alloc", "dep:musli"]
-axum08 = ["dep:axum08", "axum-core05", "dep:bytes", "dep:tokio-stream", "ws"]
+axum08 = ["dep:axum08", "axum-core05", "dep:bytes", "dep:futures-core03", "ws"]
 json = ["musli/json", "std", "alloc", "dep:bytes", "dep:mime", "axum-core05", "dep:http"]
 ws = ["musli/storage", "std", "api", "dep:bytes", "dep:rand", "tokio/time", "axum-core05", "axum08/ws"]
 yew021 = ["musli/storage", "std", "api", "dep:log", "dep:slab", "wasm-bindgen02", "web-sys03", "dep:yew021", "gloo-timers03"]
@@ -33,14 +40,14 @@ mime = { version = "0.3.17", default-features = false, optional = true }
 rand = { version = "0.9.1", default-features = false, optional = true, features = ["small_rng"] }
 tracing = { version = "0.1.40", default-features = false }
 tokio = { version = "1.37.0", default-features = false, optional = true }
-tokio-stream = { version = "0.1.15", default-features = false, optional = true }
 
 log = { version = "0.4.21", default-features = false, optional = true }
 slab = { version = "0.4.9", default-features = false, optional = true }
 
-axum-core05 = { package="axum-core", version = "0.5.2", default-features = false, optional = true }
+futures-core03 = { package = "futures-core", version = "0.3.0", default-features = false, optional = true }
+axum-core05 = { package="axum-core", version = "0.5.0", default-features = false, optional = true }
 axum08 = { package = "axum", version = "0.8.0", default-features = false, optional = true }
 yew021 = { package = "yew", version = "0.21.0", default-features = false, optional = true }
-wasm-bindgen02 = { package = "wasm-bindgen", version = "0.2.92", default-features = false, optional = true }
-web-sys03 = { package = "web-sys", version = "0.3.69", default-features = false, features = ["WebSocket", "MessageEvent", "Performance"], optional = true }
+wasm-bindgen02 = { package = "wasm-bindgen", version = "0.2.0", default-features = false, optional = true }
+web-sys03 = { package = "web-sys", version = "0.3.0", default-features = false, features = ["WebSocket", "MessageEvent", "Performance"], optional = true }
 gloo-timers03 = { package = "gloo-timers", version = "0.3.0", default-features = false, optional = true }

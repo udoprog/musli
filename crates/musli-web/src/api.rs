@@ -76,7 +76,7 @@ macro_rules! __define {
 /// }
 ///
 /// #[derive(Encode, Decode)]
-/// pub struct TickBody<'de> {
+/// pub struct TickEvent<'de> {
 ///     pub message: &'de str,
 ///     pub tick: u32,
 /// }
@@ -88,7 +88,7 @@ macro_rules! __define {
 ///     }
 ///
 ///     broadcast Tick {
-///         body<'de> = TickBody<'de>;
+///         body<'de> = TickEvent<'de>;
 ///     }
 /// }
 /// ```

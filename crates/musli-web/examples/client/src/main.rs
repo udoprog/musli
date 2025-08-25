@@ -97,6 +97,8 @@ impl Component for App {
                 true
             }
             Msg::HelloResponse(packet) => {
+                log::warn!("Got response");
+
                 if let Some(response) = packet.decode(ctx) {
                     self.response = response.message.to_owned();
                 }

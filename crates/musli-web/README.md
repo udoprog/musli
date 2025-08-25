@@ -37,10 +37,11 @@ You can run the server like this:
 cd examples/server && cargo run
 ```
 
-[`api`]: <https://github.com/udoprog/musli/crates/musli-web/examples/api/>
+[`api`]: <https://github.com/udoprog/musli/tree/main/crates/musli-web/examples/api/>
 [`axum`]: <https://github.com/tokio-rs/axum>
-[`client`]: <https://github.com/udoprog/musli/crates/musli-web/examples/client/>
+[`client`]: <https://github.com/udoprog/musli/tree/main/crates/musli-web/examples/client/>
 [`Json`]: <https://docs.rs/musli-web/latest/musli-web/Json.struct.html>
-[`server`]: <https://github.com/udoprog/musli/crates/musli-web/examples/server/>
+[`server`]: <https://github.com/udoprog/musli/tree/main/crates/musli-web/examples/server/>
+[`ws::Server`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html
 [`yew`]: <https://yew.rs>
 [Müsli]: <https://github.com/udoprog/musli>

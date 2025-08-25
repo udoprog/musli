@@ -2,8 +2,11 @@
 //!
 //! Use [`server()`] to set up the server and feed it incoming requests.
 
+use core::pin::Pin;
+use core::task::Poll;
+use core::task::{Context, ready};
+
 use bytes::Bytes;
-use tokio_stream::StreamExt;
 
 use axum_core05::Error;
 use axum08::extract::ws::{CloseFrame, Message, WebSocket};
@@ -23,22 +26,33 @@ where
 pub enum AxumServer {}
 
 impl Socket for WebSocket {
-    type Error = Error;
     type Message = Message;
+    type Error = Error;
 
     #[inline]
     #[allow(private_interfaces)]
-    async fn next(&mut self) -> Option<Result<ws::Message, Self::Error>> {
-        let result = StreamExt::next(self).await?;
+    fn poll_next(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Option<Result<ws::Message, Self::Error>>> {
+        let Some(result) = ready!(futures_core03::Stream::poll_next(self, ctx)) else {
+            return Poll::Ready(None);
+        };
 
-        match result {
-            Ok(Message::Text(..)) => Some(Ok(ws::Message::Text)),
-            Ok(Message::Binary(data)) => Some(Ok(ws::Message::Binary(data))),
-            Ok(Message::Ping(data)) => Some(Ok(ws::Message::Ping(data))),
-            Ok(Message::Pong(data)) => Some(Ok(ws::Message::Pong(data))),
-            Ok(Message::Close(..)) => Some(Ok(ws::Message::Close)),
-            Err(err) => Some(Err(err)),
-        }
+        let message = match result {
+            Ok(message) => message,
+            Err(err) => return Poll::Ready(Some(Err(err))),
+        };
+
+        let message = match message {
+            Message::Text(..) => ws::Message::Text,
+            Message::Binary(data) => ws::Message::Binary(data),
+            Message::Ping(data) => ws::Message::Ping(data),
+            Message::Pong(data) => ws::Message::Pong(data),
+            Message::Close(..) => ws::Message::Close,
+        };
+
+        Poll::Ready(Some(Ok(message)))
     }
 
     #[inline]
@@ -63,8 +77,8 @@ impl ServerImplementation for AxumServer {
     }
 
     #[inline]
-    fn binary(data: Bytes) -> Self::Message {
-        Message::Binary(data)
+    fn binary(data: &[u8]) -> Self::Message {
+        Message::Binary(Bytes::from(data.to_vec()))
     }
 
     #[inline]

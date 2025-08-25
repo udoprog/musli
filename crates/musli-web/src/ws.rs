@@ -1,5 +1,6 @@
 use core::fmt::{self, Write};
 use core::future::Future;
+use core::ops::Range;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
@@ -14,8 +15,9 @@ use musli::storage;
 use musli::{Decode, Encode};
 use rand::prelude::*;
 use rand::rngs::SmallRng;
-use tokio::time::{Duration, Instant};
+use tokio::time::{Duration, Instant, Sleep};
 
+use crate::Buf;
 use crate::api;
 
 const MAX_CAPACITY: usize = 1048576;
@@ -54,13 +56,16 @@ where
     Self: self::sealed::Sealed,
 {
     #[doc(hidden)]
-    type Error;
-
-    #[doc(hidden)]
     type Message;
 
     #[doc(hidden)]
-    async fn next(&mut self) -> Option<Result<Message, Self::Error>>;
+    type Error;
+
+    #[doc(hidden)]
+    fn poll_next(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Message, Self::Error>>>;
 
     #[doc(hidden)]
     async fn send(&mut self, message: Self::Message) -> Result<(), Self::Error>;
@@ -88,7 +93,7 @@ where
     fn pong(data: Bytes) -> Self::Message;
 
     #[doc(hidden)]
-    fn binary(data: Bytes) -> Self::Message;
+    fn binary(data: &[u8]) -> Self::Message;
 
     #[doc(hidden)]
     fn close(code: u16, reason: &str) -> Self::Message;
@@ -133,6 +138,10 @@ enum ErrorKind {
         error: storage::Error,
     },
     FormatError,
+    InvalidBufferFrame {
+        frame: Range<usize>,
+        size: usize,
+    },
 }
 
 #[derive(Debug)]
@@ -155,6 +164,10 @@ impl fmt::Display for Error {
             ErrorKind::AxumCore05 { .. } => write!(f, "Error in axum-core"),
             ErrorKind::Musli { .. } => write!(f, "Error in musli"),
             ErrorKind::FormatError => write!(f, "Error formatting error response"),
+            ErrorKind::InvalidBufferFrame {
+                frame: Range { start, end },
+                size,
+            } => write!(f, "Invalid buffer frame {start}..{end} is not in 0..{size}"),
         }
     }
 }
@@ -186,6 +199,13 @@ impl From<storage::Error> for Error {
     }
 }
 
+impl From<ErrorKind> for Error {
+    #[inline]
+    fn from(kind: ErrorKind) -> Self {
+        Self::new(kind)
+    }
+}
+
 type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// A handler for incoming requests.
@@ -213,8 +233,9 @@ where
     handler: H,
     last_ping: Option<u32>,
     rng: SmallRng,
-    close_interval: tokio::time::Sleep,
-    ping_interval: tokio::time::Sleep,
+    close_sleep: Sleep,
+    ping_sleep: Sleep,
+    max_capacity: usize,
 }
 
 impl<S, H> Server<S, H>
@@ -233,9 +254,21 @@ where
             handler,
             last_ping: None::<u32>,
             rng: SmallRng::seed_from_u64(DEFAULT_SEED),
-            close_interval: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
-            ping_interval: tokio::time::sleep_until(now + PING_TIMEOUT),
+            close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
+            ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
+            max_capacity: MAX_CAPACITY,
         }
+    }
+
+    /// Modify the max allocated capacity of the outgoing buffer.
+    ///
+    /// Note that this capacity can be exceeded by writing large messages, but
+    /// once messages have been flushed the allocation will be shrunk to the
+    /// specified value.
+    #[inline]
+    pub fn with_max_capacity(mut self, max_capacity: usize) -> Self {
+        self.max_capacity = max_capacity;
+        self
     }
 }
 
@@ -253,6 +286,17 @@ where
         self.rng = SmallRng::seed_from_u64(seed);
         self
     }
+
+    fn project(self: Pin<&mut Self>) -> (Pin<&mut Sleep>, Pin<&mut Sleep>, Pin<&mut S::Socket>) {
+        // SAFETY: Deal with running the server.
+        unsafe {
+            let this = Pin::get_unchecked_mut(self);
+            let close = Pin::new_unchecked(&mut this.close_sleep);
+            let ping = Pin::new_unchecked(&mut this.ping_sleep);
+            let socket = Pin::new_unchecked(&mut this.socket);
+            (close, ping, socket)
+        }
+    }
 }
 
 impl<S, H> Server<S, H>
@@ -262,28 +306,37 @@ where
     H: Handler,
 {
     /// Run the server.
-    pub async fn run(self: Pin<&mut Self>) -> Result<(), Error> {
+    ///
+    /// This must be called to handle buffered outgoing and incoming messages.
+    pub async fn run(mut self: Pin<&mut Self>) -> Result<(), Error> {
         tracing::trace!("Accepted");
 
-        // SAFETY: Deal with running the server.
-        let this = unsafe { Pin::get_unchecked_mut(self) };
-
         let close_here = loop {
-            // SAFETY: The server is pinned.
-            let mut close = unsafe { Pin::new_unchecked(&mut this.close_interval) };
-            let mut ping = unsafe { Pin::new_unchecked(&mut this.ping_interval) };
+            if !self.buf.is_empty() {
+                self.as_mut().flush().await?;
+            }
 
-            let inner = Inner {
-                close: close.as_mut(),
-                ping: ping.as_mut(),
-                socket: this.socket.next(),
+            let result = {
+                let (close, ping, socket) = self.as_mut().project();
+
+                let inner = Inner {
+                    close,
+                    ping,
+                    socket,
+                };
+
+                inner.await
             };
 
-            match inner.await {
+            match result {
                 InnerOutput::Close => {
                     break Some((CLOSE_NORMAL, "connection timed out"));
                 }
                 InnerOutput::Ping => {
+                    // SAFETY: Deal with running the server.
+                    let this = unsafe { Pin::get_unchecked_mut(self.as_mut()) };
+                    let mut ping = unsafe { Pin::new_unchecked(&mut this.ping_sleep) };
+
                     let payload = this.rng.random::<u32>();
                     this.last_ping = Some(payload);
                     let data = payload.to_ne_bytes().into_iter().collect::<Vec<_>>();
@@ -310,33 +363,39 @@ where
                                 }
                             };
 
-                            match this.handle_request(reader, header).await {
-                                Ok(()) => {
-                                    this.flush().await?;
+                            if let Err(error) = self.as_mut().handle_request(reader, header).await {
+                                // SAFETY: Deal with running the server.
+                                let this = unsafe { Pin::get_unchecked_mut(self.as_mut()) };
+
+                                if write!(this.error, "{error}").is_err() {
+                                    return Err(Error::new(ErrorKind::FormatError));
                                 }
-                                Err(error) => {
-                                    if write!(this.error, "{error}").is_err() {
-                                        return Err(Error::new(ErrorKind::FormatError));
-                                    }
 
-                                    this.buf.buffer.clear();
+                                // Reset the buffer to the previous start point.
+                                this.buf.reset();
 
-                                    this.buf.write(api::ResponseHeader {
-                                        index: header.index,
-                                        serial: header.serial,
-                                        broadcast: None,
-                                        error: Some(this.error.as_str()),
-                                    })?;
+                                this.buf.write(api::ResponseHeader {
+                                    index: header.index,
+                                    serial: header.serial,
+                                    broadcast: None,
+                                    error: Some(this.error.as_str()),
+                                })?;
 
-                                    this.flush().await?;
-                                }
+                                this.buf.done();
                             }
                         }
                         Message::Ping(payload) => {
+                            // SAFETY: Deal with running the server.
+                            let this = unsafe { Pin::get_unchecked_mut(self.as_mut()) };
                             this.socket.send(S::pong(payload)).await?;
                             continue;
                         }
                         Message::Pong(data) => {
+                            // SAFETY: Deal with running the server.
+                            let this = unsafe { Pin::get_unchecked_mut(self.as_mut()) };
+                            let close = unsafe { Pin::new_unchecked(&mut this.close_sleep) };
+                            let ping = unsafe { Pin::new_unchecked(&mut this.ping_sleep) };
+
                             tracing::trace!(data = ?&data[..], "Pong");
 
                             let Some(expected) = this.last_ping else {
@@ -361,6 +420,7 @@ where
 
         if let Some((code, reason)) = close_here {
             tracing::trace!(code, reason, "Closing websocket with reason");
+            let this = unsafe { Pin::get_unchecked_mut(self) };
             this.socket.send(S::close(code, reason)).await?;
         } else {
             tracing::trace!("Closing websocket");
@@ -369,8 +429,11 @@ where
         Ok(())
     }
 
-    /// Send a broadcast message on the server.
-    pub async fn broadcast<'de, T>(self: Pin<&mut Self>, message: T) -> Result<(), Error>
+    /// Write a broadcast message.
+    ///
+    /// Note that the written message is buffered, and will be sent when
+    /// [`Server::run`] is called.
+    pub fn broadcast<'de, T>(self: Pin<&mut Self>, message: T) -> Result<(), Error>
     where
         T: api::Broadcast<'de>,
     {
@@ -384,28 +447,40 @@ where
         })?;
 
         this.buf.write(message)?;
-        this.flush().await?;
+        this.buf.done();
         Ok(())
     }
 
-    async fn flush(&mut self) -> Result<()> {
-        self.socket
-            .send(S::binary(self.buf.buffer.to_vec().into()))
-            .await?;
-        self.error.clear();
-        self.buf.buffer.clear();
-        self.buf.buffer.shrink_to(MAX_CAPACITY);
+    /// Flush outgoing messages that have been written to the outgoing buffer.
+    ///
+    /// This will block until the messages have been sent over the network.
+    pub async fn flush(self: Pin<&mut Self>) -> Result<()> {
+        let this = unsafe { Pin::get_unchecked_mut(self) };
+
+        for frame in this.buf.frames() {
+            let frame =
+                frame.map_err(|(frame, size)| ErrorKind::InvalidBufferFrame { frame, size })?;
+
+            this.socket.send(S::binary(frame)).await?;
+        }
+
+        this.error.clear();
+        this.buf.clear();
+        this.buf.shrink_to(MAX_CAPACITY);
         Ok(())
     }
 
     async fn handle_request<'header>(
-        &mut self,
+        self: Pin<&mut Self>,
         reader: SliceReader<'_>,
         header: api::RequestHeader<'header>,
     ) -> Result<(), OneOf<'header, H::Error>> {
         tracing::trace!("Got request: {header:?}");
 
-        self.buf.write(api::ResponseHeader {
+        // SAFETY: The server is pinned.
+        let this = unsafe { Pin::get_unchecked_mut(self) };
+
+        this.buf.write(api::ResponseHeader {
             index: header.index,
             serial: header.serial,
             broadcast: None,
@@ -420,10 +495,10 @@ where
         let mut outgoing = Outgoing {
             error: None,
             written: false,
-            buf: &mut self.buf,
+            buf: &mut this.buf,
         };
 
-        let result = self
+        let result = this
             .handler
             .handle(header.kind, &mut incoming, &mut outgoing)
             .await;
@@ -444,37 +519,37 @@ where
     }
 }
 
-enum InnerOutput<O> {
+enum InnerOutput<E> {
     /// The connection should be closed.
     Close,
     /// A ping message was received.
     Ping,
     /// A message was received.
-    Output(O),
+    Output(Option<Result<Message, E>>),
 }
 
-struct Inner<C, P, S> {
-    close: C,
-    ping: P,
-    socket: S,
+struct Inner<'a, C, P, S> {
+    close: Pin<&'a mut C>,
+    ping: Pin<&'a mut P>,
+    socket: Pin<&'a mut S>,
 }
 
-impl<C, P, S> Future for Inner<C, P, S>
+impl<C, P, S> Future for Inner<'_, C, P, S>
 where
     C: Future,
     P: Future,
-    S: Future,
+    S: Socket,
 {
-    type Output = InnerOutput<S::Output>;
+    type Output = InnerOutput<S::Error>;
 
     #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // SAFETY: This type is not Unpin.
         let (close, ping, socket) = unsafe {
             let this = Pin::get_unchecked_mut(self);
-            let close = Pin::new_unchecked(&mut this.close);
-            let ping = Pin::new_unchecked(&mut this.ping);
-            let socket = Pin::new_unchecked(&mut this.socket);
+            let close = this.close.as_mut();
+            let ping = this.ping.as_mut();
+            let socket = this.socket.as_mut();
             (close, ping, socket)
         };
 
@@ -488,7 +563,7 @@ where
             return Poll::Ready(InnerOutput::Ping);
         }
 
-        if let Poll::Ready(output) = socket.poll(cx) {
+        if let Poll::Ready(output) = socket.poll_next(cx) {
             cx.waker().wake_by_ref();
             return Poll::Ready(InnerOutput::Output(output));
         }
@@ -537,21 +612,7 @@ impl Outgoing<'_> {
             self.error = Some(error);
         } else {
             self.written = true;
+            self.buf.done();
         }
-    }
-}
-
-#[derive(Default)]
-struct Buf {
-    buffer: Vec<u8>,
-}
-
-impl Buf {
-    fn write<T>(&mut self, value: T) -> Result<(), storage::Error>
-    where
-        T: Encode<Binary>,
-    {
-        storage::to_writer(&mut self.buffer, &value)?;
-        Ok(())
     }
 }
