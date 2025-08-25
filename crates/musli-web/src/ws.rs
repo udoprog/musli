@@ -1,3 +1,10 @@
+//! The server side of the websocket protocol.
+//!
+//! See [`server()`] for how to use with [axum].
+//!
+//! [`server()`]: crate::axum08::server
+//! [axum]: <https://docs.rs/axum>
+
 use core::fmt::{self, Write};
 use core::future::Future;
 use core::ops::Range;
@@ -71,7 +78,11 @@ where
     async fn send(&mut self, message: Self::Message) -> Result<(), Self::Error>;
 }
 
-/// The implementation of a server.
+/// The details of how a [`Server`] is implemented.
+///
+/// See [`AxumServer`] for an example.
+///
+/// [`AxumServer`]: crate::axum08::AxumServer
 pub trait ServerImplementation
 where
     Self: self::sealed::Sealed,
@@ -144,6 +155,7 @@ enum ErrorKind {
     },
 }
 
+/// The error produced by the server side of the websocket protocol
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
@@ -209,6 +221,10 @@ impl From<ErrorKind> for Error {
 type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// A handler for incoming requests.
+///
+/// See [`server()`] for how to use with `axum`.
+///
+/// [`server()`]: crate::axum08::server
 pub trait Handler {
     /// Error returned by handler.
     type Error: fmt::Display;
@@ -222,7 +238,11 @@ pub trait Handler {
     ) -> impl Future<Output = Result<(), Self::Error>> + Send + 'this;
 }
 
-/// The server side of the websocket connection.
+/// The server side handle of the websocket protocol.
+///
+/// See [`server()`] for how to use with `axum`.
+///
+/// [`server()`]: crate::axum08::server
 pub struct Server<S, H>
 where
     S: ServerImplementation,
@@ -309,8 +329,6 @@ where
     ///
     /// This must be called to handle buffered outgoing and incoming messages.
     pub async fn run(mut self: Pin<&mut Self>) -> Result<(), Error> {
-        tracing::trace!("Accepted");
-
         let close_here = loop {
             if !self.buf.is_empty() {
                 self.as_mut().flush().await?;
@@ -455,6 +473,8 @@ where
     ///
     /// This will block until the messages have been sent over the network.
     pub async fn flush(self: Pin<&mut Self>) -> Result<()> {
+        tracing::trace!("flushing outbound buffer");
+
         let this = unsafe { Pin::get_unchecked_mut(self) };
 
         for frame in this.buf.frames() {
@@ -572,7 +592,11 @@ where
     }
 }
 
-/// An incoming request.
+/// The buffer for incoming requests.
+///
+/// See [`server()`] for how to use with `axum`.
+///
+/// [`server()`]: crate::axum08::server
 pub struct Incoming<'de> {
     error: Option<storage::Error>,
     reader: SliceReader<'de>,
@@ -595,7 +619,11 @@ impl<'de> Incoming<'de> {
     }
 }
 
-/// Handler for an outgoing buffer.
+/// The buffer for outgoing responses.
+///
+/// See [`server()`] for how to use with `axum`.
+///
+/// [`server()`]: crate::axum08::server
 pub struct Outgoing<'a> {
     error: Option<storage::Error>,
     written: bool,
@@ -604,6 +632,10 @@ pub struct Outgoing<'a> {
 
 impl Outgoing<'_> {
     /// Write a response.
+    ///
+    /// See [`server()`] for how to use with `axum`.
+    ///
+    /// [`server()`]: crate::axum08::server
     pub fn write<T>(&mut self, value: T)
     where
         T: Encode<Binary>,

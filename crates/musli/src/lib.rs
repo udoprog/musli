@@ -38,7 +38,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! musli = { version = "0.0.135", features = ["storage"] }
+//! musli = { version = "0.0.136", features = ["storage"] }
 //! ```
 //!
 //! <br>

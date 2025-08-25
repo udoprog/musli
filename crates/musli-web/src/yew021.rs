@@ -1,6 +1,167 @@
 //! Client side implementation for [`yew`].
 //!
 //! [`yew`]: https://yew.rs
+//!
+//! # Examples
+//!
+//! ```
+//! # extern crate yew021 as yew;
+//! # extern crate web_sys03 as web_sys;
+//! use web_sys::HtmlInputElement;
+//! use yew::prelude::*;
+//!
+//! use musli_web::yew021 as ws;
+//!
+//! mod api {
+//!     use musli::{Decode, Encode};
+//!     use musli_web::api;
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct HelloRequest<'de> {
+//!         pub message: &'de str,
+//!     }
+//!    
+//!     #[derive(Encode, Decode)]
+//!     pub struct HelloResponse<'de> {
+//!         pub message: &'de str,
+//!     }
+//!    
+//!     #[derive(Encode, Decode)]
+//!     pub struct TickEvent<'de> {
+//!         pub message: &'de str,
+//!         pub tick: u32,
+//!     }
+//!    
+//!     api::define! {
+//!         endpoint Hello {
+//!             request<'de> = HelloRequest<'de>;
+//!             response<'de> = HelloResponse<'de>;
+//!         }
+//!    
+//!         broadcast Tick {
+//!             body<'de> = TickEvent<'de>;
+//!         }
+//!     }
+//! }
+//!
+//! enum Msg {
+//!     Error(ws::Error),
+//!     WebSocket(ws::Msg),
+//!     Send,
+//!     HelloResponse(ws::Packet<api::Hello>),
+//!     Tick(ws::Packet<api::Tick>),
+//! }
+//!
+//! impl From<ws::Error> for Msg {
+//!     #[inline]
+//!     fn from(error: ws::Error) -> Self {
+//!         Msg::Error(error)
+//!     }
+//! }
+//!
+//! impl From<ws::Msg> for Msg {
+//!     #[inline]
+//!     fn from(error: ws::Msg) -> Self {
+//!         Msg::WebSocket(error)
+//!     }
+//! }
+//!
+//! struct App {
+//!     service: ws::Service<Self>,
+//!     handle: ws::Handle,
+//!     input: NodeRef,
+//!     _listen: ws::Listener<api::Tick>,
+//!     request: ws::Request<api::Hello>,
+//!     response: String,
+//!     tick: u32,
+//! }
+//!
+//! impl Component for App {
+//!     type Message = Msg;
+//!     type Properties = ();
+//!
+//!     fn create(ctx: &Context<Self>) -> Self {
+//!         let (mut service, handle) =
+//!             ws::Service::new(ctx, ws::Connect::location_with_path(String::from("/ws")));
+//!         let input = NodeRef::default();
+//!
+//!         service.connect();
+//!
+//!         let listen = handle.listen(ctx, Msg::Tick);
+//!
+//!         Self {
+//!             service,
+//!             handle,
+//!             input,
+//!             _listen: listen,
+//!             request: ws::Request::empty(),
+//!             response: String::new(),
+//!             tick: 0,
+//!         }
+//!     }
+//!
+//!     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+//!         match msg {
+//!             Msg::Error(error) => {
+//!                 log::error!("WebSocket error: {:?}", error);
+//!                 false
+//!             }
+//!             Msg::WebSocket(msg) => {
+//!                 self.service.update(msg);
+//!                 false
+//!             }
+//!             Msg::Send => {
+//!                 let Some(input) = self.input.cast::<HtmlInputElement>() else {
+//!                     return false;
+//!                 };
+//!
+//!                 let value = input.value();
+//!                 input.set_value("");
+//!
+//!                 self.request = self
+//!                     .handle
+//!                     .request(ctx)
+//!                     .body(api::HelloRequest {
+//!                         message: value.as_str(),
+//!                     })
+//!                     .on_packet(Msg::HelloResponse)
+//!                     .send();
+//!
+//!                 true
+//!             }
+//!             Msg::HelloResponse(packet) => {
+//!                 log::warn!("Got response");
+//!
+//!                 if let Some(response) = packet.decode(ctx) {
+//!                     self.response = response.message.to_owned();
+//!                 }
+//!
+//!                 true
+//!             }
+//!             Msg::Tick(packet) => {
+//!                 if let Some(tick) = packet.decode_broadcast(ctx) {
+//!                     self.tick = tick.tick;
+//!                 }
+//!
+//!                 true
+//!             }
+//!         }
+//!     }
+//!
+//!     fn view(&self, ctx: &Context<Self>) -> Html {
+//!         let onclick = ctx.link().callback(|_: MouseEvent| Msg::Send);
+//!
+//!         html! {
+//!             <div class="container">
+//!                 <input type="text" ref={self.input.clone()} />
+//!                 <button {onclick}>{"Send Message"}</button>
+//!                 <div>{format!("Response: {}", self.response)}</div>
+//!                 <div>{format!("Global tick: {}", self.tick)}</div>
+//!             </div>
+//!         }
+//!     }
+//! }
+//! ```
 
 use core::cell::{Cell, Ref, RefCell, RefMut};
 use core::fmt;
@@ -554,7 +715,10 @@ where
     }
 }
 
-/// A request builder that has a body.
+/// A request builder that is empty.
+///
+/// Call [`EmptyRequestBuilder::body`] to associate a body with the request and
+/// convert into a [`RequestBuilder`] which can be sent.
 pub struct EmptyRequestBuilder<'ctx, C>
 where
     C: Component,
@@ -592,6 +756,12 @@ where
 }
 
 /// A request builder that has a body.
+///
+/// Associate the callback to be used by using either
+/// [`RequestBuilder::on_packet`] or [`RequestBuilder::on_raw_packet`] depending
+/// on your needs.
+///
+/// Send the request with [`RequestBuilder::send`].
 pub struct RequestBuilder<'ctx, C, E>
 where
     C: Component,
@@ -653,7 +823,7 @@ where
         self
     }
 
-    /// Build and return the inner request handler.
+    /// Build and return the request.
     pub fn send(self) -> Request<E> {
         let Some(body) = self.body else {
             return Request::empty();
@@ -855,6 +1025,101 @@ impl Handle {
     /// Returns a handle for the request.
     ///
     /// If the handle is dropped, the request is cancelled.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew021 as yew;
+    /// use yew::prelude::*;
+    ///
+    /// use musli_web::yew021 as ws;
+    ///
+    /// mod api {
+    ///     use musli::{Decode, Encode};
+    ///     use musli_web::api;
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct HelloRequest<'de> {
+    ///         pub message: &'de str,
+    ///     }
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct HelloResponse<'de> {
+    ///         pub message: &'de str,
+    ///     }
+    ///
+    ///     api::define! {
+    ///         endpoint Hello {
+    ///             request<'de> = HelloRequest<'de>;
+    ///             response<'de> = HelloResponse<'de>;
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// enum Msg {
+    ///     Error(ws::Error),
+    ///     OnHello(ws::Packet<api::Hello>),
+    /// }
+    ///
+    /// impl From<ws::Error> for Msg {
+    ///     #[inline]
+    ///     fn from(error: ws::Error) -> Self {
+    ///         Msg::Error(error)
+    ///     }
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     message: String,
+    ///     _hello: ws::Request<api::Hello>,
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let hello = ctx.props().ws
+    ///             .request(ctx)
+    ///             .body(api::HelloRequest { message: "Hello!"})
+    ///             .on_packet(Msg::OnHello)
+    ///             .send();
+    ///
+    ///         Self {
+    ///             message: String::from("No Message :("),
+    ///             _hello: hello,
+    ///         }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::Error(error) => {
+    ///                 log::error!("Request error: {:?}", error);
+    ///                 false
+    ///             }
+    ///             Msg::OnHello(packet) => {
+    ///                 if let Some(response) = packet.decode(ctx) {
+    ///                     self.message = response.message.to_owned();
+    ///                 }
+    ///
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///                 <p>{format!("Message: {}", self.message)}</p>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
     pub fn request<'ctx, C>(&self, ctx: &'ctx Context<C>) -> EmptyRequestBuilder<'ctx, C>
     where
         C: Component<Message: From<Error>>,
@@ -871,6 +1136,92 @@ impl Handle {
     /// Returns a handle for the broadcasts.
     ///
     /// If the handle is dropped, the listener is cancelled.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew021 as yew;
+    /// use yew::prelude::*;
+    ///
+    /// use musli_web::yew021 as ws;
+    ///
+    /// mod api {
+    ///     use musli::{Decode, Encode};
+    ///     use musli_web::api;
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct TickEvent<'de> {
+    ///         pub message: &'de str,
+    ///         pub tick: u32,
+    ///     }
+    ///
+    ///     api::define! {
+    ///         broadcast Tick {
+    ///             body<'de> = TickEvent<'de>;
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// enum Msg {
+    ///     Error(ws::Error),
+    ///     Tick(ws::Packet<api::Tick>),
+    /// }
+    ///
+    /// impl From<ws::Error> for Msg {
+    ///     #[inline]
+    ///     fn from(error: ws::Error) -> Self {
+    ///         Msg::Error(error)
+    ///     }
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     tick: u32,
+    ///     _listen: ws::Listener<api::Tick>,
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let listen = ctx.props().ws.listen(ctx, Msg::Tick);
+    ///
+    ///         Self {
+    ///             tick: 0,
+    ///             _listen: listen,
+    ///         }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::Error(error) => {
+    ///                 log::error!("Broadcast error: {:?}", error);
+    ///                 false
+    ///             }
+    ///             Msg::Tick(packet) => {
+    ///                 if let Some(tick) = packet.decode_broadcast(ctx) {
+    ///                     self.tick = tick.tick;
+    ///                 }
+    ///
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///                 <p>{format!("Tick: {}", self.tick)}</p>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
     pub fn listen<T, C>(
         &self,
         ctx: &Context<C>,
