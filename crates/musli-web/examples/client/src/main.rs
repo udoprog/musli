@@ -86,13 +86,14 @@ impl Component for App {
                 let value = input.value();
                 input.set_value("");
 
-                self.request = self.handle.request(
-                    ctx,
-                    api::HelloRequest {
+                self.request = self
+                    .handle
+                    .request(ctx)
+                    .body(api::HelloRequest {
                         message: value.as_str(),
-                    },
-                    Msg::HelloResponse,
-                );
+                    })
+                    .on_packet(Msg::HelloResponse)
+                    .send();
 
                 true
             }

@@ -6,12 +6,16 @@ use core::cell::{Cell, Ref, RefCell, RefMut};
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem::take;
+use std::rc::Weak;
 
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use musli::Decode;
+use musli::alloc::Global;
+use musli::mode::Binary;
 
 use std::collections::{HashMap, hash_map};
 
@@ -319,21 +323,13 @@ where
                 let broadcasts = Ref::map(self.shared.mutable.borrow(), |m| &m.broadcasts);
                 let at = body.len() - reader.remaining();
 
-                if let Some(broadcasts) = broadcasts.get(kind) {
-                    let mut it = broadcasts.iter();
-
-                    let last = it.next_back();
-                    let raw = RawPacket {
-                        body: body.clone(),
-                        at,
-                    };
-
-                    for (_, callback) in it {
-                        (callback)(raw.clone());
-                    }
-
-                    if let Some((_, callback)) = last {
-                        (callback)(raw);
+                if let Some((&kind, broadcasts)) = broadcasts.get_key_value(kind) {
+                    for (_, callback) in broadcasts.iter() {
+                        (callback)(RawPacket {
+                            body: body.clone(),
+                            at,
+                            kind,
+                        });
                     }
                 }
             }
@@ -350,11 +346,17 @@ where
                     && pending.serial == header.serial
                 {
                     if let Some(error) = header.error {
-                        (pending.callback)(Err(Error::from(error)));
-                    } else {
+                        if let Some(callback) = &pending.callback {
+                            callback(Err(Error::from(error)));
+                        }
+                    } else if let Some(callback) = &pending.callback {
                         let at = body.len() - reader.remaining();
-                        let raw = RawPacket { body, at };
-                        (pending.callback)(Ok(raw));
+                        let raw = RawPacket {
+                            body,
+                            at,
+                            kind: pending.kind,
+                        };
+                        callback(Ok(raw));
                     }
                 }
             }
@@ -552,9 +554,141 @@ where
     }
 }
 
+/// A request builder that has a body.
+pub struct EmptyRequestBuilder<'ctx, C>
+where
+    C: Component,
+{
+    link: &'ctx Scope<C>,
+    shared: Rc<Shared>,
+    callback: Option<Box<dyn Fn(Result<RawPacket>)>>,
+}
+
+impl<'ctx, C> EmptyRequestBuilder<'ctx, C>
+where
+    C: Component<Message: From<Error>>,
+{
+    /// Set the body of the request.
+    pub fn body<T>(self, body: T) -> RequestBuilder<'ctx, C, T::Endpoint>
+    where
+        T: api::Request,
+    {
+        let body = match musli::storage::to_vec(&body) {
+            Ok(body) => body,
+            Err(error) => {
+                self.link.send_message(Error::from(error));
+                Vec::new()
+            }
+        };
+
+        RequestBuilder {
+            link: self.link,
+            shared: self.shared,
+            body: Some(body),
+            callback: self.callback,
+            _marker: PhantomData,
+        }
+    }
+}
+
+/// A request builder that has a body.
+pub struct RequestBuilder<'ctx, C, E>
+where
+    C: Component,
+{
+    link: &'ctx Scope<C>,
+    shared: Rc<Shared>,
+    body: Option<Vec<u8>>,
+    callback: Option<Box<dyn Fn(Result<RawPacket>)>>,
+    _marker: PhantomData<E>,
+}
+
+impl<'ctx, C, E> RequestBuilder<'ctx, C, E>
+where
+    C: Component<Message: From<Error>>,
+    E: api::Endpoint,
+{
+    /// Handle the response by converting a typed packet into a message.
+    pub fn on_packet(mut self, f: impl Fn(Packet<E>) -> C::Message + 'static) -> Self {
+        let link = self.link.clone();
+
+        self.callback = Some(Box::new(move |result| {
+            let raw = match result {
+                Ok(raw) => raw,
+                Err(error) => {
+                    link.send_message(error);
+                    return;
+                }
+            };
+
+            link.send_message(f(Packet {
+                raw,
+                _marker: PhantomData,
+            }));
+        }));
+
+        self
+    }
+
+    /// Handle the response by converting a raw packet into a message.
+    ///
+    /// This can be useful if all of your responses are expected to return the
+    /// same response type and you only want to have one message to handle all
+    /// of them.
+    pub fn on_raw_packet(mut self, f: impl Fn(RawPacket) -> C::Message + 'static) -> Self {
+        let link = self.link.clone();
+
+        self.callback = Some(Box::new(move |result| {
+            let raw = match result {
+                Ok(raw) => raw,
+                Err(error) => {
+                    link.send_message(error);
+                    return;
+                }
+            };
+
+            link.send_message(f(raw));
+        }));
+
+        self
+    }
+
+    /// Build and return the inner request handler.
+    pub fn send(self) -> Request<E> {
+        let Some(body) = self.body else {
+            return Request::empty();
+        };
+
+        let serial = self.shared.serial.get();
+        self.shared.serial.set(serial.wrapping_add(1));
+
+        let pending = Pending {
+            serial,
+            callback: self.callback,
+            kind: E::KIND,
+        };
+
+        let index = self.shared.mutable.borrow_mut().requests.insert(pending) as u32;
+
+        (self.shared.onmessage)(ClientRequest {
+            header: api::RequestHeader {
+                index,
+                serial,
+                kind: E::KIND,
+            },
+            body,
+        });
+
+        Request {
+            inner: Some((Rc::downgrade(&self.shared), index)),
+            _marker: PhantomData,
+        }
+    }
+}
+
 /// The handle for a pending request. Dropping this handle cancels the request.
 pub struct Request<T> {
-    inner: Option<(Rc<Shared>, u32)>,
+    inner: Option<(Weak<Shared>, u32)>,
     _marker: PhantomData<T>,
 }
 
@@ -579,12 +713,10 @@ impl<T> Default for Request<T> {
 impl<T> Drop for Request<T> {
     #[inline]
     fn drop(&mut self) {
-        if let Some((shared, index)) = self.inner.take() {
-            shared
-                .mutable
-                .borrow_mut()
-                .requests
-                .try_remove(index as usize);
+        if let Some((s, index)) = self.inner.take()
+            && let Some(s) = s.upgrade()
+        {
+            s.mutable.borrow_mut().requests.try_remove(index as usize);
         }
     }
 }
@@ -629,32 +761,27 @@ impl Drop for StateListener {
     }
 }
 
+/// A raw packet of data.
 #[derive(Clone)]
-struct RawPacket {
+pub struct RawPacket {
     body: Rc<[u8]>,
     at: usize,
+    kind: &'static str,
 }
 
-/// A packet of data.
-pub struct Packet<T> {
-    raw: RawPacket,
-    _marker: PhantomData<T>,
-}
-
-impl<T> Packet<T>
-where
-    T: api::Endpoint,
-{
-    /// Handle a broadcast packet.
-    pub fn decode(
-        &self,
+impl RawPacket {
+    /// Decode the contents of a raw packet.
+    pub fn decode<'this, T>(
+        &'this self,
         ctx: &Context<impl Component<Message: From<Error>>>,
-    ) -> Option<T::Response<'_>> {
-        let Some(bytes) = self.raw.body.get(self.raw.at..) else {
-            ctx.link().send_message(Error::new(ErrorKind::Overflow(
-                self.raw.at,
-                self.raw.body.len(),
-            )));
+    ) -> Option<T>
+    where
+        T: Decode<'this, Binary, Global>,
+    {
+        let Some(bytes) = self.body.get(self.at..) else {
+            ctx.link()
+                .send_message(Error::new(ErrorKind::Overflow(self.at, self.body.len())));
+
             return None;
         };
 
@@ -666,32 +793,53 @@ where
             }
         }
     }
+
+    /// The kind of the packet.
+    pub fn kind(&self) -> &str {
+        self.kind
+    }
+}
+
+/// A typed packet of data.
+#[derive(Clone)]
+pub struct Packet<T> {
+    raw: RawPacket,
+    _marker: PhantomData<T>,
+}
+
+impl<T> Packet<T> {
+    /// Convert a packet into a raw packet.
+    ///
+    /// To determine which endpoint or broadcast it belongs to the
+    /// [`RawPacket::kind`] method can be used.
+    pub fn into_raw(self) -> RawPacket {
+        self.raw
+    }
+}
+
+impl<T> Packet<T>
+where
+    T: api::Endpoint,
+{
+    /// Decode a response.
+    pub fn decode(
+        &self,
+        ctx: &Context<impl Component<Message: From<Error>>>,
+    ) -> Option<T::Response<'_>> {
+        self.raw.decode(ctx)
+    }
 }
 
 impl<T> Packet<T>
 where
     T: api::Listener,
 {
-    /// Handle a broadcast packet.
+    /// Decode a broadcast message.
     pub fn decode_broadcast(
         &self,
         ctx: &Context<impl Component<Message: From<Error>>>,
     ) -> Option<T::Broadcast<'_>> {
-        let Some(bytes) = self.raw.body.get(self.raw.at..) else {
-            ctx.link().send_message(Error::new(ErrorKind::Overflow(
-                self.raw.at,
-                self.raw.body.len(),
-            )));
-            return None;
-        };
-
-        match musli::storage::from_slice(bytes) {
-            Ok(value) => Some(value),
-            Err(error) => {
-                ctx.link().send_message(Error::from(error));
-                None
-            }
-        }
+        self.raw.decode(ctx)
     }
 }
 
@@ -707,61 +855,14 @@ impl Handle {
     /// Returns a handle for the request.
     ///
     /// If the handle is dropped, the request is cancelled.
-    pub fn request<T, C>(
-        &self,
-        ctx: &Context<C>,
-        request: T,
-        f: impl Fn(Packet<T::Endpoint>) -> C::Message + 'static,
-    ) -> Request<T::Endpoint>
+    pub fn request<'ctx, C>(&self, ctx: &'ctx Context<C>) -> EmptyRequestBuilder<'ctx, C>
     where
-        T: api::Request,
         C: Component<Message: From<Error>>,
     {
-        let body = match musli::storage::to_vec(&request) {
-            Ok(body) => body,
-            Err(error) => {
-                ctx.link().send_message(Error::from(error));
-                return Request::default();
-            }
-        };
-
-        let serial = self.shared.serial.get();
-        self.shared.serial.set(serial.wrapping_add(1));
-
-        let link = ctx.link().clone();
-
-        let pending = Pending {
-            serial,
-            callback: Box::new(move |result| {
-                let raw = match result {
-                    Ok(raw) => raw,
-                    Err(error) => {
-                        link.send_message(error);
-                        return;
-                    }
-                };
-
-                link.send_message(f(Packet {
-                    raw,
-                    _marker: PhantomData,
-                }));
-            }),
-        };
-
-        let index = self.shared.mutable.borrow_mut().requests.insert(pending) as u32;
-
-        (self.shared.onmessage)(ClientRequest {
-            header: api::RequestHeader {
-                index,
-                serial,
-                kind: <T::Endpoint as api::Endpoint>::KIND,
-            },
-            body,
-        });
-
-        Request {
-            inner: Some((self.shared.clone(), index)),
-            _marker: PhantomData,
+        EmptyRequestBuilder {
+            link: ctx.link(),
+            shared: self.shared.clone(),
+            callback: None,
         }
     }
 
@@ -839,7 +940,8 @@ fn now() -> Option<f64> {
 
 struct Pending {
     serial: u32,
-    callback: Box<dyn Fn(Result<RawPacket>)>,
+    callback: Option<Box<dyn Fn(Result<RawPacket>)>>,
+    kind: &'static str,
 }
 
 type Broadcasts = HashMap<&'static str, Slab<Box<dyn Fn(RawPacket)>>>;
