@@ -16,6 +16,13 @@ It includes support for:
 - [`yew`] integration, allowing you to use Müsli for communicating with
   websocket clients using a well-defined API.
 
+Note that the organization of the modules include the version of the corresponding
+crate. Unstable versions are prefixed with `0`, such as [`yew021`].
+
+See the following modules for how to use:
+* [`axum08`] for Axum 0.8 integration.
+* [`yew021`] for Yew 0.21 integration.
+
 <br>
 
 ## Examples
