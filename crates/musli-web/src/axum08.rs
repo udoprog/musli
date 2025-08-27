@@ -76,30 +76,32 @@ use crate::ws::{self, Handler, Server, ServerImplementation, Socket};
 /// struct MyHandler;
 ///
 /// impl ws::Handler for MyHandler {
-///     type Error = &'static str;
+///     type Response = bool;
 ///
 ///     async fn handle(
 ///         &mut self,
 ///         kind: &str,
 ///         incoming: &mut ws::Incoming<'_>,
 ///         outgoing: &mut ws::Outgoing<'_>,
-///     ) -> Result<(), Self::Error> {
+///     ) -> Self::Response {
 ///         tracing::info!("Handling: {kind}");
 ///
 ///         match kind {
 ///             api::Hello::KIND => {
 ///                 let Some(request) = incoming.read::<api::HelloRequest<'_>>() else {
-///                     return Ok(());
+///                     return false;
 ///                 };
 ///
 ///                 outgoing.write(api::HelloResponse {
 ///                     message: request.message,
 ///                 });
-///             }
-///             _ => {}
-///         }
 ///
-///         Ok(())
+///                 true
+///             }
+///             _ => {
+///                 false
+///             }
+///         }
 ///     }
 /// }
 ///

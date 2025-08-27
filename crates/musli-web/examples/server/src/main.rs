@@ -30,20 +30,20 @@ enum Broadcast {
 struct MyHandler;
 
 impl ws::Handler for MyHandler {
-    type Error = anyhow::Error;
+    type Response = bool;
 
     async fn handle(
         &mut self,
         kind: &str,
         incoming: &mut ws::Incoming<'_>,
         outgoing: &mut ws::Outgoing<'_>,
-    ) -> Result<(), Self::Error> {
+    ) -> Self::Response {
         tracing::info!("Handling: {kind}");
 
         match kind {
             api::Hello::KIND => {
                 let Some(request) = incoming.read::<api::HelloRequest<'_>>() else {
-                    return Ok(());
+                    return false;
                 };
 
                 outgoing.write(api::HelloResponse {
@@ -53,11 +53,11 @@ impl ws::Handler for MyHandler {
                 outgoing.write(api::HelloResponse {
                     message: request.message.to_uppercase().as_str(),
                 });
-            }
-            _ => {}
-        }
 
-        Ok(())
+                true
+            }
+            _ => false,
+        }
     }
 }
 
