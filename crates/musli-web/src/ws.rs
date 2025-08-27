@@ -263,7 +263,19 @@ pub trait IntoResponse {
     fn into_response(self) -> Result<Response, Self::Error>;
 }
 
-/// Implement [`IntoResponse`] for bool.
+/// Implement [`IntoResponse`] for unit types `()`.
+///
+/// This indicates that the request has been handled.
+impl IntoResponse for () {
+    type Error = Infallible;
+
+    #[inline]
+    fn into_response(self) -> Result<Response, Self::Error> {
+        Ok(Response { handled: true })
+    }
+}
+
+/// Implement [`IntoResponse`] for `bool`.
 ///
 /// On `true`, this means that the request was supported `false` means that it
 /// wasn't.
@@ -276,11 +288,13 @@ impl IntoResponse for bool {
     }
 }
 
-/// Implement [`IntoResponse`] for result types.
+/// Implement [`IntoResponse`] for [`Result`] types.
 ///
 /// Note that this allows anything that implements [`fmt::Display`] to be used
 /// as an [`Err`] variant. The exact message it's being formatted into will be
 /// forwarded as an error to the client.
+///
+/// [`Result`]: core::result::Result
 impl<T, E> IntoResponse for Result<T, E>
 where
     T: IntoResponse<Error = Infallible>,
@@ -296,6 +310,26 @@ where
                 Err(error) => match error {},
             },
             Err(error) => Err(error),
+        }
+    }
+}
+
+/// Implement [`IntoResponse`] for [`Option`] types.
+///
+/// This will propagate any responses for the interior value if present. If the
+/// value is [`None`] this will be treated as unhandled. This can be useful when
+/// used in combination with [`Incoming::read`] since it returns an [`Option`].
+impl<T> IntoResponse for Option<T>
+where
+    T: IntoResponse,
+{
+    type Error = T::Error;
+
+    #[inline]
+    fn into_response(self) -> Result<Response, Self::Error> {
+        match self {
+            Some(value) => value.into_response(),
+            None => Ok(Response { handled: false }),
         }
     }
 }
@@ -710,7 +744,13 @@ pub struct Incoming<'de> {
 }
 
 impl<'de> Incoming<'de> {
-    /// Read a request.
+    /// Read a request and return `Some(T)` if the request was successfully
+    /// decoded.
+    ///
+    /// Note that any failure to decode will be propagated as an error
+    /// automatically, the user does not have to deal with it themselves.
+    /// Instead, failure to decode should be treated as if the request was
+    /// unhandled by returning for example `false` or `Option::None`.
     #[inline]
     pub fn read<T>(&mut self) -> Option<T>
     where
