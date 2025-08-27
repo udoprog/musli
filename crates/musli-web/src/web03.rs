@@ -186,6 +186,76 @@ const MAX_CAPACITY: usize = 1048576;
 type StateSlab = Slab<Rc<dyn Fn(State)>>;
 type Broadcasts = HashMap<&'static str, Slab<Rc<dyn Fn(RawPacket)>>>;
 
+/// Construct a new [`ServiceBuilder`] associated with the given [`Connect`]
+/// strategy.
+pub fn connect(connect: Connect) -> ServiceBuilder {
+    let shared = Rc::<Shared>::new_cyclic(|shared| {
+        let open = {
+            let shared = shared.clone();
+
+            Closure::new(move || {
+                if let Some(shared) = shared.upgrade() {
+                    shared.do_open();
+                }
+            })
+        };
+
+        let close = {
+            let shared = shared.clone();
+
+            Closure::new(move |e: CloseEvent| {
+                if let Some(shared) = shared.upgrade() {
+                    shared.do_close(e);
+                }
+            })
+        };
+
+        let message = {
+            let shared = shared.clone();
+
+            Closure::new(move |e: MessageEvent| {
+                if let Some(shared) = shared.upgrade() {
+                    shared.do_message(e);
+                }
+            })
+        };
+
+        let error = {
+            let shared = shared.clone();
+
+            Closure::new(move |e: ErrorEvent| {
+                if let Some(shared) = shared.upgrade() {
+                    shared.do_error(e);
+                }
+            })
+        };
+
+        Shared {
+            connect,
+            state: Cell::new(State::Closed),
+            opened: Cell::new(None),
+            serial: Cell::new(0),
+            state_listeners: RefCell::new(Slab::new()),
+            requests: RefCell::new(Slab::new()),
+            broadcasts: RefCell::new(HashMap::new()),
+            socket: RefCell::new(None),
+            output: RefCell::new(Vec::new()),
+            current_timeout: Cell::new(INITIAL_TIMEOUT),
+            reconnect_timeout: RefCell::new(None),
+            deferred: RefCell::new(VecDeque::new()),
+            handles: Handles {
+                open,
+                close,
+                message,
+                error,
+            },
+            on_error: None,
+        }
+    });
+
+    ServiceBuilder { shared }
+}
+
 /// The state of the connection.
 ///
 /// A listener for state changes can be set up through for example
@@ -319,20 +389,7 @@ struct Handles {
     error: Closure<dyn Fn(ErrorEvent)>,
 }
 
-impl Handles {
-    fn empty() -> Self {
-        Self {
-            open: Closure::new(|| {}),
-            close: Closure::new(|_| {}),
-            message: Closure::new(|_| {}),
-            error: Closure::new(|_| {}),
-        }
-    }
-}
-
 enum Defer {
-    // Deferred error callback.
-    Error(Rc<dyn Fn(Error)>, Error),
     // Deferred broadcast callback.
     Broadcast(Rc<dyn Fn(RawPacket)>, RawPacket),
     // Deferred request callback.
@@ -342,26 +399,27 @@ enum Defer {
 struct Shared {
     connect: Connect,
     state: Cell<State>,
+    opened: Cell<Option<Opened>>,
     serial: Cell<u32>,
+    state_listeners: RefCell<StateSlab>,
     requests: RefCell<Slab<Pending>>,
     broadcasts: RefCell<Broadcasts>,
     socket: RefCell<Option<WebSocket>>,
-    opened: Cell<Option<Opened>>,
     output: RefCell<Vec<u8>>,
-    on_error: RefCell<Rc<dyn Fn(Error)>>,
     current_timeout: Cell<u32>,
     reconnect_timeout: RefCell<Option<Timeout>>,
-    state_listeners: RefCell<StateSlab>,
-    handles: RefCell<Handles>,
     deferred: RefCell<VecDeque<Defer>>,
+    on_error: Option<Box<dyn Fn(Error)>>,
+    handles: Handles,
 }
 
 impl Drop for Shared {
     fn drop(&mut self) {
         if let Some(old) = self.socket.take()
             && let Err(error) = old.close()
+            && let Some(handle) = &self.on_error
         {
-            (self.on_error.borrow())(Error::from(error));
+            handle(Error::from(error));
         }
 
         let state_listeners = mem::take(&mut *self.state_listeners.borrow_mut());
@@ -379,6 +437,44 @@ impl Drop for Shared {
     }
 }
 
+/// Builder of a service.
+pub struct ServiceBuilder {
+    shared: Rc<Shared>,
+}
+
+impl ServiceBuilder {
+    /// Set the error handler to use for the service.
+    #[cfg(feature = "yew021")]
+    pub(crate) fn on_error(mut self, on_error: impl Fn(Error) + 'static) -> Self {
+        use core::ptr;
+
+        let old;
+
+        // SAFETY: This builder ensures that the service cannot be safely used
+        // in a way which causes the error handler to be exposed.
+        unsafe {
+            let ptr = Rc::into_raw(self.shared).cast_mut();
+            old = ptr::addr_of_mut!((*ptr).on_error).replace(Some(Box::new(on_error)));
+            self.shared = Rc::from_raw(ptr.cast_const());
+        }
+
+        drop(old);
+        self
+    }
+
+    /// Build a new service and handle.
+    pub fn build(self) -> Service {
+        let handle = Handle {
+            shared: Rc::downgrade(&self.shared),
+        };
+
+        Service {
+            shared: self.shared,
+            handle,
+        }
+    }
+}
+
 /// The WebSocket service.
 pub struct Service {
     shared: Rc<Shared>,
@@ -386,95 +482,6 @@ pub struct Service {
 }
 
 impl Service {
-    /// Construct a new websocket service, and return it and return the service
-    /// instance and handle associated with it.
-    pub fn new(connect: Connect) -> Self {
-        let shared = Rc::new(Shared {
-            connect,
-            state: Cell::new(State::Closed),
-            serial: Cell::new(0),
-            requests: RefCell::new(Slab::new()),
-            broadcasts: RefCell::new(HashMap::new()),
-            state_listeners: RefCell::new(Slab::new()),
-            socket: RefCell::new(None),
-            opened: Cell::new(None),
-            output: RefCell::new(Vec::new()),
-            current_timeout: Cell::new(INITIAL_TIMEOUT),
-            on_error: RefCell::new(Rc::new(|_| {})),
-            reconnect_timeout: RefCell::new(None),
-            handles: RefCell::new(Handles::empty()),
-            deferred: RefCell::new(VecDeque::new()),
-        });
-
-        let open = {
-            let shared = Rc::downgrade(&shared);
-
-            let cb: Box<dyn Fn()> = Box::new(move || {
-                if let Some(shared) = shared.upgrade() {
-                    shared.do_open();
-                }
-            });
-
-            Closure::wrap(cb)
-        };
-
-        let close = {
-            let shared = Rc::downgrade(&shared);
-
-            let cb: Box<dyn Fn(CloseEvent)> = Box::new(move |e: CloseEvent| {
-                if let Some(shared) = shared.upgrade() {
-                    shared.do_close(e);
-                }
-            });
-
-            Closure::wrap(cb)
-        };
-
-        let message = {
-            let shared = Rc::downgrade(&shared);
-
-            let cb: Box<dyn Fn(MessageEvent)> = Box::new(move |e: MessageEvent| {
-                if let Some(shared) = shared.upgrade() {
-                    shared.do_message(e);
-                }
-            });
-
-            Closure::wrap(cb)
-        };
-
-        let error = {
-            let shared = Rc::downgrade(&shared);
-
-            let cb: Box<dyn Fn(ErrorEvent)> = Box::new(move |e: ErrorEvent| {
-                if let Some(shared) = shared.upgrade() {
-                    shared.do_error(e);
-                }
-            });
-
-            Closure::wrap(cb)
-        };
-
-        *shared.handles.borrow_mut() = Handles {
-            open,
-            close,
-            message,
-            error,
-        };
-
-        let handle = Handle {
-            shared: Rc::downgrade(&shared),
-        };
-
-        Service { shared, handle }
-    }
-
-    /// Modify the service with the given error handler.
-    pub fn on_error(self, on_error: impl Fn(Error) + 'static) -> Self {
-        let old = mem::replace(&mut *self.shared.on_error.borrow_mut(), Rc::new(on_error));
-        drop(old);
-        self
-    }
-
     /// Attempt to establish a websocket connection.
     pub fn connect(&self) {
         Shared::connect(&self.shared)
@@ -503,7 +510,7 @@ impl Shared {
         tracing::debug!("Message event");
 
         if let Err(error) = self.message(e) {
-            self.defer_error(error);
+            self.handle_error(error);
         }
 
         self.flush();
@@ -517,21 +524,21 @@ impl Shared {
     }
 
     /// Defer an error.
-    fn defer_error(&self, error: Error) {
-        tracing::debug!("Deferring error: {error:?}");
-
-        let defer = Defer::Error(self.on_error.borrow().clone(), error);
-        self.deferred.borrow_mut().push_back(defer);
+    #[inline]
+    fn handle_error(&self, error: Error) {
+        if let Some(handle) = &self.on_error {
+            handle(error);
+        }
     }
 
-    fn defer_broadcast(&self, callback: Rc<dyn Fn(RawPacket)>, packet: RawPacket) {
+    fn handle_broadcast(&self, callback: Rc<dyn Fn(RawPacket)>, packet: RawPacket) {
         tracing::debug!("Deferring broadcast");
 
         let defer = Defer::Broadcast(callback, packet);
         self.deferred.borrow_mut().push_back(defer);
     }
 
-    fn defer_request(&self, callback: Rc<dyn Fn(Result<RawPacket>)>, packet: RawPacket) {
+    fn handle_request(&self, callback: Rc<dyn Fn(Result<RawPacket>)>, packet: RawPacket) {
         tracing::debug!("Deferring request");
 
         let defer = Defer::Request(callback, packet);
@@ -554,9 +561,6 @@ impl Shared {
             };
 
             match defer {
-                Defer::Error(callback, error) => {
-                    callback(error);
-                }
                 Defer::Broadcast(callback, packet) => {
                     callback(packet);
                 }
@@ -612,7 +616,7 @@ impl Shared {
                     };
 
                     for (_, callback) in broadcasts.iter() {
-                        self.defer_broadcast(callback.clone(), packet.clone());
+                        self.handle_broadcast(callback.clone(), packet.clone());
                     }
                 }
             }
@@ -639,7 +643,7 @@ impl Shared {
                             kind: pending.kind,
                         };
 
-                        self.defer_request(callback.clone(), packet);
+                        self.handle_request(callback.clone(), packet);
                     }
                 }
             }
@@ -705,7 +709,7 @@ impl Shared {
         if let Some(old) = self.socket.take()
             && let Err(error) = old.close()
         {
-            self.defer_error(Error::from(error));
+            self.handle_error(Error::from(error));
         }
 
         let timeout = Timeout::new(self.current_timeout.get(), move || {
@@ -733,7 +737,7 @@ impl Shared {
 
     fn client_request(&self, request: ClientRequest<'static>) {
         if let Err(error) = self.send_client_request(request) {
-            self.defer_error(error);
+            self.handle_error(error);
         }
     }
 
@@ -742,7 +746,7 @@ impl Shared {
 
         let failed = {
             if let Err(error) = self.build() {
-                self.defer_error(error);
+                self.handle_error(error);
                 true
             } else {
                 false
@@ -802,12 +806,10 @@ impl Shared {
 
         ws.set_binary_type(BinaryType::Arraybuffer);
 
-        let handles = self.handles.borrow();
-
-        ws.set_onopen(Some(handles.open.as_ref().unchecked_ref()));
-        ws.set_onclose(Some(handles.close.as_ref().unchecked_ref()));
-        ws.set_onmessage(Some(handles.message.as_ref().unchecked_ref()));
-        ws.set_onerror(Some(handles.error.as_ref().unchecked_ref()));
+        ws.set_onopen(Some(self.handles.open.as_ref().unchecked_ref()));
+        ws.set_onclose(Some(self.handles.close.as_ref().unchecked_ref()));
+        ws.set_onmessage(Some(self.handles.message.as_ref().unchecked_ref()));
+        ws.set_onerror(Some(self.handles.error.as_ref().unchecked_ref()));
 
         let old = self.socket.borrow_mut().replace(ws);
 
