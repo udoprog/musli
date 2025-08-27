@@ -384,7 +384,7 @@ where
     fn on_raw_packet(self, f: Callback<Result<RawPacket, Error>>) -> Self;
 }
 
-impl<E> RequestBuilderExt<E> for RequestBuilder<'_, E>
+impl<E, T> RequestBuilderExt<E> for RequestBuilder<'_, E, T>
 where
     E: api::Endpoint,
 {

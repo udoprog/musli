@@ -154,9 +154,9 @@ use core::cell::{Cell, RefCell};
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
+use std::collections::VecDeque;
 
 use alloc::boxed::Box;
-use alloc::collections::VecDeque;
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::rc::Weak;
@@ -165,10 +165,11 @@ use alloc::vec::Vec;
 
 use std::collections::hash_map::{Entry, HashMap};
 
-use musli::Decode;
 use musli::alloc::Global;
 use musli::mode::Binary;
 use musli::reader::SliceReader;
+use musli::storage;
+use musli::{Decode, Encode};
 
 use gloo_timers03::callback::Timeout;
 use slab::Slab;
@@ -234,13 +235,13 @@ pub fn connect(connect: Connect) -> ServiceBuilder {
             opened: Cell::new(None),
             serial: Cell::new(0),
             state_listeners: RefCell::new(Slab::new()),
-            requests: RefCell::new(Slab::new()),
+            requests: RefCell::new(Requests::new()),
             broadcasts: RefCell::new(HashMap::new()),
+            deferred: RefCell::new(VecDeque::new()),
             socket: RefCell::new(None),
             output: RefCell::new(Vec::new()),
             current_timeout: Cell::new(INITIAL_TIMEOUT),
             reconnect_timeout: RefCell::new(None),
-            deferred: RefCell::new(VecDeque::new()),
             handles: Handles {
                 open,
                 close,
@@ -278,7 +279,7 @@ pub struct Error {
 #[derive(Debug)]
 enum ErrorKind {
     Message(String),
-    Storage(musli::storage::Error),
+    Storage(storage::Error),
     Overflow(usize, usize),
 }
 
@@ -317,9 +318,9 @@ impl core::error::Error for Error {
     }
 }
 
-impl From<musli::storage::Error> for Error {
+impl From<storage::Error> for Error {
     #[inline]
-    fn from(error: musli::storage::Error) -> Self {
+    fn from(error: storage::Error) -> Self {
         Self::new(ErrorKind::Storage(error))
     }
 }
@@ -335,11 +336,6 @@ type Result<T, E = Error> = core::result::Result<T, E>;
 
 const INITIAL_TIMEOUT: u32 = 250;
 const MAX_TIMEOUT: u32 = 4000;
-
-struct ClientRequest<'a> {
-    header: api::RequestHeader<'a>,
-    body: Vec<u8>,
-}
 
 /// How to connect to the websocket.
 enum ConnectKind {
@@ -387,12 +383,39 @@ struct Handles {
     error: Closure<dyn Fn(ErrorEvent)>,
 }
 
-enum Defer {
-    // Deferred broadcast callback.
-    Broadcast(Rc<dyn Fn(RawPacket)>, RawPacket),
-    // Deferred request callback.
-    Request(Rc<dyn Fn(Result<RawPacket>)>, RawPacket),
+struct Requests {
+    serials: HashMap<u32, usize>,
+    pending: Slab<Pending>,
 }
+
+impl Requests {
+    fn new() -> Self {
+        Self {
+            serials: HashMap::new(),
+            pending: Slab::new(),
+        }
+    }
+
+    #[inline]
+    fn remove(&mut self, serial: u32) -> Option<Pending> {
+        let index = self.serials.remove(&serial)?;
+        self.pending.try_remove(index)
+    }
+
+    #[inline]
+    fn insert(&mut self, serial: u32, pending: Pending) -> usize {
+        let index = self.pending.insert(pending);
+
+        if let Some(existing) = self.serials.insert(serial, index) {
+            _ = self.pending.try_remove(existing);
+        }
+
+        index
+    }
+}
+
+/// Queue of deferred items.
+type Deferred = VecDeque<Rc<dyn Fn(RawPacket)>>;
 
 struct Shared {
     connect: Connect,
@@ -400,13 +423,13 @@ struct Shared {
     opened: Cell<Option<Opened>>,
     serial: Cell<u32>,
     state_listeners: RefCell<StateSlab>,
-    requests: RefCell<Slab<Pending>>,
+    requests: RefCell<Requests>,
     broadcasts: RefCell<Broadcasts>,
+    deferred: RefCell<Deferred>,
     socket: RefCell<Option<WebSocket>>,
     output: RefCell<Vec<u8>>,
     current_timeout: Cell<u32>,
     reconnect_timeout: RefCell<Option<Timeout>>,
-    deferred: RefCell<VecDeque<Defer>>,
     on_error: Option<Box<dyn Fn(Error)>>,
     handles: Handles,
 }
@@ -421,14 +444,16 @@ impl Drop for Shared {
         }
 
         let state_listeners = mem::take(&mut *self.state_listeners.borrow_mut());
-        let requests = mem::take(&mut *self.requests.borrow_mut());
+        let mut requests = self.requests.borrow_mut();
 
         for (_, listener) in state_listeners {
             listener(State::Closed);
         }
 
-        for (_, request) in requests {
-            if let Some(callback) = request.callback {
+        requests.serials.clear();
+
+        for pending in requests.pending.drain() {
+            if let Some(callback) = pending.callback {
                 callback(Err(Error::msg("Websocket service closed")));
             }
         }
@@ -494,13 +519,11 @@ impl Shared {
     fn do_open(&self) {
         tracing::debug!("Open event");
         self.set_open();
-        self.flush();
     }
 
     fn do_close(self: &Rc<Self>, e: CloseEvent) {
         tracing::debug!(code = e.code(), reason = e.reason(), "Close event");
         self.close();
-        self.flush();
     }
 
     fn do_message(self: &Rc<Shared>, e: MessageEvent) {
@@ -509,15 +532,12 @@ impl Shared {
         if let Err(error) = self.message(e) {
             self.handle_error(error);
         }
-
-        self.flush();
     }
 
     fn do_error(self: &Rc<Self>, e: ErrorEvent) {
         tracing::debug!(message = e.message(), "Error event");
 
         self.close();
-        self.flush();
     }
 
     /// Defer an error.
@@ -528,62 +548,35 @@ impl Shared {
         }
     }
 
-    fn handle_broadcast(&self, callback: Rc<dyn Fn(RawPacket)>, packet: RawPacket) {
-        tracing::debug!("Deferring broadcast");
-
-        let defer = Defer::Broadcast(callback, packet);
-        self.deferred.borrow_mut().push_back(defer);
-    }
-
-    fn handle_request(&self, callback: Rc<dyn Fn(Result<RawPacket>)>, packet: RawPacket) {
-        tracing::debug!("Deferring request");
-
-        let defer = Defer::Request(callback, packet);
-        self.deferred.borrow_mut().push_back(defer);
-    }
-
-    /// Flush deferred actions.
-    ///
-    /// We put this in here to avoid nested borrowing issues. Deferred actions instead avoid borrowing shared elements.
-    fn flush(&self) {
-        tracing::debug!("Flushing deferred");
-
-        loop {
-            let defer = {
-                let Some(defer) = self.deferred.borrow_mut().pop_front() else {
-                    break;
-                };
-
-                defer
-            };
-
-            match defer {
-                Defer::Broadcast(callback, packet) => {
-                    callback(packet);
-                }
-                Defer::Request(callback, packet) => {
-                    callback(Ok(packet));
-                }
-            }
-        }
-    }
-
     /// Send a client message.
-    fn send_client_request(&self, request: ClientRequest<'_>) -> Result<()> {
+    fn send_client_request<E, T>(&self, serial: u32, body: &T) -> Result<()>
+    where
+        E: api::Endpoint,
+        T: Encode<Binary>,
+    {
         let Some(ref socket) = *self.socket.borrow() else {
             return Err(Error::msg("Socket is not connected"));
         };
 
+        let header = api::RequestHeader {
+            serial,
+            kind: E::KIND,
+        };
+
+        let out = &mut *self.output.borrow_mut();
+
+        storage::to_writer(&mut *out, &header)?;
+        storage::to_writer(&mut *out, &body)?;
+
         tracing::debug!(
-            request.header.serial,
-            request.header.index,
+            header.serial,
+            header.kind,
+            len = out.len(),
             "Sending request"
         );
 
-        let out = &mut *self.output.borrow_mut();
-        musli::storage::to_writer(&mut *out, &request.header)?;
-        out.extend_from_slice(request.body.as_slice());
         socket.send_with_u8_array(out.as_slice())?;
+
         out.clear();
         out.shrink_to(MAX_CAPACITY);
         Ok(())
@@ -597,51 +590,81 @@ impl Shared {
         let body = Rc::from(Uint8Array::new(&array_buffer).to_vec());
         let mut reader = SliceReader::new(&body);
 
-        let header: api::ResponseHeader<'_> = musli::storage::decode(&mut reader)?;
+        let header: api::ResponseHeader<'_> = storage::decode(&mut reader)?;
 
         match header.broadcast {
             Some(kind) => {
-                let at = body.len() - reader.remaining();
+                tracing::debug!(kind, "Got broadcast",);
 
-                let broadcasts = &*self.broadcasts.borrow();
+                // Note: We need to defer this, since the outcome of calling the
+                // broadcast callback might be that the broadcast listener is
+                // modified, which could require mutable access to broadcasts.
+                let mut deferred = self.deferred.borrow_mut();
 
-                if let Some((&kind, broadcasts)) = broadcasts.get_key_value(kind) {
+                let kind = {
+                    let broadcasts = self.broadcasts.borrow();
+
+                    let Some((&kind, broadcasts)) = broadcasts.get_key_value(kind) else {
+                        return Ok(());
+                    };
+
+                    for (_, callback) in broadcasts.iter() {
+                        deferred.push_back(callback.clone());
+                    }
+
+                    kind
+                };
+
+                if deferred.is_empty() {
+                    return Ok(());
+                }
+
+                let at = body.len().saturating_sub(reader.remaining());
+
+                let packet = RawPacket {
+                    body: body.clone(),
+                    at: Cell::new(at),
+                    kind,
+                };
+
+                let last = deferred.pop_back();
+
+                while let Some(callback) = deferred.pop_front() {
+                    callback(packet.clone());
+                }
+
+                if let Some(callback) = last {
+                    callback(packet);
+                }
+            }
+            None => {
+                tracing::debug!(header.serial, "Got response");
+
+                let (kind, callback) = {
+                    let mut requests = self.requests.borrow_mut();
+
+                    let Some(p) = requests.remove(header.serial) else {
+                        tracing::warn!(header.serial, "Missing request");
+                        return Ok(());
+                    };
+
+                    (p.kind, p.callback)
+                };
+
+                if let Some(error) = header.error {
+                    if let Some(callback) = callback {
+                        callback(Err(Error::msg(error)));
+                    }
+                } else if let Some(callback) = callback {
+                    let at = body.len().saturating_sub(reader.remaining());
+
                     let packet = RawPacket {
-                        body: body.clone(),
+                        body,
                         at: Cell::new(at),
                         kind,
                     };
 
-                    for (_, callback) in broadcasts.iter() {
-                        self.handle_broadcast(callback.clone(), packet.clone());
-                    }
-                }
-            }
-            None => {
-                tracing::debug!(
-                    "Got response: index={}, serial={}",
-                    header.index,
-                    header.serial
-                );
-
-                if let Some(pending) = self.requests.borrow().get(header.index as usize)
-                    && pending.serial == header.serial
-                {
-                    if let Some(error) = header.error {
-                        if let Some(callback) = &pending.callback {
-                            callback(Err(Error::msg(error)));
-                        }
-                    } else if let Some(callback) = &pending.callback {
-                        let at = body.len() - reader.remaining();
-
-                        let packet = RawPacket {
-                            body,
-                            at: Cell::new(at),
-                            kind: pending.kind,
-                        };
-
-                        self.handle_request(callback.clone(), packet);
-                    }
+                    callback(Ok(packet));
                 }
             }
         }
@@ -730,12 +753,6 @@ impl Shared {
 
     fn is_closed(&self) -> bool {
         self.opened.get().is_none()
-    }
-
-    fn client_request(&self, request: ClientRequest<'static>) {
-        if let Err(error) = self.send_client_request(request) {
-            self.handle_error(error);
-        }
     }
 
     fn connect(self: &Rc<Self>) {
@@ -828,83 +845,75 @@ impl Shared {
 ///
 /// [`RequestBuilderExt::on_packet`]: crate::yew021::RequestBuilderExt::on_packet
 /// [`RequestBuilderExt::on_raw_packet`]: crate::yew021::RequestBuilderExt::on_raw_packet
-pub struct RequestBuilder<'a, E> {
+pub struct RequestBuilder<'a, E, T> {
     shared: &'a Weak<Shared>,
-    body: Option<Vec<u8>>,
     callback: Option<Rc<dyn Fn(Result<RawPacket>)>>,
-    error: Option<Error>,
+    body: T,
     _marker: PhantomData<E>,
 }
 
-impl<'a, E> RequestBuilder<'a, E>
+impl<'a, E> RequestBuilder<'a, E, ()>
 where
     E: api::Endpoint,
 {
     /// Set the body of the request.
-    pub fn body<T>(mut self, body: T) -> RequestBuilder<'a, E>
+    #[inline]
+    pub fn body<T>(self, body: T) -> RequestBuilder<'a, E, T>
     where
         T: api::Request<Endpoint = E>,
     {
-        match musli::storage::to_vec(&body) {
-            Ok(vec) => self.body = Some(vec),
-            Err(err) => self.error = Some(Error::from(err)),
+        RequestBuilder {
+            shared: self.shared,
+            callback: self.callback,
+            body,
+            _marker: self._marker,
         }
-
-        self
     }
+}
 
+impl<'a, E, T> RequestBuilder<'a, E, T>
+where
+    E: api::Endpoint,
+    T: Encode<Binary>,
+{
     /// Build and return the request.
     pub fn send(self) -> Request {
-        if let Some(error) = self.error {
-            if let Some(callback) = self.callback {
-                callback(Err(error));
-            }
-
-            return Request::empty();
-        }
-
         let Some(shared) = self.shared.upgrade() else {
             return Request::empty();
         };
 
-        let body = self.body.unwrap_or_default();
-
-        let request = if shared.is_closed() {
+        if shared.is_closed() {
             if let Some(callback) = self.callback {
                 callback(Err(Error::msg("WebSocket is not connected")));
             }
 
-            Request::empty()
-        } else {
-            let serial = shared.serial.get();
-            shared.serial.set(serial.wrapping_add(1));
+            return Request::empty();
+        }
 
-            let pending = Pending {
-                serial,
-                callback: self.callback,
-                kind: E::KIND,
-            };
+        let serial = shared.serial.get();
 
-            let index = shared.requests.borrow_mut().insert(pending) as u32;
+        if let Err(error) = shared.send_client_request::<E, T>(serial, &self.body) {
+            shared.handle_error(error);
+            return Request::empty();
+        }
 
-            shared.client_request(ClientRequest {
-                header: api::RequestHeader {
-                    index,
-                    serial,
-                    kind: E::KIND,
-                },
-                body,
-            });
+        shared.serial.set(serial.wrapping_add(1));
 
-            Request {
-                inner: Some((self.shared.clone(), index)),
-            }
+        let pending = Pending {
+            serial,
+            callback: self.callback,
+            kind: E::KIND,
         };
 
-        shared.flush();
-        request
-    }
+        shared.requests.borrow_mut().insert(serial, pending);
 
+        Request {
+            inner: Some((self.shared.clone(), serial)),
+        }
+    }
+}
+
+impl<'a, E, T> RequestBuilder<'a, E, T> {
     /// Handle the response using the specified callback.
     ///
     /// # Examples
@@ -1024,13 +1033,23 @@ impl Default for Request {
 impl Drop for Request {
     #[inline]
     fn drop(&mut self) {
-        let mut removed = None;
+        let removed = {
+            let Some((s, serial)) = self.inner.take() else {
+                return;
+            };
 
-        if let Some((s, index)) = self.inner.take()
-            && let Some(s) = s.upgrade()
-        {
-            removed = s.requests.borrow_mut().try_remove(index as usize);
-        }
+            let Some(s) = s.upgrade() else {
+                return;
+            };
+
+            let mut requests = s.requests.borrow_mut();
+
+            let Some(p) = requests.remove(serial) else {
+                return;
+            };
+
+            p
+        };
 
         drop(removed);
     }
@@ -1134,7 +1153,7 @@ impl RawPacket {
 
         let mut reader = SliceReader::new(bytes);
 
-        match musli::storage::decode(&mut reader) {
+        match storage::decode(&mut reader) {
             Ok(value) => {
                 self.at.set(at + bytes.len() - reader.remaining());
                 Ok(value)
@@ -1328,15 +1347,14 @@ impl Handle {
     ///     }
     /// }
     /// ```
-    pub fn request<E>(&self) -> RequestBuilder<'_, E>
+    pub fn request<E>(&self) -> RequestBuilder<'_, E, ()>
     where
         E: api::Endpoint,
     {
         RequestBuilder {
             shared: &self.shared,
-            body: None,
             callback: None,
-            error: None,
+            body: (),
             _marker: PhantomData,
         }
     }
@@ -1549,6 +1567,16 @@ struct Pending {
     serial: u32,
     callback: Option<Rc<dyn Fn(Result<RawPacket>)>>,
     kind: &'static str,
+}
+
+impl fmt::Debug for Pending {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Pending")
+            .field("serial", &self.serial)
+            .field("kind", &self.kind)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
