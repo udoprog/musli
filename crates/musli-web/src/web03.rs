@@ -66,9 +66,9 @@
 //!     type Properties = ();
 //!
 //!     fn create(ctx: &Context<Self>) -> Self {
-//!         let link = ctx.link().clone();
-//!         let service = ws::Service::new(ws::Connect::location_with_path(String::from("/ws")))
-//!             .on_error(move |error| link.send_message(Msg::Error(error)));
+//!         let service = ws::connect(ws::Connect::location_with_path(String::from("/ws")))
+//!             .on_error(ctx.link().callback(Msg::Error))
+//!             .build();
 //!
 //!         let input = NodeRef::default();
 //!
@@ -176,8 +176,6 @@ use wasm_bindgen02::closure::Closure;
 use wasm_bindgen02::{JsCast, JsValue};
 use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
 use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, window};
-#[cfg(feature = "yew021")]
-use yew021::html::ImplicitClone as ImplicitClone021;
 
 use crate::api;
 
@@ -444,8 +442,7 @@ pub struct ServiceBuilder {
 
 impl ServiceBuilder {
     /// Set the error handler to use for the service.
-    #[cfg(feature = "yew021")]
-    pub(crate) fn on_error(mut self, on_error: impl Fn(Error) + 'static) -> Self {
+    pub fn on_error_cb(mut self, on_error: impl Fn(Error) + 'static) -> Self {
         use core::ptr;
 
         let old;
@@ -908,8 +905,97 @@ where
         request
     }
 
-    #[cfg(feature = "yew021")]
-    pub(crate) fn on_packet(mut self, f: impl Fn(Result<RawPacket, Error>) + 'static) -> Self {
+    /// Handle the response using the specified callback.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew021 as yew;
+    /// use yew::prelude::*;
+    /// use musli_web::yew021::*;
+    ///
+    /// mod api {
+    ///     use musli::{Decode, Encode};
+    ///     use musli_web::api;
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct HelloRequest<'de> {
+    ///         pub message: &'de str,
+    ///     }
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct HelloResponse<'de> {
+    ///         pub message: &'de str,
+    ///     }
+    ///
+    ///     api::define! {
+    ///         endpoint Hello {
+    ///             request<'de> = HelloRequest<'de>;
+    ///             response<'de> = HelloResponse<'de>;
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// enum Msg {
+    ///     OnHello(Result<ws::RawPacket, ws::Error>),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     message: String,
+    ///     _hello: ws::Request,
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let link = ctx.link().clone();
+    ///
+    ///         let hello = ctx.props().ws
+    ///             .request::<api::Hello>()
+    ///             .body(api::HelloRequest { message: "Hello!"})
+    ///             .on_raw_packet_cb(move |packet| link.send_message(Msg::OnHello(packet)))
+    ///             .send();
+    ///
+    ///         Self {
+    ///             message: String::from("No Message :("),
+    ///             _hello: hello,
+    ///         }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::OnHello(Err(error)) => {
+    ///                 tracing::error!("Request error: {:?}", error);
+    ///                 false
+    ///             }
+    ///             Msg::OnHello(Ok(packet)) => {
+    ///                 if let Ok(response) = packet.decode::<api::HelloResponse>() {
+    ///                     self.message = response.message.to_owned();
+    ///                 }
+    ///
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///                 <p>{format!("Message: {}", self.message)}</p>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn on_raw_packet_cb(mut self, f: impl Fn(Result<RawPacket, Error>) + 'static) -> Self {
         self.callback = Some(Rc::new(f));
         self
     }
@@ -1082,9 +1168,13 @@ pub struct Packet<T> {
 }
 
 impl<T> Packet<T> {
-    #[cfg(feature = "yew021")]
+    /// Construct a new typed package from a raw one.
+    ///
+    /// Note that this does not guarantee that the typed package is correct, but
+    /// the `T` parameter becomes associated with it allowing it to be used
+    /// automatically with methods such as [`Packet::decode`].
     #[inline]
-    pub(crate) fn new(raw: RawPacket) -> Self {
+    pub fn new(raw: RawPacket) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -1237,6 +1327,7 @@ impl Handle {
     ///         }
     ///     }
     /// }
+    /// ```
     pub fn request<E>(&self) -> RequestBuilder<'_, E>
     where
         E: api::Endpoint,
@@ -1250,8 +1341,86 @@ impl Handle {
         }
     }
 
-    #[cfg(feature = "yew021")]
-    pub(crate) fn listen<T>(&self, f: impl Fn(RawPacket) + 'static) -> Listener
+    /// Listen for broadcasts of type `T`.
+    ///
+    /// Returns a handle for the listener that will cancel the listener if
+    /// dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew021 as yew;
+    /// use yew::prelude::*;
+    /// use musli_web::yew021::*;
+    ///
+    /// mod api {
+    ///     use musli::{Decode, Encode};
+    ///     use musli_web::api;
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct TickEvent<'de> {
+    ///         pub message: &'de str,
+    ///         pub tick: u32,
+    ///     }
+    ///
+    ///     api::define! {
+    ///         broadcast Tick {
+    ///             body<'de> = TickEvent<'de>;
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// enum Msg {
+    ///     Tick(ws::RawPacket),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     tick: u32,
+    ///     _listen: ws::Listener,
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let link = ctx.link().clone();
+    ///         let listen = ctx.props().ws.listen_cb::<api::Tick>(move |packet| link.send_message(Msg::Tick(packet)));
+    ///
+    ///         Self {
+    ///             tick: 0,
+    ///             _listen: listen,
+    ///         }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::Tick(packet) => {
+    ///                 if let Ok(tick) = packet.decode::<api::TickEvent>() {
+    ///                     self.tick = tick.tick;
+    ///                 }
+    ///
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///                 <p>{format!("Tick: {}", self.tick)}</p>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn listen_cb<T>(&self, f: impl Fn(RawPacket) + 'static) -> Listener
     where
         T: api::Listener,
     {
@@ -1272,8 +1441,71 @@ impl Handle {
         }
     }
 
-    #[cfg(feature = "yew021")]
-    pub(crate) fn on_state_change(&self, f: impl Fn(State) + 'static) -> (State, StateListener) {
+    /// Listen for state changes to the underlying connection.
+    ///
+    /// This indicates when the connection is open and ready to receive requests
+    /// through [`State::Open`], or if it's closed and requests will be queued
+    /// through [`State::Closed`].
+    ///
+    /// Dropping the returned handle will cancel the listener.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew021 as yew;
+    /// use yew::prelude::*;
+    /// use musli_web::yew021::*;
+    ///
+    /// enum Msg {
+    ///     StateChange(ws::State),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     state: ws::State,
+    ///     _listen: ws::StateListener,
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let link = ctx.link().clone();
+    ///
+    ///         let (state, listen) = ctx.props().ws.on_state_change_cb(move |state| {
+    ///             link.send_message(Msg::StateChange(state));
+    ///         });
+    ///
+    ///         Self {
+    ///             state,
+    ///             _listen: listen,
+    ///         }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::StateChange(state) => {
+    ///                 self.state = state;
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///                 <p>{format!("State: {:?}", self.state)}</p>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
+    pub fn on_state_change_cb(&self, f: impl Fn(State) + 'static) -> (State, StateListener) {
         let Some(shared) = self.shared.upgrade() else {
             return (
                 State::Closed,
@@ -1295,14 +1527,6 @@ impl Handle {
         };
 
         (state, listener)
-    }
-}
-
-#[cfg(feature = "yew021")]
-impl ImplicitClone021 for Handle {
-    #[inline]
-    fn implicit_clone(&self) -> Self {
-        self.clone()
     }
 }
 
