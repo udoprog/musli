@@ -443,6 +443,9 @@ impl Drop for Shared {
             handle(Error::from(error));
         }
 
+        // We don't need to worry about mutable borrows here, since we only have
+        // weak references to Shared and by virtue of this being dropped they
+        // are all invalid.
         let state_listeners = mem::take(&mut *self.state_listeners.borrow_mut());
         let mut requests = self.requests.borrow_mut();
 
