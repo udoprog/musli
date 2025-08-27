@@ -53,11 +53,17 @@ macro_rules! __define {
 /// The marker type is used with the various types used when interacting with an
 /// API endpoint or broadcast, such as:
 ///
-/// * [`yew021::Request<T>`] where `T: Endpoint`.
-/// * [`yew021::Listener<T>`] where `T: BroadcastEndpoint`.
+/// * [`web03::Request<T>`] where `T: Endpoint`.
+/// * [`web03::Listener<T>`] where `T: BroadcastEndpoint`.
 ///
-/// [`yew021::Request<T>`]: crate::yew021::Request
-/// [`yew021::Listener<T>`]: crate::yew021::Listener
+/// [`web03::Request<T>`]: crate::web03::Request
+/// [`web03::Listener<T>`]: crate::web03::Listener
+///
+/// These are in turn extended with the relevant API using them:
+///
+/// * [`yew021`] for yew `0.21.x`.
+///
+/// [`yew021`]: crate::yew021
 ///
 /// # Examples
 ///
