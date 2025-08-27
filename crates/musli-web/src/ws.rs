@@ -2,9 +2,67 @@
 //!
 //! See [`server()`] for how to use with [axum].
 //!
+//! Handlers are implemented via the [`Handler`] trait, which allows returning
+//! various forms of responses dictated through the [`IntoResponse`] trait. This
+//! is primarily implemented for `bool`, where returning `false` indicates that
+//! the given request kind is not supported.
+//!
+//! You can also return custom error for a handler by having it return anything
+//! that implements [`fmt::Display`]:
+//!
+//! ```
+//! use musli::{Decode, Encode};
+//! use musli_web::ws;
+//!
+//! #[derive(Decode)]
+//! struct Request<'de> {
+//!     message: &'de str,
+//! }
+//!
+//! #[derive(Encode)]
+//! struct Response<'de> {
+//!     message: &'de str,
+//! }
+//!
+//! struct MyHandler;
+//!
+//! impl ws::Handler for MyHandler {
+//!     type Response = Result<bool, &'static str>;
+//!
+//!     async fn handle(
+//!         &mut self,
+//!         kind: &str,
+//!         incoming: &mut ws::Incoming<'_>,
+//!         outgoing: &mut ws::Outgoing<'_>,
+//!     ) -> Self::Response {
+//!         tracing::info!("Handling: {kind}");
+//!
+//!         match kind {
+//!             "request" => {
+//!                 let Some(request) = incoming.read::<Request<'_>>() else {
+//!                     return Ok(false);
+//!                 };
+//!
+//!                 if !request.message.contains("hello") {
+//!                     return Err("Rude message");
+//!                 }
+//!
+//!                 outgoing.write(Response {
+//!                     message: request.message,
+//!                 });
+//!
+//!                 Ok(true)
+//!             }
+//!             _ => Ok(false),
+//!         }
+//!     }
+//! }
+//! ```
+//!
 //! [`server()`]: crate::axum08::server
 //! [axum]: <https://docs.rs/axum>
 
+use core::convert::Infallible;
 use core::fmt::{self, Write};
 use core::future::Future;
 use core::ops::Range;
@@ -110,35 +168,6 @@ where
     fn close(code: u16, reason: &str) -> Self::Message;
 }
 
-enum OneOf<'a, E> {
-    Handler { error: E },
-    Musli { error: storage::Error },
-    UnknownRequest { kind: &'a str },
-}
-
-impl<E> From<storage::Error> for OneOf<'_, E> {
-    #[inline]
-    fn from(error: storage::Error) -> Self {
-        Self::Musli { error }
-    }
-}
-
-impl<E> fmt::Display for OneOf<'_, E>
-where
-    E: fmt::Display,
-{
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            OneOf::Handler { error } => error.fmt(f),
-            OneOf::Musli { error } => error.fmt(f),
-            OneOf::UnknownRequest { kind } => {
-                write!(f, "Unknown request kind: {kind}")
-            }
-        }
-    }
-}
-
 #[derive(Debug)]
 enum ErrorKind {
     #[cfg(feature = "axum-core05")]
@@ -220,14 +249,65 @@ impl From<ErrorKind> for Error {
 
 type Result<T, E = Error> = core::result::Result<T, E>;
 
+/// The response meta from handling a request.
+pub struct Response {
+    handled: bool,
+}
+
+/// Trait governing how something can be converted into a response.
+pub trait IntoResponse {
+    /// The error variant being produced.
+    type Error: fmt::Display;
+
+    /// Convert self into a response.
+    fn into_response(self) -> Result<Response, Self::Error>;
+}
+
+/// Implement [`IntoResponse`] for bool.
+///
+/// On `true`, this means that the request was supported `false` means that it
+/// wasn't.
+impl IntoResponse for bool {
+    type Error = Infallible;
+
+    #[inline]
+    fn into_response(self) -> Result<Response, Self::Error> {
+        Ok(Response { handled: self })
+    }
+}
+
+/// Implement [`IntoResponse`] for result types.
+///
+/// Note that this allows anything that implements [`fmt::Display`] to be used
+/// as an [`Err`] variant. The exact message it's being formatted into will be
+/// forwarded as an error to the client.
+impl<T, E> IntoResponse for Result<T, E>
+where
+    T: IntoResponse<Error = Infallible>,
+    E: fmt::Display,
+{
+    type Error = E;
+
+    #[inline]
+    fn into_response(self) -> Result<Response, E> {
+        match self {
+            Ok(into_response) => match IntoResponse::into_response(into_response) {
+                Ok(response) => Ok(response),
+                Err(error) => match error {},
+            },
+            Err(error) => Err(error),
+        }
+    }
+}
+
 /// A handler for incoming requests.
 ///
 /// See [`server()`] for how to use with `axum`.
 ///
 /// [`server()`]: crate::axum08::server
 pub trait Handler {
-    /// Error returned by handler.
-    type Error: fmt::Display;
+    /// The response type returned by the handler.
+    type Response: IntoResponse;
 
     /// Handle a request.
     fn handle<'this>(
@@ -235,7 +315,7 @@ pub trait Handler {
         kind: &'this str,
         incoming: &'this mut Incoming<'_>,
         outgoing: &'this mut Outgoing<'_>,
-    ) -> impl Future<Output = Result<(), Self::Error>> + Send + 'this;
+    ) -> impl Future<Output = Self::Response> + Send + 'this;
 }
 
 /// The server side handle of the websocket protocol.
@@ -325,6 +405,18 @@ where
     Error: From<S::Error>,
     H: Handler,
 {
+    fn format_error(self: Pin<&mut Self>, error: impl fmt::Display) -> Result<(), Error> {
+        let this = unsafe { Pin::get_unchecked_mut(self) };
+        this.error.clear();
+
+        if write!(this.error, "{error}").is_err() {
+            this.error.clear();
+            return Err(Error::new(ErrorKind::FormatError));
+        }
+
+        Ok(())
+    }
+
     /// Run the server.
     ///
     /// This must be called to handle buffered outgoing and incoming messages.
@@ -381,13 +473,32 @@ where
                                 }
                             };
 
-                            if let Err(error) = self.as_mut().handle_request(reader, header).await {
-                                // SAFETY: Deal with running the server.
-                                let this = unsafe { Pin::get_unchecked_mut(self.as_mut()) };
-
-                                if write!(this.error, "{error}").is_err() {
-                                    return Err(Error::new(ErrorKind::FormatError));
+                            let errored = match self.as_mut().handle_request(reader, header).await {
+                                Ok(response) => match response.into_response() {
+                                    Err(error) => {
+                                        self.as_mut().format_error(error)?;
+                                        false
+                                    }
+                                    Ok(response) => {
+                                        if response.handled {
+                                            true
+                                        } else {
+                                            self.as_mut().format_error(format_args!(
+                                                "No support for request {}",
+                                                header.kind
+                                            ))?;
+                                            false
+                                        }
+                                    }
+                                },
+                                Err(error) => {
+                                    self.as_mut().format_error(error)?;
+                                    false
                                 }
+                            };
+
+                            if errored {
+                                let this = unsafe { Pin::get_unchecked_mut(self.as_mut()) };
 
                                 // Reset the buffer to the previous start point.
                                 this.buf.reset();
@@ -490,11 +601,11 @@ where
         Ok(())
     }
 
-    async fn handle_request<'header>(
+    async fn handle_request(
         self: Pin<&mut Self>,
         reader: SliceReader<'_>,
-        header: api::RequestHeader<'header>,
-    ) -> Result<(), OneOf<'header, H::Error>> {
+        header: api::RequestHeader<'_>,
+    ) -> Result<H::Response, storage::Error> {
         tracing::trace!("Got request: {header:?}");
 
         // SAFETY: The server is pinned.
@@ -514,29 +625,24 @@ where
 
         let mut outgoing = Outgoing {
             error: None,
-            written: false,
             buf: &mut this.buf,
         };
 
-        let result = this
+        let response = this
             .handler
             .handle(header.kind, &mut incoming, &mut outgoing)
             .await;
 
-        if let Err(error) = result {
-            return Err(OneOf::Handler { error });
-        }
-
         if let Some(error) = incoming.error.take() {
-            return Err(OneOf::Musli { error });
+            return Err(error);
         }
 
-        if !outgoing.written {
-            return Err(OneOf::UnknownRequest { kind: header.kind });
+        if let Some(error) = outgoing.error.take() {
+            return Err(error);
         }
 
         outgoing.buf.done();
-        Ok(())
+        Ok(response)
     }
 }
 
@@ -627,7 +733,6 @@ impl<'de> Incoming<'de> {
 /// [`server()`]: crate::axum08::server
 pub struct Outgoing<'a> {
     error: Option<storage::Error>,
-    written: bool,
     buf: &'a mut Buf,
 }
 
@@ -643,8 +748,6 @@ impl Outgoing<'_> {
     {
         if let Err(error) = self.buf.write(value) {
             self.error = Some(error);
-        } else {
-            self.written = true;
         }
     }
 }
