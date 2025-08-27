@@ -8,37 +8,25 @@
 //!
 //! [`yew`]: https://yew.rs
 
-use musli_web::yew021 as ws;
+use musli_web::yew021::*;
+use tracing::Level;
+use tracing_subscriber::Registry;
+use tracing_subscriber::layer::SubscriberExt as _;
+use tracing_wasm::{WASMLayer, WASMLayerConfigBuilder};
 use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 enum Msg {
     Error(ws::Error),
-    WebSocket(ws::Msg),
     Send,
     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
     Tick(ws::Packet<api::Tick>),
 }
 
-impl From<ws::Error> for Msg {
-    #[inline]
-    fn from(error: ws::Error) -> Self {
-        Msg::Error(error)
-    }
-}
-
-impl From<ws::Msg> for Msg {
-    #[inline]
-    fn from(error: ws::Msg) -> Self {
-        Msg::WebSocket(error)
-    }
-}
-
 struct App {
-    service: ws::Service<Self>,
-    handle: ws::Handle,
+    service: ws::Service,
     input: NodeRef,
-    _listen: ws::Listener<api::Tick>,
+    _listen: ws::Listener,
     request: ws::Request,
     responses: Vec<String>,
     tick: u32,
@@ -49,17 +37,21 @@ impl Component for App {
     type Properties = ();
 
     fn create(ctx: &Context<Self>) -> Self {
-        let (mut service, handle) =
-            ws::Service::new(ctx, ws::Connect::location_with_path(String::from("/ws")));
+        let link = ctx.link().clone();
+
+        let service = ws::Service::new(ws::Connect::location_with_path(String::from("/ws")))
+            .on_error(move |error| {
+                link.send_message(Msg::Error(error));
+            });
+
         let input = NodeRef::default();
 
         service.connect();
 
-        let listen = handle.listen(ctx.link().callback(Msg::Tick));
+        let listen = service.handle().listen(ctx.link().callback(Msg::Tick));
 
         Self {
             service,
-            handle,
             input,
             _listen: listen,
             request: ws::Request::empty(),
@@ -71,11 +63,7 @@ impl Component for App {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             Msg::Error(error) => {
-                log::error!("WebSocket error: {:?}", error);
-                false
-            }
-            Msg::WebSocket(msg) => {
-                self.service.update(msg);
+                tracing::error!("WebSocket error: {:?}", error);
                 false
             }
             Msg::Send => {
@@ -87,22 +75,26 @@ impl Component for App {
                 input.set_value("");
 
                 self.request = self
-                    .handle
+                    .service
+                    .handle()
                     .request::<api::Hello>()
                     .body(api::HelloRequest {
                         message: value.as_str(),
                     })
-                    .on_packet(ctx.link().callback(Msg::HelloResponse))
+                    .on_packet(
+                        ctx.link()
+                            .callback(|result: Result<_, _>| Msg::HelloResponse(result)),
+                    )
                     .send();
 
                 true
             }
             Msg::HelloResponse(Err(error)) => {
-                log::error!("Request error: {:?}", error);
+                tracing::error!("Request error: {:?}", error);
                 false
             }
             Msg::HelloResponse(Ok(packet)) => {
-                log::warn!("Got response");
+                tracing::debug!("Got response");
 
                 while !packet.is_empty() {
                     let Ok(response) = packet.decode() else {
@@ -115,6 +107,8 @@ impl Component for App {
                 true
             }
             Msg::Tick(packet) => {
+                tracing::debug!("Got tick");
+
                 if let Ok(tick) = packet.decode_broadcast() {
                     self.tick = tick.tick;
                 }
@@ -139,7 +133,17 @@ impl Component for App {
 }
 
 fn main() {
-    wasm_logger::init(wasm_logger::Config::default());
-    log::trace!("Started up");
+    console_error_panic_hook::set_once();
+
+    let mut config = WASMLayerConfigBuilder::new();
+    config.set_max_level(Level::INFO);
+
+    if let Err(error) = tracing::subscriber::set_global_default(
+        Registry::default().with(WASMLayer::new(config.build())),
+    ) {
+        panic!("Failed to set logger: {error:?}");
+    }
+
+    tracing::trace!("Started up");
     yew::Renderer::<App>::new().render();
 }

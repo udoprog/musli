@@ -78,6 +78,10 @@ pub mod api;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "axum08")))]
 pub mod axum08;
 
+#[cfg(feature = "web03")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "web03")))]
+pub mod web03;
+
 #[cfg(feature = "yew021")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "yew021")))]
 pub mod yew021;

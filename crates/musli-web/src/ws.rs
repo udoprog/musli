@@ -484,7 +484,7 @@ where
                     let payload = this.rng.random::<u32>();
                     this.last_ping = Some(payload);
                     let data = payload.to_ne_bytes().into_iter().collect::<Vec<_>>();
-                    tracing::trace!(data = ?&data[..], "Sending ping");
+                    tracing::debug!(data = ?&data[..], "Sending ping");
                     this.socket.send(S::ping(data.to_vec().into())).await?;
                     let now = Instant::now();
                     ping.as_mut().reset(now + PING_TIMEOUT);
@@ -511,29 +511,29 @@ where
                                 Ok(response) => match response.into_response() {
                                     Err(error) => {
                                         self.as_mut().format_error(error)?;
-                                        false
+                                        true
                                     }
                                     Ok(response) => {
                                         if response.handled {
-                                            true
+                                            false
                                         } else {
                                             self.as_mut().format_error(format_args!(
                                                 "No support for request {}",
                                                 header.kind
                                             ))?;
-                                            false
+                                            true
                                         }
                                     }
                                 },
                                 Err(error) => {
                                     self.as_mut().format_error(error)?;
-                                    false
+                                    true
                                 }
                             };
 
-                            if errored {
-                                let this = unsafe { Pin::get_unchecked_mut(self.as_mut()) };
+                            let this = unsafe { Pin::get_unchecked_mut(self.as_mut()) };
 
+                            if errored {
                                 // Reset the buffer to the previous start point.
                                 this.buf.reset();
 
@@ -544,6 +544,8 @@ where
                                     error: Some(this.error.as_str()),
                                 })?;
 
+                                this.buf.done();
+                            } else {
                                 this.buf.done();
                             }
                         }
@@ -559,7 +561,7 @@ where
                             let close = unsafe { Pin::new_unchecked(&mut this.close_sleep) };
                             let ping = unsafe { Pin::new_unchecked(&mut this.ping_sleep) };
 
-                            tracing::trace!(data = ?&data[..], "Pong");
+                            tracing::debug!(data = ?&data[..], "Pong");
 
                             let Some(expected) = this.last_ping else {
                                 continue;
@@ -582,11 +584,11 @@ where
         };
 
         if let Some((code, reason)) = close_here {
-            tracing::trace!(code, reason, "Closing websocket with reason");
+            tracing::debug!(code, reason, "Closing websocket with reason");
             let this = unsafe { Pin::get_unchecked_mut(self) };
             this.socket.send(S::close(code, reason)).await?;
         } else {
-            tracing::trace!("Closing websocket");
+            tracing::debug!("Closing websocket");
         };
 
         Ok(())
@@ -618,7 +620,7 @@ where
     ///
     /// This will block until the messages have been sent over the network.
     pub async fn flush(self: Pin<&mut Self>) -> Result<()> {
-        tracing::trace!("flushing outbound buffer");
+        tracing::debug!("Flushing outbound buffer");
 
         let this = unsafe { Pin::get_unchecked_mut(self) };
 
@@ -640,7 +642,7 @@ where
         reader: SliceReader<'_>,
         header: api::RequestHeader<'_>,
     ) -> Result<H::Response, storage::Error> {
-        tracing::trace!("Got request: {header:?}");
+        tracing::debug!(?header, "Got request");
 
         // SAFETY: The server is pinned.
         let this = unsafe { Pin::get_unchecked_mut(self) };
@@ -675,7 +677,6 @@ where
             return Err(error);
         }
 
-        outgoing.buf.done();
         Ok(response)
     }
 }
