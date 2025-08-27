@@ -95,7 +95,10 @@ macro_rules! __define {
 #[doc(inline)]
 pub use __define as define;
 
-pub trait Endpoint {
+pub trait Endpoint
+where
+    Self: 'static,
+{
     /// The kind of the response.
     const KIND: &'static str;
 
@@ -103,7 +106,10 @@ pub trait Endpoint {
     type Response<'de>: Decode<'de, Binary, Global>;
 }
 
-pub trait Listener {
+pub trait Listener
+where
+    Self: 'static,
+{
     /// The kind of the response.
     const KIND: &'static str;
 
