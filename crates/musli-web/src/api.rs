@@ -144,9 +144,7 @@ where
 /// A request header.
 #[derive(Debug, Clone, Copy, Encode, Decode)]
 pub struct RequestHeader<'a> {
-    /// The index of the request.
-    pub index: u32,
-    /// The serial number of the request.
+    /// The serial of the request.
     pub serial: u32,
     /// The kind of the request.
     pub kind: &'a str,
@@ -155,11 +153,10 @@ pub struct RequestHeader<'a> {
 /// The header of a response.
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct ResponseHeader<'de> {
-    /// The index of the request this is a response to.
-    pub index: u32,
-    /// The serial number of the request this is a response to.
+    /// The serial request this is a response to.
     pub serial: u32,
-    /// This is a broadcast over the specified topic.
+    /// This is a broadcast over the specified topic. If this is set, then
+    /// serial is `0`.
     #[musli(default, skip_encoding_if = Option::is_none)]
     pub broadcast: Option<&'de str>,
     /// An error message in the response.

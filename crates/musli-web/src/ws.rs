@@ -538,7 +538,6 @@ where
                                 this.buf.reset();
 
                                 this.buf.write(api::ResponseHeader {
-                                    index: header.index,
                                     serial: header.serial,
                                     broadcast: None,
                                     error: Some(this.error.as_str()),
@@ -605,7 +604,6 @@ where
         let this = unsafe { Pin::get_unchecked_mut(self) };
 
         this.buf.write(api::ResponseHeader {
-            index: 0,
             serial: 0,
             broadcast: Some(<T::Endpoint as api::Listener>::KIND),
             error: None,
@@ -648,7 +646,6 @@ where
         let this = unsafe { Pin::get_unchecked_mut(self) };
 
         this.buf.write(api::ResponseHeader {
-            index: header.index,
             serial: header.serial,
             broadcast: None,
             error: None,
