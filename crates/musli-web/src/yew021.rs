@@ -48,7 +48,7 @@
 //!     Error(ws::Error),
 //!     WebSocket(ws::Msg),
 //!     Send,
-//!     HelloResponse(ws::Packet<api::Hello>),
+//!     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
 //!     Tick(ws::Packet<api::Tick>),
 //! }
 //!
@@ -71,7 +71,7 @@
 //!     handle: ws::Handle,
 //!     input: NodeRef,
 //!     _listen: ws::Listener<api::Tick>,
-//!     request: ws::Request<api::Hello>,
+//!     request: ws::Request,
 //!     response: String,
 //!     tick: u32,
 //! }
@@ -87,7 +87,7 @@
 //!
 //!         service.connect();
 //!
-//!         let listen = handle.listen(ctx, Msg::Tick);
+//!         let listen = handle.listen(ctx.link().callback(Msg::Tick));
 //!
 //!         Self {
 //!             service,
@@ -120,26 +120,30 @@
 //!
 //!                 self.request = self
 //!                     .handle
-//!                     .request(ctx)
+//!                     .request::<api::Hello>()
 //!                     .body(api::HelloRequest {
 //!                         message: value.as_str(),
 //!                     })
-//!                     .on_packet(Msg::HelloResponse)
+//!                     .on_packet(ctx.link().callback(Msg::HelloResponse))
 //!                     .send();
 //!
 //!                 true
 //!             }
-//!             Msg::HelloResponse(packet) => {
+//!             Msg::HelloResponse(Err(error)) => {
+//!                 log::error!("Request error: {error}");
+//!                 false
+//!             }
+//!             Msg::HelloResponse(Ok(packet)) => {
 //!                 log::warn!("Got response");
 //!
-//!                 if let Some(response) = packet.decode(ctx) {
+//!                 if let Ok(response) = packet.decode() {
 //!                     self.response = response.message.to_owned();
 //!                 }
 //!
 //!                 true
 //!             }
 //!             Msg::Tick(packet) => {
-//!                 if let Some(tick) = packet.decode_broadcast(ctx) {
+//!                 if let Ok(tick) = packet.decode_broadcast() {
 //!                     self.tick = tick.tick;
 //!                 }
 //!
@@ -187,7 +191,7 @@ use wasm_bindgen02::{JsCast, JsValue};
 use web_sys03::js_sys::{ArrayBuffer, Uint8Array};
 use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, window};
 use yew021::html::{ImplicitClone, Scope};
-use yew021::{Component, Context};
+use yew021::{Callback, Component, Context};
 
 use crate::api;
 
@@ -715,86 +719,50 @@ where
     }
 }
 
-/// A request builder that is empty.
-///
-/// Call [`EmptyRequestBuilder::body`] to associate a body with the request and
-/// convert into a [`RequestBuilder`] which can be sent.
-pub struct EmptyRequestBuilder<'ctx, C>
-where
-    C: Component,
-{
-    link: &'ctx Scope<C>,
-    shared: Rc<Shared>,
-    callback: Option<Box<dyn Fn(Result<RawPacket>)>>,
-}
-
-impl<'ctx, C> EmptyRequestBuilder<'ctx, C>
-where
-    C: Component<Message: From<Error>>,
-{
-    /// Set the body of the request.
-    pub fn body<T>(self, body: T) -> RequestBuilder<'ctx, C, T::Endpoint>
-    where
-        T: api::Request,
-    {
-        let body = match musli::storage::to_vec(&body) {
-            Ok(body) => body,
-            Err(error) => {
-                self.link.send_message(Error::from(error));
-                Vec::new()
-            }
-        };
-
-        RequestBuilder {
-            link: self.link,
-            shared: self.shared,
-            body: Some(body),
-            callback: self.callback,
-            _marker: PhantomData,
-        }
-    }
-}
-
-/// A request builder that has a body.
+/// A request builder .
 ///
 /// Associate the callback to be used by using either
 /// [`RequestBuilder::on_packet`] or [`RequestBuilder::on_raw_packet`] depending
 /// on your needs.
 ///
 /// Send the request with [`RequestBuilder::send`].
-pub struct RequestBuilder<'ctx, C, E>
-where
-    C: Component,
-{
-    link: &'ctx Scope<C>,
-    shared: Rc<Shared>,
+pub struct RequestBuilder<'a, E> {
+    shared: &'a Rc<Shared>,
     body: Option<Vec<u8>>,
     callback: Option<Box<dyn Fn(Result<RawPacket>)>>,
+    error: Option<Error>,
     _marker: PhantomData<E>,
 }
 
-impl<'ctx, C, E> RequestBuilder<'ctx, C, E>
+impl<'a, E> RequestBuilder<'a, E>
 where
-    C: Component<Message: From<Error>>,
     E: api::Endpoint,
 {
+    /// Set the body of the request.
+    pub fn body<T>(mut self, body: T) -> RequestBuilder<'a, E>
+    where
+        T: api::Request<Endpoint = E>,
+    {
+        match musli::storage::to_vec(&body) {
+            Ok(vec) => self.body = Some(vec),
+            Err(err) => self.error = Some(Error::from(err)),
+        }
+
+        self
+    }
+
     /// Handle the response by converting a typed packet into a message.
-    pub fn on_packet(mut self, f: impl Fn(Packet<E>) -> C::Message + 'static) -> Self {
-        let link = self.link.clone();
-
-        self.callback = Some(Box::new(move |result| {
-            let raw = match result {
-                Ok(raw) => raw,
-                Err(error) => {
-                    link.send_message(error);
-                    return;
-                }
-            };
-
-            link.send_message(f(Packet {
-                raw,
-                _marker: PhantomData,
-            }));
+    pub fn on_packet(mut self, f: Callback<Result<Packet<E>>>) -> Self {
+        self.callback = Some(Box::new(move |result| match result {
+            Ok(raw) => {
+                f.emit(Ok(Packet {
+                    raw,
+                    _marker: PhantomData,
+                }));
+            }
+            Err(error) => {
+                f.emit(Err(error));
+            }
         }));
 
         self
@@ -805,29 +773,30 @@ where
     /// This can be useful if all of your responses are expected to return the
     /// same response type and you only want to have one message to handle all
     /// of them.
-    pub fn on_raw_packet(mut self, f: impl Fn(RawPacket) -> C::Message + 'static) -> Self {
-        let link = self.link.clone();
-
-        self.callback = Some(Box::new(move |result| {
-            let raw = match result {
-                Ok(raw) => raw,
-                Err(error) => {
-                    link.send_message(error);
-                    return;
-                }
-            };
-
-            link.send_message(f(raw));
+    pub fn on_raw_packet(mut self, f: Callback<Result<RawPacket>>) -> Self {
+        self.callback = Some(Box::new(move |result| match result {
+            Ok(raw) => {
+                f.emit(Ok(raw));
+            }
+            Err(error) => {
+                f.emit(Err(error));
+            }
         }));
 
         self
     }
 
     /// Build and return the request.
-    pub fn send(self) -> Request<E> {
-        let Some(body) = self.body else {
+    pub fn send(self) -> Request {
+        if let Some(error) = self.error {
+            if let Some(callback) = self.callback {
+                callback(Err(error));
+            }
+
             return Request::empty();
-        };
+        }
+
+        let body = self.body.unwrap_or_default();
 
         let serial = self.shared.serial.get();
         self.shared.serial.set(serial.wrapping_add(1));
@@ -850,19 +819,17 @@ where
         });
 
         Request {
-            inner: Some((Rc::downgrade(&self.shared), index)),
-            _marker: PhantomData,
+            inner: Some((Rc::downgrade(self.shared), index)),
         }
     }
 }
 
 /// The handle for a pending request. Dropping this handle cancels the request.
-pub struct Request<T> {
+pub struct Request {
     inner: Option<(Weak<Shared>, u32)>,
-    _marker: PhantomData<T>,
 }
 
-impl<T> Request<T> {
+impl Request {
     /// An empty request handler.
     #[inline]
     pub fn empty() -> Self {
@@ -870,17 +837,14 @@ impl<T> Request<T> {
     }
 }
 
-impl<T> Default for Request<T> {
+impl Default for Request {
     #[inline]
     fn default() -> Self {
-        Self {
-            inner: None,
-            _marker: PhantomData,
-        }
+        Self { inner: None }
     }
 }
 
-impl<T> Drop for Request<T> {
+impl Drop for Request {
     #[inline]
     fn drop(&mut self) {
         if let Some((s, index)) = self.inner.take()
@@ -941,26 +905,17 @@ pub struct RawPacket {
 
 impl RawPacket {
     /// Decode the contents of a raw packet.
-    pub fn decode<'this, T>(
-        &'this self,
-        ctx: &Context<impl Component<Message: From<Error>>>,
-    ) -> Option<T>
+    pub fn decode<'this, T>(&'this self) -> Result<T>
     where
         T: Decode<'this, Binary, Global>,
     {
         let Some(bytes) = self.body.get(self.at..) else {
-            ctx.link()
-                .send_message(Error::new(ErrorKind::Overflow(self.at, self.body.len())));
-
-            return None;
+            return Err(Error::new(ErrorKind::Overflow(self.at, self.body.len())));
         };
 
         match musli::storage::from_slice(bytes) {
-            Ok(value) => Some(value),
-            Err(error) => {
-                ctx.link().send_message(Error::from(error));
-                None
-            }
+            Ok(value) => Ok(value),
+            Err(error) => Err(Error::from(error)),
         }
     }
 
@@ -991,12 +946,9 @@ impl<T> Packet<T>
 where
     T: api::Endpoint,
 {
-    /// Decode a response.
-    pub fn decode(
-        &self,
-        ctx: &Context<impl Component<Message: From<Error>>>,
-    ) -> Option<T::Response<'_>> {
-        self.raw.decode(ctx)
+    /// Decode a typed response.
+    pub fn decode(&self) -> Result<T::Response<'_>> {
+        self.raw.decode()
     }
 }
 
@@ -1004,12 +956,9 @@ impl<T> Packet<T>
 where
     T: api::Listener,
 {
-    /// Decode a broadcast message.
-    pub fn decode_broadcast(
-        &self,
-        ctx: &Context<impl Component<Message: From<Error>>>,
-    ) -> Option<T::Broadcast<'_>> {
-        self.raw.decode(ctx)
+    /// Decode a typed broadcast.
+    pub fn decode_broadcast(&self) -> Result<T::Broadcast<'_>> {
+        self.raw.decode()
     }
 }
 
@@ -1057,15 +1006,7 @@ impl Handle {
     /// }
     ///
     /// enum Msg {
-    ///     Error(ws::Error),
-    ///     OnHello(ws::Packet<api::Hello>),
-    /// }
-    ///
-    /// impl From<ws::Error> for Msg {
-    ///     #[inline]
-    ///     fn from(error: ws::Error) -> Self {
-    ///         Msg::Error(error)
-    ///     }
+    ///     OnHello(Result<ws::Packet<api::Hello>, ws::Error>),
     /// }
     ///
     /// #[derive(Properties, PartialEq)]
@@ -1075,7 +1016,7 @@ impl Handle {
     ///
     /// struct App {
     ///     message: String,
-    ///     _hello: ws::Request<api::Hello>,
+    ///     _hello: ws::Request,
     /// }
     ///
     /// impl Component for App {
@@ -1084,9 +1025,9 @@ impl Handle {
     ///
     ///     fn create(ctx: &Context<Self>) -> Self {
     ///         let hello = ctx.props().ws
-    ///             .request(ctx)
+    ///             .request::<api::Hello>()
     ///             .body(api::HelloRequest { message: "Hello!"})
-    ///             .on_packet(Msg::OnHello)
+    ///             .on_packet(ctx.link().callback(Msg::OnHello))
     ///             .send();
     ///
     ///         Self {
@@ -1097,12 +1038,12 @@ impl Handle {
     ///
     ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
     ///         match msg {
-    ///             Msg::Error(error) => {
+    ///             Msg::OnHello(Err(error)) => {
     ///                 log::error!("Request error: {:?}", error);
     ///                 false
     ///             }
-    ///             Msg::OnHello(packet) => {
-    ///                 if let Some(response) = packet.decode(ctx) {
+    ///             Msg::OnHello(Ok(packet)) => {
+    ///                 if let Ok(response) = packet.decode() {
     ///                     self.message = response.message.to_owned();
     ///                 }
     ///
@@ -1120,14 +1061,16 @@ impl Handle {
     ///         }
     ///     }
     /// }
-    pub fn request<'ctx, C>(&self, ctx: &'ctx Context<C>) -> EmptyRequestBuilder<'ctx, C>
+    pub fn request<E>(&self) -> RequestBuilder<'_, E>
     where
-        C: Component<Message: From<Error>>,
+        E: api::Endpoint,
     {
-        EmptyRequestBuilder {
-            link: ctx.link(),
-            shared: self.shared.clone(),
+        RequestBuilder {
+            shared: &self.shared,
+            body: None,
             callback: None,
+            error: None,
+            _marker: PhantomData,
         }
     }
 
@@ -1189,7 +1132,7 @@ impl Handle {
     ///     type Properties = Props;
     ///
     ///     fn create(ctx: &Context<Self>) -> Self {
-    ///         let listen = ctx.props().ws.listen(ctx, Msg::Tick);
+    ///         let listen = ctx.props().ws.listen(ctx.link().callback(Msg::Tick));
     ///
     ///         Self {
     ///             tick: 0,
@@ -1204,7 +1147,7 @@ impl Handle {
     ///                 false
     ///             }
     ///             Msg::Tick(packet) => {
-    ///                 if let Some(tick) = packet.decode_broadcast(ctx) {
+    ///                 if let Ok(tick) = packet.decode_broadcast() {
     ///                     self.tick = tick.tick;
     ///                 }
     ///
@@ -1222,25 +1165,19 @@ impl Handle {
     ///         }
     ///     }
     /// }
-    pub fn listen<T, C>(
-        &self,
-        ctx: &Context<C>,
-        f: impl Fn(Packet<T>) -> C::Message + 'static,
-    ) -> Listener<T>
+    pub fn listen<T>(&self, f: Callback<Packet<T>>) -> Listener<T>
     where
         T: api::Listener,
-        C: Component<Message: From<Error>>,
     {
         let mut broadcasts = RefMut::map(self.shared.mutable.borrow_mut(), |m| &mut m.broadcasts);
 
         let slots = broadcasts.entry(T::KIND).or_default();
-        let link = ctx.link().clone();
 
         let index = slots.insert(Box::new(move |raw| {
-            link.send_message(f(Packet {
+            f.emit(Packet {
                 raw,
                 _marker: PhantomData,
-            }));
+            });
         }));
 
         Listener {

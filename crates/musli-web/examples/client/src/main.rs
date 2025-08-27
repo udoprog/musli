@@ -16,7 +16,7 @@ enum Msg {
     Error(ws::Error),
     WebSocket(ws::Msg),
     Send,
-    HelloResponse(ws::Packet<api::Hello>),
+    HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
     Tick(ws::Packet<api::Tick>),
 }
 
@@ -39,7 +39,7 @@ struct App {
     handle: ws::Handle,
     input: NodeRef,
     _listen: ws::Listener<api::Tick>,
-    request: ws::Request<api::Hello>,
+    request: ws::Request,
     response: String,
     tick: u32,
 }
@@ -55,7 +55,7 @@ impl Component for App {
 
         service.connect();
 
-        let listen = handle.listen(ctx, Msg::Tick);
+        let listen = handle.listen(ctx.link().callback(Msg::Tick));
 
         Self {
             service,
@@ -88,26 +88,30 @@ impl Component for App {
 
                 self.request = self
                     .handle
-                    .request(ctx)
+                    .request::<api::Hello>()
                     .body(api::HelloRequest {
                         message: value.as_str(),
                     })
-                    .on_packet(Msg::HelloResponse)
+                    .on_packet(ctx.link().callback(Msg::HelloResponse))
                     .send();
 
                 true
             }
-            Msg::HelloResponse(packet) => {
+            Msg::HelloResponse(Err(error)) => {
+                log::error!("Request error: {:?}", error);
+                false
+            }
+            Msg::HelloResponse(Ok(packet)) => {
                 log::warn!("Got response");
 
-                if let Some(response) = packet.decode(ctx) {
+                if let Ok(response) = packet.decode() {
                     self.response = response.message.to_owned();
                 }
 
                 true
             }
             Msg::Tick(packet) => {
-                if let Some(tick) = packet.decode_broadcast(ctx) {
+                if let Ok(tick) = packet.decode_broadcast() {
                     self.tick = tick.tick;
                 }
 
