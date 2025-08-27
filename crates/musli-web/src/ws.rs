@@ -535,6 +535,7 @@ where
             return Err(OneOf::UnknownRequest { kind: header.kind });
         }
 
+        outgoing.buf.done();
         Ok(())
     }
 }
@@ -644,7 +645,6 @@ impl Outgoing<'_> {
             self.error = Some(error);
         } else {
             self.written = true;
-            self.buf.done();
         }
     }
 }

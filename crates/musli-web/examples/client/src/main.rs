@@ -40,7 +40,7 @@ struct App {
     input: NodeRef,
     _listen: ws::Listener<api::Tick>,
     request: ws::Request,
-    response: String,
+    responses: Vec<String>,
     tick: u32,
 }
 
@@ -63,7 +63,7 @@ impl Component for App {
             input,
             _listen: listen,
             request: ws::Request::empty(),
-            response: String::new(),
+            responses: Vec::new(),
             tick: 0,
         }
     }
@@ -104,8 +104,12 @@ impl Component for App {
             Msg::HelloResponse(Ok(packet)) => {
                 log::warn!("Got response");
 
-                if let Ok(response) = packet.decode() {
-                    self.response = response.message.to_owned();
+                while !packet.is_empty() {
+                    let Ok(response) = packet.decode() else {
+                        break;
+                    };
+
+                    self.responses.push(response.message.to_owned());
                 }
 
                 true
@@ -127,7 +131,7 @@ impl Component for App {
             <div class="container">
                 <input type="text" ref={self.input.clone()} />
                 <button {onclick}>{"Send Message"}</button>
-                <div>{format!("Response: {}", self.response)}</div>
+                {for self.responses.iter().enumerate().map(|(index, response)| html!(<div>{format!("Response #{index}: {response}")}</div>))}
                 <div>{format!("Global tick: {}", self.tick)}</div>
             </div>
         }

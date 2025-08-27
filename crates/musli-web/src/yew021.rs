@@ -181,6 +181,7 @@ use alloc::vec::Vec;
 use musli::Decode;
 use musli::alloc::Global;
 use musli::mode::Binary;
+use musli::reader::SliceReader;
 
 use std::collections::{HashMap, hash_map};
 
@@ -200,7 +201,7 @@ const MAX_CAPACITY: usize = 1048576;
 /// The state of the connection.
 ///
 /// A listener for state changes can be set up through
-/// [`Handle::state_changes`].
+/// [`Handle::on_state_change`].
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[non_exhaustive]
 pub enum State {
@@ -361,7 +362,6 @@ where
     shared: Rc<Shared>,
     socket: Option<WebSocket>,
     opened: Option<Opened>,
-    state: State,
     buffer: Vec<ClientRequest<'static>>,
     output: Vec<u8>,
     timeout: u32,
@@ -384,6 +384,7 @@ where
         let link = ctx.link().clone();
 
         let shared = Rc::new(Shared {
+            state: Cell::new(State::Closed),
             serial: Cell::new(0),
             onmessage: Box::new(move |request| {
                 link.send_message(Msg::new(MsgKind::ClientRequest(request)))
@@ -391,7 +392,7 @@ where
             mutable: RefCell::new(Mutable {
                 requests: Slab::new(),
                 broadcasts: HashMap::new(),
-                state_changes: Slab::new(),
+                state_listeners: Slab::new(),
             }),
         });
 
@@ -441,7 +442,6 @@ where
             shared: shared.clone(),
             socket: None,
             opened: None,
-            state: State::Closed,
             buffer: Vec::new(),
             output: Vec::new(),
             timeout: INITIAL_TIMEOUT,
@@ -479,7 +479,7 @@ where
         };
 
         let body = Rc::from(Uint8Array::new(&array_buffer).to_vec());
-        let mut reader = musli::reader::SliceReader::new(&body);
+        let mut reader = SliceReader::new(&body);
 
         let header: api::ResponseHeader<'_> = musli::storage::decode(&mut reader)?;
 
@@ -492,7 +492,7 @@ where
                     for (_, callback) in broadcasts.iter() {
                         (callback)(RawPacket {
                             body: body.clone(),
-                            at,
+                            at: Cell::new(at),
                             kind,
                         });
                     }
@@ -516,11 +516,13 @@ where
                         }
                     } else if let Some(callback) = &pending.callback {
                         let at = body.len() - reader.remaining();
+
                         let raw = RawPacket {
                             body,
-                            at,
+                            at: Cell::new(at),
                             kind: pending.kind,
                         };
+
                         callback(Ok(raw));
                     }
                 }
@@ -573,14 +575,13 @@ where
     }
 
     fn emit_state_change(&mut self, state: State) {
-        if self.state != state {
-            let callbacks = Ref::map(self.shared.mutable.borrow(), |m| &m.state_changes);
+        if self.shared.state.get() != state {
+            self.shared.state.set(state);
+            let callbacks = Ref::map(self.shared.mutable.borrow(), |m| &m.state_listeners);
 
             for (_, callback) in callbacks.iter() {
-                callback(state);
+                callback.emit(state);
             }
-
-            self.state = state;
         }
     }
 
@@ -881,17 +882,19 @@ impl<T> Drop for Listener<T> {
 /// The handle for state change listening. Dropping this handle cancels the request.
 pub struct StateListener {
     index: usize,
-    shared: Rc<Shared>,
+    shared: Weak<Shared>,
 }
 
 impl Drop for StateListener {
     #[inline]
     fn drop(&mut self) {
-        self.shared
-            .mutable
-            .borrow_mut()
-            .state_changes
-            .try_remove(self.index);
+        if let Some(shared) = self.shared.upgrade() {
+            shared
+                .mutable
+                .borrow_mut()
+                .state_listeners
+                .try_remove(self.index);
+        }
     }
 }
 
@@ -899,27 +902,50 @@ impl Drop for StateListener {
 #[derive(Clone)]
 pub struct RawPacket {
     body: Rc<[u8]>,
-    at: usize,
+    at: Cell<usize>,
     kind: &'static str,
 }
 
 impl RawPacket {
     /// Decode the contents of a raw packet.
+    ///
+    /// This can be called multiple times if there are multiple payloads in
+    /// sequence of the response.
+    ///
+    /// You can check if the packet is empty using [`RawPacket::is_empty`].
     pub fn decode<'this, T>(&'this self) -> Result<T>
     where
         T: Decode<'this, Binary, Global>,
     {
-        let Some(bytes) = self.body.get(self.at..) else {
-            return Err(Error::new(ErrorKind::Overflow(self.at, self.body.len())));
+        let at = self.at.get();
+
+        let Some(bytes) = self.body.get(at..) else {
+            return Err(Error::new(ErrorKind::Overflow(at, self.body.len())));
         };
 
-        match musli::storage::from_slice(bytes) {
-            Ok(value) => Ok(value),
-            Err(error) => Err(Error::from(error)),
+        let mut reader = SliceReader::new(bytes);
+
+        match musli::storage::decode(&mut reader) {
+            Ok(value) => {
+                self.at.set(at + bytes.len() - reader.remaining());
+                Ok(value)
+            }
+            Err(error) => {
+                self.at.set(self.body.len());
+                Err(Error::from(error))
+            }
         }
     }
 
-    /// The kind of the packet.
+    /// Check if the packet is empty.
+    pub fn is_empty(&self) -> bool {
+        self.at.get() >= self.body.len()
+    }
+
+    /// The kind of the packet this is a response to as specified by
+    /// [`Endpoint::KIND`].
+    ///
+    /// [`Endpoint::KIND`]: crate::api::Endpoint::KIND
     pub fn kind(&self) -> &str {
         self.kind
     }
@@ -940,13 +966,31 @@ impl<T> Packet<T> {
     pub fn into_raw(self) -> RawPacket {
         self.raw
     }
+
+    /// Check if the packet is empty.
+    pub fn is_empty(&self) -> bool {
+        self.raw.is_empty()
+    }
+
+    /// The kind of the packet this is a response to as specified by
+    /// [`Endpoint::KIND`].
+    ///
+    /// [`Endpoint::KIND`]: crate::api::Endpoint::KIND
+    pub fn kind(&self) -> &str {
+        self.raw.kind()
+    }
 }
 
 impl<T> Packet<T>
 where
     T: api::Endpoint,
 {
-    /// Decode a typed response.
+    /// Decode the contents of a packet.
+    ///
+    /// This can be called multiple times if there are multiple payloads in
+    /// sequence of the response.
+    ///
+    /// You can check if the packet is empty using [`Packet::is_empty`].
     pub fn decode(&self) -> Result<T::Response<'_>> {
         self.raw.decode()
     }
@@ -1106,15 +1150,7 @@ impl Handle {
     /// }
     ///
     /// enum Msg {
-    ///     Error(ws::Error),
     ///     Tick(ws::Packet<api::Tick>),
-    /// }
-    ///
-    /// impl From<ws::Error> for Msg {
-    ///     #[inline]
-    ///     fn from(error: ws::Error) -> Self {
-    ///         Msg::Error(error)
-    ///     }
     /// }
     ///
     /// #[derive(Properties, PartialEq)]
@@ -1142,10 +1178,6 @@ impl Handle {
     ///
     ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
     ///         match msg {
-    ///             Msg::Error(error) => {
-    ///                 log::error!("Broadcast error: {:?}", error);
-    ///                 false
-    ///             }
     ///             Msg::Tick(packet) => {
     ///                 if let Ok(tick) = packet.decode_broadcast() {
     ///                     self.tick = tick.tick;
@@ -1189,22 +1221,79 @@ impl Handle {
     }
 
     /// Listen for state changes to the underlying connection.
-    pub fn state_changes<C>(
-        &self,
-        ctx: &Context<C>,
-        f: impl Fn(State) -> C::Message + 'static,
-    ) -> StateListener
-    where
-        C: Component,
-    {
-        let link = ctx.link().clone();
-        let mut state = RefMut::map(self.shared.mutable.borrow_mut(), |m| &mut m.state_changes);
-        let index = state.insert(Box::new(move |state| link.send_message(f(state))));
+    ///
+    /// This indicates when the connection is open and ready to receive requests
+    /// through [`State::Open`], or if it's closed and requests will be queued
+    /// through [`State::Closed`].
+    ///
+    /// Dropping the returned handle will cancel the listener.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew021 as yew;
+    /// use yew::prelude::*;
+    ///
+    /// use musli_web::yew021 as ws;
+    ///
+    /// enum Msg {
+    ///     StateChange(ws::State),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     state: ws::State,
+    ///     _listen: ws::StateListener,
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let (state, listen) = ctx.props().ws.on_state_change(ctx.link().callback(Msg::StateChange));
+    ///
+    ///         Self {
+    ///             state,
+    ///             _listen: listen,
+    ///         }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::StateChange(state) => {
+    ///                 self.state = state;
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///                 <p>{format!("State: {:?}", self.state)}</p>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
+    pub fn on_state_change(&self, f: Callback<State>) -> (State, StateListener) {
+        let state = self.shared.state.get();
 
-        StateListener {
+        let mut state_listeners =
+            RefMut::map(self.shared.mutable.borrow_mut(), |m| &mut m.state_listeners);
+        let index = state_listeners.insert(f);
+
+        let listener = StateListener {
             index,
-            shared: self.shared.clone(),
-        }
+            shared: Rc::downgrade(&self.shared),
+        };
+
+        (state, listener)
     }
 }
 
@@ -1234,15 +1323,15 @@ struct Pending {
 
 type Broadcasts = HashMap<&'static str, Slab<Box<dyn Fn(RawPacket)>>>;
 type OnMessageCallback = dyn Fn(ClientRequest<'static>);
-type StateCallback = dyn Fn(State);
 
 struct Mutable {
     requests: Slab<Pending>,
     broadcasts: Broadcasts,
-    state_changes: Slab<Box<StateCallback>>,
+    state_listeners: Slab<Callback<State>>,
 }
 
 struct Shared {
+    state: Cell<State>,
     serial: Cell<u32>,
     onmessage: Box<OnMessageCallback>,
     mutable: RefCell<Mutable>,
