@@ -37,12 +37,9 @@ impl Component for App {
     type Properties = ();
 
     fn create(ctx: &Context<Self>) -> Self {
-        let link = ctx.link().clone();
-
-        let service = ws::Service::new(ws::Connect::location_with_path(String::from("/ws")))
-            .on_error(move |error| {
-                link.send_message(Msg::Error(error));
-            });
+        let service = ws::connect(ws::Connect::location_with_path(String::from("/ws")))
+            .on_error(ctx.link().callback(Msg::Error))
+            .build();
 
         let input = NodeRef::default();
 

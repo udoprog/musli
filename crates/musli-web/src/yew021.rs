@@ -5,9 +5,22 @@ use yew021::Callback;
 pub use crate::web03 as ws;
 
 use crate::api;
-use crate::web03::{Error, RawPacket};
+use crate::web03::{Error, RawPacket, ServiceBuilder};
 use crate::web03::{Handle, Listener, Packet, RequestBuilder};
 use crate::web03::{State, StateListener};
+
+/// Service builder extension for interacting with handles in yew `0.21.x`.
+pub trait ServiceBuilderExt {
+    /// Set the error handler to use for the service.
+    fn on_error(self, callback: Callback<Error>) -> Self;
+}
+
+impl ServiceBuilderExt for ws::ServiceBuilder {
+    #[inline]
+    fn on_error(self, callback: Callback<Error>) -> Self {
+        ServiceBuilder::on_error(self, move |error| callback.emit(error))
+    }
+}
 
 /// Request builder extension for interacting with handles in yew `0.21.x`.
 pub trait HandleExt {
