@@ -1,6 +1,6 @@
 [package]
 name = "musli-web"
-version = "0.0.137"
+version = "0.0.138"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2024"
 description = """
@@ -34,7 +34,7 @@ web03 = ["std", "alloc", "api", "slab", "musli/storage", "dep:web-sys03", "dep:t
 test = ["api", "json", "ws", "yew021"]
 
 [dependencies]
-musli = { path = "../musli", version = "0.0.137", default-features = false, optional = true }
+musli = { path = "../musli", version = "0.0.138", default-features = false, optional = true }
 http = { version = "1.3.1", default-features = false, optional = true }
 bytes = { version = "1.10.0", default-features = false, optional = true }
 mime = { version = "0.3.17", default-features = false, optional = true }
