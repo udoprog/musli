@@ -49,6 +49,10 @@ impl ws::Handler for MyHandler {
                 outgoing.write(api::HelloResponse {
                     message: request.message,
                 });
+
+                outgoing.write(api::HelloResponse {
+                    message: request.message.to_uppercase().as_str(),
+                });
             }
             _ => {}
         }
