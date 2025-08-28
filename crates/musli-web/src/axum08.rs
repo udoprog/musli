@@ -12,8 +12,10 @@ use bytes::Bytes;
 
 use axum_core05::Error;
 use axum08::extract::ws::{CloseFrame, Message, WebSocket};
+use futures_core03::Stream;
+use futures_sink03::Sink;
 
-use crate::ws::{self, Handler, Server, ServerImplementation, Socket};
+use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 
 /// Construct a new axum server with the specified handler.
 ///
@@ -160,6 +162,8 @@ where
     Server::new(socket, handler)
 }
 
+impl crate::ws::server_sealed::Sealed for AxumServer {}
+
 /// Marker type used in combination with [`Server`] to indicate that the
 /// implementation uses axum.
 ///
@@ -167,43 +171,7 @@ where
 #[non_exhaustive]
 pub enum AxumServer {}
 
-impl Socket for WebSocket {
-    type Message = Message;
-    type Error = Error;
-
-    #[inline]
-    #[allow(private_interfaces)]
-    fn poll_next(
-        self: Pin<&mut Self>,
-        ctx: &mut Context<'_>,
-    ) -> Poll<Option<Result<ws::Message, Self::Error>>> {
-        let Some(result) = ready!(futures_core03::Stream::poll_next(self, ctx)) else {
-            return Poll::Ready(None);
-        };
-
-        let message = match result {
-            Ok(message) => message,
-            Err(err) => return Poll::Ready(Some(Err(err))),
-        };
-
-        let message = match message {
-            Message::Text(..) => ws::Message::Text,
-            Message::Binary(data) => ws::Message::Binary(data),
-            Message::Ping(data) => ws::Message::Ping(data),
-            Message::Pong(data) => ws::Message::Pong(data),
-            Message::Close(..) => ws::Message::Close,
-        };
-
-        Poll::Ready(Some(Ok(message)))
-    }
-
-    #[inline]
-    async fn send(&mut self, message: Self::Message) -> Result<(), Self::Error> {
-        WebSocket::send(self, message).await
-    }
-}
-
-impl ServerImplementation for AxumServer {
+impl ServerImpl for AxumServer {
     type Error = Error;
     type Message = Message;
     type Socket = WebSocket;
@@ -229,5 +197,53 @@ impl ServerImplementation for AxumServer {
             code,
             reason: reason.into(),
         }))
+    }
+}
+
+impl crate::ws::socket_sealed::Sealed for WebSocket {}
+
+impl SocketImpl for WebSocket {
+    type Message = Message;
+    type Error = Error;
+
+    #[inline]
+    #[allow(private_interfaces)]
+    fn poll_next(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Option<Result<ws::Message, Self::Error>>> {
+        let Some(result) = ready!(Stream::poll_next(self, ctx)) else {
+            return Poll::Ready(None);
+        };
+
+        let message = match result {
+            Ok(message) => message,
+            Err(err) => return Poll::Ready(Some(Err(err))),
+        };
+
+        let message = match message {
+            Message::Text(..) => ws::Message::Text,
+            Message::Binary(data) => ws::Message::Binary(data),
+            Message::Ping(data) => ws::Message::Ping(data),
+            Message::Pong(data) => ws::Message::Pong(data),
+            Message::Close(..) => ws::Message::Close,
+        };
+
+        Poll::Ready(Some(Ok(message)))
+    }
+
+    #[inline]
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Sink::poll_ready(self, cx)
+    }
+
+    #[inline]
+    fn start_send(self: Pin<&mut Self>, message: Self::Message) -> Result<(), Self::Error> {
+        Sink::start_send(self, message)
+    }
+
+    #[inline]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Sink::poll_flush(self, cx)
     }
 }

@@ -1,3 +1,5 @@
+use core::cell::Cell;
+use core::fmt;
 use core::mem;
 use core::num::NonZeroUsize;
 use core::ops::Range;
@@ -6,12 +8,30 @@ use alloc::vec::Vec;
 use musli::mode::Binary;
 use musli::{Encode, storage};
 
+#[derive(Debug)]
+pub(crate) struct InvalidFrame {
+    frame: Range<usize>,
+    size: usize,
+}
+
+impl fmt::Display for InvalidFrame {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Invalid frame {}-{} (in {} bytes)",
+            self.frame.start, self.frame.end, self.size
+        )
+    }
+}
+
 /// A length-prefixed buffer which keeps track of the start of each frame and
 /// allows them to be iterated over.
 #[derive(Default)]
 pub(crate) struct Buf {
     start: Option<NonZeroUsize>,
     buffer: Vec<u8>,
+    read: Cell<usize>,
 }
 
 impl Buf {
@@ -40,18 +60,9 @@ impl Buf {
     /// Check if the buffer is empty.
     #[inline]
     pub(crate) fn is_empty(&self) -> bool {
-        if self.buffer.is_empty() {
-            return true;
-        }
-
-        matches!(self.len_at(0), None | Some(0))
-    }
-
-    fn len_at(&self, at: usize) -> Option<u32> {
-        match self.buffer.get(at..at + mem::size_of::<u32>())? {
-            &[a, b, c, d] => Some(u32::from_ne_bytes([a, b, c, d])),
-            _ => None,
-        }
+        // NB: Read should never exceed the length of the buffer.
+        debug_assert!(self.read.get() <= self.buffer.len());
+        self.read.get() >= self.buffer.len()
     }
 
     fn len_at_mut(&mut self, at: usize) -> Option<&mut [u8; 4]> {
@@ -96,60 +107,59 @@ impl Buf {
     pub(crate) fn clear(&mut self) {
         self.start = None;
         self.buffer.clear();
+        self.read.set(0);
     }
 
+    /// Get the next frame starting at the given location.
     #[inline]
-    pub(crate) fn shrink_to(&mut self, size: usize) {
-        self.buffer.shrink_to(size);
-    }
+    pub(crate) fn read(&self) -> Result<Option<&[u8]>, InvalidFrame> {
+        let read = self.read.get();
 
-    /// Drain the current frames from the buffer.
-    ///
-    /// Note that this does not drain the buffer itself, to do this you must
-    /// call [`Buf::clear`].
-    #[inline]
-    pub(crate) fn frames(&mut self) -> Frames<'_> {
-        Frames {
-            buffer: self.buffer.as_slice(),
-        }
-    }
-}
-
-/// An iterator over frames.
-pub(crate) struct Frames<'a> {
-    buffer: &'a [u8],
-}
-
-impl<'a> Iterator for Frames<'a> {
-    type Item = Result<&'a [u8], (Range<usize>, usize)>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        macro_rules! split_at {
-            ($len:expr) => {{
-                let Some((out, tail)) = self.buffer.split_at_checked($len) else {
-                    let range = 0..$len;
-                    let available = self.buffer.len();
-                    self.buffer = &[];
-                    return Some(Err((range, available)));
-                };
-
-                self.buffer = tail;
-                out
-            }};
+        if self.buffer.len() == read {
+            return Ok(None);
         }
 
-        if self.buffer.is_empty() {
-            return None;
-        }
-
-        let len = split_at!(mem::size_of::<u32>());
-
-        let len = match len {
-            &[a, b, c, d] => usize::try_from(u32::from_ne_bytes([a, b, c, d])).ok()?,
-            _ => return None,
+        let Some(tail) = self.buffer.get(read..) else {
+            return Err(InvalidFrame {
+                frame: 0..read,
+                size: self.buffer.len(),
+            });
         };
 
-        let frame = split_at!(len);
-        Some(Ok(frame))
+        let Some((head, tail)) = tail.split_at_checked(mem::size_of::<u32>()) else {
+            return Err(InvalidFrame {
+                frame: 0..read,
+                size: self.buffer.len(),
+            });
+        };
+
+        let frame = read..read + mem::size_of::<u32>();
+
+        let &[a, b, c, d] = head else {
+            return Err(InvalidFrame {
+                frame: frame.clone(),
+                size: self.buffer.len(),
+            });
+        };
+
+        let Ok(len) = usize::try_from(u32::from_ne_bytes([a, b, c, d])) else {
+            return Err(InvalidFrame {
+                frame: frame.clone(),
+                size: self.buffer.len(),
+            });
+        };
+
+        let Some(out) = tail.get(..len) else {
+            return Err(InvalidFrame {
+                frame: frame.start..frame.end + len,
+                size: self.buffer.len(),
+            });
+        };
+
+        self.read.set(
+            read.saturating_add(mem::size_of::<u32>())
+                .saturating_add(len),
+        );
+        Ok(Some(out))
     }
 }
