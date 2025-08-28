@@ -83,7 +83,7 @@ use rand::rngs::SmallRng;
 use tokio::time::{Duration, Instant, Sleep};
 
 use crate::Buf;
-use crate::api;
+use crate::api::{Broadcast, Listener, RequestHeader, ResponseHeader};
 use crate::buf::InvalidFrame;
 
 const MAX_CAPACITY: usize = 1048576;
@@ -94,6 +94,7 @@ const PING_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_SEED: u64 = 0xdeadbeef;
 
 /// A websocket message.
+#[derive(Debug)]
 pub(crate) enum Message {
     /// A text message.
     Text,
@@ -119,7 +120,7 @@ where
     type Message;
 
     #[doc(hidden)]
-    type Error;
+    type Error: fmt::Debug;
 
     #[doc(hidden)]
     fn poll_next(
@@ -151,7 +152,7 @@ where
     Self: self::server_sealed::Sealed,
 {
     #[doc(hidden)]
-    type Error;
+    type Error: fmt::Debug;
 
     #[doc(hidden)]
     type Message;
@@ -379,8 +380,9 @@ where
     close_sleep: Sleep,
     ping_sleep: Sleep,
     max_capacity: usize,
-    outgoing: VecDeque<S::Message>,
-    flush: bool,
+    out: VecDeque<S::Message>,
+    socket_send: bool,
+    socket_flush: bool,
 }
 
 impl<S, H> Server<S, H>
@@ -403,8 +405,9 @@ where
             close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
             ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
             max_capacity: MAX_CAPACITY,
-            outgoing: VecDeque::new(),
-            flush: false,
+            out: VecDeque::new(),
+            socket_send: false,
+            socket_flush: false,
         }
     }
 
@@ -442,7 +445,7 @@ where
     Error: From<S::Error>,
     H: Handler,
 {
-    fn format_error(&mut self, error: impl fmt::Display) -> Result<(), Error> {
+    fn format_err(&mut self, error: impl fmt::Display) -> Result<(), Error> {
         self.error.clear();
 
         if write!(self.error, "{error}").is_err() {
@@ -461,38 +464,34 @@ where
         let this = unsafe { Pin::get_unchecked_mut(self) };
 
         loop {
-            if this.closing && this.outgoing.is_empty() && this.buf.is_empty() {
+            if this.closing && this.out.is_empty() && this.buf.is_empty() {
                 break;
             }
 
+            this.handle_send()?;
+
             let result = {
-                let inner = Inner {
+                let inner = Select {
                     close: &mut this.close_sleep,
                     ping: &mut this.ping_sleep,
                     socket: &mut this.socket,
-                    socket_send: !this.outgoing.is_empty() || !this.buf.is_empty(),
-                    socket_flush: this.flush,
+                    wants_socket_send: !this.socket_send,
+                    wants_socket_flush: this.socket_flush,
                 };
 
                 inner.await
             };
 
+            tracing::debug!(?result);
+
             match result {
                 Output::Close => {
-                    this.outgoing
+                    this.out
                         .push_back(S::close(CLOSE_NORMAL, "connection timed out"));
                     this.closing = true;
                 }
                 Output::Ping => {
-                    let mut ping = unsafe { Pin::new_unchecked(&mut this.ping_sleep) };
-
-                    let payload = this.rng.random::<u32>();
-                    this.last_ping = Some(payload);
-                    let data = payload.to_ne_bytes().into_iter().collect::<Vec<_>>();
-                    tracing::debug!(data = ?&data[..], "Sending ping");
-                    this.outgoing.push_back(S::ping(data.into()));
-                    let now = Instant::now();
-                    ping.as_mut().reset(now + PING_TIMEOUT);
+                    this.handle_ping()?;
                 }
                 Output::Recv(message) => {
                     let Some(message) = message else {
@@ -502,91 +501,20 @@ where
 
                     match message? {
                         Message::Text => {
-                            this.outgoing.push_back(S::close(
+                            this.out.push_back(S::close(
                                 CLOSE_PROTOCOL_ERROR,
                                 "Unsupported text message",
                             ));
                             this.closing = true;
-                            continue;
                         }
                         Message::Binary(bytes) => {
-                            let mut reader = SliceReader::new(&bytes);
-
-                            let header = match storage::decode(&mut reader) {
-                                Ok(header) => header,
-                                Err(error) => {
-                                    tracing::warn!(?error, "Invalid request header");
-                                    this.outgoing.push_back(S::close(
-                                        CLOSE_PROTOCOL_ERROR,
-                                        "Invalid request header",
-                                    ));
-                                    this.closing = true;
-                                    continue;
-                                }
-                            };
-
-                            let err = 'err: {
-                                match this.handle_request(reader, header).await {
-                                    Ok(response) => match response.into_response() {
-                                        Err(error) => {
-                                            this.format_error(error)?;
-                                            break 'err true;
-                                        }
-                                        Ok(response) => {
-                                            if !response.handled {
-                                                this.format_error(format_args!(
-                                                    "No support for request `{}`",
-                                                    header.kind
-                                                ))?;
-                                                break 'err true;
-                                            }
-                                        }
-                                    },
-                                    Err(error) => {
-                                        this.format_error(error)?;
-                                        break 'err true;
-                                    }
-                                }
-
-                                false
-                            };
-
-                            if err {
-                                // Reset the buffer to the previous start point.
-                                this.buf.reset();
-
-                                this.buf.write(api::ResponseHeader {
-                                    serial: header.serial,
-                                    broadcast: None,
-                                    error: Some(this.error.as_str()),
-                                })?;
-                            }
-
-                            this.buf.done();
+                            this.handle_message(bytes).await?;
                         }
                         Message::Ping(payload) => {
-                            this.outgoing.push_back(S::pong(payload));
-                            continue;
+                            this.out.push_back(S::pong(payload));
                         }
                         Message::Pong(data) => {
-                            let close = unsafe { Pin::new_unchecked(&mut this.close_sleep) };
-                            let ping = unsafe { Pin::new_unchecked(&mut this.ping_sleep) };
-
-                            tracing::debug!(data = ?&data[..], "Pong");
-
-                            let Some(expected) = this.last_ping else {
-                                continue;
-                            };
-
-                            if expected.to_ne_bytes()[..] != data[..] {
-                                continue;
-                            }
-
-                            let now = Instant::now();
-
-                            close.reset(now + CLOSE_TIMEOUT);
-                            ping.reset(now + PING_TIMEOUT);
-                            this.last_ping = None;
+                            this.handle_pong(data)?;
                         }
                         Message::Close => {
                             this.closing = true;
@@ -598,32 +526,143 @@ where
                         return Err(Error::from(err));
                     };
 
-                    let mut socket = unsafe { Pin::new_unchecked(&mut this.socket) };
-
-                    if let Some(message) = this.outgoing.pop_front() {
-                        socket.as_mut().start_send(message)?;
-                        this.flush = true;
-                        continue;
-                    }
-
-                    if let Some(frame) = this.buf.read()? {
-                        socket.as_mut().start_send(S::binary(frame))?;
-
-                        if this.buf.is_empty() {
-                            this.buf.clear();
-                        }
-
-                        this.flush = true;
-                    }
+                    this.socket_send = true;
                 }
                 Output::Flushed(result) => {
                     if let Err(err) = result {
                         return Err(Error::from(err));
                     };
 
-                    this.flush = false;
+                    this.socket_flush = false;
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self, bytes))]
+    async fn handle_message(&mut self, bytes: Bytes) -> Result<(), Error> {
+        let mut reader = SliceReader::new(&bytes);
+
+        let header = match storage::decode(&mut reader) {
+            Ok(header) => header,
+            Err(error) => {
+                tracing::warn!(?error, "Invalid request header");
+                self.out
+                    .push_back(S::close(CLOSE_PROTOCOL_ERROR, "Invalid request header"));
+                self.closing = true;
+                return Ok(());
+            }
+        };
+
+        let err = 'err: {
+            let res = match self.handle_request(reader, header).await {
+                Ok(res) => res,
+                Err(err) => {
+                    self.format_err(err)?;
+                    break 'err true;
+                }
+            };
+
+            let res = match res.into_response() {
+                Ok(res) => res,
+                Err(err) => {
+                    self.format_err(err)?;
+                    break 'err true;
+                }
+            };
+
+            if !res.handled {
+                self.format_err(format_args!("No support for request `{}`", header.kind))?;
+                break 'err true;
+            }
+
+            false
+        };
+
+        if err {
+            // Reset the buffer to the previous start point.
+            self.buf.reset();
+
+            self.buf.write(ResponseHeader {
+                serial: header.serial,
+                broadcast: None,
+                error: Some(self.error.as_str()),
+            })?;
+        }
+
+        self.buf.done();
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn handle_ping(&mut self) -> Result<(), Error> {
+        let mut ping_sleep = unsafe { Pin::new_unchecked(&mut self.ping_sleep) };
+
+        let payload = self.rng.random::<u32>();
+        self.last_ping = Some(payload);
+        let data = payload.to_ne_bytes().into_iter().collect::<Vec<_>>();
+
+        tracing::debug!(data = ?&data[..], "Sending ping");
+        self.out.push_back(S::ping(data.into()));
+
+        let now = Instant::now();
+        ping_sleep.as_mut().reset(now + PING_TIMEOUT);
+
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self, data))]
+    fn handle_pong(&mut self, data: Bytes) -> Result<(), Error> {
+        let close_sleep = unsafe { Pin::new_unchecked(&mut self.close_sleep) };
+        let ping_sleep = unsafe { Pin::new_unchecked(&mut self.ping_sleep) };
+
+        tracing::debug!(data = ?&data[..], "Pong");
+
+        let Some(expected) = self.last_ping else {
+            tracing::debug!("No ping sent");
+            return Ok(());
+        };
+
+        let expected = expected.to_ne_bytes();
+
+        if expected[..] != data[..] {
+            tracing::debug!(?expected, ?data, "Pong doesn't match");
+            return Ok(());
+        }
+
+        let now = Instant::now();
+
+        close_sleep.reset(now + CLOSE_TIMEOUT);
+        ping_sleep.reset(now + PING_TIMEOUT);
+        self.last_ping = None;
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn handle_send(&mut self) -> Result<(), Error> {
+        let mut socket = unsafe { Pin::new_unchecked(&mut self.socket) };
+
+        if self.socket_send
+            && let Some(message) = self.out.pop_front()
+        {
+            socket.as_mut().start_send(message)?;
+            self.socket_flush = true;
+            self.socket_send = false;
+        }
+
+        if self.socket_send
+            && let Some(frame) = self.buf.read()?
+        {
+            socket.as_mut().start_send(S::binary(frame))?;
+
+            if self.buf.is_empty() {
+                self.buf.clear();
+            }
+
+            self.socket_flush = true;
+            self.socket_send = false;
         }
 
         Ok(())
@@ -635,13 +674,13 @@ where
     /// [`Server::run`] is called.
     pub fn broadcast<'de, T>(self: Pin<&mut Self>, message: T) -> Result<(), Error>
     where
-        T: api::Broadcast<'de>,
+        T: Broadcast<'de>,
     {
         let this = unsafe { Pin::get_unchecked_mut(self) };
 
-        this.buf.write(api::ResponseHeader {
+        this.buf.write(ResponseHeader {
             serial: 0,
-            broadcast: Some(<T::Endpoint as api::Listener>::KIND),
+            broadcast: Some(<T::Endpoint as Listener>::KIND),
             error: None,
         })?;
 
@@ -653,11 +692,11 @@ where
     async fn handle_request(
         &mut self,
         reader: SliceReader<'_>,
-        header: api::RequestHeader<'_>,
+        header: RequestHeader<'_>,
     ) -> Result<H::Response, storage::Error> {
         tracing::debug!(?header, "Got request");
 
-        self.buf.write(api::ResponseHeader {
+        self.buf.write(ResponseHeader {
             serial: header.serial,
             broadcast: None,
             error: None,
@@ -690,6 +729,7 @@ where
     }
 }
 
+#[derive(Debug)]
 enum Output<E> {
     /// The connection should be closed.
     Close,
@@ -703,15 +743,15 @@ enum Output<E> {
     Flushed(Result<(), E>),
 }
 
-struct Inner<'a, C, P, S> {
+struct Select<'a, C, P, S> {
     close: &'a mut C,
     ping: &'a mut P,
     socket: &'a mut S,
-    socket_send: bool,
-    socket_flush: bool,
+    wants_socket_send: bool,
+    wants_socket_flush: bool,
 }
 
-impl<C, P, S> Future for Inner<'_, C, P, S>
+impl<C, P, S> Future for Select<'_, C, P, S>
 where
     C: Future,
     P: Future,
@@ -724,8 +764,8 @@ where
         let close;
         let ping;
         let mut socket;
-        let socket_send;
-        let socket_flush;
+        let wants_socket_send;
+        let wants_socket_flush;
 
         // SAFETY: This type is not Unpin.
         unsafe {
@@ -733,8 +773,8 @@ where
             close = Pin::new_unchecked(&mut *this.close);
             ping = Pin::new_unchecked(&mut *this.ping);
             socket = Pin::new_unchecked(&mut *this.socket);
-            socket_send = this.socket_send;
-            socket_flush = this.socket_flush;
+            wants_socket_send = this.wants_socket_send;
+            wants_socket_flush = this.wants_socket_flush;
         };
 
         if close.poll(cx).is_ready() {
@@ -749,11 +789,11 @@ where
             return Poll::Ready(Output::Recv(output));
         }
 
-        if socket_send && let Poll::Ready(result) = socket.as_mut().poll_ready(cx) {
+        if wants_socket_send && let Poll::Ready(result) = socket.as_mut().poll_ready(cx) {
             return Poll::Ready(Output::Send(result));
         }
 
-        if socket_flush && let Poll::Ready(result) = socket.as_mut().poll_flush(cx) {
+        if wants_socket_flush && let Poll::Ready(result) = socket.as_mut().poll_flush(cx) {
             return Poll::Ready(Output::Flushed(result));
         }
 
