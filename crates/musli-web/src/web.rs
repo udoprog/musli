@@ -28,8 +28,14 @@ use crate::api;
 
 const MAX_CAPACITY: usize = 1048576;
 
-type StateSlab = Slab<Rc<dyn Fn(State)>>;
-type Broadcasts<H> = HashMap<&'static str, Slab<Rc<dyn Fn(RawPacket<H>)>>>;
+/// Slab of state listeners.
+type StateListeners = Slab<Rc<dyn Fn(State)>>;
+/// Slab of broadcast listeners.
+type Broadcasts = HashMap<&'static str, Slab<Rc<dyn Fn(RawPacket)>>>;
+/// Queue of deferred items.
+type Deferred = VecDeque<Rc<dyn Fn(RawPacket)>>;
+/// Queue of recycled buffers.
+type Buffers = VecDeque<Box<BufData>>;
 
 /// Location information for websocket implementation.
 #[doc(hidden)]
@@ -43,11 +49,7 @@ pub(crate) mod sealed_socket {
     pub trait Sealed {}
 }
 
-pub(crate) mod sealed_web {
-    pub trait Sealed {}
-}
-
-pub trait SocketImplementation
+pub(crate) trait SocketImpl
 where
     Self: Sized + self::sealed_socket::Sealed,
 {
@@ -62,6 +64,43 @@ where
 
     #[doc(hidden)]
     fn close(self) -> Result<(), Error>;
+}
+
+pub(crate) mod sealed_performance {
+    pub trait Sealed {}
+}
+
+pub trait PerformanceImpl
+where
+    Self: Sized + self::sealed_performance::Sealed,
+{
+    #[doc(hidden)]
+    fn now(&self) -> f64;
+}
+
+pub(crate) mod sealed_window {
+    pub trait Sealed {}
+}
+
+pub(crate) trait WindowImpl
+where
+    Self: Sized + self::sealed_window::Sealed,
+{
+    #[doc(hidden)]
+    type Performance: PerformanceImpl;
+
+    #[doc(hidden)]
+    fn new() -> Result<Self, Error>;
+
+    #[doc(hidden)]
+    fn performance(&self) -> Result<Self::Performance, Error>;
+
+    #[doc(hidden)]
+    fn location(&self) -> Result<Location, Error>;
+}
+
+pub(crate) mod sealed_web {
+    pub trait Sealed {}
 }
 
 /// Central trait for web integration.
@@ -81,35 +120,22 @@ where
     Self: 'static + Copy + Sized + self::sealed_web::Sealed,
 {
     #[doc(hidden)]
-    type Window;
-
-    #[doc(hidden)]
-    type Performance;
+    #[allow(private_bounds)]
+    type Window: WindowImpl;
 
     #[doc(hidden)]
     type Handles;
 
     #[doc(hidden)]
-    type Socket: SocketImplementation<Handles = Self::Handles>;
-
-    #[doc(hidden)]
-    fn window() -> Result<Self::Window, Error>;
-
-    #[doc(hidden)]
-    fn performance(window: &Self::Window) -> Result<Self::Performance, Error>;
+    #[allow(private_bounds)]
+    type Socket: SocketImpl<Handles = Self::Handles>;
 
     #[doc(hidden)]
     #[allow(private_interfaces)]
     fn handles(shared: &Weak<Shared<Self>>) -> Self::Handles;
 
     #[doc(hidden)]
-    fn location(window: &Self::Window) -> Result<Location, Error>;
-
-    #[doc(hidden)]
     fn random(range: u32) -> u32;
-
-    #[doc(hidden)]
-    fn now(window: &Self::Performance) -> f64;
 }
 
 /// Construct a new [`ServiceBuilder`] associated with the given [`Connect`]
@@ -210,7 +236,7 @@ const MAX_TIMEOUT: u32 = 4000;
 
 /// How to connect to the websocket.
 enum ConnectKind {
-    Location { path: Option<String> },
+    Location { path: String },
     Url { url: String },
 }
 
@@ -220,20 +246,16 @@ pub struct Connect {
 }
 
 impl Connect {
-    /// Connect to the same location.
-    #[inline]
-    pub fn location() -> Self {
-        Self {
-            kind: ConnectKind::Location { path: None },
-        }
-    }
-
     /// Connect to the same location with a custom path.
+    ///
+    /// Note that any number of `/` prefixes are ignored, the canonical
+    /// representation always ignores them and the path is relative to the
+    /// current location.
     #[inline]
-    pub fn location_with_path(path: impl AsRef<str>) -> Self {
+    pub fn location(path: impl AsRef<str>) -> Self {
         Self {
             kind: ConnectKind::Location {
-                path: Some(String::from(path.as_ref())),
+                path: String::from(path.as_ref()),
             },
         }
     }
@@ -247,18 +269,12 @@ impl Connect {
     }
 }
 
-struct Requests<H>
-where
-    H: WebImpl,
-{
+struct Requests {
     serials: HashMap<u32, usize>,
-    pending: Slab<Pending<H>>,
+    pending: Slab<Pending>,
 }
 
-impl<H> Requests<H>
-where
-    H: WebImpl,
-{
+impl Requests {
     fn new() -> Self {
         Self {
             serials: HashMap::new(),
@@ -267,13 +283,13 @@ where
     }
 
     #[inline]
-    fn remove(&mut self, serial: u32) -> Option<Pending<H>> {
+    fn remove(&mut self, serial: u32) -> Option<Pending> {
         let index = self.serials.remove(&serial)?;
         self.pending.try_remove(index)
     }
 
     #[inline]
-    fn insert(&mut self, serial: u32, pending: Pending<H>) -> usize {
+    fn insert(&mut self, serial: u32, pending: Pending) -> usize {
         let index = self.pending.insert(pending);
 
         if let Some(existing) = self.serials.insert(serial, index) {
@@ -284,8 +300,13 @@ where
     }
 }
 
-/// Queue of deferred items.
-type Deferred<H> = VecDeque<Rc<dyn Fn(RawPacket<H>)>>;
+/// Generic but shared fields which do not depend on specialization over `H`.
+struct Generic {
+    state_listeners: RefCell<StateListeners>,
+    requests: RefCell<Requests>,
+    broadcasts: RefCell<Broadcasts>,
+    buffers: RefCell<Buffers>,
+}
 
 /// Shared implementation details for websocket implementations.
 pub(crate) struct Shared<H>
@@ -295,20 +316,17 @@ where
     connect: Connect,
     on_error: Option<Box<dyn Fn(Error)>>,
     window: H::Window,
-    performance: H::Performance,
+    performance: <H::Window as WindowImpl>::Performance,
     handles: H::Handles,
     state: Cell<State>,
     opened: Cell<Option<f64>>,
     serial: Cell<u32>,
-    state_listeners: RefCell<StateSlab>,
-    requests: RefCell<Requests<H>>,
-    broadcasts: RefCell<Broadcasts<H>>,
-    deferred: RefCell<Deferred<H>>,
+    deferred: RefCell<Deferred>,
     socket: RefCell<Option<H::Socket>>,
     output: RefCell<Vec<u8>>,
     current_timeout: Cell<u32>,
     reconnect_timeout: RefCell<Option<Timeout>>,
-    buffers: RefCell<VecDeque<Box<BufData<H>>>>,
+    g: Rc<Generic>,
 }
 
 impl<H> Drop for Shared<H>
@@ -326,8 +344,8 @@ where
         // We don't need to worry about mutable borrows here, since we only have
         // weak references to Shared and by virtue of this being dropped they
         // are all invalid.
-        let state_listeners = mem::take(&mut *self.state_listeners.borrow_mut());
-        let mut requests = self.requests.borrow_mut();
+        let state_listeners = mem::take(&mut *self.g.state_listeners.borrow_mut());
+        let mut requests = self.g.requests.borrow_mut();
 
         for (_, listener) in state_listeners {
             listener(State::Closed);
@@ -365,14 +383,14 @@ where
 
     /// Build a new service and handle.
     pub fn build(self) -> Service<H> {
-        let window = match H::window() {
+        let window = match H::Window::new() {
             Ok(window) => window,
             Err(error) => {
                 panic!("{error}")
             }
         };
 
-        let performance = match H::performance(&window) {
+        let performance = match WindowImpl::performance(&window) {
             Ok(performance) => performance,
             Err(error) => {
                 panic!("{error}")
@@ -388,15 +406,17 @@ where
             state: Cell::new(State::Closed),
             opened: Cell::new(None),
             serial: Cell::new(0),
-            state_listeners: RefCell::new(Slab::new()),
-            requests: RefCell::new(Requests::new()),
-            broadcasts: RefCell::new(HashMap::new()),
             deferred: RefCell::new(VecDeque::new()),
             socket: RefCell::new(None),
             output: RefCell::new(Vec::new()),
             current_timeout: Cell::new(INITIAL_TIMEOUT),
             reconnect_timeout: RefCell::new(None),
-            buffers: RefCell::new(VecDeque::new()),
+            g: Rc::new(Generic {
+                state_listeners: RefCell::new(Slab::new()),
+                broadcasts: RefCell::new(HashMap::new()),
+                requests: RefCell::new(Requests::new()),
+                buffers: RefCell::new(VecDeque::new()),
+            }),
         });
 
         let handle = Handle {
@@ -480,8 +500,8 @@ where
         Ok(())
     }
 
-    pub(crate) fn next_buffer(self: &Rc<Self>, needed: usize) -> Box<BufData<H>> {
-        match self.buffers.borrow_mut().pop_front() {
+    pub(crate) fn next_buffer(self: &Rc<Self>, needed: usize) -> Box<BufData> {
+        match self.g.buffers.borrow_mut().pop_front() {
             Some(mut buf) => {
                 if buf.data.capacity() < needed {
                     buf.data.reserve(needed - buf.data.len());
@@ -489,11 +509,11 @@ where
 
                 buf
             }
-            None => Box::new(BufData::with_capacity(Rc::downgrade(self), needed)),
+            None => Box::new(BufData::with_capacity(Rc::downgrade(&self.g), needed)),
         }
     }
 
-    pub(crate) fn message(self: &Rc<Self>, buf: Box<BufData<H>>) -> Result<()> {
+    pub(crate) fn message(self: &Rc<Self>, buf: Box<BufData>) -> Result<()> {
         // Wrap the buffer in a simple shared reference-counted container.
         let buf = BufRc::new(buf);
         let mut reader = SliceReader::new(&buf);
@@ -510,7 +530,7 @@ where
                 let mut deferred = self.deferred.borrow_mut();
 
                 let kind = {
-                    let broadcasts = self.broadcasts.borrow();
+                    let broadcasts = self.g.broadcasts.borrow();
 
                     let Some((&kind, broadcasts)) = broadcasts.get_key_value(kind) else {
                         return Ok(());
@@ -549,7 +569,7 @@ where
                 tracing::debug!(header.serial, "Got response");
 
                 let (kind, callback) = {
-                    let mut requests = self.requests.borrow_mut();
+                    let mut requests = self.g.requests.borrow_mut();
 
                     let Some(p) = requests.remove(header.serial) else {
                         tracing::warn!(header.serial, "Missing request");
@@ -582,7 +602,8 @@ where
 
     pub(crate) fn set_open(&self) {
         tracing::debug!("Set open");
-        self.opened.set(Some(H::now(&self.performance)));
+        self.opened
+            .set(Some(PerformanceImpl::now(&self.performance)));
         self.emit_state_change(State::Open);
     }
 
@@ -591,8 +612,7 @@ where
             return false;
         };
 
-        let now = H::now(&self.performance);
-
+        let now = PerformanceImpl::now(&self.performance);
         (now - at) >= 250.0
     }
 
@@ -647,7 +667,7 @@ where
         if self.state.get() != state {
             self.state.set(state);
 
-            for (_, callback) in self.state_listeners.borrow().iter() {
+            for (_, callback) in self.g.state_listeners.borrow().iter() {
                 callback(state);
             }
         }
@@ -676,24 +696,13 @@ where
 
     /// Build a websocket connection.
     fn build(self: &Rc<Self>) -> Result<()> {
-        struct ForcePrefix<'a>(&'a str);
-
-        impl fmt::Display for ForcePrefix<'_> {
-            #[inline]
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                '/'.fmt(f)?;
-                self.0.trim_start_matches('/').fmt(f)?;
-                Ok(())
-            }
-        }
-
         let url = match &self.connect.kind {
             ConnectKind::Location { path } => {
                 let Location {
                     protocol,
                     host,
                     port,
-                } = H::location(&self.window)?;
+                } = WindowImpl::location(&self.window)?;
 
                 let protocol = match protocol.as_str() {
                     "https:" => "wss:",
@@ -705,11 +714,7 @@ where
                     }
                 };
 
-                let path = match path {
-                    Some(path) => ForcePrefix(path),
-                    None => ForcePrefix(""),
-                };
-
+                let path = ForcePrefix(path, '/');
                 format!("{protocol}//{host}:{port}{path}")
             }
             ConnectKind::Url { url } => url.clone(),
@@ -742,7 +747,7 @@ where
     H: WebImpl,
 {
     shared: &'a Weak<Shared<H>>,
-    callback: Option<Rc<dyn Fn(Result<RawPacket<H>>)>>,
+    callback: Option<Rc<dyn Fn(Result<RawPacket>)>>,
     body: T,
     _marker: PhantomData<E>,
 }
@@ -774,9 +779,13 @@ where
     H: WebImpl,
 {
     /// Build and return the request.
-    pub fn send(self) -> Request<H> {
+    pub fn send(self) -> Request {
         let Some(shared) = self.shared.upgrade() else {
-            return Request::empty();
+            if let Some(callback) = self.callback {
+                callback(Err(Error::msg("WebSocket service is down")));
+            }
+
+            return Request::new();
         };
 
         if shared.is_closed() {
@@ -784,14 +793,14 @@ where
                 callback(Err(Error::msg("WebSocket is not connected")));
             }
 
-            return Request::empty();
+            return Request::new();
         }
 
         let serial = shared.serial.get();
 
         if let Err(error) = shared.send_client_request::<E, T>(serial, &self.body) {
             shared.handle_error(error);
-            return Request::empty();
+            return Request::new();
         }
 
         shared.serial.set(serial.wrapping_add(1));
@@ -802,10 +811,11 @@ where
             kind: E::KIND,
         };
 
-        shared.requests.borrow_mut().insert(serial, pending);
+        shared.g.requests.borrow_mut().insert(serial, pending);
 
         Request {
-            inner: Some((self.shared.clone(), serial)),
+            serial,
+            g: Rc::downgrade(&shared.g),
         }
     }
 }
@@ -904,59 +914,45 @@ where
     ///     }
     /// }
     /// ```
-    pub fn on_packet_cb(mut self, f: impl Fn(Result<RawPacket<H>, Error>) + 'static) -> Self {
+    pub fn on_packet_cb(mut self, f: impl Fn(Result<RawPacket, Error>) + 'static) -> Self {
         self.callback = Some(Rc::new(f));
         self
     }
 }
 
-/// The handle for a pending request. Dropping this handle cancels the request.
-pub struct Request<H>
-where
-    H: WebImpl,
-{
-    inner: Option<(Weak<Shared<H>>, u32)>,
+/// The handle for a pending request.
+///
+/// Dropping or [`clear()`] this handle will cancel the request.
+///
+/// [`clear()`]: Self::clear
+pub struct Request {
+    serial: u32,
+    g: Weak<Generic>,
 }
 
-impl<H> Request<H>
-where
-    H: WebImpl,
-{
+impl Request {
     /// An empty request handler.
     #[inline]
-    pub fn empty() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self {
+            serial: 0,
+            g: Weak::new(),
+        }
     }
-}
 
-impl<H> Default for Request<H>
-where
-    H: WebImpl,
-{
-    #[inline]
-    fn default() -> Self {
-        Self { inner: None }
-    }
-}
-
-impl<H> Drop for Request<H>
-where
-    H: WebImpl,
-{
-    #[inline]
-    fn drop(&mut self) {
+    /// Clear the request handle without dropping it, cancelling any pending
+    /// requests.
+    pub fn clear(&mut self) {
         let removed = {
-            let Some((s, serial)) = self.inner.take() else {
+            let serial = mem::take(&mut self.serial);
+
+            let Some(g) = self.g.upgrade() else {
                 return;
             };
 
-            let Some(s) = s.upgrade() else {
-                return;
-            };
+            self.g = Weak::new();
 
-            let mut requests = s.requests.borrow_mut();
-
-            let Some(p) = requests.remove(serial) else {
+            let Some(p) = g.requests.borrow_mut().remove(serial) else {
                 return;
             };
 
@@ -967,57 +963,81 @@ where
     }
 }
 
-/// The handle for a pending request. Dropping this handle cancels the request.
-pub struct Listener<H>
-where
-    H: WebImpl,
-{
-    kind: &'static str,
-    index: usize,
-    shared: Weak<Shared<H>>,
+impl Default for Request {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-impl<H> Listener<H>
-where
-    H: WebImpl,
-{
-    /// Set up an empty listener.
-    pub fn empty_with_kind(kind: &'static str) -> Self {
-        Self {
-            kind,
-            index: 0,
-            shared: Weak::new(),
-        }
+impl Drop for Request {
+    #[inline]
+    fn drop(&mut self) {
+        self.clear();
     }
+}
 
-    /// Set up an empty listener.
-    pub fn empty() -> Self {
+/// The handle for a pending request.
+///
+/// Dropping or calling [`clear()`] on this handle remove the listener.
+///
+/// [`clear()`]: Self::clear
+pub struct Listener {
+    kind: &'static str,
+    index: usize,
+    g: Weak<Generic>,
+}
+
+impl Listener {
+    /// Construct an empty listener.
+    #[inline]
+    pub const fn new() -> Self {
         Self {
             kind: "",
             index: 0,
-            shared: Weak::new(),
+            g: Weak::new(),
         }
     }
-}
 
-impl<H> Drop for Listener<H>
-where
-    H: WebImpl,
-{
+    /// Build up an empty listener with the specified kind.
     #[inline]
-    fn drop(&mut self) {
-        let mut removed = None;
-        let mut removed_value = None;
+    pub(crate) const fn empty_with_kind(kind: &'static str) -> Self {
+        Self {
+            kind,
+            index: 0,
+            g: Weak::new(),
+        }
+    }
+
+    /// Clear the listener without dropping it.
+    ///
+    /// This will remove the associated broadcast listener from being notified.
+    pub fn clear(&mut self) {
+        // Gather values here to drop them outside of the upgrade block.
+        let removed;
+        let removed_value;
 
         {
-            if let Some(s) = self.shared.upgrade()
-                && let Entry::Occupied(mut e) = s.broadcasts.borrow_mut().entry(self.kind)
-            {
-                removed = e.get_mut().try_remove(self.index);
+            let Some(g) = self.g.upgrade() else {
+                return;
+            };
 
-                if e.get().is_empty() {
-                    removed_value = Some(e.remove());
-                }
+            self.g = Weak::new();
+            let kind = mem::take(&mut self.kind);
+            let index = mem::take(&mut self.index);
+
+            let mut broadcasts = g.broadcasts.borrow_mut();
+
+            let Entry::Occupied(mut e) = broadcasts.entry(kind) else {
+                return;
+            };
+
+            removed = e.get_mut().try_remove(index);
+
+            if e.get().is_empty() {
+                removed_value = Some(e.remove());
+            } else {
+                removed_value = None;
             }
         }
 
@@ -1028,56 +1048,92 @@ where
     }
 }
 
-/// The handle for state change listening. Dropping this handle cancels the request.
-pub struct StateListener<H>
-where
-    H: WebImpl,
-{
-    index: usize,
-    shared: Weak<Shared<H>>,
+impl Default for Listener {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-impl<H> Drop for StateListener<H>
-where
-    H: WebImpl,
-{
+impl Drop for Listener {
     #[inline]
     fn drop(&mut self) {
-        let mut removed = None;
+        self.clear();
+    }
+}
 
-        if let Some(shared) = self.shared.upgrade() {
-            removed = shared.state_listeners.borrow_mut().try_remove(self.index);
+/// The handle for state change listening.
+///
+/// Dropping or calling [`clear()`] on this handle will remove the associated
+/// callback from being notified.
+///
+/// [`clear()`]: Self::clear
+pub struct StateListener {
+    index: usize,
+    g: Weak<Generic>,
+}
+
+impl StateListener {
+    /// Construct an empty state listener.
+    #[inline]
+    pub const fn new() -> Self {
+        Self {
+            index: 0,
+            g: Weak::new(),
         }
+    }
+
+    /// Clear the state listener without dropping it.
+    ///
+    /// This will remove the associated callback from being notified.
+    pub fn clear(&mut self) {
+        let removed = {
+            let Some(g) = self.g.upgrade() else {
+                return;
+            };
+
+            self.g = Weak::new();
+
+            g.state_listeners.borrow_mut().try_remove(self.index)
+        };
 
         drop(removed);
     }
 }
 
-pub(crate) struct BufData<H>
-where
-    H: WebImpl,
-{
-    /// Reference to shared state where the buffer will be recycled to.
-    shared: Weak<Shared<H>>,
+impl Default for StateListener {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for StateListener {
+    #[inline]
+    fn drop(&mut self) {
+        self.clear();
+    }
+}
+
+pub(crate) struct BufData {
     /// Buffer being used.
     pub(crate) data: Vec<u8>,
     /// Number of strong references to this buffer.
     strong: Cell<usize>,
+    /// Reference to shared state where the buffer will be recycled to.
+    g: Weak<Generic>,
 }
 
-impl<H> BufData<H>
-where
-    H: WebImpl,
-{
-    fn with_capacity(shared: Weak<Shared<H>>, capacity: usize) -> Self {
+impl BufData {
+    fn with_capacity(g: Weak<Generic>, capacity: usize) -> Self {
         Self {
-            shared,
             data: Vec::with_capacity(capacity),
             strong: Cell::new(0),
+            g,
         }
     }
 
-    unsafe fn dec(ptr: NonNull<BufData<H>>) {
+    unsafe fn dec(ptr: NonNull<BufData>) {
         unsafe {
             let count = ptr.as_ref().strong.get().wrapping_sub(1);
             ptr.as_ref().strong.set(count);
@@ -1090,11 +1146,11 @@ where
 
             // Try to recycle the buffer if shared is available, else let it be
             // dropped and free here.
-            let Some(shared) = buf.as_ref().shared.upgrade() else {
+            let Some(g) = buf.as_ref().g.upgrade() else {
                 return;
             };
 
-            let mut buffers = shared.buffers.borrow_mut();
+            let mut buffers = g.buffers.borrow_mut();
 
             // Set the length of the recycled buffer.
             buf.data.set_len(buf.data.len().min(MAX_CAPACITY));
@@ -1108,7 +1164,7 @@ where
         }
     }
 
-    unsafe fn inc(ptr: NonNull<BufData<H>>) {
+    unsafe fn inc(ptr: NonNull<BufData>) {
         unsafe {
             let count = ptr.as_ref().strong.get().wrapping_add(1);
 
@@ -1121,18 +1177,13 @@ where
     }
 }
 
-struct BufRc<H>
-where
-    H: WebImpl,
-{
-    data: NonNull<BufData<H>>,
+/// A shared buffer of data that is recycled when dropped.
+struct BufRc {
+    data: NonNull<BufData>,
 }
 
-impl<H> BufRc<H>
-where
-    H: WebImpl,
-{
-    fn new(data: Box<BufData<H>>) -> Self {
+impl BufRc {
+    fn new(data: Box<BufData>) -> Self {
         let data = NonNull::from(Box::leak(data));
 
         unsafe {
@@ -1143,10 +1194,7 @@ where
     }
 }
 
-impl<H> Deref for BufRc<H>
-where
-    H: WebImpl,
-{
+impl Deref for BufRc {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -1154,10 +1202,7 @@ where
     }
 }
 
-impl<H> Clone for BufRc<H>
-where
-    H: WebImpl,
-{
+impl Clone for BufRc {
     fn clone(&self) -> Self {
         unsafe {
             BufData::inc(self.data);
@@ -1167,10 +1212,7 @@ where
     }
 }
 
-impl<H> Drop for BufRc<H>
-where
-    H: WebImpl,
-{
+impl Drop for BufRc {
     fn drop(&mut self) {
         unsafe {
             BufData::dec(self.data);
@@ -1180,19 +1222,13 @@ where
 
 /// A raw packet of data.
 #[derive(Clone)]
-pub struct RawPacket<H>
-where
-    H: WebImpl,
-{
-    buf: BufRc<H>,
+pub struct RawPacket {
+    buf: BufRc,
     at: Cell<usize>,
     kind: &'static str,
 }
 
-impl<H> RawPacket<H>
-where
-    H: WebImpl,
-{
+impl RawPacket {
     /// Decode the contents of a raw packet.
     ///
     /// This can be called multiple times if there are multiple payloads in
@@ -1239,25 +1275,19 @@ where
 
 /// A typed packet of data.
 #[derive(Clone)]
-pub struct Packet<T, H>
-where
-    H: WebImpl,
-{
-    raw: RawPacket<H>,
+pub struct Packet<T> {
+    raw: RawPacket,
     _marker: PhantomData<T>,
 }
 
-impl<T, H> Packet<T, H>
-where
-    H: WebImpl,
-{
+impl<T> Packet<T> {
     /// Construct a new typed package from a raw one.
     ///
     /// Note that this does not guarantee that the typed package is correct, but
     /// the `T` parameter becomes associated with it allowing it to be used
     /// automatically with methods such as [`Packet::decode`].
     #[inline]
-    pub fn new(raw: RawPacket<H>) -> Self {
+    pub fn new(raw: RawPacket) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -1268,7 +1298,7 @@ where
     ///
     /// To determine which endpoint or broadcast it belongs to the
     /// [`RawPacket::kind`] method can be used.
-    pub fn into_raw(self) -> RawPacket<H> {
+    pub fn into_raw(self) -> RawPacket {
         self.raw
     }
 
@@ -1286,10 +1316,9 @@ where
     }
 }
 
-impl<T, H> Packet<T, H>
+impl<T> Packet<T>
 where
     T: api::Endpoint,
-    H: WebImpl,
 {
     /// Decode the contents of a packet.
     ///
@@ -1302,10 +1331,9 @@ where
     }
 }
 
-impl<T, H> Packet<T, H>
+impl<T> Packet<T>
 where
     T: api::Listener,
-    H: WebImpl,
 {
     /// Decode a typed broadcast.
     pub fn decode_broadcast(&self) -> Result<T::Broadcast<'_>> {
@@ -1510,7 +1538,7 @@ where
     ///     }
     /// }
     /// ```
-    pub fn listen_cb<T>(&self, f: impl Fn(RawPacket<H>) + 'static) -> Listener<H>
+    pub fn listen_cb<T>(&self, f: impl Fn(RawPacket) + 'static) -> Listener
     where
         T: api::Listener,
     {
@@ -1519,7 +1547,7 @@ where
         };
 
         let index = {
-            let mut broadcasts = shared.broadcasts.borrow_mut();
+            let mut broadcasts = shared.g.broadcasts.borrow_mut();
             let slots = broadcasts.entry(T::KIND).or_default();
             slots.insert(Rc::new(f))
         };
@@ -1527,7 +1555,7 @@ where
         Listener {
             kind: T::KIND,
             index,
-            shared: self.shared.clone(),
+            g: Rc::downgrade(&shared.g),
         }
     }
 
@@ -1595,25 +1623,25 @@ where
     ///         }
     ///     }
     /// }
-    pub fn on_state_change_cb(&self, f: impl Fn(State) + 'static) -> (State, StateListener<H>) {
+    pub fn on_state_change_cb(&self, f: impl Fn(State) + 'static) -> (State, StateListener) {
         let Some(shared) = self.shared.upgrade() else {
             return (
                 State::Closed,
                 StateListener {
                     index: 0,
-                    shared: Weak::new(),
+                    g: Weak::new(),
                 },
             );
         };
 
         let (state, index) = {
-            let index = shared.state_listeners.borrow_mut().insert(Rc::new(f));
+            let index = shared.g.state_listeners.borrow_mut().insert(Rc::new(f));
             (shared.state.get(), index)
         };
 
         let listener = StateListener {
             index,
-            shared: self.shared.clone(),
+            g: Rc::downgrade(&shared.g),
         };
 
         (state, listener)
@@ -1630,24 +1658,29 @@ where
     }
 }
 
-struct Pending<H>
-where
-    H: WebImpl,
-{
+struct Pending {
     serial: u32,
-    callback: Option<Rc<dyn Fn(Result<RawPacket<H>>)>>,
+    callback: Option<Rc<dyn Fn(Result<RawPacket>)>>,
     kind: &'static str,
 }
 
-impl<H> fmt::Debug for Pending<H>
-where
-    H: WebImpl,
-{
+impl fmt::Debug for Pending {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Pending")
             .field("serial", &self.serial)
             .field("kind", &self.kind)
             .finish_non_exhaustive()
+    }
+}
+struct ForcePrefix<'a>(&'a str, char);
+
+impl fmt::Display for ForcePrefix<'_> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self(string, prefix) = *self;
+        prefix.fmt(f)?;
+        string.trim_start_matches(prefix).fmt(f)?;
+        Ok(())
     }
 }

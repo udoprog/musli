@@ -47,6 +47,7 @@
 //!
 //! enum Msg {
 //!     Error(ws::Error),
+//!     Change(String),
 //!     Send,
 //!     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
 //!     Tick(ws::Packet<api::Tick>),
@@ -54,11 +55,11 @@
 //!
 //! struct App {
 //!     service: ws::Service,
-//!     input: NodeRef,
 //!     _listen: ws::Listener,
 //!     request: ws::Request,
-//!     response: String,
+//!     text: String,
 //!     tick: u32,
+//!     responses: Vec<String>,
 //! }
 //!
 //! impl Component for App {
@@ -66,11 +67,9 @@
 //!     type Properties = ();
 //!
 //!     fn create(ctx: &Context<Self>) -> Self {
-//!         let service = ws::connect(ws::Connect::location_with_path(String::from("/ws")))
+//!         let service = ws::connect(ws::Connect::location("ws"))
 //!             .on_error(ctx.link().callback(Msg::Error))
 //!             .build();
-//!
-//!         let input = NodeRef::default();
 //!
 //!         service.connect();
 //!
@@ -78,11 +77,11 @@
 //!
 //!         Self {
 //!             service,
-//!             input,
 //!             _listen: listen,
-//!             request: ws::Request::empty(),
-//!             response: String::new(),
+//!             request: ws::Request::new(),
+//!             text: String::new(),
 //!             tick: 0,
+//!             responses: Vec::new(),
 //!         }
 //!     }
 //!
@@ -92,40 +91,47 @@
 //!                 tracing::error!("WebSocket error: {:?}", error);
 //!                 false
 //!             }
+//!             Msg::Change(text) => {
+//!                 self.text = text;
+//!                 true
+//!             }
 //!             Msg::Send => {
-//!                 let Some(input) = self.input.cast::<HtmlInputElement>() else {
-//!                     return false;
-//!                 };
-//!
-//!                 let value = input.value();
-//!                 input.set_value("");
-//!
 //!                 self.request = self
 //!                     .service
 //!                     .handle()
 //!                     .request::<api::Hello>()
 //!                     .body(api::HelloRequest {
-//!                         message: value.as_str(),
+//!                         message: self.text.as_str(),
 //!                     })
-//!                     .on_packet(ctx.link().callback(Msg::HelloResponse))
+//!                     .on_packet(
+//!                         ctx.link()
+//!                             .callback(|result: Result<_, _>| Msg::HelloResponse(result)),
+//!                     )
 //!                     .send();
 //!
+//!                 self.text.clear();
 //!                 true
 //!             }
 //!             Msg::HelloResponse(Err(error)) => {
-//!                 tracing::error!("Request error: {error}");
+//!                 tracing::error!("Request error: {:?}", error);
 //!                 false
 //!             }
 //!             Msg::HelloResponse(Ok(packet)) => {
-//!                 tracing::warn!("Got response");
+//!                 tracing::debug!("Got response");
 //!
-//!                 if let Ok(response) = packet.decode() {
-//!                     self.response = response.message.to_owned();
+//!                 while !packet.is_empty() {
+//!                     let Ok(response) = packet.decode() else {
+//!                         break;
+//!                     };
+//!
+//!                     self.responses.push(response.message.to_owned());
 //!                 }
 //!
 //!                 true
 //!             }
 //!             Msg::Tick(packet) => {
+//!                 tracing::debug!("Got tick");
+//!
 //!                 if let Ok(tick) = packet.decode_broadcast() {
 //!                     self.tick = tick.tick;
 //!                 }
@@ -136,13 +142,20 @@
 //!     }
 //!
 //!     fn view(&self, ctx: &Context<Self>) -> Html {
-//!         let onclick = ctx.link().callback(|_: MouseEvent| Msg::Send);
+//!         let oninput = ctx.link().callback(|e: InputEvent| {
+//!             let input = e.target_unchecked_into::<HtmlInputElement>();
+//!             Msg::Change(input.value())
+//!         });
+//!
+//!         let onclick = ctx.link().callback(|_: MouseEvent| {
+//!             Msg::Send
+//!         });
 //!
 //!         html! {
 //!             <div class="container">
-//!                 <input type="text" ref={self.input.clone()} />
+//!                 <input type="text" {oninput} value={self.text.clone()} />
 //!                 <button {onclick}>{"Send Message"}</button>
-//!                 <div>{format!("Response: {}", self.response)}</div>
+//!                 {for self.responses.iter().enumerate().map(|(index, response)| html!(<div>{format!("Response #{index}: {response}")}</div>))}
 //!                 <div>{format!("Global tick: {}", self.tick)}</div>
 //!             </div>
 //!         }
@@ -197,10 +210,7 @@ where
 }
 
 /// Request builder extension for interacting with handles in yew `0.21.x`.
-pub trait HandleExt<H>
-where
-    H: WebImpl,
-{
+pub trait HandleExt {
     /// Listen for broadcasts of type `T`.
     ///
     /// Returns a handle for the listener that will cancel the listener if
@@ -279,7 +289,7 @@ where
     ///     }
     /// }
     /// ```
-    fn listen<T>(&self, callback: Callback<Packet<T, H>>) -> Listener<H>
+    fn listen<T>(&self, callback: Callback<Packet<T>>) -> Listener
     where
         T: api::Listener;
 
@@ -344,15 +354,15 @@ where
     ///     }
     /// }
     /// ```
-    fn on_state_change(&self, callback: Callback<State>) -> (State, StateListener<H>);
+    fn on_state_change(&self, callback: Callback<State>) -> (State, StateListener);
 }
 
-impl<H> HandleExt<H> for Handle<H>
+impl<H> HandleExt for Handle<H>
 where
     H: WebImpl,
 {
     #[inline]
-    fn listen<T>(&self, callback: Callback<Packet<T, H>>) -> Listener<H>
+    fn listen<T>(&self, callback: Callback<Packet<T>>) -> Listener
     where
         T: api::Listener,
     {
@@ -360,7 +370,7 @@ where
     }
 
     #[inline]
-    fn on_state_change(&self, callback: Callback<State>) -> (State, StateListener<H>) {
+    fn on_state_change(&self, callback: Callback<State>) -> (State, StateListener) {
         Handle::on_state_change_cb(self, move |state| callback.emit(state))
     }
 }
@@ -460,7 +470,7 @@ where
     ///     }
     /// }
     /// ```
-    fn on_packet(self, f: Callback<Result<Packet<E, H>, Error>>) -> Self;
+    fn on_packet(self, f: Callback<Result<Packet<E>, Error>>) -> Self;
 
     /// Handle the raw response using the specified callback.
     ///
@@ -554,7 +564,7 @@ where
     ///     }
     /// }
     /// ```
-    fn on_raw_packet(self, f: Callback<Result<RawPacket<H>, Error>>) -> Self;
+    fn on_raw_packet(self, f: Callback<Result<RawPacket, Error>>) -> Self;
 }
 
 impl<E, T, H> RequestBuilderExt<E, H> for RequestBuilder<'_, E, T, H>
@@ -563,7 +573,7 @@ where
     H: WebImpl,
 {
     #[inline]
-    fn on_packet(self, callback: Callback<Result<Packet<E, H>, Error>>) -> Self {
+    fn on_packet(self, callback: Callback<Result<Packet<E>, Error>>) -> Self {
         RequestBuilder::on_packet_cb(self, move |result| match result {
             Ok(raw) => {
                 callback.emit(Ok(Packet::new(raw)));
@@ -575,7 +585,7 @@ where
     }
 
     #[inline]
-    fn on_raw_packet(self, callback: Callback<Result<RawPacket<H>, Error>>) -> Self {
+    fn on_raw_packet(self, callback: Callback<Result<RawPacket, Error>>) -> Self {
         RequestBuilder::on_packet_cb(self, move |result| match result {
             Ok(raw) => {
                 callback.emit(Ok(raw));

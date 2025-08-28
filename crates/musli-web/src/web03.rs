@@ -33,7 +33,7 @@
 //!     }
 //! }
 //!
-//! let service = ws::connect(ws::Connect::location_with_path(String::from("/ws")))
+//! let service = ws::connect(ws::Connect::location("ws"))
 //!     .on_error_cb(|error| {
 //!         tracing::error!("WebSocket error: {error}");
 //!     })
@@ -73,7 +73,9 @@ use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
 use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, window};
 
 use crate::web::Location;
-use crate::web::SocketImplementation;
+use crate::web::PerformanceImpl;
+use crate::web::SocketImpl;
+use crate::web::WindowImpl;
 use crate::web::{Connect, Error, ServiceBuilder, Shared, WebImpl};
 
 pub mod prelude {
@@ -83,7 +85,9 @@ pub mod prelude {
         //! Organization module prefixing all exported items with `ws` for
         //! convenient namespacing.
 
-        pub use crate::web::{Connect, Error, State};
+        pub use crate::web::{
+            Connect, Error, Listener, Packet, RawPacket, Request, State, StateListener,
+        };
         use crate::web03::Web03Impl;
 
         /// Implementation alias for [`connect`].
@@ -98,30 +102,10 @@ pub mod prelude {
         /// [`Service`]: crate::web::Service
         pub type Service = crate::web::Service<Web03Impl>;
 
-        /// Implementation alias for [`Request`].
-        ///
-        /// [`Request`]: crate::web::Request
-        pub type Request = crate::web::Request<Web03Impl>;
-
         /// Implementation alias for [`Handle`].
         ///
         /// [`Handle`]: crate::web::Handle
         pub type Handle = crate::web::Handle<Web03Impl>;
-
-        /// Implementation alias for [`Listener`].
-        ///
-        /// [`Listener`]: crate::web::Listener
-        pub type Listener = crate::web::Listener<Web03Impl>;
-
-        /// Implementation alias for [`Packet`].
-        ///
-        /// [`Packet`]: crate::web::Packet
-        pub type Packet<T> = crate::web::Packet<T, Web03Impl>;
-
-        /// Implementation alias for [`RawPacket`].
-        ///
-        /// [`RawPacket`]: crate::web::RawPacket
-        pub type RawPacket = crate::web::RawPacket<Web03Impl>;
 
         /// Implementation alias for [`RequestBuilder`].
         ///
@@ -132,11 +116,6 @@ pub mod prelude {
         ///
         /// [`ServiceBuilder`]: crate::web::ServiceBuilder
         pub type ServiceBuilder = crate::web::ServiceBuilder<Web03Impl>;
-
-        /// Implementation alias for [`StateListener`].
-        ///
-        /// [`StateListener`]: crate::web::StateListener
-        pub type StateListener = crate::web::StateListener<Web03Impl>;
     }
 }
 
@@ -157,7 +136,7 @@ pub enum Web03Impl {}
 
 impl crate::web::sealed_socket::Sealed for WebSocket {}
 
-impl SocketImplementation for WebSocket {
+impl SocketImpl for WebSocket {
     type Handles = Handles;
 
     #[inline]
@@ -184,16 +163,22 @@ impl SocketImplementation for WebSocket {
     }
 }
 
-impl crate::web::sealed_web::Sealed for Web03Impl {}
+impl crate::web::sealed_performance::Sealed for Performance {}
 
-impl WebImpl for Web03Impl {
-    type Window = Window;
+impl PerformanceImpl for Performance {
+    #[inline]
+    fn now(&self) -> f64 {
+        Performance::now(self)
+    }
+}
+
+impl crate::web::sealed_window::Sealed for Window {}
+
+impl WindowImpl for Window {
     type Performance = Performance;
-    type Handles = Handles;
-    type Socket = WebSocket;
 
     #[inline]
-    fn window() -> Result<Self::Window, Error> {
+    fn new() -> Result<Self, Error> {
         let Some(window) = window() else {
             return Err(Error::msg("No window in web-sys 0.3.x context"));
         };
@@ -202,8 +187,8 @@ impl WebImpl for Web03Impl {
     }
 
     #[inline]
-    fn performance(window: &Self::Window) -> Result<Self::Performance, Error> {
-        let Some(performance) = window.performance() else {
+    fn performance(&self) -> Result<Self::Performance, Error> {
+        let Some(performance) = Window::performance(self) else {
             return Err(Error::msg("No window.performance in web-sys 0.3.x context"));
         };
 
@@ -211,8 +196,8 @@ impl WebImpl for Web03Impl {
     }
 
     #[inline]
-    fn location(window: &Self::Window) -> Result<Location, Error> {
-        let location = window.location();
+    fn location(&self) -> Result<Location, Error> {
+        let location = Window::location(self);
 
         Ok(Location {
             protocol: location.protocol()?,
@@ -220,15 +205,18 @@ impl WebImpl for Web03Impl {
             port: location.port()?,
         })
     }
+}
+
+impl crate::web::sealed_web::Sealed for Web03Impl {}
+
+impl WebImpl for Web03Impl {
+    type Window = Window;
+    type Handles = Handles;
+    type Socket = WebSocket;
 
     #[inline]
     fn random(range: u32) -> u32 {
         ((Math::random() * range as f64).round() as u32).min(range)
-    }
-
-    #[inline]
-    fn now(performance: &Self::Performance) -> f64 {
-        performance.now()
     }
 
     #[inline]
