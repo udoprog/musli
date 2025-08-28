@@ -53,11 +53,11 @@ macro_rules! __define {
 /// The marker type is used with the various types used when interacting with an
 /// API endpoint or broadcast, such as:
 ///
-/// * [`web03::Request<T>`] where `T: Endpoint`.
-/// * [`web03::Listener<T>`] where `T: BroadcastEndpoint`.
+/// * [`web::Request`]
+/// * [`web::Listener`]
 ///
-/// [`web03::Request<T>`]: crate::web03::Request
-/// [`web03::Listener<T>`]: crate::web03::Listener
+/// [`web::Request`]: crate::web::Request
+/// [`web::Listener`]: crate::web::Listener
 ///
 /// These are in turn extended with the relevant API using them:
 ///

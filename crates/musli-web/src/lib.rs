@@ -52,6 +52,7 @@
 
 #![no_std]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
+#![allow(clippy::type_complexity)]
 
 #[cfg(feature = "std")]
 extern crate std;
@@ -77,6 +78,10 @@ pub mod api;
 #[cfg(feature = "axum08")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "axum08")))]
 pub mod axum08;
+
+#[cfg(feature = "web03")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "web03")))]
+pub mod web;
 
 #[cfg(feature = "web03")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "web03")))]

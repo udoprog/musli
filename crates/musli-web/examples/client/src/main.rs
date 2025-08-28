@@ -8,7 +8,7 @@
 //!
 //! [`yew`]: https://yew.rs
 
-use musli_web::yew021::*;
+use musli_web::yew021::prelude::*;
 use tracing::Level;
 use tracing_subscriber::Registry;
 use tracing_subscriber::layer::SubscriberExt as _;
