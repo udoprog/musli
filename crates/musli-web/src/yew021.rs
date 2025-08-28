@@ -3,14 +3,82 @@
 use yew021::Callback;
 use yew021::html::ImplicitClone;
 
-pub use crate::web03 as ws;
+pub mod prelude {
+    //! The public facing API for use with yew `0.2.1` and web-sys `0.3.x`.
+
+    pub use crate::yew021::{HandleExt, RequestBuilderExt, ServiceBuilderExt};
+
+    pub mod ws {
+        //! Organization module prefixing all exported items with `ws` for
+        //! convenient namespacing.
+
+        pub use crate::web::{Connect, Error, State};
+        use crate::web03::Implementation;
+
+        /// Implementation alias for [`connect`].
+        ///
+        /// [`connect`]: crate::web03::connect
+        pub fn connect(connect: Connect) -> ServiceBuilder {
+            crate::web03::connect(connect)
+        }
+
+        /// Implementation alias for [`Service`].
+        ///
+        /// [`Service`]: crate::web::Service
+        pub type Service = crate::web::Service<Implementation>;
+
+        /// Implementation alias for [`Request`].
+        ///
+        /// [`Request`]: crate::web::Request
+        pub type Request = crate::web::Request<Implementation>;
+
+        /// Implementation alias for [`Handle`].
+        ///
+        /// [`Handle`]: crate::web::Handle
+        pub type Handle = crate::web::Handle<Implementation>;
+
+        /// Implementation alias for [`Listener`].
+        ///
+        /// [`Listener`]: crate::web::Listener
+        pub type Listener = crate::web::Listener<Implementation>;
+
+        /// Implementation alias for [`Packet`].
+        ///
+        /// [`Packet`]: crate::web::Packet
+        pub type Packet<T> = crate::web::Packet<T, Implementation>;
+
+        /// Implementation alias for [`RawPacket`].
+        ///
+        /// [`RawPacket`]: crate::web::RawPacket
+        pub type RawPacket = crate::web::RawPacket<Implementation>;
+
+        /// Implementation alias for [`RequestBuilder`].
+        ///
+        /// [`RequestBuilder`]: crate::web::RequestBuilder
+        pub type RequestBuilder<'a, E, T> = crate::web::RequestBuilder<'a, E, T, Implementation>;
+
+        /// Implementation alias for [`ServiceBuilder`].
+        ///
+        /// [`ServiceBuilder`]: crate::web::ServiceBuilder
+        pub type ServiceBuilder = crate::web::ServiceBuilder<Implementation>;
+
+        /// Implementation alias for [`StateListener`].
+        ///
+        /// [`StateListener`]: crate::web::StateListener
+        pub type StateListener = crate::web::StateListener<Implementation>;
+    }
+}
 
 use crate::api;
-use crate::web03::{Error, RawPacket, ServiceBuilder};
-use crate::web03::{Handle, Listener, Packet, RequestBuilder};
-use crate::web03::{State, StateListener};
+use crate::web::{
+    Error, Handle, Listener, Packet, RawPacket, RequestBuilder, ServiceBuilder, State,
+    StateListener, WebImplementation,
+};
 
-impl ImplicitClone for Handle {
+impl<H> ImplicitClone for Handle<H>
+where
+    H: WebImplementation,
+{
     #[inline]
     fn implicit_clone(&self) -> Self {
         self.clone()
@@ -23,7 +91,10 @@ pub trait ServiceBuilderExt {
     fn on_error(self, callback: Callback<Error>) -> Self;
 }
 
-impl ServiceBuilderExt for ws::ServiceBuilder {
+impl<H> ServiceBuilderExt for ServiceBuilder<H>
+where
+    H: WebImplementation,
+{
     #[inline]
     fn on_error(self, callback: Callback<Error>) -> Self {
         ServiceBuilder::on_error_cb(self, move |error| callback.emit(error))
@@ -31,7 +102,10 @@ impl ServiceBuilderExt for ws::ServiceBuilder {
 }
 
 /// Request builder extension for interacting with handles in yew `0.21.x`.
-pub trait HandleExt {
+pub trait HandleExt<H>
+where
+    H: WebImplementation,
+{
     /// Listen for broadcasts of type `T`.
     ///
     /// Returns a handle for the listener that will cancel the listener if
@@ -42,7 +116,7 @@ pub trait HandleExt {
     /// ```
     /// # extern crate yew021 as yew;
     /// use yew::prelude::*;
-    /// use musli_web::yew021::*;
+    /// use musli_web::yew021::prelude::*;
     ///
     /// mod api {
     ///     use musli::{Decode, Encode};
@@ -110,7 +184,7 @@ pub trait HandleExt {
     ///     }
     /// }
     /// ```
-    fn listen<T>(&self, callback: Callback<Packet<T>>) -> Listener
+    fn listen<T>(&self, callback: Callback<Packet<T, H>>) -> Listener<H>
     where
         T: api::Listener;
 
@@ -127,7 +201,7 @@ pub trait HandleExt {
     /// ```
     /// # extern crate yew021 as yew;
     /// use yew::prelude::*;
-    /// use musli_web::yew021::*;
+    /// use musli_web::yew021::prelude::*;
     ///
     /// enum Msg {
     ///     StateChange(ws::State),
@@ -175,12 +249,15 @@ pub trait HandleExt {
     ///     }
     /// }
     /// ```
-    fn on_state_change(&self, callback: Callback<State>) -> (State, StateListener);
+    fn on_state_change(&self, callback: Callback<State>) -> (State, StateListener<H>);
 }
 
-impl HandleExt for Handle {
+impl<H> HandleExt<H> for Handle<H>
+where
+    H: WebImplementation,
+{
     #[inline]
-    fn listen<T>(&self, callback: Callback<Packet<T>>) -> Listener
+    fn listen<T>(&self, callback: Callback<Packet<T, H>>) -> Listener<H>
     where
         T: api::Listener,
     {
@@ -188,16 +265,17 @@ impl HandleExt for Handle {
     }
 
     #[inline]
-    fn on_state_change(&self, callback: Callback<State>) -> (State, StateListener) {
+    fn on_state_change(&self, callback: Callback<State>) -> (State, StateListener<H>) {
         Handle::on_state_change_cb(self, move |state| callback.emit(state))
     }
 }
 
 /// Request builder extension for interacting with request builders in yew `0.21.x`.
-pub trait RequestBuilderExt<E>
+pub trait RequestBuilderExt<E, H>
 where
     Self: Sized,
     E: api::Endpoint,
+    H: WebImplementation,
 {
     /// Handle the response using the specified callback.
     ///
@@ -206,7 +284,7 @@ where
     /// ```
     /// # extern crate yew021 as yew;
     /// use yew::prelude::*;
-    /// use musli_web::yew021::*;
+    /// use musli_web::yew021::prelude::*;
     ///
     /// mod api {
     ///     use musli::{Decode, Encode};
@@ -287,7 +365,7 @@ where
     ///     }
     /// }
     /// ```
-    fn on_packet(self, f: Callback<Result<Packet<E>, Error>>) -> Self;
+    fn on_packet(self, f: Callback<Result<Packet<E, H>, Error>>) -> Self;
 
     /// Handle the raw response using the specified callback.
     ///
@@ -300,7 +378,7 @@ where
     /// ```
     /// # extern crate yew021 as yew;
     /// use yew::prelude::*;
-    /// use musli_web::yew021::*;
+    /// use musli_web::yew021::prelude::*;
     ///
     /// mod api {
     ///     use musli::{Decode, Encode};
@@ -381,15 +459,16 @@ where
     ///     }
     /// }
     /// ```
-    fn on_raw_packet(self, f: Callback<Result<RawPacket, Error>>) -> Self;
+    fn on_raw_packet(self, f: Callback<Result<RawPacket<H>, Error>>) -> Self;
 }
 
-impl<E, T> RequestBuilderExt<E> for RequestBuilder<'_, E, T>
+impl<E, T, H> RequestBuilderExt<E, H> for RequestBuilder<'_, E, T, H>
 where
     E: api::Endpoint,
+    H: WebImplementation,
 {
     #[inline]
-    fn on_packet(self, callback: Callback<Result<Packet<E>, Error>>) -> Self {
+    fn on_packet(self, callback: Callback<Result<Packet<E, H>, Error>>) -> Self {
         RequestBuilder::on_raw_packet_cb(self, move |result| match result {
             Ok(raw) => {
                 callback.emit(Ok(Packet::new(raw)));
@@ -401,7 +480,7 @@ where
     }
 
     #[inline]
-    fn on_raw_packet(self, callback: Callback<Result<RawPacket, Error>>) -> Self {
+    fn on_raw_packet(self, callback: Callback<Result<RawPacket<H>, Error>>) -> Self {
         RequestBuilder::on_raw_packet_cb(self, move |result| match result {
             Ok(raw) => {
                 callback.emit(Ok(raw));
