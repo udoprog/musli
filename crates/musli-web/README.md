@@ -20,8 +20,9 @@ Note that the organization of the modules include the version of the correspondi
 crate. Unstable versions are prefixed with `0`, such as [`yew021`].
 
 See the following modules for how to use:
-* [`axum08`] for Axum 0.8 integration.
-* [`yew021`] for Yew 0.21 integration.
+* [`axum08`] for [`axum`] `0.8.x` integration.
+* [`yew021`] for [`yew`] `0.21.x` integration.
+* [`web03`] for [`web-sys`] `0.3.x` integration.
 
 <br>
 
@@ -45,10 +46,11 @@ cd examples/server && cargo run
 ```
 
 [`api`]: <https://github.com/udoprog/musli/tree/main/crates/musli-web/examples/api/>
-[`axum`]: <https://github.com/tokio-rs/axum>
+[`axum`]: <https://docs.rs/axum>
 [`client`]: <https://github.com/udoprog/musli/tree/main/crates/musli-web/examples/client/>
 [`Json`]: <https://docs.rs/musli-web/latest/musli-web/Json.struct.html>
 [`server`]: <https://github.com/udoprog/musli/tree/main/crates/musli-web/examples/server/>
-[`ws::Server`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html
+[`web-sys`]: <https://docs.rs/web-sys>
+[`ws::Server`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html>
 [`yew`]: <https://yew.rs>
 [Müsli]: <https://github.com/udoprog/musli>

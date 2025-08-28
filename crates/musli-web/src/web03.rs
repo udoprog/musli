@@ -4,14 +4,12 @@
 //!
 //! # Examples
 //!
-//! This example uses yew:
+//! This example uses [`yew021`]:
 //!
-//! ```
-//! # extern crate yew021 as yew;
-//! # extern crate web_sys03 as web_sys;
-//! use web_sys::HtmlInputElement;
-//! use yew::prelude::*;
-//! use musli_web::yew021::prelude::*;
+//! [`yew021`]: crate::yew021
+//!
+//! ```no_run
+//! use musli_web::web03::prelude::*;
 //!
 //! mod api {
 //!     use musli::{Decode, Encode};
@@ -26,141 +24,121 @@
 //!     pub struct HelloResponse<'de> {
 //!         pub message: &'de str,
 //!     }
-//!    
-//!     #[derive(Encode, Decode)]
-//!     pub struct TickEvent<'de> {
-//!         pub message: &'de str,
-//!         pub tick: u32,
-//!     }
-//!    
+//!
 //!     api::define! {
 //!         endpoint Hello {
 //!             request<'de> = HelloRequest<'de>;
 //!             response<'de> = HelloResponse<'de>;
 //!         }
-//!    
-//!         broadcast Tick {
-//!             body<'de> = TickEvent<'de>;
-//!         }
 //!     }
 //! }
 //!
-//! enum Msg {
-//!     Error(ws::Error),
-//!     Send,
-//!     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
-//!     Tick(ws::Packet<api::Tick>),
-//! }
+//! let service = ws::connect(ws::Connect::location_with_path(String::from("/ws")))
+//!     .on_error_cb(|error| {
+//!         tracing::error!("WebSocket error: {error}");
+//!     })
+//!     .build();
 //!
-//! struct App {
-//!     service: ws::Service,
-//!     input: NodeRef,
-//!     _listen: ws::Listener,
-//!     request: ws::Request,
-//!     response: String,
-//!     tick: u32,
-//! }
+//! service.connect();
 //!
-//! impl Component for App {
-//!     type Message = Msg;
-//!     type Properties = ();
-//!
-//!     fn create(ctx: &Context<Self>) -> Self {
-//!         let service = ws::connect(ws::Connect::location_with_path(String::from("/ws")))
-//!             .on_error(ctx.link().callback(Msg::Error))
-//!             .build();
-//!
-//!         let input = NodeRef::default();
-//!
-//!         service.connect();
-//!
-//!         let listen = service.handle().listen(ctx.link().callback(Msg::Tick));
-//!
-//!         Self {
-//!             service,
-//!             input,
-//!             _listen: listen,
-//!             request: ws::Request::empty(),
-//!             response: String::new(),
-//!             tick: 0,
-//!         }
-//!     }
-//!
-//!     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-//!         match msg {
-//!             Msg::Error(error) => {
-//!                 tracing::error!("WebSocket error: {:?}", error);
-//!                 false
+//! let request = service
+//!     .handle()
+//!     .request::<api::Hello>()
+//!     .body(api::HelloRequest {
+//!         message: "Hello!",
+//!     })
+//!     .on_packet_cb(move |packet| {
+//!         match packet {
+//!             Ok(packet) => {
+//!                 if let Ok(response) = packet.decode::<api::HelloResponse>() {
+//!                     tracing::info!("Response: {}", response.message);
+//!                 }
 //!             }
-//!             Msg::Send => {
-//!                 let Some(input) = self.input.cast::<HtmlInputElement>() else {
-//!                     return false;
-//!                 };
-//!
-//!                 let value = input.value();
-//!                 input.set_value("");
-//!
-//!                 self.request = self
-//!                     .service
-//!                     .handle()
-//!                     .request::<api::Hello>()
-//!                     .body(api::HelloRequest {
-//!                         message: value.as_str(),
-//!                     })
-//!                     .on_packet(ctx.link().callback(Msg::HelloResponse))
-//!                     .send();
-//!
-//!                 true
-//!             }
-//!             Msg::HelloResponse(Err(error)) => {
+//!             Err(error) => {
 //!                 tracing::error!("Request error: {error}");
-//!                 false
-//!             }
-//!             Msg::HelloResponse(Ok(packet)) => {
-//!                 tracing::warn!("Got response");
-//!
-//!                 if let Ok(response) = packet.decode() {
-//!                     self.response = response.message.to_owned();
-//!                 }
-//!
-//!                 true
-//!             }
-//!             Msg::Tick(packet) => {
-//!                 if let Ok(tick) = packet.decode_broadcast() {
-//!                     self.tick = tick.tick;
-//!                 }
-//!
-//!                 true
 //!             }
 //!         }
-//!     }
-//!
-//!     fn view(&self, ctx: &Context<Self>) -> Html {
-//!         let onclick = ctx.link().callback(|_: MouseEvent| Msg::Send);
-//!
-//!         html! {
-//!             <div class="container">
-//!                 <input type="text" ref={self.input.clone()} />
-//!                 <button {onclick}>{"Send Message"}</button>
-//!                 <div>{format!("Response: {}", self.response)}</div>
-//!                 <div>{format!("Global tick: {}", self.tick)}</div>
-//!             </div>
-//!         }
-//!     }
-//! }
+//!     })
+//!     .send();
 //! ```
 
-use alloc::borrow::ToOwned;
 use alloc::rc::Rc;
 use alloc::rc::Weak;
 
 use wasm_bindgen02::JsCast;
 use wasm_bindgen02::closure::Closure;
+use web_sys03::Performance;
+use web_sys03::Window;
 use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
 use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, window};
 
 use crate::web::Location;
-use crate::web::{Connect, Error, ServiceBuilder, Shared, WebImplementation};
+use crate::web::SocketImplementation;
+use crate::web::{Connect, Error, ServiceBuilder, Shared, WebImpl};
+
+pub mod prelude {
+    //! The public facing API for use with yew `0.2.1` and web-sys `0.3.x`.
+
+    pub mod ws {
+        //! Organization module prefixing all exported items with `ws` for
+        //! convenient namespacing.
+
+        pub use crate::web::{Connect, Error, State};
+        use crate::web03::Web03Impl;
+
+        /// Implementation alias for [`connect`].
+        ///
+        /// [`connect`]: crate::web03::connect
+        pub fn connect(connect: Connect) -> ServiceBuilder {
+            crate::web03::connect(connect)
+        }
+
+        /// Implementation alias for [`Service`].
+        ///
+        /// [`Service`]: crate::web::Service
+        pub type Service = crate::web::Service<Web03Impl>;
+
+        /// Implementation alias for [`Request`].
+        ///
+        /// [`Request`]: crate::web::Request
+        pub type Request = crate::web::Request<Web03Impl>;
+
+        /// Implementation alias for [`Handle`].
+        ///
+        /// [`Handle`]: crate::web::Handle
+        pub type Handle = crate::web::Handle<Web03Impl>;
+
+        /// Implementation alias for [`Listener`].
+        ///
+        /// [`Listener`]: crate::web::Listener
+        pub type Listener = crate::web::Listener<Web03Impl>;
+
+        /// Implementation alias for [`Packet`].
+        ///
+        /// [`Packet`]: crate::web::Packet
+        pub type Packet<T> = crate::web::Packet<T, Web03Impl>;
+
+        /// Implementation alias for [`RawPacket`].
+        ///
+        /// [`RawPacket`]: crate::web::RawPacket
+        pub type RawPacket = crate::web::RawPacket<Web03Impl>;
+
+        /// Implementation alias for [`RequestBuilder`].
+        ///
+        /// [`RequestBuilder`]: crate::web::RequestBuilder
+        pub type RequestBuilder<'a, E, T> = crate::web::RequestBuilder<'a, E, T, Web03Impl>;
+
+        /// Implementation alias for [`ServiceBuilder`].
+        ///
+        /// [`ServiceBuilder`]: crate::web::ServiceBuilder
+        pub type ServiceBuilder = crate::web::ServiceBuilder<Web03Impl>;
+
+        /// Implementation alias for [`StateListener`].
+        ///
+        /// [`StateListener`]: crate::web::StateListener
+        pub type StateListener = crate::web::StateListener<Web03Impl>;
+    }
+}
 
 /// Handles for websocket implementation.
 #[doc(hidden)]
@@ -175,39 +153,71 @@ pub struct Handles {
 ///
 /// See [`connect()`].
 #[derive(Clone, Copy)]
-pub enum Implementation {}
+pub enum Web03Impl {}
 
-impl crate::web::sealed::Sealed for Implementation {}
+impl crate::web::sealed_socket::Sealed for WebSocket {}
 
-impl WebImplementation for Implementation {
+impl SocketImplementation for WebSocket {
+    type Handles = Handles;
+
+    #[inline]
+    fn new(url: &str, handles: &Self::Handles) -> Result<Self, Error> {
+        let this = WebSocket::new(url)?;
+        this.set_binary_type(BinaryType::Arraybuffer);
+        this.set_onopen(Some(handles.open.as_ref().unchecked_ref()));
+        this.set_onclose(Some(handles.close.as_ref().unchecked_ref()));
+        this.set_onmessage(Some(handles.message.as_ref().unchecked_ref()));
+        this.set_onerror(Some(handles.error.as_ref().unchecked_ref()));
+        Ok(this)
+    }
+
+    #[inline]
+    fn send(&self, data: &[u8]) -> Result<(), Error> {
+        self.send_with_u8_array(data)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn close(self) -> Result<(), Error> {
+        WebSocket::close(&self)?;
+        Ok(())
+    }
+}
+
+impl crate::web::sealed_web::Sealed for Web03Impl {}
+
+impl WebImpl for Web03Impl {
+    type Window = Window;
+    type Performance = Performance;
     type Handles = Handles;
     type Socket = WebSocket;
 
     #[inline]
-    fn location() -> Result<Location, Error> {
+    fn window() -> Result<Self::Window, Error> {
         let Some(window) = window() else {
-            return Err(Error::msg("No window available"));
+            return Err(Error::msg("No window in web-sys 0.3.x context"));
         };
 
-        let protocol = window.location().protocol()?;
+        Ok(window)
+    }
 
-        let protocol = match protocol.as_str() {
-            "https:" => "wss:",
-            "http:" => "ws:",
-            other => {
-                return Err(Error::msg(format_args!(
-                    "Same host connection is not supported for protocol `{other}`"
-                )));
-            }
+    #[inline]
+    fn performance(window: &Self::Window) -> Result<Self::Performance, Error> {
+        let Some(performance) = window.performance() else {
+            return Err(Error::msg("No window.performance in web-sys 0.3.x context"));
         };
 
-        let host = window.location().hostname()?;
-        let port = window.location().port()?;
+        Ok(performance)
+    }
+
+    #[inline]
+    fn location(window: &Self::Window) -> Result<Location, Error> {
+        let location = window.location();
 
         Ok(Location {
-            protocol: protocol.to_owned(),
-            host,
-            port,
+            protocol: location.protocol()?,
+            host: location.hostname()?,
+            port: location.port()?,
         })
     }
 
@@ -217,34 +227,12 @@ impl WebImplementation for Implementation {
     }
 
     #[inline]
-    fn now() -> Option<f64> {
-        Some(window()?.performance()?.now())
+    fn now(performance: &Self::Performance) -> f64 {
+        performance.now()
     }
 
     #[inline]
-    fn new(url: &str, handles: &Self::Handles) -> Result<Self::Socket, Error> {
-        let ws = WebSocket::new(url)?;
-        ws.set_binary_type(BinaryType::Arraybuffer);
-        ws.set_onopen(Some(handles.open.as_ref().unchecked_ref()));
-        ws.set_onclose(Some(handles.close.as_ref().unchecked_ref()));
-        ws.set_onmessage(Some(handles.message.as_ref().unchecked_ref()));
-        ws.set_onerror(Some(handles.error.as_ref().unchecked_ref()));
-        Ok(ws)
-    }
-
-    #[inline]
-    fn send(socket: &Self::Socket, data: &[u8]) -> Result<(), Error> {
-        socket.send_with_u8_array(data)?;
-        Ok(())
-    }
-
-    #[inline]
-    fn close(socket: Self::Socket) -> Result<(), Error> {
-        socket.close()?;
-        Ok(())
-    }
-
-    #[inline]
+    #[allow(private_interfaces)]
     fn handles(shared: &Weak<Shared<Self>>) -> Self::Handles {
         let open = {
             let shared = shared.clone();
@@ -297,11 +285,11 @@ impl WebImplementation for Implementation {
 
 /// Construct a new [`ServiceBuilder`] associated with the given [`Connect`]
 /// strategy.
-pub fn connect(connect: Connect) -> ServiceBuilder<Implementation> {
-    crate::web::connect::<Implementation>(connect)
+pub fn connect(connect: Connect) -> ServiceBuilder<Web03Impl> {
+    crate::web::connect::<Web03Impl>(connect)
 }
 
-impl Shared<Implementation> {
+impl Shared<Web03Impl> {
     fn do_open(&self) {
         tracing::debug!("Open event");
         self.set_open();
@@ -312,7 +300,7 @@ impl Shared<Implementation> {
         self.close();
     }
 
-    fn do_message(self: &Rc<Shared<Implementation>>, e: MessageEvent) {
+    fn do_message(self: &Rc<Shared<Web03Impl>>, e: MessageEvent) {
         tracing::debug!("Message event");
 
         if let Err(error) = self.web03_message(e) {
@@ -320,7 +308,7 @@ impl Shared<Implementation> {
         }
     }
 
-    fn web03_message(self: &Rc<Shared<Implementation>>, e: MessageEvent) -> Result<(), Error> {
+    fn web03_message(self: &Rc<Shared<Web03Impl>>, e: MessageEvent) -> Result<(), Error> {
         let Ok(array_buffer) = e.data().dyn_into::<ArrayBuffer>() else {
             return Err(Error::msg("Expected message as ArrayBuffer"));
         };

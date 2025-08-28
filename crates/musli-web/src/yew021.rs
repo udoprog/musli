@@ -1,4 +1,154 @@
-//! Prelude to import when integrating with yew `0.21.x`.
+//! Integration with yew `0.21.x`.
+//!
+//! # Examples
+//!
+//! This example uses [`yew021`]:
+//!
+//! [`yew021`]: crate::yew021
+//!
+//! ```
+//! # extern crate yew021 as yew;
+//! # extern crate web_sys03 as web_sys;
+//! use web_sys::HtmlInputElement;
+//! use yew::prelude::*;
+//! use musli_web::yew021::prelude::*;
+//!
+//! mod api {
+//!     use musli::{Decode, Encode};
+//!     use musli_web::api;
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct HelloRequest<'de> {
+//!         pub message: &'de str,
+//!     }
+//!    
+//!     #[derive(Encode, Decode)]
+//!     pub struct HelloResponse<'de> {
+//!         pub message: &'de str,
+//!     }
+//!    
+//!     #[derive(Encode, Decode)]
+//!     pub struct TickEvent<'de> {
+//!         pub message: &'de str,
+//!         pub tick: u32,
+//!     }
+//!  
+//!     api::define! {
+//!         endpoint Hello {
+//!             request<'de> = HelloRequest<'de>;
+//!             response<'de> = HelloResponse<'de>;
+//!         }
+//!    
+//!         broadcast Tick {
+//!             body<'de> = TickEvent<'de>;
+//!         }
+//!     }
+//! }
+//!
+//! enum Msg {
+//!     Error(ws::Error),
+//!     Send,
+//!     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
+//!     Tick(ws::Packet<api::Tick>),
+//! }
+//!
+//! struct App {
+//!     service: ws::Service,
+//!     input: NodeRef,
+//!     _listen: ws::Listener,
+//!     request: ws::Request,
+//!     response: String,
+//!     tick: u32,
+//! }
+//!
+//! impl Component for App {
+//!     type Message = Msg;
+//!     type Properties = ();
+//!
+//!     fn create(ctx: &Context<Self>) -> Self {
+//!         let service = ws::connect(ws::Connect::location_with_path(String::from("/ws")))
+//!             .on_error(ctx.link().callback(Msg::Error))
+//!             .build();
+//!
+//!         let input = NodeRef::default();
+//!
+//!         service.connect();
+//!
+//!         let listen = service.handle().listen(ctx.link().callback(Msg::Tick));
+//!
+//!         Self {
+//!             service,
+//!             input,
+//!             _listen: listen,
+//!             request: ws::Request::empty(),
+//!             response: String::new(),
+//!             tick: 0,
+//!         }
+//!     }
+//!
+//!     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+//!         match msg {
+//!             Msg::Error(error) => {
+//!                 tracing::error!("WebSocket error: {:?}", error);
+//!                 false
+//!             }
+//!             Msg::Send => {
+//!                 let Some(input) = self.input.cast::<HtmlInputElement>() else {
+//!                     return false;
+//!                 };
+//!
+//!                 let value = input.value();
+//!                 input.set_value("");
+//!
+//!                 self.request = self
+//!                     .service
+//!                     .handle()
+//!                     .request::<api::Hello>()
+//!                     .body(api::HelloRequest {
+//!                         message: value.as_str(),
+//!                     })
+//!                     .on_packet(ctx.link().callback(Msg::HelloResponse))
+//!                     .send();
+//!
+//!                 true
+//!             }
+//!             Msg::HelloResponse(Err(error)) => {
+//!                 tracing::error!("Request error: {error}");
+//!                 false
+//!             }
+//!             Msg::HelloResponse(Ok(packet)) => {
+//!                 tracing::warn!("Got response");
+//!
+//!                 if let Ok(response) = packet.decode() {
+//!                     self.response = response.message.to_owned();
+//!                 }
+//!
+//!                 true
+//!             }
+//!             Msg::Tick(packet) => {
+//!                 if let Ok(tick) = packet.decode_broadcast() {
+//!                     self.tick = tick.tick;
+//!                 }
+//!
+//!                 true
+//!             }
+//!         }
+//!     }
+//!
+//!     fn view(&self, ctx: &Context<Self>) -> Html {
+//!         let onclick = ctx.link().callback(|_: MouseEvent| Msg::Send);
+//!
+//!         html! {
+//!             <div class="container">
+//!                 <input type="text" ref={self.input.clone()} />
+//!                 <button {onclick}>{"Send Message"}</button>
+//!                 <div>{format!("Response: {}", self.response)}</div>
+//!                 <div>{format!("Global tick: {}", self.tick)}</div>
+//!             </div>
+//!         }
+//!     }
+//! }
+//! ```
 
 use yew021::Callback;
 use yew021::html::ImplicitClone;
@@ -9,75 +159,20 @@ pub mod prelude {
     pub use crate::yew021::{HandleExt, RequestBuilderExt, ServiceBuilderExt};
 
     pub mod ws {
-        //! Organization module prefixing all exported items with `ws` for
-        //! convenient namespacing.
-
-        pub use crate::web::{Connect, Error, State};
-        use crate::web03::Implementation;
-
-        /// Implementation alias for [`connect`].
-        ///
-        /// [`connect`]: crate::web03::connect
-        pub fn connect(connect: Connect) -> ServiceBuilder {
-            crate::web03::connect(connect)
-        }
-
-        /// Implementation alias for [`Service`].
-        ///
-        /// [`Service`]: crate::web::Service
-        pub type Service = crate::web::Service<Implementation>;
-
-        /// Implementation alias for [`Request`].
-        ///
-        /// [`Request`]: crate::web::Request
-        pub type Request = crate::web::Request<Implementation>;
-
-        /// Implementation alias for [`Handle`].
-        ///
-        /// [`Handle`]: crate::web::Handle
-        pub type Handle = crate::web::Handle<Implementation>;
-
-        /// Implementation alias for [`Listener`].
-        ///
-        /// [`Listener`]: crate::web::Listener
-        pub type Listener = crate::web::Listener<Implementation>;
-
-        /// Implementation alias for [`Packet`].
-        ///
-        /// [`Packet`]: crate::web::Packet
-        pub type Packet<T> = crate::web::Packet<T, Implementation>;
-
-        /// Implementation alias for [`RawPacket`].
-        ///
-        /// [`RawPacket`]: crate::web::RawPacket
-        pub type RawPacket = crate::web::RawPacket<Implementation>;
-
-        /// Implementation alias for [`RequestBuilder`].
-        ///
-        /// [`RequestBuilder`]: crate::web::RequestBuilder
-        pub type RequestBuilder<'a, E, T> = crate::web::RequestBuilder<'a, E, T, Implementation>;
-
-        /// Implementation alias for [`ServiceBuilder`].
-        ///
-        /// [`ServiceBuilder`]: crate::web::ServiceBuilder
-        pub type ServiceBuilder = crate::web::ServiceBuilder<Implementation>;
-
-        /// Implementation alias for [`StateListener`].
-        ///
-        /// [`StateListener`]: crate::web::StateListener
-        pub type StateListener = crate::web::StateListener<Implementation>;
+        #[doc(inline)]
+        pub use crate::web03::prelude::ws::*;
     }
 }
 
 use crate::api;
 use crate::web::{
     Error, Handle, Listener, Packet, RawPacket, RequestBuilder, ServiceBuilder, State,
-    StateListener, WebImplementation,
+    StateListener, WebImpl,
 };
 
 impl<H> ImplicitClone for Handle<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn implicit_clone(&self) -> Self {
@@ -93,7 +188,7 @@ pub trait ServiceBuilderExt {
 
 impl<H> ServiceBuilderExt for ServiceBuilder<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn on_error(self, callback: Callback<Error>) -> Self {
@@ -104,7 +199,7 @@ where
 /// Request builder extension for interacting with handles in yew `0.21.x`.
 pub trait HandleExt<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Listen for broadcasts of type `T`.
     ///
@@ -254,7 +349,7 @@ where
 
 impl<H> HandleExt<H> for Handle<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn listen<T>(&self, callback: Callback<Packet<T, H>>) -> Listener<H>
@@ -275,7 +370,7 @@ pub trait RequestBuilderExt<E, H>
 where
     Self: Sized,
     E: api::Endpoint,
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Handle the response using the specified callback.
     ///
@@ -465,11 +560,11 @@ where
 impl<E, T, H> RequestBuilderExt<E, H> for RequestBuilder<'_, E, T, H>
 where
     E: api::Endpoint,
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn on_packet(self, callback: Callback<Result<Packet<E, H>, Error>>) -> Self {
-        RequestBuilder::on_raw_packet_cb(self, move |result| match result {
+        RequestBuilder::on_packet_cb(self, move |result| match result {
             Ok(raw) => {
                 callback.emit(Ok(Packet::new(raw)));
             }
@@ -481,7 +576,7 @@ where
 
     #[inline]
     fn on_raw_packet(self, callback: Callback<Result<RawPacket<H>, Error>>) -> Self {
-        RequestBuilder::on_raw_packet_cb(self, move |result| match result {
+        RequestBuilder::on_packet_cb(self, move |result| match result {
             Ok(raw) => {
                 callback.emit(Ok(raw));
             }

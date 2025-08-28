@@ -39,68 +39,90 @@ pub struct Location {
     pub(crate) port: String,
 }
 
-pub(crate) mod sealed {
+pub(crate) mod sealed_socket {
     pub trait Sealed {}
 }
 
-/// Trait for building handles.
-pub trait WebImplementation
+pub(crate) mod sealed_web {
+    pub trait Sealed {}
+}
+
+pub trait SocketImplementation
 where
-    Self: 'static + Copy + Sized + self::sealed::Sealed,
+    Self: Sized + self::sealed_socket::Sealed,
 {
     #[doc(hidden)]
     type Handles;
 
     #[doc(hidden)]
-    type Socket;
+    fn new(url: &str, handles: &Self::Handles) -> Result<Self, Error>;
 
     #[doc(hidden)]
-    fn location() -> Result<Location, Error>;
+    fn send(&self, data: &[u8]) -> Result<(), Error>;
+
+    #[doc(hidden)]
+    fn close(self) -> Result<(), Error>;
+}
+
+/// Central trait for web integration.
+///
+/// Since web integration is currently unstable, this requires multiple
+/// different implementations, each time an ecosystem breaking change is
+/// released.
+///
+/// The crate in focus here is `web-sys`, and the corresponding modules provide
+/// integrations:
+///
+/// * [web03] for `web-sys` `0.3.x`.
+///
+/// [web03]: crate::web03
+pub trait WebImpl
+where
+    Self: 'static + Copy + Sized + self::sealed_web::Sealed,
+{
+    #[doc(hidden)]
+    type Window;
+
+    #[doc(hidden)]
+    type Performance;
+
+    #[doc(hidden)]
+    type Handles;
+
+    #[doc(hidden)]
+    type Socket: SocketImplementation<Handles = Self::Handles>;
+
+    #[doc(hidden)]
+    fn window() -> Result<Self::Window, Error>;
+
+    #[doc(hidden)]
+    fn performance(window: &Self::Window) -> Result<Self::Performance, Error>;
+
+    #[doc(hidden)]
+    #[allow(private_interfaces)]
+    fn handles(shared: &Weak<Shared<Self>>) -> Self::Handles;
+
+    #[doc(hidden)]
+    fn location(window: &Self::Window) -> Result<Location, Error>;
 
     #[doc(hidden)]
     fn random(range: u32) -> u32;
 
     #[doc(hidden)]
-    fn now() -> Option<f64>;
-
-    #[doc(hidden)]
-    fn new(url: &str, handles: &Self::Handles) -> Result<Self::Socket, Error>;
-
-    #[doc(hidden)]
-    fn send(socket: &Self::Socket, data: &[u8]) -> Result<(), Error>;
-
-    #[doc(hidden)]
-    fn close(socket: Self::Socket) -> Result<(), Error>;
-
-    #[doc(hidden)]
-    fn handles(shared: &Weak<Shared<Self>>) -> Self::Handles;
+    fn now(window: &Self::Performance) -> f64;
 }
 
 /// Construct a new [`ServiceBuilder`] associated with the given [`Connect`]
 /// strategy.
 pub fn connect<H>(connect: Connect) -> ServiceBuilder<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
-    let shared = Rc::<Shared<H>>::new_cyclic(|shared| Shared {
+    ServiceBuilder {
         connect,
-        state: Cell::new(State::Closed),
-        opened: Cell::new(None),
-        serial: Cell::new(0),
-        state_listeners: RefCell::new(Slab::new()),
-        requests: RefCell::new(Requests::new()),
-        broadcasts: RefCell::new(HashMap::new()),
-        deferred: RefCell::new(VecDeque::new()),
-        socket: RefCell::new(None),
-        output: RefCell::new(Vec::new()),
-        current_timeout: Cell::new(INITIAL_TIMEOUT),
-        reconnect_timeout: RefCell::new(None),
-        buffers: RefCell::new(VecDeque::new()),
-        handles: H::handles(shared),
         on_error: None,
-    });
-
-    ServiceBuilder { shared }
+        _marker: PhantomData,
+    }
 }
 
 /// The state of the connection.
@@ -227,7 +249,7 @@ impl Connect {
 
 struct Requests<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     serials: HashMap<u32, usize>,
     pending: Slab<Pending<H>>,
@@ -235,7 +257,7 @@ where
 
 impl<H> Requests<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     fn new() -> Self {
         Self {
@@ -266,14 +288,17 @@ where
 type Deferred<H> = VecDeque<Rc<dyn Fn(RawPacket<H>)>>;
 
 /// Shared implementation details for websocket implementations.
-#[doc(hidden)]
-pub struct Shared<H>
+pub(crate) struct Shared<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     connect: Connect,
+    on_error: Option<Box<dyn Fn(Error)>>,
+    window: H::Window,
+    performance: H::Performance,
+    handles: H::Handles,
     state: Cell<State>,
-    opened: Cell<Option<Opened>>,
+    opened: Cell<Option<f64>>,
     serial: Cell<u32>,
     state_listeners: RefCell<StateSlab>,
     requests: RefCell<Requests<H>>,
@@ -284,17 +309,15 @@ where
     current_timeout: Cell<u32>,
     reconnect_timeout: RefCell<Option<Timeout>>,
     buffers: RefCell<VecDeque<Box<BufData<H>>>>,
-    on_error: Option<Box<dyn Fn(Error)>>,
-    handles: H::Handles,
 }
 
 impl<H> Drop for Shared<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     fn drop(&mut self) {
         if let Some(old) = self.socket.take()
-            && let Err(error) = H::close(old)
+            && let Err(error) = H::Socket::close(old)
             && let Some(handle) = &self.on_error
         {
             handle(error);
@@ -323,43 +346,64 @@ where
 /// Builder of a service.
 pub struct ServiceBuilder<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
-    shared: Rc<Shared<H>>,
+    connect: Connect,
+    on_error: Option<Box<dyn Fn(Error)>>,
+    _marker: PhantomData<H>,
 }
 
 impl<H> ServiceBuilder<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Set the error handler to use for the service.
     pub fn on_error_cb(mut self, on_error: impl Fn(Error) + 'static) -> Self {
-        use core::ptr;
-
-        let old;
-
-        // SAFETY: This builder ensures that the service cannot be safely used
-        // in a way which causes the error handler to be exposed.
-        unsafe {
-            let ptr = Rc::into_raw(self.shared).cast_mut();
-            old = ptr::addr_of_mut!((*ptr).on_error).replace(Some(Box::new(on_error)));
-            self.shared = Rc::from_raw(ptr.cast_const());
-        }
-
-        drop(old);
+        self.on_error = Some(Box::new(on_error));
         self
     }
 
     /// Build a new service and handle.
     pub fn build(self) -> Service<H> {
-        let handle = Handle {
-            shared: Rc::downgrade(&self.shared),
+        let window = match H::window() {
+            Ok(window) => window,
+            Err(error) => {
+                panic!("{error}")
+            }
         };
 
-        Service {
-            shared: self.shared,
-            handle,
-        }
+        let performance = match H::performance(&window) {
+            Ok(performance) => performance,
+            Err(error) => {
+                panic!("{error}")
+            }
+        };
+
+        let shared = Rc::<Shared<H>>::new_cyclic(|shared| Shared {
+            connect: self.connect,
+            on_error: self.on_error,
+            window,
+            performance,
+            handles: H::handles(shared),
+            state: Cell::new(State::Closed),
+            opened: Cell::new(None),
+            serial: Cell::new(0),
+            state_listeners: RefCell::new(Slab::new()),
+            requests: RefCell::new(Requests::new()),
+            broadcasts: RefCell::new(HashMap::new()),
+            deferred: RefCell::new(VecDeque::new()),
+            socket: RefCell::new(None),
+            output: RefCell::new(Vec::new()),
+            current_timeout: Cell::new(INITIAL_TIMEOUT),
+            reconnect_timeout: RefCell::new(None),
+            buffers: RefCell::new(VecDeque::new()),
+        });
+
+        let handle = Handle {
+            shared: Rc::downgrade(&shared),
+        };
+
+        Service { shared, handle }
     }
 }
 
@@ -369,7 +413,7 @@ where
 /// to be cancelled.
 pub struct Service<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     shared: Rc<Shared<H>>,
     handle: Handle<H>,
@@ -377,11 +421,11 @@ where
 
 impl<H> Service<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Attempt to establish a websocket connection.
     pub fn connect(&self) {
-        Shared::connect(&self.shared)
+        self.shared.connect()
     }
 
     /// Build a handle to the service.
@@ -392,7 +436,7 @@ where
 
 impl<H> Shared<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Defer an error.
     #[inline]
@@ -429,7 +473,7 @@ where
             "Sending request"
         );
 
-        H::send(socket, out.as_slice())?;
+        H::Socket::send(socket, out.as_slice())?;
 
         out.clear();
         out.shrink_to(MAX_CAPACITY);
@@ -538,22 +582,16 @@ where
 
     pub(crate) fn set_open(&self) {
         tracing::debug!("Set open");
-        self.opened.set(Some(Opened { at: H::now() }));
+        self.opened.set(Some(H::now(&self.performance)));
         self.emit_state_change(State::Open);
     }
 
     fn is_open_for_a_while(&self) -> bool {
-        let Some(opened) = self.opened.get() else {
+        let Some(at) = self.opened.get() else {
             return false;
         };
 
-        let Some(at) = opened.at else {
-            return false;
-        };
-
-        let Some(now) = H::now() else {
-            return false;
-        };
+        let now = H::now(&self.performance);
 
         (now - at) >= 250.0
     }
@@ -591,7 +629,7 @@ where
         self.emit_state_change(State::Closed);
 
         if let Some(old) = self.socket.take()
-            && let Err(error) = H::close(old)
+            && let Err(error) = H::Socket::close(old)
         {
             self.handle_error(error);
         }
@@ -655,7 +693,17 @@ where
                     protocol,
                     host,
                     port,
-                } = H::location()?;
+                } = H::location(&self.window)?;
+
+                let protocol = match protocol.as_str() {
+                    "https:" => "wss:",
+                    "http:" => "ws:",
+                    other => {
+                        return Err(Error::msg(format_args!(
+                            "Same host connection is not supported for protocol `{other}`"
+                        )));
+                    }
+                };
 
                 let path = match path {
                     Some(path) => ForcePrefix(path),
@@ -667,12 +715,12 @@ where
             ConnectKind::Url { url } => url.clone(),
         };
 
-        let ws = H::new(&url, &self.handles)?;
+        let ws = H::Socket::new(&url, &self.handles)?;
 
         let old = self.socket.borrow_mut().replace(ws);
 
         if let Some(old) = old {
-            H::close(old)?;
+            H::Socket::close(old)?;
         }
 
         Ok(())
@@ -691,7 +739,7 @@ where
 /// [`RequestBuilderExt::on_raw_packet`]: crate::yew021::RequestBuilderExt::on_raw_packet
 pub struct RequestBuilder<'a, E, T, H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     shared: &'a Weak<Shared<H>>,
     callback: Option<Rc<dyn Fn(Result<RawPacket<H>>)>>,
@@ -702,7 +750,7 @@ where
 impl<'a, E, H> RequestBuilder<'a, E, (), H>
 where
     E: api::Endpoint,
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Set the body of the request.
     #[inline]
@@ -723,7 +771,7 @@ impl<'a, E, T, H> RequestBuilder<'a, E, T, H>
 where
     E: api::Endpoint,
     T: Encode<Binary>,
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Build and return the request.
     pub fn send(self) -> Request<H> {
@@ -764,7 +812,7 @@ where
 
 impl<'a, E, T, H> RequestBuilder<'a, E, T, H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Handle the response using the specified callback.
     ///
@@ -821,7 +869,7 @@ where
     ///         let hello = ctx.props().ws
     ///             .request::<api::Hello>()
     ///             .body(api::HelloRequest { message: "Hello!"})
-    ///             .on_raw_packet_cb(move |packet| link.send_message(Msg::OnHello(packet)))
+    ///             .on_packet_cb(move |packet| link.send_message(Msg::OnHello(packet)))
     ///             .send();
     ///
     ///         Self {
@@ -856,7 +904,7 @@ where
     ///     }
     /// }
     /// ```
-    pub fn on_raw_packet_cb(mut self, f: impl Fn(Result<RawPacket<H>, Error>) + 'static) -> Self {
+    pub fn on_packet_cb(mut self, f: impl Fn(Result<RawPacket<H>, Error>) + 'static) -> Self {
         self.callback = Some(Rc::new(f));
         self
     }
@@ -865,14 +913,14 @@ where
 /// The handle for a pending request. Dropping this handle cancels the request.
 pub struct Request<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     inner: Option<(Weak<Shared<H>>, u32)>,
 }
 
 impl<H> Request<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// An empty request handler.
     #[inline]
@@ -883,7 +931,7 @@ where
 
 impl<H> Default for Request<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn default() -> Self {
@@ -893,7 +941,7 @@ where
 
 impl<H> Drop for Request<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn drop(&mut self) {
@@ -922,7 +970,7 @@ where
 /// The handle for a pending request. Dropping this handle cancels the request.
 pub struct Listener<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     kind: &'static str,
     index: usize,
@@ -931,7 +979,7 @@ where
 
 impl<H> Listener<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Set up an empty listener.
     pub fn empty_with_kind(kind: &'static str) -> Self {
@@ -954,7 +1002,7 @@ where
 
 impl<H> Drop for Listener<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn drop(&mut self) {
@@ -983,7 +1031,7 @@ where
 /// The handle for state change listening. Dropping this handle cancels the request.
 pub struct StateListener<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     index: usize,
     shared: Weak<Shared<H>>,
@@ -991,7 +1039,7 @@ where
 
 impl<H> Drop for StateListener<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn drop(&mut self) {
@@ -1007,7 +1055,7 @@ where
 
 pub(crate) struct BufData<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Reference to shared state where the buffer will be recycled to.
     shared: Weak<Shared<H>>,
@@ -1019,7 +1067,7 @@ where
 
 impl<H> BufData<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     fn with_capacity(shared: Weak<Shared<H>>, capacity: usize) -> Self {
         Self {
@@ -1075,14 +1123,14 @@ where
 
 struct BufRc<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     data: NonNull<BufData<H>>,
 }
 
 impl<H> BufRc<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     fn new(data: Box<BufData<H>>) -> Self {
         let data = NonNull::from(Box::leak(data));
@@ -1097,7 +1145,7 @@ where
 
 impl<H> Deref for BufRc<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     type Target = [u8];
 
@@ -1108,7 +1156,7 @@ where
 
 impl<H> Clone for BufRc<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     fn clone(&self) -> Self {
         unsafe {
@@ -1121,7 +1169,7 @@ where
 
 impl<H> Drop for BufRc<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     fn drop(&mut self) {
         unsafe {
@@ -1134,7 +1182,7 @@ where
 #[derive(Clone)]
 pub struct RawPacket<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     buf: BufRc<H>,
     at: Cell<usize>,
@@ -1143,7 +1191,7 @@ where
 
 impl<H> RawPacket<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Decode the contents of a raw packet.
     ///
@@ -1193,7 +1241,7 @@ where
 #[derive(Clone)]
 pub struct Packet<T, H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     raw: RawPacket<H>,
     _marker: PhantomData<T>,
@@ -1201,7 +1249,7 @@ where
 
 impl<T, H> Packet<T, H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Construct a new typed package from a raw one.
     ///
@@ -1241,7 +1289,7 @@ where
 impl<T, H> Packet<T, H>
 where
     T: api::Endpoint,
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Decode the contents of a packet.
     ///
@@ -1257,7 +1305,7 @@ where
 impl<T, H> Packet<T, H>
 where
     T: api::Listener,
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Decode a typed broadcast.
     pub fn decode_broadcast(&self) -> Result<T::Broadcast<'_>> {
@@ -1270,14 +1318,14 @@ where
 #[repr(transparent)]
 pub struct Handle<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     shared: Weak<Shared<H>>,
 }
 
 impl<H> Handle<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     /// Send a request of type `T`.
     ///
@@ -1574,7 +1622,7 @@ where
 
 impl<H> PartialEq for Handle<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn eq(&self, _: &Self) -> bool {
@@ -1584,7 +1632,7 @@ where
 
 struct Pending<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     serial: u32,
     callback: Option<Rc<dyn Fn(Result<RawPacket<H>>)>>,
@@ -1593,7 +1641,7 @@ where
 
 impl<H> fmt::Debug for Pending<H>
 where
-    H: WebImplementation,
+    H: WebImpl,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1602,9 +1650,4 @@ where
             .field("kind", &self.kind)
             .finish_non_exhaustive()
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Opened {
-    at: Option<f64>,
 }
