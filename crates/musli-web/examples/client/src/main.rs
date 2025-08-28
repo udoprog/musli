@@ -18,6 +18,7 @@ use yew::prelude::*;
 
 enum Msg {
     Error(ws::Error),
+    Change(String),
     Send,
     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
     Tick(ws::Packet<api::Tick>),
@@ -25,11 +26,11 @@ enum Msg {
 
 struct App {
     service: ws::Service,
-    input: NodeRef,
     _listen: ws::Listener,
     request: ws::Request,
-    responses: Vec<String>,
+    text: String,
     tick: u32,
+    responses: Vec<String>,
 }
 
 impl Component for App {
@@ -37,11 +38,9 @@ impl Component for App {
     type Properties = ();
 
     fn create(ctx: &Context<Self>) -> Self {
-        let service = ws::connect(ws::Connect::location_with_path(String::from("/ws")))
+        let service = ws::connect(ws::Connect::location("ws"))
             .on_error(ctx.link().callback(Msg::Error))
             .build();
-
-        let input = NodeRef::default();
 
         service.connect();
 
@@ -49,11 +48,11 @@ impl Component for App {
 
         Self {
             service,
-            input,
             _listen: listen,
-            request: ws::Request::empty(),
-            responses: Vec::new(),
+            request: ws::Request::new(),
+            text: String::new(),
             tick: 0,
+            responses: Vec::new(),
         }
     }
 
@@ -63,20 +62,17 @@ impl Component for App {
                 tracing::error!("WebSocket error: {:?}", error);
                 false
             }
+            Msg::Change(text) => {
+                self.text = text;
+                true
+            }
             Msg::Send => {
-                let Some(input) = self.input.cast::<HtmlInputElement>() else {
-                    return false;
-                };
-
-                let value = input.value();
-                input.set_value("");
-
                 self.request = self
                     .service
                     .handle()
                     .request::<api::Hello>()
                     .body(api::HelloRequest {
-                        message: value.as_str(),
+                        message: self.text.as_str(),
                     })
                     .on_packet(
                         ctx.link()
@@ -84,6 +80,7 @@ impl Component for App {
                     )
                     .send();
 
+                self.text.clear();
                 true
             }
             Msg::HelloResponse(Err(error)) => {
@@ -116,11 +113,20 @@ impl Component for App {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
+        let oninput = ctx.link().callback(|e: InputEvent| {
+            let input = e.target_unchecked_into::<HtmlInputElement>();
+            Msg::Change(input.value())
+        });
+
+        let onkeydown = ctx
+            .link()
+            .batch_callback(|e: KeyboardEvent| (e.key() == "Enter").then_some(Msg::Send));
+
         let onclick = ctx.link().callback(|_: MouseEvent| Msg::Send);
 
         html! {
             <div class="container">
-                <input type="text" ref={self.input.clone()} />
+                <input key="input" type="text" {oninput} {onkeydown} value={self.text.clone()} />
                 <button {onclick}>{"Send Message"}</button>
                 {for self.responses.iter().enumerate().map(|(index, response)| html!(<div>{format!("Response #{index}: {response}")}</div>))}
                 <div>{format!("Global tick: {}", self.tick)}</div>
