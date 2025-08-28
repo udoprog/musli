@@ -154,6 +154,8 @@ use core::cell::{Cell, RefCell};
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
+use core::ops::Deref;
+use core::ptr::NonNull;
 use std::collections::VecDeque;
 
 use alloc::boxed::Box;
@@ -242,6 +244,7 @@ pub fn connect(connect: Connect) -> ServiceBuilder {
             output: RefCell::new(Vec::new()),
             current_timeout: Cell::new(INITIAL_TIMEOUT),
             reconnect_timeout: RefCell::new(None),
+            buffers: RefCell::new(VecDeque::new()),
             handles: Handles {
                 open,
                 close,
@@ -430,6 +433,7 @@ struct Shared {
     output: RefCell<Vec<u8>>,
     current_timeout: Cell<u32>,
     reconnect_timeout: RefCell<Option<Timeout>>,
+    buffers: RefCell<VecDeque<Box<BufData>>>,
     on_error: Option<Box<dyn Fn(Error)>>,
     handles: Handles,
 }
@@ -585,13 +589,38 @@ impl Shared {
         Ok(())
     }
 
-    fn message(&self, e: MessageEvent) -> Result<()> {
+    fn message(self: &Rc<Self>, e: MessageEvent) -> Result<()> {
         let Ok(array_buffer) = e.data().dyn_into::<ArrayBuffer>() else {
             return Err(Error::msg("Expected message as ArrayBuffer"));
         };
 
-        let body = Rc::from(Uint8Array::new(&array_buffer).to_vec());
-        let mut reader = SliceReader::new(&body);
+        let array = Uint8Array::new(&array_buffer);
+        let needed = array.length() as usize;
+
+        let mut buf = match self.buffers.borrow_mut().pop_front() {
+            Some(mut buf) => {
+                if buf.data.capacity() < needed {
+                    buf.data.reserve(needed - buf.data.len());
+                }
+
+                tracing::info!("used existing buffer");
+                buf
+            }
+            None => {
+                tracing::info!("used new buffer");
+                Box::new(BufData::with_capacity(Rc::downgrade(self), needed))
+            }
+        };
+
+        // SAFETY: We've sized the buffer appropriately above.
+        unsafe {
+            array.raw_copy_to_ptr(buf.data.as_mut_ptr());
+            buf.data.set_len(needed);
+        }
+
+        // Wrap the buffer in a simple shared reference-counted container.
+        let buf = BufRc::new(buf);
+        let mut reader = SliceReader::new(&buf);
 
         let header: api::ResponseHeader<'_> = storage::decode(&mut reader)?;
 
@@ -622,10 +651,10 @@ impl Shared {
                     return Ok(());
                 }
 
-                let at = body.len().saturating_sub(reader.remaining());
+                let at = buf.len().saturating_sub(reader.remaining());
 
                 let packet = RawPacket {
-                    body: body.clone(),
+                    buf: buf.clone(),
                     at: Cell::new(at),
                     kind,
                 };
@@ -659,10 +688,10 @@ impl Shared {
                         callback(Err(Error::msg(error)));
                     }
                 } else if let Some(callback) = callback {
-                    let at = body.len().saturating_sub(reader.remaining());
+                    let at = buf.len().saturating_sub(reader.remaining());
 
                     let packet = RawPacket {
-                        body,
+                        buf,
                         at: Cell::new(at),
                         kind,
                     };
@@ -1129,10 +1158,115 @@ impl Drop for StateListener {
     }
 }
 
+struct BufData {
+    /// Reference to shared state where the buffer will be recycled to.
+    shared: Weak<Shared>,
+    /// Buffer being used.
+    data: Vec<u8>,
+    /// Number of strong references to this buffer.
+    strong: Cell<usize>,
+}
+
+impl BufData {
+    fn with_capacity(shared: Weak<Shared>, capacity: usize) -> Self {
+        Self {
+            shared,
+            data: Vec::with_capacity(capacity),
+            strong: Cell::new(0),
+        }
+    }
+
+    unsafe fn dec(ptr: NonNull<BufData>) {
+        unsafe {
+            let count = ptr.as_ref().strong.get().wrapping_sub(1);
+            ptr.as_ref().strong.set(count);
+
+            if count > 0 {
+                return;
+            }
+
+            let mut buf = Box::from_raw(ptr.as_ptr());
+
+            // Try to recycle the buffer if shared is available, else let it be
+            // dropped and free here.
+            let Some(shared) = buf.as_ref().shared.upgrade() else {
+                return;
+            };
+
+            let mut buffers = shared.buffers.borrow_mut();
+
+            // We size our buffers to some max capacity to avod overuse in case
+            // we infrequently need to handle some massive message. If we don't
+            // shrink the allocation, then memory use can run away over time.
+            if buf.data.len() > MAX_CAPACITY {
+                buf.data.shrink_to(MAX_CAPACITY);
+            }
+
+            // Set the length of the recycled buffer.
+            buf.data.set_len(0);
+            buffers.push_back(buf);
+        }
+    }
+
+    unsafe fn inc(ptr: NonNull<BufData>) {
+        unsafe {
+            let count = ptr.as_ref().strong.get().wrapping_add(1);
+
+            if count == 0 {
+                std::process::abort();
+            }
+
+            ptr.as_ref().strong.set(count);
+        }
+    }
+}
+
+struct BufRc {
+    data: NonNull<BufData>,
+}
+
+impl BufRc {
+    fn new(data: Box<BufData>) -> Self {
+        let data = NonNull::from(Box::leak(data));
+
+        unsafe {
+            BufData::inc(data);
+        }
+
+        Self { data }
+    }
+}
+
+impl Deref for BufRc {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &(*self.data.as_ptr()).data }
+    }
+}
+
+impl Clone for BufRc {
+    fn clone(&self) -> Self {
+        unsafe {
+            BufData::inc(self.data);
+        }
+
+        Self { data: self.data }
+    }
+}
+
+impl Drop for BufRc {
+    fn drop(&mut self) {
+        unsafe {
+            BufData::dec(self.data);
+        }
+    }
+}
+
 /// A raw packet of data.
 #[derive(Clone)]
 pub struct RawPacket {
-    body: Rc<[u8]>,
+    buf: BufRc,
     at: Cell<usize>,
     kind: &'static str,
 }
@@ -1150,8 +1284,8 @@ impl RawPacket {
     {
         let at = self.at.get();
 
-        let Some(bytes) = self.body.get(at..) else {
-            return Err(Error::new(ErrorKind::Overflow(at, self.body.len())));
+        let Some(bytes) = self.buf.get(at..) else {
+            return Err(Error::new(ErrorKind::Overflow(at, self.buf.len())));
         };
 
         let mut reader = SliceReader::new(bytes);
@@ -1162,7 +1296,7 @@ impl RawPacket {
                 Ok(value)
             }
             Err(error) => {
-                self.at.set(self.body.len());
+                self.at.set(self.buf.len());
                 Err(Error::from(error))
             }
         }
@@ -1170,7 +1304,7 @@ impl RawPacket {
 
     /// Check if the packet is empty.
     pub fn is_empty(&self) -> bool {
-        self.at.get() >= self.body.len()
+        self.at.get() >= self.buf.len()
     }
 
     /// The kind of the packet this is a response to as specified by
