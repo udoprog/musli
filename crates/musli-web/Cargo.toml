@@ -26,7 +26,7 @@ default = ["alloc", "std"]
 alloc = ["musli?/alloc"]
 std = ["musli?/std"]
 api = ["alloc", "dep:musli"]
-axum08 = ["dep:axum08", "axum-core05", "dep:bytes", "dep:futures-core03", "ws"]
+axum08 = ["dep:axum08", "axum-core05", "dep:bytes", "dep:futures-core03", "dep:futures-sink03", "ws"]
 json = ["musli/json", "std", "alloc", "dep:bytes", "dep:mime", "axum-core05", "dep:http"]
 ws = ["musli/storage", "std", "api", "dep:bytes", "dep:rand", "tokio/time", "axum-core05", "axum08/ws", "dep:tracing"]
 yew021 = ["web03", "dep:yew021"]
@@ -45,6 +45,7 @@ tokio = { version = "1.37.0", default-features = false, optional = true }
 slab = { version = "0.4.9", default-features = false, optional = true }
 
 futures-core03 = { package = "futures-core", version = "0.3.0", default-features = false, optional = true }
+futures-sink03 = { package = "futures-sink", version = "0.3.0", default-features = false, optional = true }
 axum-core05 = { package="axum-core", version = "0.5.0", default-features = false, optional = true }
 axum08 = { package = "axum", version = "0.8.0", default-features = false, optional = true }
 yew021 = { package = "yew", version = "0.21.0", default-features = false, optional = true }
