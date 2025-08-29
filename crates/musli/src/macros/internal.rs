@@ -997,6 +997,7 @@ macro_rules! implement_error {
         $vis:vis struct $id:ident;
     ) => {
         $(#[$($meta)*])*
+        #[derive(PartialEq, Eq)]
         #[cfg(feature = "alloc")]
         pub struct $id<A = $crate::alloc::Global>
         where
@@ -1006,6 +1007,7 @@ macro_rules! implement_error {
         }
 
         $(#[$($meta)*])*
+        #[derive(PartialEq, Eq)]
         #[cfg(not(feature = "alloc"))]
         pub struct $id<A>
         where
@@ -1034,6 +1036,7 @@ macro_rules! implement_error {
             }
         }
 
+        #[derive(PartialEq, Eq)]
         enum Impl<A>
         where
             A: $crate::Allocator,

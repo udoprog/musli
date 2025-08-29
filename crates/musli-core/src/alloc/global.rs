@@ -31,7 +31,7 @@ use super::{Alloc, AllocError, Allocator};
 /// assert_eq!(buf1.as_slice(), b"Hello, world!");
 /// # Ok::<_, musli::alloc::AllocError>(())
 /// ```
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Global;
 

@@ -263,11 +263,13 @@ where
 
     #[inline]
     fn decode_f32(mut self) -> Result<f32, Self::Error> {
+        self.parser.skip_whitespace(self.cx);
         self.parser.parse_f32(self.cx)
     }
 
     #[inline]
     fn decode_f64(mut self) -> Result<f64, Self::Error> {
+        self.parser.skip_whitespace(self.cx);
         self.parser.parse_f64(self.cx)
     }
 

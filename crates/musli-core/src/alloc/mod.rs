@@ -57,7 +57,7 @@ pub use self::alloc::Alloc;
 use core::fmt;
 
 /// An allocation error.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct AllocError;
 
 impl fmt::Display for AllocError {
