@@ -70,7 +70,7 @@ impl Component for App {
                 self.request = self
                     .service
                     .handle()
-                    .request::<api::Hello>()
+                    .request()
                     .body(api::HelloRequest {
                         message: self.text.as_str(),
                     })

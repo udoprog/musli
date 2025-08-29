@@ -15,11 +15,11 @@ use alloc::vec::Vec;
 
 use std::collections::hash_map::{Entry, HashMap};
 
+use musli::Decode;
 use musli::alloc::Global;
 use musli::mode::Binary;
 use musli::reader::SliceReader;
 use musli::storage;
-use musli::{Decode, Encode};
 
 use gloo_timers03::callback::Timeout;
 use slab::Slab;
@@ -27,6 +27,13 @@ use slab::Slab;
 use crate::api;
 
 const MAX_CAPACITY: usize = 1048576;
+
+/// An empty request.
+pub struct EmptyBody;
+
+/// An empty callback.
+#[non_exhaustive]
+pub struct EmptyCallback;
 
 /// Slab of state listeners.
 type StateListeners = Slab<Rc<dyn Fn(State)>>;
@@ -269,7 +276,7 @@ impl Connect {
 
 struct Requests {
     serials: HashMap<u32, usize>,
-    pending: Slab<Pending>,
+    pending: Slab<Box<Pending<dyn Callback<Result<RawPacket>>>>>,
 }
 
 impl Requests {
@@ -281,13 +288,17 @@ impl Requests {
     }
 
     #[inline]
-    fn remove(&mut self, serial: u32) -> Option<Pending> {
+    fn remove(&mut self, serial: u32) -> Option<Box<Pending<dyn Callback<Result<RawPacket>>>>> {
         let index = self.serials.remove(&serial)?;
         self.pending.try_remove(index)
     }
 
     #[inline]
-    fn insert(&mut self, serial: u32, pending: Pending) -> usize {
+    fn insert(
+        &mut self,
+        serial: u32,
+        pending: Box<Pending<dyn Callback<Result<RawPacket>>>>,
+    ) -> usize {
         let index = self.pending.insert(pending);
 
         if let Some(existing) = self.serials.insert(serial, index) {
@@ -353,9 +364,9 @@ where
         requests.serials.clear();
 
         for pending in requests.pending.drain() {
-            if let Some(callback) = pending.callback {
-                callback(Err(Error::msg("Websocket service closed")));
-            }
+            pending
+                .callback
+                .call(Err(Error::msg("Websocket service closed")));
         }
     }
 }
@@ -467,10 +478,9 @@ where
     }
 
     /// Send a client message.
-    fn send_client_request<E, T>(&self, serial: u32, body: &T) -> Result<()>
+    fn send_client_request<T>(&self, serial: u32, body: &T) -> Result<()>
     where
-        E: api::Endpoint,
-        T: Encode<Binary>,
+        T: api::Request,
     {
         let Some(ref socket) = *self.socket.borrow() else {
             return Err(Error::msg("Socket is not connected"));
@@ -478,7 +488,7 @@ where
 
         let header = api::RequestHeader {
             serial,
-            kind: E::KIND,
+            kind: <T::Endpoint as api::Endpoint>::KIND,
         };
 
         let out = &mut *self.output.borrow_mut();
@@ -553,7 +563,7 @@ where
             None => {
                 tracing::debug!(header.serial, "Got response");
 
-                let (kind, callback) = {
+                let p = {
                     let mut requests = self.g.requests.borrow_mut();
 
                     let Some(p) = requests.remove(header.serial) else {
@@ -561,23 +571,21 @@ where
                         return Ok(());
                     };
 
-                    (p.kind, p.callback)
+                    p
                 };
 
                 if let Some(error) = header.error {
-                    if let Some(callback) = callback {
-                        callback(Err(Error::msg(error)));
-                    }
-                } else if let Some(callback) = callback {
+                    p.callback.call(Err(Error::msg(error)));
+                } else {
                     let at = buf.len().saturating_sub(reader.remaining());
 
                     let packet = RawPacket {
                         buf,
                         at: Cell::new(at),
-                        kind,
+                        kind: p.kind,
                     };
 
-                    callback(Ok(packet));
+                    p.callback.call(Ok(packet));
                 }
             }
         }
@@ -755,98 +763,65 @@ where
     }
 }
 
+/// Trait governing how callbacks are called.
+pub trait Callback<I>
+where
+    Self: 'static,
+{
+    /// Call the callback.
+    fn call(&self, input: I);
+}
+
+impl<I> Callback<I> for EmptyCallback {
+    #[inline]
+    fn call(&self, _: I) {}
+}
+
+impl<F, I> Callback<I> for F
+where
+    F: 'static + Fn(I),
+{
+    #[inline]
+    fn call(&self, input: I) {
+        self(input)
+    }
+}
+
 /// A request builder .
 ///
 /// Associate the callback to be used by using either
-/// [`RequestBuilderExt::on_packet`] or [`RequestBuilderExt::on_raw_packet`]
+/// [`RequestBuilderExt::on_packet`] or [`RequestBuilder::on_raw_packet`]
 /// depending on your needs.
 ///
 /// Send the request with [`RequestBuilder::send`].
 ///
 /// [`RequestBuilderExt::on_packet`]: crate::yew021::RequestBuilderExt::on_packet
-/// [`RequestBuilderExt::on_raw_packet`]: crate::yew021::RequestBuilderExt::on_raw_packet
-pub struct RequestBuilder<'a, E, T, H>
+pub struct RequestBuilder<'a, B, C, H>
 where
     H: WebImpl,
 {
     shared: &'a Weak<Shared<H>>,
-    callback: Option<Rc<dyn Fn(Result<RawPacket>)>>,
-    body: T,
-    _marker: PhantomData<E>,
+    body: B,
+    callback: C,
 }
 
-impl<'a, E, H> RequestBuilder<'a, E, (), H>
+impl<'a, B, C, H> RequestBuilder<'a, B, C, H>
 where
-    E: api::Endpoint,
     H: WebImpl,
 {
     /// Set the body of the request.
     #[inline]
-    pub fn body<T>(self, body: T) -> RequestBuilder<'a, E, T, H>
+    pub fn body<U>(self, body: U) -> RequestBuilder<'a, U, C, H>
     where
-        T: api::Request<Endpoint = E>,
+        U: api::Request,
     {
         RequestBuilder {
             shared: self.shared,
-            callback: self.callback,
             body,
-            _marker: self._marker,
-        }
-    }
-}
-
-impl<'a, E, T, H> RequestBuilder<'a, E, T, H>
-where
-    E: api::Endpoint,
-    T: Encode<Binary>,
-    H: WebImpl,
-{
-    /// Build and return the request.
-    pub fn send(self) -> Request {
-        let Some(shared) = self.shared.upgrade() else {
-            if let Some(callback) = self.callback {
-                callback(Err(Error::msg("WebSocket service is down")));
-            }
-
-            return Request::new();
-        };
-
-        if shared.is_closed() {
-            if let Some(callback) = self.callback {
-                callback(Err(Error::msg("WebSocket is not connected")));
-            }
-
-            return Request::new();
-        }
-
-        let serial = shared.serial.get();
-
-        if let Err(error) = shared.send_client_request::<E, T>(serial, &self.body) {
-            shared.handle_error(error);
-            return Request::new();
-        }
-
-        shared.serial.set(serial.wrapping_add(1));
-
-        let pending = Pending {
-            serial,
             callback: self.callback,
-            kind: E::KIND,
-        };
-
-        shared.g.requests.borrow_mut().insert(serial, pending);
-
-        Request {
-            serial,
-            g: Rc::downgrade(&shared.g),
         }
     }
-}
 
-impl<'a, E, T, H> RequestBuilder<'a, E, T, H>
-where
-    H: WebImpl,
-{
     /// Handle the response using the specified callback.
     ///
     /// # Examples
@@ -900,9 +875,9 @@ where
     ///         let link = ctx.link().clone();
     ///
     ///         let hello = ctx.props().ws
-    ///             .request::<api::Hello>()
+    ///             .request()
     ///             .body(api::HelloRequest { message: "Hello!"})
-    ///             .on_packet_cb(move |packet| link.send_message(Msg::OnHello(packet)))
+    ///             .on_raw_packet(move |packet| link.send_message(Msg::OnHello(packet)))
     ///             .send();
     ///
     ///         Self {
@@ -937,9 +912,65 @@ where
     ///     }
     /// }
     /// ```
-    pub fn on_packet_cb(mut self, f: impl Fn(Result<RawPacket, Error>) + 'static) -> Self {
-        self.callback = Some(Rc::new(f));
-        self
+    pub fn on_raw_packet<U>(self, callback: U) -> RequestBuilder<'a, B, U, H>
+    where
+        U: Callback<Result<RawPacket, Error>>,
+    {
+        RequestBuilder {
+            shared: self.shared,
+            body: self.body,
+            callback,
+        }
+    }
+}
+
+impl<'a, B, C, H> RequestBuilder<'a, B, C, H>
+where
+    B: api::Request,
+    C: Callback<Result<RawPacket>>,
+    H: WebImpl,
+{
+    /// Send the request.
+    ///
+    /// This requires that a body has been set using [`RequestBuilder::body`].
+    pub fn send(self) -> Request {
+        let Some(shared) = self.shared.upgrade() else {
+            self.callback
+                .call(Err(Error::msg("WebSocket service is down")));
+            return Request::new();
+        };
+
+        if shared.is_closed() {
+            self.callback
+                .call(Err(Error::msg("WebSocket is not connected")));
+            return Request::new();
+        }
+
+        let serial = shared.serial.get();
+
+        if let Err(error) = shared.send_client_request(serial, &self.body) {
+            shared.handle_error(error);
+            return Request::new();
+        }
+
+        shared.serial.set(serial.wrapping_add(1));
+
+        let pending = Pending {
+            serial,
+            kind: <B::Endpoint as api::Endpoint>::KIND,
+            callback: self.callback,
+        };
+
+        shared
+            .g
+            .requests
+            .borrow_mut()
+            .insert(serial, Box::new(pending));
+
+        Request {
+            serial,
+            g: Rc::downgrade(&shared.g),
+        }
     }
 }
 
@@ -1433,7 +1464,7 @@ where
     ///
     ///     fn create(ctx: &Context<Self>) -> Self {
     ///         let hello = ctx.props().ws
-    ///             .request::<api::Hello>()
+    ///             .request()
     ///             .body(api::HelloRequest { message: "Hello!"})
     ///             .on_packet(ctx.link().callback(Msg::OnHello))
     ///             .send();
@@ -1470,15 +1501,11 @@ where
     ///     }
     /// }
     /// ```
-    pub fn request<E>(&self) -> RequestBuilder<'_, E, (), H>
-    where
-        E: api::Endpoint,
-    {
+    pub fn request(&self) -> RequestBuilder<'_, EmptyBody, EmptyCallback, H> {
         RequestBuilder {
             shared: &self.shared,
-            callback: None,
-            body: (),
-            _marker: PhantomData,
+            body: EmptyBody,
+            callback: EmptyCallback,
         }
     }
 
@@ -1685,13 +1712,16 @@ where
     }
 }
 
-struct Pending {
+struct Pending<C>
+where
+    C: ?Sized,
+{
     serial: u32,
-    callback: Option<Rc<dyn Fn(Result<RawPacket>)>>,
     kind: &'static str,
+    callback: C,
 }
 
-impl fmt::Debug for Pending {
+impl<C> fmt::Debug for Pending<C> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Pending")

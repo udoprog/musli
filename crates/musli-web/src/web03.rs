@@ -43,11 +43,11 @@
 //!
 //! let request = service
 //!     .handle()
-//!     .request::<api::Hello>()
+//!     .request()
 //!     .body(api::HelloRequest {
 //!         message: "Hello!",
 //!     })
-//!     .on_packet_cb(move |packet| {
+//!     .on_raw_packet(move |packet: Result<ws::RawPacket, ws::Error>| {
 //!         match packet {
 //!             Ok(packet) => {
 //!                 if let Ok(response) = packet.decode::<api::HelloResponse>() {
@@ -110,7 +110,7 @@ pub mod prelude {
         /// Implementation alias for [`RequestBuilder`].
         ///
         /// [`RequestBuilder`]: crate::web::RequestBuilder
-        pub type RequestBuilder<'a, E, T> = crate::web::RequestBuilder<'a, E, T, Web03Impl>;
+        pub type RequestBuilder<'a, B, C> = crate::web::RequestBuilder<'a, B, C, Web03Impl>;
 
         /// Implementation alias for [`ServiceBuilder`].
         ///
