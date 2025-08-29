@@ -99,7 +99,7 @@
 //!                 self.request = self
 //!                     .service
 //!                     .handle()
-//!                     .request::<api::Hello>()
+//!                     .request()
 //!                     .body(api::HelloRequest {
 //!                         message: self.text.as_str(),
 //!                     })
@@ -387,10 +387,9 @@ where
 }
 
 /// Request builder extension for interacting with request builders in yew `0.21.x`.
-pub trait RequestBuilderExt<E, H>
+pub trait RequestBuilderExt<'a, B, C, H>
 where
     Self: Sized,
-    E: api::Endpoint,
     H: WebImpl,
 {
     /// Handle the response using the specified callback.
@@ -444,7 +443,7 @@ where
     ///
     ///     fn create(ctx: &Context<Self>) -> Self {
     ///         let hello = ctx.props().ws
-    ///             .request::<api::Hello>()
+    ///             .request()
     ///             .body(api::HelloRequest { message: "Hello!"})
     ///             .on_packet(ctx.link().callback(Msg::OnHello))
     ///             .send();
@@ -481,129 +480,50 @@ where
     ///     }
     /// }
     /// ```
-    fn on_packet(self, f: Callback<Result<Packet<E>, Error>>) -> Self;
-
-    /// Handle the raw response using the specified callback.
-    ///
-    /// This can be useful if all of your responses are expected to return the
-    /// same response type and you only want to have one message to handle all
-    /// of them.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate yew021 as yew;
-    /// use yew::prelude::*;
-    /// use musli_web::yew021::prelude::*;
-    ///
-    /// mod api {
-    ///     use musli::{Decode, Encode};
-    ///     use musli_web::api;
-    ///
-    ///     #[derive(Encode, Decode)]
-    ///     pub struct HelloRequest<'de> {
-    ///         pub message: &'de str,
-    ///     }
-    ///
-    ///     #[derive(Encode, Decode)]
-    ///     pub struct HelloResponse<'de> {
-    ///         pub message: &'de str,
-    ///     }
-    ///
-    ///     api::define! {
-    ///         endpoint Hello {
-    ///             request<'de> = HelloRequest<'de>;
-    ///             response<'de> = HelloResponse<'de>;
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// enum Msg {
-    ///     OnHello(Result<ws::RawPacket, ws::Error>),
-    /// }
-    ///
-    /// #[derive(Properties, PartialEq)]
-    /// struct Props {
-    ///     ws: ws::Handle,
-    /// }
-    ///
-    /// struct App {
-    ///     message: String,
-    ///     _hello: ws::Request,
-    /// }
-    ///
-    /// impl Component for App {
-    ///     type Message = Msg;
-    ///     type Properties = Props;
-    ///
-    ///     fn create(ctx: &Context<Self>) -> Self {
-    ///         let hello = ctx.props().ws
-    ///             .request::<api::Hello>()
-    ///             .body(api::HelloRequest { message: "Hello!"})
-    ///             .on_raw_packet(ctx.link().callback(Msg::OnHello))
-    ///             .send();
-    ///
-    ///         Self {
-    ///             message: String::from("No Message :("),
-    ///             _hello: hello,
-    ///         }
-    ///     }
-    ///
-    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-    ///         match msg {
-    ///             Msg::OnHello(Err(error)) => {
-    ///                 tracing::error!("Request error: {:?}", error);
-    ///                 false
-    ///             }
-    ///             Msg::OnHello(Ok(packet)) => {
-    ///                 if let Ok(response) = packet.decode::<api::HelloResponse>() {
-    ///                     self.message = response.message.to_owned();
-    ///                 }
-    ///
-    ///                 true
-    ///             }
-    ///         }
-    ///     }
-    ///
-    ///     fn view(&self, ctx: &Context<Self>) -> Html {
-    ///         html! {
-    ///             <div>
-    ///                 <h1>{"WebSocket Example"}</h1>
-    ///                 <p>{format!("Message: {}", self.message)}</p>
-    ///             </div>
-    ///         }
-    ///     }
-    /// }
-    /// ```
-    fn on_raw_packet(self, f: Callback<Result<RawPacket, Error>>) -> Self;
+    fn on_packet<E>(
+        self,
+        f: Callback<Result<Packet<E>, Error>>,
+    ) -> RequestBuilder<'a, B, Callback<Result<Packet<E>, Error>>, H>
+    where
+        E: api::Endpoint;
 }
 
-impl<E, T, H> RequestBuilderExt<E, H> for RequestBuilder<'_, E, T, H>
+impl<'a, B, C, H> RequestBuilderExt<'a, B, C, H> for RequestBuilder<'a, B, C, H>
 where
-    E: api::Endpoint,
     H: WebImpl,
 {
     #[inline]
-    fn on_packet(self, callback: Callback<Result<Packet<E>, Error>>) -> Self {
-        RequestBuilder::on_packet_cb(self, move |result| match result {
-            Ok(raw) => {
-                callback.emit(Ok(Packet::new(raw)));
-            }
-            Err(error) => {
-                callback.emit(Err(error));
-            }
-        })
+    fn on_packet<E>(
+        self,
+        callback: Callback<Result<Packet<E>, Error>>,
+    ) -> RequestBuilder<'a, B, Callback<Result<Packet<E>, Error>>, H>
+    where
+        E: api::Endpoint,
+    {
+        RequestBuilder::on_raw_packet(self, callback)
     }
+}
 
+impl<E> crate::web::Callback<Result<RawPacket, Error>> for Callback<Result<Packet<E>, Error>>
+where
+    E: api::Endpoint,
+{
     #[inline]
-    fn on_raw_packet(self, callback: Callback<Result<RawPacket, Error>>) -> Self {
-        RequestBuilder::on_packet_cb(self, move |result| match result {
+    fn call(&self, result: Result<RawPacket, Error>) {
+        match result {
             Ok(raw) => {
-                callback.emit(Ok(raw));
+                self.emit(Ok(Packet::new(raw)));
             }
             Err(error) => {
-                callback.emit(Err(error));
+                self.emit(Err(error));
             }
-        })
+        }
+    }
+}
+
+impl crate::web::Callback<Result<RawPacket, Error>> for Callback<Result<RawPacket, Error>> {
+    #[inline]
+    fn call(&self, result: Result<RawPacket, Error>) {
+        self.emit(result);
     }
 }
