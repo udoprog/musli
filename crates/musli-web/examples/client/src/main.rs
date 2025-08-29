@@ -8,7 +8,7 @@
 //!
 //! [`yew`]: https://yew.rs
 
-use musli_web::yew021::prelude::*;
+use musli_web::web03::prelude::*;
 use tracing::Level;
 use tracing_subscriber::Registry;
 use tracing_subscriber::layer::SubscriberExt as _;
@@ -44,7 +44,9 @@ impl Component for App {
 
         service.connect();
 
-        let listen = service.handle().listen(ctx.link().callback(Msg::Tick));
+        let listen = service
+            .handle()
+            .on_broadcast(ctx.link().callback(Msg::Tick));
 
         Self {
             service,
@@ -74,10 +76,7 @@ impl Component for App {
                     .body(api::HelloRequest {
                         message: self.text.as_str(),
                     })
-                    .on_packet(
-                        ctx.link()
-                            .callback(|result: Result<_, _>| Msg::HelloResponse(result)),
-                    )
+                    .on_packet(ctx.link().callback(Msg::HelloResponse))
                     .send();
 
                 self.text.clear();

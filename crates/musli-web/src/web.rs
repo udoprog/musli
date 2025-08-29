@@ -37,9 +37,9 @@ pub struct EmptyBody;
 pub struct EmptyCallback;
 
 /// Slab of state listeners.
-type StateListeners = Slab<Rc<dyn Fn(State)>>;
+type StateListeners = Slab<Rc<dyn Callback<State>>>;
 /// Slab of broadcast listeners.
-type Broadcasts = HashMap<&'static str, Slab<Rc<dyn Fn(Result<RawPacket>)>>>;
+type Broadcasts = HashMap<&'static str, Slab<Rc<dyn Callback<Result<RawPacket>>>>>;
 /// Queue of recycled buffers.
 type Buffers = VecDeque<Box<BufData>>;
 
@@ -146,13 +146,13 @@ where
 
 /// Construct a new [`ServiceBuilder`] associated with the given [`Connect`]
 /// strategy.
-pub fn connect<H>(connect: Connect) -> ServiceBuilder<H>
+pub fn connect<H>(connect: Connect) -> ServiceBuilder<H, EmptyCallback>
 where
     H: WebImpl,
 {
     ServiceBuilder {
         connect,
-        on_error: None,
+        on_error: EmptyCallback,
         _marker: PhantomData,
     }
 }
@@ -160,9 +160,7 @@ where
 /// The state of the connection.
 ///
 /// A listener for state changes can be set up through for example
-/// [`yew021::HandleExt::on_state_change`].
-///
-/// [`yew021::HandleExt::on_state_change`]: crate::yew021::HandleExt::on_state_change
+/// [`Handle::on_state_change`].
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[non_exhaustive]
 pub enum State {
@@ -324,15 +322,15 @@ where
     H: WebImpl,
 {
     connect: Connect,
-    on_error: Option<Box<dyn Fn(Error)>>,
+    pub(crate) on_error: Box<dyn Callback<Error>>,
     window: H::Window,
     performance: <H::Window as WindowImpl>::Performance,
     handles: H::Handles,
     state: Cell<State>,
     opened: Cell<Option<f64>>,
     serial: Cell<u32>,
-    defer_broadcasts: RefCell<VecDeque<Weak<dyn Fn(Result<RawPacket>)>>>,
-    defer_state_listeners: RefCell<VecDeque<Weak<dyn Fn(State)>>>,
+    defer_broadcasts: RefCell<VecDeque<Weak<dyn Callback<Result<RawPacket>>>>>,
+    defer_state_listeners: RefCell<VecDeque<Weak<dyn Callback<State>>>>,
     socket: RefCell<Option<H::Socket>>,
     output: RefCell<Vec<u8>>,
     current_timeout: Cell<u32>,
@@ -347,9 +345,8 @@ where
     fn drop(&mut self) {
         if let Some(s) = self.socket.take()
             && let Err(e) = s.close()
-            && let Some(callback) = &self.on_error
         {
-            callback(e);
+            self.on_error.call(e);
         }
 
         // We don't need to worry about mutable borrows here, since we only have
@@ -359,7 +356,7 @@ where
         let mut requests = self.g.requests.borrow_mut();
 
         for (_, listener) in state_listeners {
-            listener(State::Closed);
+            listener.call(State::Closed);
         }
 
         requests.serials.clear();
@@ -373,23 +370,30 @@ where
 }
 
 /// Builder of a service.
-pub struct ServiceBuilder<H>
+pub struct ServiceBuilder<H, E>
 where
     H: WebImpl,
 {
     connect: Connect,
-    on_error: Option<Box<dyn Fn(Error)>>,
+    on_error: E,
     _marker: PhantomData<H>,
 }
 
-impl<H> ServiceBuilder<H>
+impl<H, E> ServiceBuilder<H, E>
 where
     H: WebImpl,
+    E: Callback<Error>,
 {
     /// Set the error handler to use for the service.
-    pub fn on_error_cb(mut self, on_error: impl Fn(Error) + 'static) -> Self {
-        self.on_error = Some(Box::new(on_error));
-        self
+    pub fn on_error<U>(self, on_error: U) -> ServiceBuilder<H, U>
+    where
+        U: Callback<Error>,
+    {
+        ServiceBuilder {
+            connect: self.connect,
+            on_error,
+            _marker: self._marker,
+        }
     }
 
     /// Build a new service and handle.
@@ -408,9 +412,9 @@ where
             }
         };
 
-        let shared = Rc::<Shared<H>>::new_cyclic(|shared| Shared {
+        let shared = Rc::<Shared<H>>::new_cyclic(move |shared| Shared {
             connect: self.connect,
-            on_error: self.on_error,
+            on_error: Box::new(self.on_error),
             window,
             performance,
             handles: H::handles(shared),
@@ -470,14 +474,6 @@ impl<H> Shared<H>
 where
     H: WebImpl,
 {
-    /// Defer an error.
-    #[inline]
-    pub(crate) fn handle_error(&self, error: Error) {
-        if let Some(handle) = &self.on_error {
-            handle(error);
-        }
-    }
-
     /// Send a client message.
     fn send_client_request<T>(&self, serial: u32, body: &T) -> Result<()>
     where
@@ -542,7 +538,7 @@ where
                 if let Some(error) = header.error {
                     while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
                         if let Some(callback) = callback.upgrade() {
-                            callback(Err(Error::msg(error)));
+                            callback.call(Err(Error::msg(error)));
                         }
                     }
                 } else {
@@ -556,7 +552,7 @@ where
 
                     while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
                         if let Some(callback) = callback.upgrade() {
-                            callback(Ok(packet.clone()));
+                            callback.call(Ok(packet.clone()));
                         }
                     }
                 }
@@ -666,7 +662,7 @@ where
         if let Some(s) = self.socket.take()
             && let Err(e) = s.close()
         {
-            self.handle_error(e);
+            self.on_error.call(e);
         }
 
         let timeout = Timeout::new(self.current_timeout.get(), move || {
@@ -700,7 +696,7 @@ where
 
         while let Some(callback) = self.defer_state_listeners.borrow_mut().pop_front() {
             if let Some(callback) = callback.upgrade() {
-                callback(state);
+                callback.call(state);
             }
         }
     }
@@ -714,7 +710,7 @@ where
 
         let failed = {
             if let Err(error) = self.build() {
-                self.handle_error(error);
+                self.on_error.call(error);
                 true
             } else {
                 false
@@ -791,12 +787,10 @@ where
 /// A request builder .
 ///
 /// Associate the callback to be used by using either
-/// [`RequestBuilderExt::on_packet`] or [`RequestBuilder::on_raw_packet`]
-/// depending on your needs.
+/// [`RequestBuilder::on_packet`] or [`RequestBuilder::on_raw_packet`] depending
+/// on your needs.
 ///
 /// Send the request with [`RequestBuilder::send`].
-///
-/// [`RequestBuilderExt::on_packet`]: crate::yew021::RequestBuilderExt::on_packet
 pub struct RequestBuilder<'a, H, B, C>
 where
     H: WebImpl,
@@ -830,7 +824,108 @@ where
     /// ```
     /// # extern crate yew021 as yew;
     /// use yew::prelude::*;
-    /// use musli_web::yew021::prelude::*;
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// mod api {
+    ///     use musli::{Decode, Encode};
+    ///     use musli_web::api;
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct HelloRequest<'de> {
+    ///         pub message: &'de str,
+    ///     }
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct HelloResponse<'de> {
+    ///         pub message: &'de str,
+    ///     }
+    ///
+    ///     api::define! {
+    ///         endpoint Hello {
+    ///             request<'de> = HelloRequest<'de>;
+    ///             response<'de> = HelloResponse<'de>;
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// enum Msg {
+    ///     OnHello(Result<ws::Packet<api::Hello>, ws::Error>),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     message: String,
+    ///     _hello: ws::Request,
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let hello = ctx.props().ws
+    ///             .request()
+    ///             .body(api::HelloRequest { message: "Hello!"})
+    ///             .on_packet(ctx.link().callback(Msg::OnHello))
+    ///             .send();
+    ///
+    ///         Self {
+    ///             message: String::from("No Message :("),
+    ///             _hello: hello,
+    ///         }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::OnHello(Err(error)) => {
+    ///                 tracing::error!("Request error: {:?}", error);
+    ///                 false
+    ///             }
+    ///             Msg::OnHello(Ok(packet)) => {
+    ///                 if let Ok(response) = packet.decode() {
+    ///                     self.message = response.message.to_owned();
+    ///                 }
+    ///
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///                 <p>{format!("Message: {}", self.message)}</p>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn on_packet<E>(
+        self,
+        callback: impl Callback<Result<Packet<E>>>,
+    ) -> RequestBuilder<'a, H, B, impl Callback<Result<RawPacket>>>
+    where
+        E: api::Endpoint,
+    {
+        self.on_raw_packet(move |result: Result<RawPacket>| match result {
+            Ok(ok) => callback.call(Ok(Packet::new(ok))),
+            Err(err) => callback.call(Err(err)),
+        })
+    }
+
+    /// Handle the response using the specified callback.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew021 as yew;
+    /// use yew::prelude::*;
+    /// use musli_web::web03::prelude::*;
     ///
     /// mod api {
     ///     use musli::{Decode, Encode};
@@ -950,7 +1045,7 @@ where
         let serial = shared.serial.get();
 
         if let Err(error) = shared.send_client_request(serial, &self.body) {
-            shared.handle_error(error);
+            shared.on_error.call(error);
             return Request::new();
         }
 
@@ -1421,7 +1516,7 @@ where
     /// ```
     /// # extern crate yew021 as yew;
     /// use yew::prelude::*;
-    /// use musli_web::yew021::prelude::*;
+    /// use musli_web::web03::prelude::*;
     ///
     /// mod api {
     ///     use musli::{Decode, Encode};
@@ -1520,7 +1615,99 @@ where
     /// ```
     /// # extern crate yew021 as yew;
     /// use yew::prelude::*;
-    /// use musli_web::yew021::prelude::*;
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// mod api {
+    ///     use musli::{Decode, Encode};
+    ///     use musli_web::api;
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct TickEvent<'de> {
+    ///         pub message: &'de str,
+    ///         pub tick: u32,
+    ///     }
+    ///
+    ///     api::define! {
+    ///         broadcast Tick {
+    ///             body<'de> = TickEvent<'de>;
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// enum Msg {
+    ///     Tick(Result<ws::Packet<api::Tick>, ws::Error>),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     tick: u32,
+    ///     _listen: ws::Listener,
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let listen = ctx.props().ws.on_broadcast(ctx.link().callback(Msg::Tick));
+    ///
+    ///         Self {
+    ///             tick: 0,
+    ///             _listen: listen,
+    ///         }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::Tick(Err(error)) => {
+    ///                 tracing::error!("Tick error: {error}");
+    ///                 false
+    ///             }
+    ///             Msg::Tick(Ok(packet)) => {
+    ///                 if let Ok(tick) = packet.decode_broadcast() {
+    ///                     self.tick = tick.tick;
+    ///                 }
+    ///
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///                 <p>{format!("Tick: {}", self.tick)}</p>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn on_broadcast<T>(&self, callback: impl Callback<Result<Packet<T>>>) -> Listener
+    where
+        T: api::Listener,
+    {
+        self.on_raw_broadcast::<T>(move |result| match result {
+            Ok(packet) => callback.call(Ok(Packet::new(packet))),
+            Err(error) => callback.call(Err(error)),
+        })
+    }
+
+    /// Listen for broadcasts of type `T`.
+    ///
+    /// Returns a handle for the listener that will cancel the listener if
+    /// dropped.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew021 as yew;
+    /// use yew::prelude::*;
+    /// use musli_web::web03::prelude::*;
     ///
     /// mod api {
     ///     use musli::{Decode, Encode};
@@ -1559,7 +1746,7 @@ where
     ///
     ///     fn create(ctx: &Context<Self>) -> Self {
     ///         let link = ctx.link().clone();
-    ///         let listen = ctx.props().ws.listen_cb::<api::Tick>(move |packet| link.send_message(Msg::Tick(packet)));
+    ///         let listen = ctx.props().ws.on_raw_broadcast::<api::Tick>(ctx.link().callback(Msg::Tick));
     ///
     ///         Self {
     ///             tick: 0,
@@ -1593,7 +1780,7 @@ where
     ///     }
     /// }
     /// ```
-    pub fn listen_cb<T>(&self, f: impl Fn(Result<RawPacket>) + 'static) -> Listener
+    pub fn on_raw_broadcast<T>(&self, callback: impl Callback<Result<RawPacket>>) -> Listener
     where
         T: api::Listener,
     {
@@ -1604,7 +1791,7 @@ where
         let index = {
             let mut broadcasts = shared.g.broadcasts.borrow_mut();
             let slots = broadcasts.entry(T::KIND).or_default();
-            slots.insert(Rc::new(f))
+            slots.insert(Rc::new(callback))
         };
 
         Listener {
@@ -1627,7 +1814,7 @@ where
     /// ```
     /// # extern crate yew021 as yew;
     /// use yew::prelude::*;
-    /// use musli_web::yew021::prelude::*;
+    /// use musli_web::web03::prelude::*;
     ///
     /// enum Msg {
     ///     StateChange(ws::State),
@@ -1650,7 +1837,7 @@ where
     ///     fn create(ctx: &Context<Self>) -> Self {
     ///         let link = ctx.link().clone();
     ///
-    ///         let (state, listen) = ctx.props().ws.on_state_change_cb(move |state| {
+    ///         let (state, listen) = ctx.props().ws.on_state_change(move |state| {
     ///             link.send_message(Msg::StateChange(state));
     ///         });
     ///
@@ -1678,7 +1865,7 @@ where
     ///         }
     ///     }
     /// }
-    pub fn on_state_change_cb(&self, f: impl Fn(State) + 'static) -> (State, StateListener) {
+    pub fn on_state_change(&self, callback: impl Callback<State>) -> (State, StateListener) {
         let Some(shared) = self.shared.upgrade() else {
             return (
                 State::Closed,
@@ -1690,7 +1877,11 @@ where
         };
 
         let (state, index) = {
-            let index = shared.g.state_listeners.borrow_mut().insert(Rc::new(f));
+            let index = shared
+                .g
+                .state_listeners
+                .borrow_mut()
+                .insert(Rc::new(callback));
             (shared.state.get(), index)
         };
 

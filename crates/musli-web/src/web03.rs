@@ -34,7 +34,7 @@
 //! }
 //!
 //! let service = ws::connect(ws::Connect::location("ws"))
-//!     .on_error_cb(|error| {
+//!     .on_error(|error| {
 //!         tracing::error!("WebSocket error: {error}");
 //!     })
 //!     .build();
@@ -72,11 +72,10 @@ use web_sys03::Window;
 use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
 use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, window};
 
-use crate::web::Location;
-use crate::web::PerformanceImpl;
-use crate::web::SocketImpl;
-use crate::web::WindowImpl;
-use crate::web::{Connect, Error, ServiceBuilder, Shared, WebImpl};
+use crate::web::{
+    Connect, EmptyCallback, Error, Location, PerformanceImpl, ServiceBuilder, Shared, SocketImpl,
+    WebImpl, WindowImpl,
+};
 
 pub mod prelude {
     //! The public facing API for use with yew `0.2.1` and web-sys `0.3.x`.
@@ -86,14 +85,15 @@ pub mod prelude {
         //! convenient namespacing.
 
         pub use crate::web::{
-            Connect, Error, Listener, Packet, RawPacket, Request, State, StateListener,
+            Connect, EmptyCallback, Error, Listener, Packet, RawPacket, Request, State,
+            StateListener,
         };
         use crate::web03::Web03Impl;
 
         /// Implementation alias for [`connect`].
         ///
         /// [`connect`]: crate::web03::connect
-        pub fn connect(connect: Connect) -> ServiceBuilder {
+        pub fn connect(connect: Connect) -> ServiceBuilder<EmptyCallback> {
             crate::web03::connect(connect)
         }
 
@@ -110,12 +110,12 @@ pub mod prelude {
         /// Implementation alias for [`RequestBuilder`].
         ///
         /// [`RequestBuilder`]: crate::web::RequestBuilder
-        pub type RequestBuilder<'a, B, C> = crate::web::RequestBuilder<'a, B, C, Web03Impl>;
+        pub type RequestBuilder<'a, B, C> = crate::web::RequestBuilder<'a, Web03Impl, B, C>;
 
         /// Implementation alias for [`ServiceBuilder`].
         ///
         /// [`ServiceBuilder`]: crate::web::ServiceBuilder
-        pub type ServiceBuilder = crate::web::ServiceBuilder<Web03Impl>;
+        pub type ServiceBuilder<C> = crate::web::ServiceBuilder<Web03Impl, C>;
     }
 }
 
@@ -273,8 +273,9 @@ impl WebImpl for Web03Impl {
 
 /// Construct a new [`ServiceBuilder`] associated with the given [`Connect`]
 /// strategy.
-pub fn connect(connect: Connect) -> ServiceBuilder<Web03Impl> {
-    crate::web::connect::<Web03Impl>(connect)
+#[inline]
+pub fn connect(connect: Connect) -> ServiceBuilder<Web03Impl, EmptyCallback> {
+    crate::web::connect(connect)
 }
 
 impl Shared<Web03Impl> {
@@ -292,7 +293,7 @@ impl Shared<Web03Impl> {
         tracing::debug!("Message event");
 
         if let Err(error) = self.web03_message(e) {
-            self.handle_error(error);
+            self.on_error.call(error);
         }
     }
 
