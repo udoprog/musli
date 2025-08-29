@@ -50,7 +50,7 @@
 //!     Change(String),
 //!     Send,
 //!     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
-//!     Tick(ws::Packet<api::Tick>),
+//!     Tick(Result<ws::Packet<api::Tick>, ws::Error>),
 //! }
 //!
 //! struct App {
@@ -129,7 +129,11 @@
 //!
 //!                 true
 //!             }
-//!             Msg::Tick(packet) => {
+//!             Msg::Tick(Err(error)) => {
+//!                 tracing::error!("Tick error: {error}");
+//!                 false
+//!             }
+//!             Msg::Tick(Ok(packet)) => {
 //!                 tracing::debug!("Got tick");
 //!
 //!                 if let Ok(tick) = packet.decode_broadcast() {
@@ -241,7 +245,7 @@ pub trait HandleExt {
     /// }
     ///
     /// enum Msg {
-    ///     Tick(ws::Packet<api::Tick>),
+    ///     Tick(Result<ws::Packet<api::Tick>, ws::Error>),
     /// }
     ///
     /// #[derive(Properties, PartialEq)]
@@ -269,7 +273,11 @@ pub trait HandleExt {
     ///
     ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
     ///         match msg {
-    ///             Msg::Tick(packet) => {
+    ///             Msg::Tick(Err(error)) => {
+    ///                 tracing::error!("Tick error: {error}");
+    ///                 false
+    ///             }
+    ///             Msg::Tick(Ok(packet)) => {
     ///                 if let Ok(tick) = packet.decode_broadcast() {
     ///                     self.tick = tick.tick;
     ///                 }
@@ -289,7 +297,7 @@ pub trait HandleExt {
     ///     }
     /// }
     /// ```
-    fn listen<T>(&self, callback: Callback<Packet<T>>) -> Listener
+    fn listen<T>(&self, callback: Callback<Result<Packet<T>, Error>>) -> Listener
     where
         T: api::Listener;
 
@@ -362,11 +370,14 @@ where
     H: WebImpl,
 {
     #[inline]
-    fn listen<T>(&self, callback: Callback<Packet<T>>) -> Listener
+    fn listen<T>(&self, callback: Callback<Result<Packet<T>, Error>>) -> Listener
     where
         T: api::Listener,
     {
-        Handle::listen_cb::<T>(self, move |packet| callback.emit(Packet::new(packet)))
+        Handle::listen_cb::<T>(self, move |result| match result {
+            Ok(packet) => callback.emit(Ok(Packet::new(packet))),
+            Err(error) => callback.emit(Err(error)),
+        })
     }
 
     #[inline]

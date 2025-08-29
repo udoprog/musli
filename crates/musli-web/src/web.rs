@@ -31,9 +31,7 @@ const MAX_CAPACITY: usize = 1048576;
 /// Slab of state listeners.
 type StateListeners = Slab<Rc<dyn Fn(State)>>;
 /// Slab of broadcast listeners.
-type Broadcasts = HashMap<&'static str, Slab<Rc<dyn Fn(RawPacket)>>>;
-/// Queue of deferred items.
-type Deferred = VecDeque<Rc<dyn Fn(RawPacket)>>;
+type Broadcasts = HashMap<&'static str, Slab<Rc<dyn Fn(Result<RawPacket>)>>>;
 /// Queue of recycled buffers.
 type Buffers = VecDeque<Box<BufData>>;
 
@@ -321,7 +319,8 @@ where
     state: Cell<State>,
     opened: Cell<Option<f64>>,
     serial: Cell<u32>,
-    deferred: RefCell<Deferred>,
+    defer_broadcasts: RefCell<VecDeque<Weak<dyn Fn(Result<RawPacket>)>>>,
+    defer_state_listeners: RefCell<VecDeque<Weak<dyn Fn(State)>>>,
     socket: RefCell<Option<H::Socket>>,
     output: RefCell<Vec<u8>>,
     current_timeout: Cell<u32>,
@@ -334,11 +333,11 @@ where
     H: WebImpl,
 {
     fn drop(&mut self) {
-        if let Some(old) = self.socket.take()
-            && let Err(error) = H::Socket::close(old)
-            && let Some(handle) = &self.on_error
+        if let Some(s) = self.socket.take()
+            && let Err(e) = s.close()
+            && let Some(callback) = &self.on_error
         {
-            handle(error);
+            callback(e);
         }
 
         // We don't need to worry about mutable borrows here, since we only have
@@ -406,7 +405,8 @@ where
             state: Cell::new(State::Closed),
             opened: Cell::new(None),
             serial: Cell::new(0),
-            deferred: RefCell::new(VecDeque::new()),
+            defer_broadcasts: RefCell::new(VecDeque::new()),
+            defer_state_listeners: RefCell::new(VecDeque::new()),
             socket: RefCell::new(None),
             output: RefCell::new(Vec::new()),
             current_timeout: Cell::new(INITIAL_TIMEOUT),
@@ -522,47 +522,32 @@ where
 
         match header.broadcast {
             Some(kind) => {
-                tracing::debug!(kind, "Got broadcast",);
+                tracing::debug!(kind, "Got broadcast");
 
-                // Note: We need to defer this, since the outcome of calling the
-                // broadcast callback might be that the broadcast listener is
-                // modified, which could require mutable access to broadcasts.
-                let mut deferred = self.deferred.borrow_mut();
+                let Some(kind) = self.prepare_broadcast(kind) else {
+                    return Ok(());
+                };
 
-                let kind = {
-                    let broadcasts = self.g.broadcasts.borrow();
+                if let Some(error) = header.error {
+                    while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
+                        if let Some(callback) = callback.upgrade() {
+                            callback(Err(Error::msg(error)));
+                        }
+                    }
+                } else {
+                    let at = buf.len().saturating_sub(reader.remaining());
 
-                    let Some((&kind, broadcasts)) = broadcasts.get_key_value(kind) else {
-                        return Ok(());
+                    let packet = RawPacket {
+                        buf: buf.clone(),
+                        at: Cell::new(at),
+                        kind,
                     };
 
-                    for (_, callback) in broadcasts.iter() {
-                        deferred.push_back(callback.clone());
+                    while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
+                        if let Some(callback) = callback.upgrade() {
+                            callback(Ok(packet.clone()));
+                        }
                     }
-
-                    kind
-                };
-
-                if deferred.is_empty() {
-                    return Ok(());
-                }
-
-                let at = buf.len().saturating_sub(reader.remaining());
-
-                let packet = RawPacket {
-                    buf: buf.clone(),
-                    at: Cell::new(at),
-                    kind,
-                };
-
-                let last = deferred.pop_back();
-
-                while let Some(callback) = deferred.pop_front() {
-                    callback(packet.clone());
-                }
-
-                if let Some(callback) = last {
-                    callback(packet);
                 }
             }
             None => {
@@ -598,6 +583,27 @@ where
         }
 
         Ok(())
+    }
+
+    fn prepare_broadcast(self: &Rc<Self>, kind: &str) -> Option<&'static str> {
+        // Note: We need to defer this, since the outcome of calling
+        // the broadcast callback might be that the broadcast
+        // listener is modified, which could require mutable access
+        // to broadcasts.
+        let mut defer = self.defer_broadcasts.borrow_mut();
+
+        let broadcasts = self.g.broadcasts.borrow();
+        let (&kind, broadcasts) = broadcasts.get_key_value(kind)?;
+
+        for (_, callback) in broadcasts.iter() {
+            defer.push_back(Rc::downgrade(callback));
+        }
+
+        if defer.is_empty() {
+            return None;
+        }
+
+        Some(kind)
     }
 
     pub(crate) fn set_open(&self) {
@@ -648,10 +654,10 @@ where
         self.opened.set(None);
         self.emit_state_change(State::Closed);
 
-        if let Some(old) = self.socket.take()
-            && let Err(error) = H::Socket::close(old)
+        if let Some(s) = self.socket.take()
+            && let Err(e) = s.close()
         {
-            self.handle_error(error);
+            self.handle_error(e);
         }
 
         let timeout = Timeout::new(self.current_timeout.get(), move || {
@@ -664,10 +670,27 @@ where
     }
 
     fn emit_state_change(&self, state: State) {
-        if self.state.get() != state {
-            self.state.set(state);
+        if self.state.get() == state {
+            return;
+        }
+
+        {
+            // We need to collect callbacks to avoid the callback recursively
+            // borrowing state listeners, which it would if it modifies any
+            // existing state listeners.
+            let mut defer = self.defer_state_listeners.borrow_mut();
 
             for (_, callback) in self.g.state_listeners.borrow().iter() {
+                defer.push_back(Rc::downgrade(callback));
+            }
+
+            if defer.is_empty() {
+                return;
+            }
+        }
+
+        while let Some(callback) = self.defer_state_listeners.borrow_mut().pop_front() {
+            if let Some(callback) = callback.upgrade() {
                 callback(state);
             }
         }
@@ -725,7 +748,7 @@ where
         let old = self.socket.borrow_mut().replace(ws);
 
         if let Some(old) = old {
-            H::Socket::close(old)?;
+            old.close()?;
         }
 
         Ok(())
@@ -1489,7 +1512,7 @@ where
     /// }
     ///
     /// enum Msg {
-    ///     Tick(ws::RawPacket),
+    ///     Tick(Result<ws::RawPacket, ws::Error>),
     /// }
     ///
     /// #[derive(Properties, PartialEq)]
@@ -1518,7 +1541,11 @@ where
     ///
     ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
     ///         match msg {
-    ///             Msg::Tick(packet) => {
+    ///             Msg::Tick(Err(error)) => {
+    ///                 tracing::error!("Tick error: {error}");
+    ///                 false
+    ///             }
+    ///             Msg::Tick(Ok(packet)) => {
     ///                 if let Ok(tick) = packet.decode::<api::TickEvent>() {
     ///                     self.tick = tick.tick;
     ///                 }
@@ -1538,7 +1565,7 @@ where
     ///     }
     /// }
     /// ```
-    pub fn listen_cb<T>(&self, f: impl Fn(RawPacket) + 'static) -> Listener
+    pub fn listen_cb<T>(&self, f: impl Fn(Result<RawPacket>) + 'static) -> Listener
     where
         T: api::Listener,
     {
