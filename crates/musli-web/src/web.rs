@@ -28,7 +28,8 @@ use crate::api;
 
 const MAX_CAPACITY: usize = 1048576;
 
-/// An empty request.
+/// An empty request body.
+#[non_exhaustive]
 pub struct EmptyBody;
 
 /// An empty callback.
