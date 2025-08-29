@@ -21,7 +21,7 @@ enum Msg {
     Change(String),
     Send,
     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
-    Tick(ws::Packet<api::Tick>),
+    Tick(Result<ws::Packet<api::Tick>, ws::Error>),
 }
 
 struct App {
@@ -100,7 +100,11 @@ impl Component for App {
 
                 true
             }
-            Msg::Tick(packet) => {
+            Msg::Tick(Err(error)) => {
+                tracing::error!("Tick error: {error}");
+                false
+            }
+            Msg::Tick(Ok(packet)) => {
                 tracing::debug!("Got tick");
 
                 if let Ok(tick) = packet.decode_broadcast() {
