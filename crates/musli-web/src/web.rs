@@ -504,7 +504,7 @@ where
             "Sending request"
         );
 
-        H::Socket::send(socket, out.as_slice())?;
+        socket.send(out.as_slice())?;
 
         out.clear();
         out.shrink_to(MAX_CAPACITY);
@@ -752,7 +752,7 @@ where
             ConnectKind::Url { url } => url.clone(),
         };
 
-        let ws = H::Socket::new(&url, &self.handles)?;
+        let ws = SocketImpl::new(&url, &self.handles)?;
 
         let old = self.socket.borrow_mut().replace(ws);
 
@@ -797,7 +797,7 @@ where
 /// Send the request with [`RequestBuilder::send`].
 ///
 /// [`RequestBuilderExt::on_packet`]: crate::yew021::RequestBuilderExt::on_packet
-pub struct RequestBuilder<'a, B, C, H>
+pub struct RequestBuilder<'a, H, B, C>
 where
     H: WebImpl,
 {
@@ -806,13 +806,13 @@ where
     callback: C,
 }
 
-impl<'a, B, C, H> RequestBuilder<'a, B, C, H>
+impl<'a, H, B, C> RequestBuilder<'a, H, B, C>
 where
     H: WebImpl,
 {
     /// Set the body of the request.
     #[inline]
-    pub fn body<U>(self, body: U) -> RequestBuilder<'a, U, C, H>
+    pub fn body<U>(self, body: U) -> RequestBuilder<'a, H, U, C>
     where
         U: api::Request,
     {
@@ -913,7 +913,7 @@ where
     ///     }
     /// }
     /// ```
-    pub fn on_raw_packet<U>(self, callback: U) -> RequestBuilder<'a, B, U, H>
+    pub fn on_raw_packet<U>(self, callback: U) -> RequestBuilder<'a, H, B, U>
     where
         U: Callback<Result<RawPacket, Error>>,
     {
@@ -925,7 +925,7 @@ where
     }
 }
 
-impl<'a, B, C, H> RequestBuilder<'a, B, C, H>
+impl<'a, H, B, C> RequestBuilder<'a, H, B, C>
 where
     B: api::Request,
     C: Callback<Result<RawPacket>>,
@@ -1502,7 +1502,7 @@ where
     ///     }
     /// }
     /// ```
-    pub fn request(&self) -> RequestBuilder<'_, EmptyBody, EmptyCallback, H> {
+    pub fn request(&self) -> RequestBuilder<'_, H, EmptyBody, EmptyCallback> {
         RequestBuilder {
             shared: &self.shared,
             body: EmptyBody,

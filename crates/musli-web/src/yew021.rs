@@ -387,7 +387,7 @@ where
 }
 
 /// Request builder extension for interacting with request builders in yew `0.21.x`.
-pub trait RequestBuilderExt<'a, B, C, H>
+pub trait RequestBuilderExt<'a, H, B, C>
 where
     Self: Sized,
     H: WebImpl,
@@ -483,12 +483,12 @@ where
     fn on_packet<E>(
         self,
         f: Callback<Result<Packet<E>, Error>>,
-    ) -> RequestBuilder<'a, B, Callback<Result<Packet<E>, Error>>, H>
+    ) -> RequestBuilder<'a, H, B, Callback<Result<Packet<E>, Error>>>
     where
         E: api::Endpoint;
 }
 
-impl<'a, B, C, H> RequestBuilderExt<'a, B, C, H> for RequestBuilder<'a, B, C, H>
+impl<'a, H, B, C> RequestBuilderExt<'a, H, B, C> for RequestBuilder<'a, H, B, C>
 where
     H: WebImpl,
 {
@@ -496,7 +496,7 @@ where
     fn on_packet<E>(
         self,
         callback: Callback<Result<Packet<E>, Error>>,
-    ) -> RequestBuilder<'a, B, Callback<Result<Packet<E>, Error>>, H>
+    ) -> RequestBuilder<'a, H, B, Callback<Result<Packet<E>, Error>>>
     where
         E: api::Endpoint,
     {
