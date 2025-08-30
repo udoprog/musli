@@ -1,3 +1,11 @@
+//! The generic web implementation.
+//!
+//! This is specialized over the `H` parameter through modules such as:
+//!
+//! * [`web03`] for `web-sys` `0.3.x`.
+//!
+//! [`web03`]: crate::web03
+
 use core::cell::{Cell, RefCell};
 use core::fmt;
 use core::marker::PhantomData;
@@ -21,7 +29,6 @@ use musli::mode::Binary;
 use musli::reader::SliceReader;
 use musli::storage;
 
-use gloo_timers03::callback::Timeout;
 use slab::Slab;
 
 use crate::api;
@@ -96,6 +103,9 @@ where
     type Performance: PerformanceImpl;
 
     #[doc(hidden)]
+    type Timeout;
+
+    #[doc(hidden)]
     fn new() -> Result<Self, Error>;
 
     #[doc(hidden)]
@@ -103,6 +113,13 @@ where
 
     #[doc(hidden)]
     fn location(&self) -> Result<Location, Error>;
+
+    #[doc(hidden)]
+    fn set_timeout(
+        &self,
+        millis: u32,
+        callback: impl FnOnce() + 'static,
+    ) -> Result<Self::Timeout, Error>;
 }
 
 pub(crate) mod sealed_web {
@@ -331,10 +348,10 @@ where
     serial: Cell<u32>,
     defer_broadcasts: RefCell<VecDeque<Weak<dyn Callback<Result<RawPacket>>>>>,
     defer_state_listeners: RefCell<VecDeque<Weak<dyn Callback<State>>>>,
-    socket: RefCell<Option<H::Socket>>,
+    pub(crate) socket: RefCell<Option<H::Socket>>,
     output: RefCell<Vec<u8>>,
     current_timeout: Cell<u32>,
-    reconnect_timeout: RefCell<Option<Timeout>>,
+    reconnect_timeout: RefCell<Option<<H::Window as WindowImpl>::Timeout>>,
     g: Rc<Generic>,
 }
 
@@ -564,7 +581,7 @@ where
                     let mut requests = self.g.requests.borrow_mut();
 
                     let Some(p) = requests.remove(header.serial) else {
-                        tracing::warn!(header.serial, "Missing request");
+                        tracing::debug!(header.serial, "Missing request");
                         return Ok(());
                     };
 
@@ -627,7 +644,7 @@ where
         (now - at) >= 250.0
     }
 
-    pub(crate) fn close(self: &Rc<Self>) {
+    pub(crate) fn close(self: &Rc<Self>) -> Result<(), Error> {
         tracing::debug!("Close connection");
 
         // We need a weak reference back to shared state to handle the timeout.
@@ -659,25 +676,28 @@ where
         self.opened.set(None);
         self.emit_state_change(State::Closed);
 
-        if let Some(s) = self.socket.take()
-            && let Err(e) = s.close()
-        {
-            self.on_error.call(e);
+        if let Some(s) = self.socket.take() {
+            s.close()?;
         }
 
-        let timeout = Timeout::new(self.current_timeout.get(), move || {
-            if let Some(shared) = shared.upgrade() {
-                Self::connect(&shared);
-            }
-        });
+        let timeout = self
+            .window
+            .set_timeout(self.current_timeout.get(), move || {
+                if let Some(shared) = shared.upgrade() {
+                    Self::connect(&shared);
+                }
+            })?;
 
         drop(self.reconnect_timeout.borrow_mut().replace(timeout));
+        Ok(())
     }
 
     fn emit_state_change(&self, state: State) {
         if self.state.get() == state {
             return;
         }
+
+        self.state.set(state);
 
         {
             // We need to collect callbacks to avoid the callback recursively
@@ -708,17 +728,14 @@ where
     fn connect(self: &Rc<Self>) {
         tracing::debug!("Connect");
 
-        let failed = {
-            if let Err(error) = self.build() {
-                self.on_error.call(error);
-                true
-            } else {
-                false
-            }
-        };
+        if let Err(e) = self.build() {
+            self.on_error.call(e);
+        } else {
+            return;
+        }
 
-        if failed {
-            self.close();
+        if let Err(e) = self.close() {
+            self.on_error.call(e);
         }
     }
 
@@ -1806,6 +1823,11 @@ where
     /// This indicates when the connection is open and ready to receive requests
     /// through [`State::Open`], or if it's closed and requests will be queued
     /// through [`State::Closed`].
+    ///
+    /// Note that if you are connecting through a proxy the reported updates
+    /// might be volatile. It is always best to send a message over the
+    /// connection on the server side that once received allows the client to
+    /// know that it is connected.
     ///
     /// Dropping the returned handle will cancel the listener.
     ///

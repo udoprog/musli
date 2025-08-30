@@ -69,6 +69,7 @@ use wasm_bindgen02::JsCast;
 use wasm_bindgen02::closure::Closure;
 use web_sys03::Performance;
 use web_sys03::Window;
+use web_sys03::js_sys::Function;
 use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
 use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, window};
 
@@ -176,6 +177,7 @@ impl crate::web::sealed_window::Sealed for Window {}
 
 impl WindowImpl for Window {
     type Performance = Performance;
+    type Timeout = Timeout;
 
     #[inline]
     fn new() -> Result<Self, Error> {
@@ -205,6 +207,43 @@ impl WindowImpl for Window {
             port: location.port()?,
         })
     }
+
+    #[inline]
+    fn set_timeout(
+        &self,
+        millis: u32,
+        callback: impl FnOnce() + 'static,
+    ) -> Result<Self::Timeout, Error> {
+        let closure = Closure::once(callback);
+
+        let id = self.set_timeout_with_callback_and_timeout_and_arguments_0(
+            closure.as_ref().unchecked_ref::<Function>(),
+            millis as i32,
+        )?;
+
+        Ok(Timeout {
+            window: self.clone(),
+            id: Some(id),
+            closure: Some(closure),
+        })
+    }
+}
+
+pub struct Timeout {
+    window: Window,
+    id: Option<i32>,
+    #[allow(dead_code)]
+    closure: Option<Closure<dyn FnMut()>>,
+}
+
+impl Drop for Timeout {
+    /// Disposes of the timeout, dually cancelling this timeout by calling
+    /// `clearTimeout` directly.
+    fn drop(&mut self) {
+        if let Some(id) = self.id.take() {
+            self.window.clear_timeout_with_handle(id);
+        }
+    }
 }
 
 impl crate::web::sealed_web::Sealed for Web03Impl {}
@@ -227,7 +266,7 @@ impl WebImpl for Web03Impl {
 
             Closure::new(move || {
                 if let Some(shared) = shared.upgrade() {
-                    shared.do_open();
+                    shared.web03_open();
                 }
             })
         };
@@ -237,7 +276,7 @@ impl WebImpl for Web03Impl {
 
             Closure::new(move |e: CloseEvent| {
                 if let Some(shared) = shared.upgrade() {
-                    shared.do_close(e);
+                    shared.web03_close(e);
                 }
             })
         };
@@ -247,7 +286,7 @@ impl WebImpl for Web03Impl {
 
             Closure::new(move |e: MessageEvent| {
                 if let Some(shared) = shared.upgrade() {
-                    shared.do_message(e);
+                    shared.web03_message(e);
                 }
             })
         };
@@ -257,7 +296,7 @@ impl WebImpl for Web03Impl {
 
             Closure::new(move |e: ErrorEvent| {
                 if let Some(shared) = shared.upgrade() {
-                    shared.do_error(e);
+                    shared.web03_error(e);
                 }
             })
         };
@@ -279,27 +318,27 @@ pub fn connect(connect: Connect) -> ServiceBuilder<Web03Impl, EmptyCallback> {
 }
 
 impl Shared<Web03Impl> {
-    fn do_open(&self) {
+    fn web03_open(&self) {
         tracing::debug!("Open event");
+
         self.set_open();
     }
 
-    fn do_close(self: &Rc<Self>, e: CloseEvent) {
+    fn web03_close(self: &Rc<Self>, e: CloseEvent) {
         tracing::debug!(code = e.code(), reason = e.reason(), "Close event");
-        self.close();
-    }
 
-    fn do_message(self: &Rc<Shared<Web03Impl>>, e: MessageEvent) {
-        tracing::debug!("Message event");
-
-        if let Err(error) = self.web03_message(e) {
-            self.on_error.call(error);
+        if let Err(e) = self.close() {
+            self.on_error.call(e);
         }
     }
 
-    fn web03_message(self: &Rc<Shared<Web03Impl>>, e: MessageEvent) -> Result<(), Error> {
+    fn web03_message(self: &Rc<Shared<Web03Impl>>, e: MessageEvent) {
+        tracing::debug!("Message event");
+
         let Ok(array_buffer) = e.data().dyn_into::<ArrayBuffer>() else {
-            return Err(Error::msg("Expected message as ArrayBuffer"));
+            self.on_error
+                .call(Error::msg("Expected message as ArrayBuffer"));
+            return;
         };
 
         let array = Uint8Array::new(&array_buffer);
@@ -313,11 +352,16 @@ impl Shared<Web03Impl> {
             buf.data.set_len(needed);
         }
 
-        self.message(buf)
+        if let Err(e) = self.message(buf) {
+            self.on_error.call(e);
+        }
     }
 
-    fn do_error(self: &Rc<Self>, e: ErrorEvent) {
+    fn web03_error(self: &Rc<Self>, e: ErrorEvent) {
         tracing::debug!(message = e.message(), "Error event");
-        self.close();
+
+        if let Err(e) = self.close() {
+            self.on_error.call(e);
+        }
     }
 }

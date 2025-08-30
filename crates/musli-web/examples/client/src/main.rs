@@ -22,11 +22,14 @@ enum Msg {
     Send,
     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
     Tick(Result<ws::Packet<api::Tick>, ws::Error>),
+    State(ws::State),
 }
 
 struct App {
+    state: ws::State,
     service: ws::Service,
     _listen: ws::Listener,
+    _state_listener: ws::StateListener,
     request: ws::Request,
     text: String,
     tick: u32,
@@ -48,9 +51,15 @@ impl Component for App {
             .handle()
             .on_broadcast(ctx.link().callback(Msg::Tick));
 
+        let (state, state_listener) = service
+            .handle()
+            .on_state_change(ctx.link().callback(Msg::State));
+
         Self {
+            state,
             service,
             _listen: listen,
+            _state_listener: state_listener,
             request: ws::Request::new(),
             text: String::new(),
             tick: 0,
@@ -112,6 +121,12 @@ impl Component for App {
 
                 true
             }
+            Msg::State(state) => {
+                tracing::debug!(?state);
+
+                self.state = state;
+                true
+            }
         }
     }
 
@@ -130,6 +145,7 @@ impl Component for App {
         html! {
             <div class="container">
                 <input key="input" type="text" {oninput} {onkeydown} value={self.text.clone()} />
+                <div>{format!("State: {:?}", self.state)}</div>
                 <button {onclick}>{"Send Message"}</button>
                 {for self.responses.iter().enumerate().map(|(index, response)| html!(<div>{format!("Response #{index}: {response}")}</div>))}
                 <div>{format!("Global tick: {}", self.tick)}</div>

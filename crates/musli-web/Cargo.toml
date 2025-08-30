@@ -30,7 +30,7 @@ axum08 = ["dep:axum08", "axum-core05", "dep:bytes", "dep:futures-core03", "dep:f
 json = ["musli/json", "std", "alloc", "dep:bytes", "dep:mime", "axum-core05", "dep:http"]
 ws = ["musli/storage", "std", "api", "dep:bytes", "dep:rand", "tokio/time", "axum-core05", "axum08/ws", "dep:tracing"]
 yew021 = ["web03", "dep:yew021"]
-web03 = ["std", "alloc", "api", "slab", "musli/storage", "dep:web-sys03", "dep:tracing", "dep:gloo-timers03", "wasm_bindgen02"]
+web03 = ["std", "alloc", "api", "slab", "musli/storage", "dep:web-sys03", "dep:tracing", "wasm_bindgen02"]
 wasm_bindgen02 = ["dep:wasm-bindgen02"]
 test = ["api", "json", "ws", "yew021"]
 
@@ -50,7 +50,6 @@ axum-core05 = { package="axum-core", version = "0.5.0", default-features = false
 axum08 = { package = "axum", version = "0.8.0", default-features = false, optional = true }
 yew021 = { package = "yew", version = "0.21.0", default-features = false, optional = true }
 wasm-bindgen02 = { package = "wasm-bindgen", version = "0.2.0", default-features = false, optional = true }
-gloo-timers03 = { package = "gloo-timers", version = "0.3.0", default-features = false, optional = true }
 
 [dependencies.web-sys03]
 package = "web-sys"

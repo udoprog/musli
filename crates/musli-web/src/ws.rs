@@ -548,7 +548,7 @@ where
         let header = match storage::decode(&mut reader) {
             Ok(header) => header,
             Err(error) => {
-                tracing::warn!(?error, "Invalid request header");
+                tracing::debug!(?error, "Invalid request header");
                 self.out
                     .push_back(S::close(CLOSE_PROTOCOL_ERROR, "Invalid request header"));
                 self.closing = true;
