@@ -5,7 +5,7 @@ use core::ptr::NonNull;
 
 use rust_alloc::alloc;
 
-use super::{Alloc, AllocError, Allocator};
+use super::{Alloc, AllocError, Allocator, GlobalAllocator};
 
 /// Global buffer that can be used in combination with an [`Allocator`].
 ///
@@ -41,17 +41,6 @@ impl Global {
     pub const fn new() -> Self {
         Self
     }
-
-    /// Construct an allocation directly from raw parts.
-    ///
-    /// # Safety
-    ///
-    /// Caller must ensure that the allocation comes from the same global
-    /// allocator and is correctly initialized per its parameters.
-    #[inline]
-    pub(crate) unsafe fn slice_from_raw_parts<T>(data: NonNull<T>, size: usize) -> GlobalAlloc<T> {
-        GlobalAlloc { data, size }
-    }
 }
 
 impl Default for Global {
@@ -61,7 +50,28 @@ impl Default for Global {
     }
 }
 
+unsafe impl GlobalAllocator for Global {
+    #[inline]
+    fn __do_not_implement() {}
+
+    #[inline]
+    fn new() -> Self {
+        Self
+    }
+
+    #[inline]
+    fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T> {
+        GlobalAlloc {
+            data: ptr,
+            size: len,
+        }
+    }
+}
+
 unsafe impl Allocator for Global {
+    #[inline]
+    fn __do_not_implement() {}
+
     const IS_GLOBAL: bool = true;
 
     type Alloc<T> = GlobalAlloc<T>;

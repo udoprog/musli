@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod tests;
-
 use core::cell::UnsafeCell;
 use core::marker::PhantomData;
 use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
@@ -9,6 +6,9 @@ use core::ops::{Deref, DerefMut};
 use core::ptr;
 
 use super::{Alloc, AllocError, Allocator, SliceBuffer};
+
+#[cfg(test)]
+mod tests;
 
 // We keep max bytes to 2^31, since that ensures that addition between two
 // magnitutes never overflow.
@@ -187,6 +187,9 @@ impl<'a> Slice<'a> {
 }
 
 unsafe impl<'a> Allocator for &'a Slice<'_> {
+    #[inline]
+    fn __do_not_implement() {}
+
     const IS_GLOBAL: bool = false;
 
     type Alloc<T> = SliceAlloc<'a, T>;

@@ -3,8 +3,8 @@ use core::fmt;
 use core::marker::PhantomData;
 
 #[cfg(feature = "alloc")]
-use crate::alloc::{AllocError, Global};
-use crate::alloc::{Box, String, Vec};
+use crate::alloc::GlobalAllocator;
+use crate::alloc::{AllocError, Box, String, Vec};
 use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 use crate::de::{
     EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
@@ -773,12 +773,15 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl TryFrom<&str> for Value<Global> {
+impl<A> TryFrom<&str> for Value<A>
+where
+    A: GlobalAllocator,
+{
     type Error = AllocError;
 
     #[inline]
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let mut string = String::new_in(Global::new());
+        let mut string = String::new_in(A::new());
         string.push_str(value)?;
         Ok(Value::String(string))
     }
@@ -786,7 +789,10 @@ impl TryFrom<&str> for Value<Global> {
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl From<rust_alloc::string::String> for Value<Global> {
+impl<A> From<rust_alloc::string::String> for Value<A>
+where
+    A: GlobalAllocator,
+{
     #[inline]
     fn from(value: rust_alloc::string::String) -> Self {
         Value::String(String::from(value))
@@ -795,21 +801,27 @@ impl From<rust_alloc::string::String> for Value<Global> {
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl From<rust_alloc::vec::Vec<Value<Global>>> for Value<Global> {
+impl<A> From<rust_alloc::vec::Vec<Value<A>>> for Value<A>
+where
+    A: GlobalAllocator,
+{
     #[inline]
-    fn from(value: rust_alloc::vec::Vec<Value<Global>>) -> Self {
+    fn from(value: rust_alloc::vec::Vec<Value<A>>) -> Self {
         Value::Sequence(Vec::from(value))
     }
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl TryFrom<&[u8]> for Value<Global> {
+impl<A> TryFrom<&[u8]> for Value<A>
+where
+    A: GlobalAllocator,
+{
     type Error = AllocError;
 
     #[inline]
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let mut string = Vec::new_in(Global::new());
+        let mut string = Vec::new_in(A::new());
         string.extend_from_slice(value)?;
         Ok(Value::Bytes(string))
     }
@@ -817,7 +829,10 @@ impl TryFrom<&[u8]> for Value<Global> {
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<const N: usize> TryFrom<&[u8; N]> for Value<Global> {
+impl<const N: usize, A> TryFrom<&[u8; N]> for Value<A>
+where
+    A: GlobalAllocator,
+{
     type Error = AllocError;
 
     #[inline]
@@ -828,7 +843,10 @@ impl<const N: usize> TryFrom<&[u8; N]> for Value<Global> {
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<const N: usize> TryFrom<[u8; N]> for Value<Global> {
+impl<const N: usize, A> TryFrom<[u8; N]> for Value<A>
+where
+    A: GlobalAllocator,
+{
     type Error = AllocError;
 
     #[inline]

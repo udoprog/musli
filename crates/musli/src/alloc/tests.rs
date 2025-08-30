@@ -1,4 +1,6 @@
-use super::{Allocator, ArrayBuffer, Global, Slice, Vec};
+use crate::alloc::Disabled;
+
+use super::{Allocator, ArrayBuffer, Global, Slice, String, Vec};
 
 macro_rules! test_for_each {
     ($global:ident, $stack:ident, $inner:ident) => {
@@ -108,3 +110,9 @@ where
 test_for_each!(global_basic, stack_basic, basic_allocations);
 test_for_each!(global_grow, stack_grow, grow_allocations);
 test_for_each!(global_zst, stack_zst, zst_allocations);
+
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<String<Disabled>>();
+    assert_send_sync::<Vec<u8, Disabled>>();
+};
