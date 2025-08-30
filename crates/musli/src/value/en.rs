@@ -10,7 +10,7 @@ use crate::storage::en::StorageEncoder;
 use crate::writer::BufWriter;
 use crate::{Allocator, Context, Options};
 
-use super::value::{Number, Value};
+use super::{Number, Value, ValueKind};
 
 /// Insert a value into the given receiver.
 trait ValueOutput<A>
@@ -18,7 +18,7 @@ where
     A: Allocator,
 {
     /// Write a value into the receiver.
-    fn write<C>(self, cx: C, value: Value<A>) -> Result<(), C::Error>
+    fn write<C>(self, cx: C, value: ValueKind<A>) -> Result<(), C::Error>
     where
         C: Context<Allocator = A>;
 }
@@ -28,11 +28,11 @@ where
     A: Allocator,
 {
     #[inline]
-    fn write<C>(self, _: C, value: Value<A>) -> Result<(), C::Error>
+    fn write<C>(self, _: C, value: ValueKind<A>) -> Result<(), C::Error>
     where
         C: Context<Allocator = A>,
     {
-        *self = value;
+        self.kind = value;
         Ok(())
     }
 }
@@ -42,11 +42,11 @@ where
     A: Allocator,
 {
     #[inline]
-    fn write<C>(self, cx: C, value: Value<A>) -> Result<(), C::Error>
+    fn write<C>(self, cx: C, value: ValueKind<A>) -> Result<(), C::Error>
     where
         C: Context<Allocator = A>,
     {
-        self.push(value).map_err(cx.map())
+        self.push(Value::new(value)).map_err(cx.map())
     }
 }
 
@@ -61,12 +61,12 @@ where
     A: Allocator,
 {
     #[inline]
-    fn write<C>(self, cx: C, value: Value<A>) -> Result<(), C::Error>
+    fn write<C>(self, cx: C, value: ValueKind<A>) -> Result<(), C::Error>
     where
         C: Context<Allocator = A>,
     {
-        let value = Box::new_in(value, cx.alloc()).map_err(cx.map())?;
-        self.output.write(cx, Value::Option(Some(value)))?;
+        let value = Box::new_in(Value::new(value), cx.alloc()).map_err(cx.map())?;
+        self.output.write(cx, ValueKind::Option(Some(value)))?;
         Ok(())
     }
 }
@@ -133,99 +133,111 @@ where
 
     #[inline]
     fn encode_bool(self, b: bool) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Bool(b))?;
+        self.output.write(self.cx, ValueKind::Bool(b))?;
         Ok(())
     }
 
     #[inline]
     fn encode_char(self, c: char) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Char(c))?;
+        self.output.write(self.cx, ValueKind::Char(c))?;
         Ok(())
     }
 
     #[inline]
     fn encode_u8(self, n: u8) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::U8(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::U8(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_u16(self, n: u16) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::U16(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::U16(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_u32(self, n: u32) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::U32(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::U32(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_u64(self, n: u64) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::U64(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::U64(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_u128(self, n: u128) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::U128(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::U128(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_i8(self, n: i8) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::I8(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::I8(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_i16(self, n: i16) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::I16(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::I16(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_i32(self, n: i32) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::I32(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::I32(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_i64(self, n: i64) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::I64(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::I64(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_i128(self, n: i128) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::I128(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::I128(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_f32(self, n: f32) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::F32(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::F32(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_f64(self, n: f64) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Number(Number::F64(n)))?;
+        self.output
+            .write(self.cx, ValueKind::Number(Number::F64(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_usize(self, n: usize) -> Result<(), Self::Error> {
         self.output
-            .write(self.cx, Value::Number(Number::Usize(n)))?;
+            .write(self.cx, ValueKind::Number(Number::Usize(n)))?;
         Ok(())
     }
 
     #[inline]
     fn encode_isize(self, n: isize) -> Result<(), Self::Error> {
         self.output
-            .write(self.cx, Value::Number(Number::Isize(n)))?;
+            .write(self.cx, ValueKind::Number(Number::Isize(n)))?;
         Ok(())
     }
 
@@ -234,7 +246,7 @@ where
         let mut bytes =
             Vec::with_capacity_in(array.len(), self.cx.alloc()).map_err(self.cx.map())?;
         bytes.extend_from_slice(array).map_err(self.cx.map())?;
-        self.output.write(self.cx, Value::Bytes(bytes))?;
+        self.output.write(self.cx, ValueKind::Bytes(bytes))?;
         Ok(())
     }
 
@@ -242,7 +254,7 @@ where
     fn encode_bytes(self, b: &[u8]) -> Result<(), Self::Error> {
         let mut bytes = Vec::with_capacity_in(b.len(), self.cx.alloc()).map_err(self.cx.map())?;
         bytes.extend_from_slice(b).map_err(self.cx.map())?;
-        self.output.write(self.cx, Value::Bytes(bytes))?;
+        self.output.write(self.cx, ValueKind::Bytes(bytes))?;
         Ok(())
     }
 
@@ -257,7 +269,7 @@ where
             bytes.extend_from_slice(b.as_ref()).map_err(self.cx.map())?;
         }
 
-        self.output.write(self.cx, Value::Bytes(bytes))?;
+        self.output.write(self.cx, ValueKind::Bytes(bytes))?;
         Ok(())
     }
 
@@ -265,7 +277,7 @@ where
     fn encode_string(self, s: &str) -> Result<(), Self::Error> {
         let mut string = String::new_in(self.cx.alloc());
         string.push_str(s).map_err(self.cx.map())?;
-        self.output.write(self.cx, Value::String(string))?;
+        self.output.write(self.cx, ValueKind::String(string))?;
         Ok(())
     }
 
@@ -281,7 +293,7 @@ where
 
     #[inline]
     fn encode_none(self) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Option(None))?;
+        self.output.write(self.cx, ValueKind::Option(None))?;
         Ok(())
     }
 
@@ -332,7 +344,7 @@ where
         T: ?Sized + Encode<Self::Mode>,
     {
         let size = hint.require(self.cx)?;
-        let mut variant = Value::Unit;
+        let mut variant = Value::new(ValueKind::Unit);
         ValueEncoder::<OPT, _, _, Self::Mode>::new(self.cx, &mut variant).encode(tag)?;
         VariantSequenceEncoder::new(self.cx, self.output, variant, size)
     }
@@ -347,7 +359,7 @@ where
         T: ?Sized + Encode<Self::Mode>,
     {
         let size = hint.require(self.cx)?;
-        let mut variant = Value::Unit;
+        let mut variant = Value::new(ValueKind::Unit);
         ValueEncoder::<OPT, _, _, Self::Mode>::new(self.cx, &mut variant).encode(tag)?;
         VariantStructEncoder::new(self.cx, self.output, variant, size)
     }
@@ -409,7 +421,8 @@ where
 
     #[inline]
     fn finish_sequence(self) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Sequence(self.values))?;
+        self.output
+            .write(self.cx, ValueKind::Sequence(self.values))?;
         Ok(())
     }
 }
@@ -469,7 +482,7 @@ where
     #[inline]
     fn finish_sequence(self) -> Result<(), Self::Error> {
         let buf = self.writer.into_inner();
-        self.output.write(self.cx, Value::Bytes(buf))?;
+        self.output.write(self.cx, ValueKind::Bytes(buf))?;
         Ok(())
     }
 }
@@ -530,7 +543,7 @@ where
 
     #[inline]
     fn finish_map(self) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Map(self.values))?;
+        self.output.write(self.cx, ValueKind::Map(self.values))?;
         Ok(())
     }
 }
@@ -561,7 +574,7 @@ where
     #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, Self::Error> {
         self.values
-            .push((Value::Unit, Value::Unit))
+            .push((Value::new(ValueKind::Unit), Value::new(ValueKind::Unit)))
             .map_err(self.cx.map())?;
 
         let Some((key, _)) = self.values.last_mut() else {
@@ -582,7 +595,7 @@ where
 
     #[inline]
     fn finish_entries(self) -> Result<(), Self::Error> {
-        self.output.write(self.cx, Value::Map(self.values))?;
+        self.output.write(self.cx, ValueKind::Map(self.values))?;
         Ok(())
     }
 }
@@ -612,7 +625,7 @@ where
         Self {
             cx,
             output,
-            pair: (Value::Unit, Value::Unit),
+            pair: (Value::new(ValueKind::Unit), Value::new(ValueKind::Unit)),
             _marker: PhantomData,
         }
     }
@@ -679,7 +692,7 @@ where
         Self {
             cx,
             output,
-            pair: (Value::Unit, Value::Unit),
+            pair: (Value::new(ValueKind::Unit), Value::new(ValueKind::Unit)),
             _marker: PhantomData,
         }
     }
@@ -721,7 +734,7 @@ where
     #[inline]
     fn finish_variant(self) -> Result<(), Self::Error> {
         let value = Box::new_in(self.pair, self.cx.alloc()).map_err(self.cx.map())?;
-        self.output.write(self.cx, Value::Variant(value))?;
+        self.output.write(self.cx, ValueKind::Variant(value))?;
         Ok(())
     }
 }
@@ -784,9 +797,9 @@ where
 
     #[inline]
     fn finish_sequence(self) -> Result<(), Self::Error> {
-        let value = (self.variant, Value::Sequence(self.values));
+        let value = (self.variant, Value::new(ValueKind::Sequence(self.values)));
         let value = Box::new_in(value, self.cx.alloc()).map_err(self.cx.map())?;
-        self.output.write(self.cx, Value::Variant(value))?;
+        self.output.write(self.cx, ValueKind::Variant(value))?;
         Ok(())
     }
 }
@@ -849,9 +862,9 @@ where
 
     #[inline]
     fn finish_map(self) -> Result<(), Self::Error> {
-        let value = (self.variant, Value::Map(self.fields));
+        let value = (self.variant, Value::new(ValueKind::Map(self.fields)));
         let value = Box::new_in(value, self.cx.alloc()).map_err(self.cx.map())?;
-        self.output.write(self.cx, Value::Variant(value))?;
+        self.output.write(self.cx, ValueKind::Variant(value))?;
         Ok(())
     }
 }

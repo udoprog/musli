@@ -17,8 +17,7 @@ use crate::{Context, Options};
 
 use super::error::ErrorMessage;
 use super::type_hint::{NumberHint, TypeHint};
-use super::value::{Number, Value};
-use super::AsValueDecoder;
+use super::{AsValueDecoder, Number, Value, ValueKind};
 
 /// Encoder for a single value.
 pub struct ValueDecoder<'de, const OPT: Options, C, A, M>
@@ -62,9 +61,9 @@ where
 
 macro_rules! ensure_number {
     ($self:expr, $opt:expr, $hint_type:ident, $value:ident::$variant:ident($v:ident) => $ty:ty) => {
-        match $self.value {
+        match &$self.value.kind {
             $value::$variant($v) => <$ty>::from_number($v).map_err(|e| $self.cx.message(e)),
-            Value::String(string)
+            ValueKind::String(string)
                 if crate::options::is_map_keys_as_numbers::<$opt>() && $self.map_key =>
             {
                 match <$ty>::parse_number(string) {
@@ -72,8 +71,8 @@ macro_rules! ensure_number {
                     None => Err($self.cx.message(ErrorMessage::ExpectedStringAsNumber)),
                 }
             }
-            value => {
-                let hint = value.type_hint();
+            _ => {
+                let hint = $self.value.type_hint();
                 return Err($self
                     .cx
                     .message(ErrorMessage::ExpectedNumber(NumberHint::$hint_type, hint)));
@@ -84,10 +83,10 @@ macro_rules! ensure_number {
 
 macro_rules! ensure {
     ($self:expr, $hint:ident, $ident:ident $tt:tt, $pat:pat => $block:expr) => {
-        match $self.value {
+        match &$self.value.kind {
             $pat => $block,
-            value => {
-                let $hint = value.type_hint();
+            _ => {
+                let $hint = $self.value.type_hint();
                 return Err($self.cx.message(ErrorMessage::$ident $tt));
             }
         }
@@ -146,92 +145,92 @@ where
 
     #[inline]
     fn decode_empty(self) -> Result<(), Self::Error> {
-        ensure!(self, hint, ExpectedUnit(hint), Value::Unit => Ok(()))
+        ensure!(self, hint, ExpectedUnit(hint), ValueKind::Unit => Ok(()))
     }
 
     #[inline]
     fn decode_bool(self) -> Result<bool, Self::Error> {
-        ensure!(self, hint, ExpectedBool(hint), Value::Bool(b) => Ok(*b))
+        ensure!(self, hint, ExpectedBool(hint), ValueKind::Bool(b) => Ok(*b))
     }
 
     #[inline]
     fn decode_char(self) -> Result<char, Self::Error> {
-        ensure!(self, hint, ExpectedChar(hint), Value::Char(c) => Ok(*c))
+        ensure!(self, hint, ExpectedChar(hint), ValueKind::Char(c) => Ok(*c))
     }
 
     #[inline]
     fn decode_u8(self) -> Result<u8, Self::Error> {
-        ensure_number!(self, OPT, U8, Value::Number(n) => u8)
+        ensure_number!(self, OPT, U8, ValueKind::Number(n) => u8)
     }
 
     #[inline]
     fn decode_u16(self) -> Result<u16, Self::Error> {
-        ensure_number!(self, OPT, U16, Value::Number(n) => u16)
+        ensure_number!(self, OPT, U16, ValueKind::Number(n) => u16)
     }
 
     #[inline]
     fn decode_u32(self) -> Result<u32, Self::Error> {
-        ensure_number!(self, OPT, U32, Value::Number(n) => u32)
+        ensure_number!(self, OPT, U32, ValueKind::Number(n) => u32)
     }
 
     #[inline]
     fn decode_u64(self) -> Result<u64, Self::Error> {
-        ensure_number!(self, OPT, U64, Value::Number(n) => u64)
+        ensure_number!(self, OPT, U64, ValueKind::Number(n) => u64)
     }
 
     #[inline]
     fn decode_u128(self) -> Result<u128, Self::Error> {
-        ensure_number!(self, OPT, U128, Value::Number(n) => u128)
+        ensure_number!(self, OPT, U128, ValueKind::Number(n) => u128)
     }
 
     #[inline]
     fn decode_i8(self) -> Result<i8, Self::Error> {
-        ensure_number!(self, OPT, I8, Value::Number(n) => i8)
+        ensure_number!(self, OPT, I8, ValueKind::Number(n) => i8)
     }
 
     #[inline]
     fn decode_i16(self) -> Result<i16, Self::Error> {
-        ensure_number!(self, OPT, I16, Value::Number(n) => i16)
+        ensure_number!(self, OPT, I16, ValueKind::Number(n) => i16)
     }
 
     #[inline]
     fn decode_i32(self) -> Result<i32, Self::Error> {
-        ensure_number!(self, OPT, I32, Value::Number(n) => i32)
+        ensure_number!(self, OPT, I32, ValueKind::Number(n) => i32)
     }
 
     #[inline]
     fn decode_i64(self) -> Result<i64, Self::Error> {
-        ensure_number!(self, OPT, I64, Value::Number(n) => i64)
+        ensure_number!(self, OPT, I64, ValueKind::Number(n) => i64)
     }
 
     #[inline]
     fn decode_i128(self) -> Result<i128, Self::Error> {
-        ensure_number!(self, OPT, I128, Value::Number(n) => i128)
+        ensure_number!(self, OPT, I128, ValueKind::Number(n) => i128)
     }
 
     #[inline]
     fn decode_f32(self) -> Result<f32, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::F32, hint), Value::Number(Number::F32(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::F32, hint), ValueKind::Number(Number::F32(n)) => Ok(*n))
     }
 
     #[inline]
     fn decode_f64(self) -> Result<f64, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::F64, hint), Value::Number(Number::F64(n)) => Ok(*n))
+        ensure!(self, hint, ExpectedNumber(NumberHint::F64, hint), ValueKind::Number(Number::F64(n)) => Ok(*n))
     }
 
     #[inline]
     fn decode_usize(self) -> Result<usize, Self::Error> {
-        ensure_number!(self, OPT, Usize, Value::Number(n) => usize)
+        ensure_number!(self, OPT, Usize, ValueKind::Number(n) => usize)
     }
 
     #[inline]
     fn decode_isize(self) -> Result<isize, Self::Error> {
-        ensure_number!(self, OPT, Isize, Value::Number(n) => isize)
+        ensure_number!(self, OPT, Isize, ValueKind::Number(n) => isize)
     }
 
     #[inline]
     fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
-        ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
+        ensure!(self, hint, ExpectedBytes(hint), ValueKind::Bytes(bytes) => {
             <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| self.cx.message(ErrorMessage::ArrayOutOfBounds))
         })
     }
@@ -241,7 +240,7 @@ where
     where
         V: UnsizedVisitor<'de, C, [u8], Error = Self::Error, Allocator = Self::Allocator>,
     {
-        ensure!(self, hint, ExpectedBytes(hint), Value::Bytes(bytes) => {
+        ensure!(self, hint, ExpectedBytes(hint), ValueKind::Bytes(bytes) => {
             visitor.visit_borrowed(self.cx, bytes)
         })
     }
@@ -251,14 +250,14 @@ where
     where
         V: UnsizedVisitor<'de, C, str, Error = Self::Error, Allocator = Self::Allocator>,
     {
-        ensure!(self, hint, ExpectedString(hint), Value::String(string) => {
+        ensure!(self, hint, ExpectedString(hint), ValueKind::String(string) => {
             visitor.visit_borrowed(self.cx, string)
         })
     }
 
     #[inline]
     fn decode_option(self) -> Result<Option<Self::DecodeSome>, Self::Error> {
-        ensure!(self, hint, ExpectedOption(hint), Value::Option(option) => {
+        ensure!(self, hint, ExpectedOption(hint), ValueKind::Option(option) => {
             Ok(option.as_ref().map(|some| ValueDecoder::new(self.cx, some)))
         })
     }
@@ -268,7 +267,7 @@ where
     where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
     {
-        ensure!(self, hint, ExpectedPack(hint), Value::Bytes(pack) => {
+        ensure!(self, hint, ExpectedPack(hint), ValueKind::Bytes(pack) => {
             f(&mut StorageDecoder::new(self.cx, SliceReader::new(pack)))
         })
     }
@@ -278,7 +277,7 @@ where
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
-        ensure!(self, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
+        ensure!(self, hint, ExpectedSequence(hint), ValueKind::Sequence(sequence) => {
             f(&mut IterValueDecoder::new(self.cx, sequence))
         })
     }
@@ -288,7 +287,7 @@ where
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
-        ensure!(self, hint, ExpectedSequence(hint), Value::Sequence(sequence) => {
+        ensure!(self, hint, ExpectedSequence(hint), ValueKind::Sequence(sequence) => {
             f(&mut IterValueDecoder::new(self.cx, sequence))
         })
     }
@@ -298,7 +297,7 @@ where
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
-        ensure!(self, hint, ExpectedMap(hint), Value::Map(st) => {
+        ensure!(self, hint, ExpectedMap(hint), ValueKind::Map(st) => {
             f(&mut IterValuePairsDecoder::new(self.cx, st))
         })
     }
@@ -316,7 +315,7 @@ where
     where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, Self::Error>,
     {
-        ensure!(self, hint, ExpectedVariant(hint), Value::Variant(st) => {
+        ensure!(self, hint, ExpectedVariant(hint), ValueKind::Variant(st) => {
             f(&mut IterValueVariantDecoder::new(self.cx, st))
         })
     }
@@ -326,11 +325,11 @@ where
     where
         V: Visitor<'de, Self::Cx, Error = Self::Error, Allocator = Self::Allocator>,
     {
-        match self.value {
-            Value::Unit => visitor.visit_empty(self.cx),
-            Value::Bool(value) => visitor.visit_bool(self.cx, *value),
-            Value::Char(value) => visitor.visit_char(self.cx, *value),
-            Value::Number(number) => match number {
+        match &self.value.kind {
+            ValueKind::Unit => visitor.visit_empty(self.cx),
+            ValueKind::Bool(value) => visitor.visit_bool(self.cx, *value),
+            ValueKind::Char(value) => visitor.visit_char(self.cx, *value),
+            ValueKind::Number(number) => match number {
                 Number::U8(value) => visitor.visit_u8(self.cx, *value),
                 Number::U16(value) => visitor.visit_u16(self.cx, *value),
                 Number::U32(value) => visitor.visit_u32(self.cx, *value),
@@ -346,29 +345,29 @@ where
                 Number::F32(value) => visitor.visit_f32(self.cx, *value),
                 Number::F64(value) => visitor.visit_f64(self.cx, *value),
             },
-            Value::Bytes(bytes) => {
+            ValueKind::Bytes(bytes) => {
                 let visitor = visitor.visit_bytes(self.cx, SizeHint::exact(bytes.len()))?;
                 visitor.visit_borrowed(self.cx, bytes)
             }
-            Value::String(string) => {
+            ValueKind::String(string) => {
                 let visitor = visitor.visit_string(self.cx, SizeHint::exact(string.len()))?;
                 visitor.visit_borrowed(self.cx, string)
             }
-            Value::Sequence(values) => {
+            ValueKind::Sequence(values) => {
                 visitor.visit_sequence(&mut IterValueDecoder::<OPT, _, _, M>::new(self.cx, values))
             }
-            Value::Map(values) => visitor.visit_map(
+            ValueKind::Map(values) => visitor.visit_map(
                 &mut IterValuePairsDecoder::<OPT, _, _, M>::new(self.cx, values),
             ),
-            Value::Variant(variant) => {
+            ValueKind::Variant(variant) => {
                 visitor.visit_variant(&mut IterValueVariantDecoder::<OPT, _, _, M>::new(
                     self.cx, variant,
                 ))
             }
-            Value::Option(Some(value)) => {
+            ValueKind::Option(Some(value)) => {
                 visitor.visit_some(ValueDecoder::<OPT, _, _, M>::new(self.cx, value))
             }
-            Value::Option(None) => visitor.visit_none(self.cx),
+            ValueKind::Option(None) => visitor.visit_none(self.cx),
         }
     }
 }
