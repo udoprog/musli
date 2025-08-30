@@ -26,18 +26,19 @@ mod types;
 
 use proc_macro::TokenStream;
 
-const CRATE_DEFAULT: &str = "musli";
+const MUSLI_CRATE: &str = "musli";
+const MUSLI_CORE_CRATE: &str = "musli";
 
 #[proc_macro_derive(Encode, attributes(musli))]
 #[doc(hidden)]
 pub fn musli_derive_encode(input: TokenStream) -> TokenStream {
-    derive_encode(input, CRATE_DEFAULT)
+    derive_encode(input, MUSLI_CRATE)
 }
 
 #[proc_macro_derive(Decode, attributes(musli))]
 #[doc(hidden)]
 pub fn musli_derive_decode(input: TokenStream) -> TokenStream {
-    derive_decode(input, CRATE_DEFAULT)
+    derive_decode(input, MUSLI_CRATE)
 }
 
 fn derive_encode(input: TokenStream, crate_default: &str) -> TokenStream {
@@ -62,12 +63,59 @@ fn derive_decode(input: TokenStream, crate_default: &str) -> TokenStream {
 
 #[proc_macro_attribute]
 #[doc(hidden)]
-pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+pub fn musli_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+    self::decoder(attr, input, MUSLI_CRATE)
+}
+
+#[proc_macro_attribute]
+#[doc(hidden)]
+pub fn musli_encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+    self::encoder(attr, input, MUSLI_CRATE)
+}
+
+#[proc_macro_attribute]
+#[doc(hidden)]
+pub fn musli_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
+    self::visitor(attr, input, MUSLI_CRATE)
+}
+
+#[proc_macro_attribute]
+#[doc(hidden)]
+pub fn musli_unsized_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
+    self::unsized_visitor(attr, input, MUSLI_CRATE)
+}
+
+#[proc_macro_attribute]
+#[doc(hidden)]
+pub fn musli_core_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+    self::decoder(attr, input, MUSLI_CORE_CRATE)
+}
+
+#[proc_macro_attribute]
+#[doc(hidden)]
+pub fn musli_core_encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+    self::encoder(attr, input, MUSLI_CORE_CRATE)
+}
+
+#[proc_macro_attribute]
+#[doc(hidden)]
+pub fn musli_core_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
+    self::visitor(attr, input, MUSLI_CORE_CRATE)
+}
+
+#[proc_macro_attribute]
+#[doc(hidden)]
+pub fn musli_core_unsized_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
+    self::unsized_visitor(attr, input, MUSLI_CORE_CRATE)
+}
+
+#[doc(hidden)]
+fn decoder(attr: TokenStream, input: TokenStream, default_crate: &'static str) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
-        CRATE_DEFAULT,
+        default_crate,
         &attr,
         "decoder",
         types::DECODER_TYPES,
@@ -79,14 +127,13 @@ pub fn decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-#[proc_macro_attribute]
 #[doc(hidden)]
-pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
+fn encoder(attr: TokenStream, input: TokenStream, default_crate: &'static str) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
-        CRATE_DEFAULT,
+        default_crate,
         &attr,
         "encoder",
         types::ENCODER_TYPES,
@@ -98,14 +145,13 @@ pub fn encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-#[proc_macro_attribute]
 #[doc(hidden)]
-pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
+fn visitor(attr: TokenStream, input: TokenStream, default_crate: &'static str) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
-        CRATE_DEFAULT,
+        default_crate,
         &attr,
         "visitor",
         types::VISITOR_TYPES,
@@ -117,14 +163,17 @@ pub fn visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
-#[proc_macro_attribute]
 #[doc(hidden)]
-pub fn unsized_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
+fn unsized_visitor(
+    attr: TokenStream,
+    input: TokenStream,
+    default_crate: &'static str,
+) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
     match input.expand(
-        CRATE_DEFAULT,
+        default_crate,
         &attr,
         "unsized visitor",
         types::UNSIZED_VISITOR_TYPES,

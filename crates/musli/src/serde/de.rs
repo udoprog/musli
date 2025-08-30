@@ -453,7 +453,7 @@ impl<V> BytesVisitor<V> {
     }
 }
 
-#[crate::de::unsized_visitor(crate)]
+#[crate::unsized_visitor(crate)]
 impl<'de, C, V> UnsizedVisitor<'de, C, [u8]> for BytesVisitor<V>
 where
     C: Context,
@@ -586,7 +586,7 @@ impl<V> StringVisitor<V> {
     }
 }
 
-#[crate::de::unsized_visitor(crate)]
+#[crate::unsized_visitor(crate)]
 impl<'de, C, V> UnsizedVisitor<'de, C, str> for StringVisitor<V>
 where
     C: Context,
@@ -719,7 +719,7 @@ impl<V> AnyVisitor<V> {
     }
 }
 
-#[crate::de::visitor(crate)]
+#[crate::visitor(crate)]
 impl<'de, C, V> Visitor<'de, C> for AnyVisitor<V>
 where
     C: Context,

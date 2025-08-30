@@ -82,7 +82,7 @@ pub use musli_core::__macros::Decode;
 /// }
 /// ```
 #[doc(inline)]
-pub use musli_core::__macros::decoder;
+pub use musli_core::__macros::musli_decoder as decoder;
 
 /// This is an attribute macro that must be used when implementing a
 /// [`Visitor`].
@@ -105,7 +105,7 @@ pub use musli_core::__macros::decoder;
 ///
 /// struct AnyVisitor;
 ///
-/// #[musli::de::visitor]
+/// #[musli::visitor]
 /// impl<'de, C> Visitor<'de, C> for AnyVisitor
 /// where
 ///     C: Context,
@@ -122,7 +122,7 @@ pub use musli_core::__macros::decoder;
 /// }
 /// ```
 #[doc(inline)]
-pub use musli_core::__macros::visitor;
+pub use musli_core::__macros::musli_visitor as visitor;
 
 /// This is an attribute macro that must be used when implementing a
 /// [`UnsizedVisitor`].
@@ -145,7 +145,7 @@ pub use musli_core::__macros::visitor;
 ///
 /// struct Visitor;
 ///
-/// #[musli::de::unsized_visitor]
+/// #[musli::unsized_visitor]
 /// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
 /// where
 ///     C: Context,
@@ -162,7 +162,7 @@ pub use musli_core::__macros::visitor;
 /// }
 /// ```
 #[doc(inline)]
-pub use musli_core::__macros::unsized_visitor;
+pub use musli_core::__macros::musli_unsized_visitor as unsized_visitor;
 
 #[doc(inline)]
 pub use musli_core::de::__traits::{

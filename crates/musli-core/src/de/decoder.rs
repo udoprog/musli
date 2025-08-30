@@ -18,7 +18,10 @@ pub enum TryFastDecode<T, D> {
     Unsupported(D),
 }
 
-/// Trait governing the implementation of a decoder.
+/// Trait governing how decoding is implemented for a given format.
+///
+/// When implementing this trait you must use the `#[musli::decoder]` attribute
+/// macro.
 #[must_use = "Decoders must be consumed through one of its decode_* methods"]
 #[allow(unused_variables)]
 pub trait Decoder<'de>: Sized {
@@ -95,8 +98,8 @@ pub trait Decoder<'de>: Sized {
     >;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::decoder]`][musli::decoder] attribute
-    /// macro when implementing [`Decoder`].
+    /// should be using the `#[musli::decoder]` attribute macro when
+    /// implementing [`Decoder`].
     #[doc(hidden)]
     type __UseMusliDecoderAttributeMacro;
 

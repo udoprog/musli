@@ -48,6 +48,12 @@
 #[doc(inline)]
 pub use musli_core::__macros::Encode;
 
+#[doc(inline)]
+pub use musli_core::en::__traits::{
+    Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntriesEncoder, EntryEncoder,
+    MapEncoder, SequenceEncoder, TryFastEncode, VariantEncoder,
+};
+
 /// This is an attribute macro that must be used when implementing a
 /// [`Encoder`].
 ///
@@ -61,9 +67,6 @@ pub use musli_core::__macros::Encode;
 /// Note that if the `Cx` or `Mode` associated types are not specified, they
 /// will be defaulted to any type parameters which starts with the uppercase `C`
 /// or `M` respectively.
-///
-/// Note that using this macro directly from `musli_core` requires you to use
-/// the `#[musli_core::encoder(crate = musli_core)]` attribute.
 ///
 /// # Examples
 ///
@@ -107,13 +110,7 @@ pub use musli_core::__macros::Encode;
 /// }
 /// ```
 #[doc(inline)]
-pub use musli_core::__macros::encoder;
-
-#[doc(inline)]
-pub use musli_core::en::__traits::{
-    Encode, EncodeBytes, EncodePacked, EncodeTrace, Encoder, EntriesEncoder, EntryEncoder,
-    MapEncoder, SequenceEncoder, TryFastEncode, VariantEncoder,
-};
+pub use musli_core::__macros::musli_encoder as encoder;
 
 #[cfg(any(
     feature = "storage",

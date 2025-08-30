@@ -31,7 +31,7 @@ pub use self::context::Context;
 
 pub mod de;
 #[doc(inline)]
-pub use self::de::{decoder, Decode, Decoder};
+pub use self::de::{decoder, unsized_visitor, visitor, Decode, Decoder};
 
 pub mod en;
 #[doc(inline)]

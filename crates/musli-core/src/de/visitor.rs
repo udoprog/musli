@@ -8,9 +8,39 @@ use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, Vari
 
 /// Visitor capable of decoding any type into a value [`Visitor::Ok`].
 ///
+/// When implementing this trait you must use the `#[musli::visitor]` attribute
+/// macro.
+///
 /// Each callback on this visitor indicates the type that should be decoded from
 /// the passed in decoder. A typical implementation would simply call the
 /// corresponding decoder function for the type being visited.
+///
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::de::Visitor;
+///
+/// struct AnyVisitor;
+///
+/// #[musli::visitor]
+/// impl<'de, C> Visitor<'de, C> for AnyVisitor
+/// where
+///     C: Context,
+/// {
+///     type Ok = ();
+///
+///     #[inline]
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(
+///             f,
+///             "a value that can be decoded into dynamic container"
+///         )
+///     }
+/// }
+/// ```
 pub trait Visitor<'de, C>: Sized
 where
     C: Context<Error = Self::Error, Allocator = Self::Allocator>,
