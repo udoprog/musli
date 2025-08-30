@@ -1,4 +1,34 @@
+use core::ptr::NonNull;
+
 use super::{Alloc, AllocError};
+
+/// The trait governing a global allocator.
+///
+/// # Safety
+///
+/// Implementing this trait promises that the implementing allocator ultimately
+/// is backed by the global allocator [`Global`] and subsequently is what will
+/// be used to allocate and free data.
+///
+/// [`Global`]: rust_alloc::alloc::Global
+pub unsafe trait GlobalAllocator
+where
+    Self: Allocator,
+{
+    /// Do not implement this trait. It is internal to Musli and will change.
+    fn __do_not_implement();
+
+    /// Construct a new instance of the global allocator.
+    #[doc(hidden)]
+    fn new() -> Self;
+
+    /// Construct an allocation from the given raw parts assuming they are
+    /// allocated using the [`Global`] allocator.
+    ///
+    /// [`Global`]: std::alloc::Global
+    #[doc(hidden)]
+    fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T>;
+}
 
 /// An allocator that can be used in combination with a context.
 ///
@@ -7,7 +37,13 @@ use super::{Alloc, AllocError};
 /// Setting `IS_GLOBAL` to `true` has safety implications, since it determines
 /// whether the allocation can be safely converted into a standard container or
 /// not.
-pub unsafe trait Allocator: Copy {
+pub unsafe trait Allocator
+where
+    Self: Copy,
+{
+    /// Do not implement this trait. It is internal to Musli and will change.
+    fn __do_not_implement();
+
     /// Whether the allocations returned by this allocatore is backed by the
     /// global allocator or not.
     ///
@@ -16,9 +52,11 @@ pub unsafe trait Allocator: Copy {
     /// Setting this to `true` has safety implications, since it determines
     /// whether the allocation can be safely converted into a standard container
     /// or not.
+    #[doc(hidden)]
     const IS_GLOBAL: bool;
 
     /// A raw allocation from the allocator.
+    #[doc(hidden)]
     type Alloc<T>: Alloc<T>;
 
     /// Construct an empty uninitialized raw vector with an alignment matching
@@ -54,6 +92,7 @@ pub unsafe trait Allocator: Copy {
     /// });
     /// # Ok::<_, AllocError>(())
     /// ```
+    #[doc(hidden)]
     fn alloc_empty<T>(self) -> Self::Alloc<T>;
 
     /// Construct an empty uninitialized raw allocation with an alignment
@@ -76,5 +115,6 @@ pub unsafe trait Allocator: Copy {
     /// });
     /// # Ok::<_, AllocError>(())
     /// ```
+    #[doc(hidden)]
     fn alloc<T>(self, value: T) -> Result<Self::Alloc<T>, AllocError>;
 }

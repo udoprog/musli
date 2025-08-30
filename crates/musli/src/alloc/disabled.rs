@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use core::ptr;
+use core::ptr::NonNull;
 
 use super::{Alloc, AllocError, Allocator};
 
@@ -11,12 +11,12 @@ pub struct EmptyBuf<T> {
 impl<T> Alloc<T> for EmptyBuf<T> {
     #[inline]
     fn as_ptr(&self) -> *const T {
-        ptr::NonNull::dangling().as_ptr()
+        NonNull::dangling().as_ptr()
     }
 
     #[inline]
     fn as_mut_ptr(&mut self) -> *mut T {
-        ptr::NonNull::dangling().as_ptr()
+        NonNull::dangling().as_ptr()
     }
 
     #[inline]
@@ -65,6 +65,9 @@ impl Default for Disabled {
 }
 
 unsafe impl Allocator for Disabled {
+    #[inline]
+    fn __do_not_implement() {}
+
     /// We can set this to `true` because the disabled allocator returns
     /// dangling pointers which are valid in a global allocation.
     const IS_GLOBAL: bool = true;

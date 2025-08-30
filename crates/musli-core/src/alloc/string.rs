@@ -12,7 +12,7 @@ use crate::de::UnsizedVisitor;
 use crate::{Context, Decode, Decoder, Encode, Encoder};
 
 #[cfg(feature = "alloc")]
-use super::Global;
+use super::GlobalAllocator;
 use super::{AllocError, Allocator, Vec};
 
 /// Collect a string into a string buffer.
@@ -35,15 +35,14 @@ where
 /// A Müsli-allocated UTF-8–encoded, growable string.
 ///
 /// `String` is the most common string type. It has ownership over the contents
-/// of the string, stored in a heap-allocated buffer (see
-/// [Representation](#representation)). It is closely related to its borrowed
-/// counterpart, the primitive [`str`].
+/// of the string, stored in a allocated buffer. It is closely related to its
+/// borrowed counterpart, the primitive [`str`].
 ///
-/// This is a [`String`][std-string] type capable of using the allocator
-/// provided through a [`Context`]. Therefore it can be safely used in no-std
-/// environments.
+/// This is a [`String`][alloc-string] style type capable of using the
+/// [`Allocator`] provided through a [`Context`]. Therefore it can be safely
+/// used in no-alloc environments.
 ///
-/// [std-string]: std::string::String
+/// [alloc-string]: rust_alloc::string::String
 /// [`str`]: prim@str
 pub struct String<A>
 where
@@ -90,11 +89,6 @@ where
     bytes: Vec<u8, A>,
     error: Utf8Error,
 }
-
-const _: () = {
-    const fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<String<crate::alloc::Disabled>>();
-};
 
 impl<A> String<A>
 where
@@ -622,21 +616,24 @@ impl_eq! { String<A>, &'a str }
 impl_eq! { Cow<'a, str>, String<A> }
 
 /// Conversion from a std [`String`][std-string] to a Müsli-allocated [`String`]
-/// in the [`Global`] allocator.
+/// in a [`GlobalAllocator`] allocator.
 ///
 /// [std-string]: rust_alloc::string::String
 ///
 /// # Examples
 ///
 /// ```
-/// use musli::alloc::String;
+/// use musli::alloc::{String, Global};
 ///
 /// let value = std::string::String::from("Hello World");
-/// let value2 = String::from(value);
+/// let value2 = String::<Global>::from(value);
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl From<rust_alloc::string::String> for String<Global> {
+impl<A> From<rust_alloc::string::String> for String<A>
+where
+    A: GlobalAllocator,
+{
     #[inline]
     fn from(value: rust_alloc::string::String) -> Self {
         Self {

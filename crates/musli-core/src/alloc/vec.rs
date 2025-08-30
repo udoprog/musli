@@ -10,23 +10,17 @@ use crate::de::{DecodeBytes, UnsizedVisitor};
 use crate::{Context, Decoder};
 
 #[cfg(feature = "alloc")]
-use super::Global;
-use super::{Alloc, AllocError, Allocator, Disabled};
+use super::GlobalAllocator;
+use super::{Alloc, AllocError, Allocator};
 
 /// A Müsli-allocated contiguous growable array type, written as `Vec<T>`, short
 /// for 'vector'.
 ///
-/// `String` is the most common string type. It has ownership over the contents
-/// of the string, stored in a heap-allocated buffer (see
-/// [Representation](#representation)). It is closely related to its borrowed
-/// counterpart, the primitive [`str`].
-///
-/// This is a [`Vec`][std-vec] type capable of using the allocator provided
-/// through a [`Context`]. Therefore it can be safely used in no-std
+/// This is a [`Vec`][alloc-vec] style type capable of using the [`Allocator`]
+/// provided through a [`Context`]. Therefore it can be safely used in no-alloc
 /// environments.
 ///
-/// [std-vec]: std::vec::Vec
-/// [`str`]: prim@str
+/// [alloc-vec]: rust_alloc::vec::Vec
 pub struct Vec<T, A>
 where
     A: Allocator,
@@ -34,11 +28,6 @@ where
     buf: A::Alloc<T>,
     len: usize,
 }
-
-const _: () = {
-    const fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<Vec<u8, Disabled>>();
-};
 
 impl<T, A> Vec<T, A>
 where
@@ -760,21 +749,24 @@ where
 }
 
 /// Conversion from a std [`Vec`][std-vec] to a Müsli-allocated [`Vec`] in the
-/// [`Global`] allocator.
+/// [`GlobalAllocator`] allocator.
 ///
 /// [std-vec]: rust_alloc::vec::Vec
 ///
 /// # Examples
 ///
 /// ```
-/// use musli::alloc::Vec;
+/// use musli::alloc::{Vec, Global};
 ///
 /// let values = vec![1, 2, 3, 4];
-/// let values2 = Vec::from(values);
+/// let values2 = Vec::<_, Global>::from(values);
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, Global> {
+impl<T, A> From<rust_alloc::vec::Vec<T>> for Vec<T, A>
+where
+    A: GlobalAllocator,
+{
     #[inline]
     fn from(value: rust_alloc::vec::Vec<T>) -> Self {
         use core::ptr::NonNull;
@@ -787,7 +779,7 @@ impl<T> From<rust_alloc::vec::Vec<T>> for Vec<T, Global> {
             let len = value.len();
             let cap = value.capacity();
 
-            let buf = Global::slice_from_raw_parts(ptr, cap);
+            let buf = A::slice_from_raw_parts(ptr, cap);
             Vec::from_raw_parts(buf, len)
         }
     }

@@ -47,7 +47,7 @@ where
 
 #[test]
 fn bytes_reference() {
-    let value = Value::try_from(&[0u8, 1, 2, 3]).unwrap();
+    let value = Value::<Global>::try_from(&[0u8, 1, 2, 3]).unwrap();
 
     assert_eq!(
         musli::value::decode::<BytesReference>(&value).unwrap(),
@@ -108,7 +108,7 @@ where
 
 #[test]
 fn string_reference() {
-    let value = Value::try_from("Hello!").unwrap();
+    let value = Value::<Global>::try_from("Hello!").unwrap();
 
     assert_eq!(
         musli::value::decode::<StringReference>(&value).unwrap(),
@@ -151,6 +151,6 @@ where
 
 #[test]
 fn owned_fn() {
-    let value = Value::try_from("A").unwrap();
+    let value = Value::<Global>::try_from("A").unwrap();
     assert_eq!(musli::value::decode::<OwnedFn>(&value).unwrap(), OwnedFn::A);
 }

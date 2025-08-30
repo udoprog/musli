@@ -83,13 +83,29 @@ mod default;
 pub use self::default::{DefaultAllocator, DEFAULT_ARRAY_BUFFER};
 
 #[doc(inline)]
-pub use musli_core::alloc::{Alloc, AllocError, Allocator, Box, Disabled, String, ToOwned, Vec};
+pub use musli_core::alloc::{
+    Alloc, AllocError, Allocator, Box, GlobalAllocator, String, ToOwned, Vec,
+};
 
 #[cfg(feature = "alloc")]
+mod global;
+#[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+pub use self::global::{Global, GlobalAlloc};
+
+#[doc(hidden)]
+#[cfg(feature = "alloc")]
+#[deprecated = "`System` has been renamed to `Global`"]
+pub type System = Global;
+
+#[doc(hidden)]
+#[cfg(feature = "alloc")]
+#[deprecated = "`SystemAlloc` has been renamed to `GlobalAlloc`"]
+pub type SystemAlloc<T> = GlobalAlloc<T>;
+
+mod disabled;
 #[doc(inline)]
-#[expect(deprecated)]
-pub use musli_core::alloc::{Global, GlobalAlloc, System, SystemAlloc};
+pub use self::disabled::Disabled;
 
 mod slice;
 #[doc(inline)]

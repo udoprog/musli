@@ -14,27 +14,7 @@ pub use self::to_owned::ToOwned;
 
 mod allocator;
 #[doc(inline)]
-pub use self::allocator::Allocator;
-
-#[cfg(feature = "alloc")]
-mod global;
-#[cfg(feature = "alloc")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub use self::global::{Global, GlobalAlloc};
-
-#[doc(hidden)]
-#[cfg(feature = "alloc")]
-#[deprecated = "`System` has been renamed to `Global`"]
-pub type System = Global;
-
-#[doc(hidden)]
-#[cfg(feature = "alloc")]
-#[deprecated = "`SystemAlloc` has been renamed to `GlobalAlloc`"]
-pub type SystemAlloc<T> = GlobalAlloc<T>;
-
-mod disabled;
-#[doc(inline)]
-pub use self::disabled::Disabled;
+pub use self::allocator::{Allocator, GlobalAllocator};
 
 mod string;
 pub(crate) use self::string::collect_string;

@@ -1,8 +1,10 @@
 use core::marker::PhantomData;
+#[cfg(feature = "alloc")]
+use core::ptr::NonNull;
 
 use super::{Alloc, AllocError, Allocator};
 #[cfg(feature = "alloc")]
-use super::{Global, GlobalAlloc};
+use super::{Global, GlobalAlloc, GlobalAllocator};
 #[cfg(not(feature = "alloc"))]
 use super::{Slice, SliceAlloc};
 
@@ -30,7 +32,7 @@ macro_rules! implement {
 
         impl<'buf, const BUF: usize> $id<'buf, BUF> {
             #[inline]
-            pub(super) fn new(inner: $ty) -> Self {
+            pub(super) const fn new(inner: $ty) -> Self {
                 Self {
                     inner,
                     _marker: PhantomData,
@@ -64,7 +66,28 @@ implement!(
     SliceAlloc<'a, T>
 );
 
+#[cfg(feature = "alloc")]
+unsafe impl<const BUF: usize> GlobalAllocator for &DefaultAllocator<'_, BUF> {
+    #[inline]
+    fn __do_not_implement() {}
+
+    fn new() -> Self {
+        &const { DefaultAllocator::new(Global::new()) }
+    }
+
+    #[inline]
+    fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T> {
+        DefaultAlloc {
+            inner: Global::slice_from_raw_parts(ptr, len),
+            _marker: PhantomData,
+        }
+    }
+}
+
 unsafe impl<'a, const BUF: usize> Allocator for &'a DefaultAllocator<'_, BUF> {
+    #[inline]
+    fn __do_not_implement() {}
+
     #[cfg(feature = "alloc")]
     const IS_GLOBAL: bool = true;
 
