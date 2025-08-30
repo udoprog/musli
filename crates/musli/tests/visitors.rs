@@ -56,7 +56,7 @@ fn bytes_reference() {
         }
     );
 
-    let value: Value<Global> = Value::Number(42u32.into());
+    let value: Value<Global> = Value::from(42u32);
 
     assert_eq!(
         musli::value::decode::<BytesReference>(&value)
@@ -115,7 +115,7 @@ fn string_reference() {
         StringReference { data: "Hello!" }
     );
 
-    let value: Value<Global> = Value::Number(42u32.into());
+    let value: Value<Global> = Value::from(42u32);
 
     assert_eq!(
         musli::value::decode::<StringReference>(&value)

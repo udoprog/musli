@@ -1,6 +1,7 @@
 use core::cmp::Ordering;
-use core::fmt;
+use core::fmt::{self, Write};
 use core::marker::PhantomData;
+use core::str;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::GlobalAllocator;
@@ -16,49 +17,8 @@ use crate::{Allocator, Context, Options};
 use super::de::ValueDecoder;
 use super::type_hint::{NumberHint, TypeHint};
 
-/// This is a type-erased value which can be deserialized from any [Müsli]
-/// supported type.
-///
-/// It's primarily used to store or cache values for more complex processing,
-/// but can also be used to store any value in-memory.
-///
-/// [Müsli]: https://github.com/udoprog/musli
-///
-/// # Examples
-///
-/// ```
-/// use musli::{Encode, value};
-/// use musli::value::Value;
-///
-/// #[derive(Encode)]
-/// struct Person {
-///     name: String,
-///     age: u32,
-/// }
-///
-/// let person = Person { name: "Alice".to_string(), age: 30 };
-/// let value = value::encode(person)?;
-///
-/// assert!(matches!(value, Value::Map(..)));
-/// # Ok::<_, value::Error>(())
-/// ```
-///
-/// Building a value directly:
-///
-/// ```
-/// use musli::alloc::{Global, Vec};
-/// use musli::value::Value;
-///
-/// let alloc = Global::new();
-///
-/// // Create a map value
-/// let entries = Vec::new_in(alloc);
-/// let value: Value<Global> = Value::Map(entries);
-///
-/// assert!(matches!(value, Value::Map(..)));
-/// ```
-#[non_exhaustive]
-pub enum Value<A>
+/// The kind of a value.
+pub(crate) enum ValueKind<A>
 where
     A: Allocator,
 {
@@ -85,10 +45,117 @@ where
     Option(Option<Box<Value<A>, A>>),
 }
 
+/// This is a type-erased value which can be deserialized from any [Müsli]
+/// supported type.
+///
+/// It's primarily used to store or cache values for more complex processing,
+/// but can also be used to store any value in-memory.
+///
+/// [Müsli]: https://github.com/udoprog/musli
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Decode, Encode};
+/// use musli::value::{self, Value};
+///
+/// #[derive(Decode, Encode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let person = Person { name: "Alice".to_string(), age: 30 };
+/// let value = value::encode(person)?;
+/// let person: Person = value::decode(&value)?;
+///
+/// assert_eq!(person.name, "Alice");
+/// assert_eq!(person.age, 30);
+/// # Ok::<_, value::Error>(())
+/// ```
+///
+/// Building a value directly:
+///
+/// ```
+/// use musli::alloc::Global;
+/// use musli::value::Value;
+///
+/// let alloc = Global::new();
+///
+/// let value: Value<Global> = Value::new_map_in([(Value::from(1u32), Value::from(2u32))], alloc)?;
+/// # Ok::<_, musli::alloc::AllocError>(())
+/// ```
+pub struct Value<A>
+where
+    A: Allocator,
+{
+    pub(super) kind: ValueKind<A>,
+}
+
 impl<A> Value<A>
 where
     A: Allocator,
 {
+    /// Construct a new value around a kind.
+    #[inline]
+    pub(crate) const fn new(kind: ValueKind<A>) -> Self {
+        Self { kind }
+    }
+
+    /// Construct a map out of entries in the given iterator.
+    ///
+    /// Note that "maps" in musli can contain duplicate keys, and unless two
+    /// maps are constructed from exactly the same input data they are not
+    /// guaranteed to be equal.
+    ///
+    /// ```
+    /// use musli::alloc::Global;
+    /// use musli::value::Value;
+    ///
+    /// let alloc = Global::new();
+    ///
+    /// let a: Value<Global> = Value::new_map_in([
+    ///     (Value::from(1u32), Value::from(2u32)),
+    ///     (Value::from(1u32), Value::from(2u32))
+    /// ], alloc)?;
+    ///
+    /// let b: Value<Global> = Value::new_map_in([
+    ///     (Value::from(2u32), Value::from(1u32)),
+    ///     (Value::from(2u32), Value::from(1u32))
+    /// ], alloc)?;
+    ///
+    /// assert_ne!(a, b);
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::Global;
+    /// use musli::value::Value;
+    ///
+    /// let alloc = Global::new();
+    ///
+    /// let value: Value<Global> = Value::new_map_in([(Value::from(1u32), Value::from(2u32))], alloc)?;
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    pub fn new_map_in(
+        iter: impl IntoIterator<Item = (Value<A>, Value<A>)>,
+        alloc: A,
+    ) -> Result<Self, AllocError> {
+        let mut entries = Vec::new_in(alloc);
+
+        let iter = iter.into_iter();
+        let (low, _) = iter.size_hint();
+        entries.reserve(low)?;
+
+        for (key, value) in iter {
+            entries.push((key, value))?;
+        }
+
+        Ok(Self::new(ValueKind::Map(entries)))
+    }
+
     /// Construct a [`IntoValueDecoder`] implementation out of the current
     /// value.
     ///
@@ -143,38 +210,67 @@ where
 
     /// Get the type hint corresponding to the value.
     pub(crate) fn type_hint(&self) -> TypeHint {
-        match self {
-            Value::Unit => TypeHint::Unit,
-            Value::Bool(..) => TypeHint::Bool,
-            Value::Char(..) => TypeHint::Char,
-            Value::Number(number) => TypeHint::Number(number.type_hint()),
-            Value::Bytes(bytes) => TypeHint::Bytes(SizeHint::exact(bytes.len())),
-            Value::String(string) => TypeHint::String(SizeHint::exact(string.len())),
-            Value::Sequence(sequence) => TypeHint::Sequence(SizeHint::exact(sequence.len())),
-            Value::Map(map) => TypeHint::Map(SizeHint::exact(map.len())),
-            Value::Variant(..) => TypeHint::Variant,
-            Value::Option(..) => TypeHint::Option,
+        match &self.kind {
+            ValueKind::Unit => TypeHint::Unit,
+            ValueKind::Bool(..) => TypeHint::Bool,
+            ValueKind::Char(..) => TypeHint::Char,
+            ValueKind::Number(number) => TypeHint::Number(number.type_hint()),
+            ValueKind::Bytes(bytes) => TypeHint::Bytes(SizeHint::exact(bytes.len())),
+            ValueKind::String(string) => TypeHint::String(SizeHint::exact(string.len())),
+            ValueKind::Sequence(sequence) => TypeHint::Sequence(SizeHint::exact(sequence.len())),
+            ValueKind::Map(map) => TypeHint::Map(SizeHint::exact(map.len())),
+            ValueKind::Variant(..) => TypeHint::Variant,
+            ValueKind::Option(..) => TypeHint::Option,
         }
     }
 }
 
+/// Debug implementation for a value.
+///
+/// # Example
+///
+/// ```
+/// use musli::alloc::Global;
+/// use musli::value::Value;
+///
+/// let value: Value<Global> = Value::try_from(b"hello world")?;
+/// assert_eq!(format!("{value:?}"), "\"hello world\"");
+/// # Ok::<_, musli::alloc::AllocError>(())
+/// ```
 impl<A> fmt::Debug for Value<A>
 where
     A: Allocator,
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Unit => write!(f, "Unit"),
-            Self::Bool(value) => f.debug_tuple("Bool").field(value).finish(),
-            Self::Char(value) => f.debug_tuple("Char").field(value).finish(),
-            Self::Number(value) => f.debug_tuple("Number").field(value).finish(),
-            Self::Bytes(value) => f.debug_tuple("Bytes").field(value).finish(),
-            Self::String(value) => f.debug_tuple("String").field(value).finish(),
-            Self::Sequence(value) => f.debug_tuple("Sequence").field(value).finish(),
-            Self::Map(value) => f.debug_tuple("Map").field(value).finish(),
-            Self::Variant(value) => f.debug_tuple("Variant").field(value).finish(),
-            Self::Option(value) => f.debug_tuple("Option").field(value).finish(),
+        match &self.kind {
+            ValueKind::Unit => write!(f, "()"),
+            ValueKind::Bool(value) => value.fmt(f),
+            ValueKind::Char(value) => value.fmt(f),
+            ValueKind::Number(value) => value.fmt(f),
+            ValueKind::Bytes(value) => BStr::new(value).fmt(f),
+            ValueKind::String(value) => value.fmt(f),
+            ValueKind::Sequence(value) => value.fmt(f),
+            ValueKind::Map(items) => {
+                let mut map = f.debug_map();
+
+                for (key, value) in items.iter() {
+                    map.entry(key, value);
+                }
+
+                map.finish()
+            }
+            ValueKind::Variant(value) => {
+                let (variant, data) = &**value;
+                f.debug_struct("Variant")
+                    .field("variant", variant)
+                    .field("data", data)
+                    .finish()
+            }
+            ValueKind::Option(value) => match value {
+                Some(v) => f.debug_tuple("Some").field(v).finish(),
+                None => f.debug_tuple("None").finish(),
+            },
         }
     }
 }
@@ -185,17 +281,18 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Bool(lhs), Self::Bool(rhs)) => lhs == rhs,
-            (Self::Char(lhs), Self::Char(rhs)) => lhs == rhs,
-            (Self::Number(lhs), Self::Number(rhs)) => lhs == rhs,
-            (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs == rhs,
-            (Self::String(lhs), Self::String(rhs)) => lhs == rhs,
-            (Self::Sequence(lhs), Self::Sequence(rhs)) => lhs == rhs,
-            (Self::Map(lhs), Self::Map(rhs)) => lhs == rhs,
-            (Self::Variant(lhs), Self::Variant(rhs)) => lhs == rhs,
-            (Self::Option(lhs), Self::Option(rhs)) => lhs == rhs,
-            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        match (&self.kind, &other.kind) {
+            (ValueKind::Unit, ValueKind::Unit) => true,
+            (ValueKind::Bool(lhs), ValueKind::Bool(rhs)) => lhs == rhs,
+            (ValueKind::Char(lhs), ValueKind::Char(rhs)) => lhs == rhs,
+            (ValueKind::Number(lhs), ValueKind::Number(rhs)) => lhs == rhs,
+            (ValueKind::Bytes(lhs), ValueKind::Bytes(rhs)) => lhs == rhs,
+            (ValueKind::String(lhs), ValueKind::String(rhs)) => lhs == rhs,
+            (ValueKind::Sequence(lhs), ValueKind::Sequence(rhs)) => lhs == rhs,
+            (ValueKind::Map(lhs), ValueKind::Map(rhs)) => lhs == rhs,
+            (ValueKind::Variant(lhs), ValueKind::Variant(rhs)) => lhs == rhs,
+            (ValueKind::Option(lhs), ValueKind::Option(rhs)) => lhs == rhs,
+            _ => false,
         }
     }
 }
@@ -206,17 +303,17 @@ where
 {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (Self::Unit, Self::Unit) => Some(Ordering::Equal),
-            (Self::Bool(lhs), Self::Bool(rhs)) => lhs.partial_cmp(rhs),
-            (Self::Char(lhs), Self::Char(rhs)) => lhs.partial_cmp(rhs),
-            (Self::Number(lhs), Self::Number(rhs)) => lhs.partial_cmp(rhs),
-            (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs.partial_cmp(rhs),
-            (Self::String(lhs), Self::String(rhs)) => lhs.partial_cmp(rhs),
-            (Self::Sequence(lhs), Self::Sequence(rhs)) => lhs.partial_cmp(rhs),
-            (Self::Map(lhs), Self::Map(rhs)) => lhs.partial_cmp(rhs),
-            (Self::Variant(lhs), Self::Variant(rhs)) => lhs.partial_cmp(rhs),
-            (Self::Option(lhs), Self::Option(rhs)) => lhs.partial_cmp(rhs),
+        match (&self.kind, &other.kind) {
+            (ValueKind::Unit, ValueKind::Unit) => Some(Ordering::Equal),
+            (ValueKind::Bool(lhs), ValueKind::Bool(rhs)) => lhs.partial_cmp(rhs),
+            (ValueKind::Char(lhs), ValueKind::Char(rhs)) => lhs.partial_cmp(rhs),
+            (ValueKind::Number(lhs), ValueKind::Number(rhs)) => lhs.partial_cmp(rhs),
+            (ValueKind::Bytes(lhs), ValueKind::Bytes(rhs)) => lhs.partial_cmp(rhs),
+            (ValueKind::String(lhs), ValueKind::String(rhs)) => lhs.partial_cmp(rhs),
+            (ValueKind::Sequence(lhs), ValueKind::Sequence(rhs)) => lhs.partial_cmp(rhs),
+            (ValueKind::Map(lhs), ValueKind::Map(rhs)) => lhs.partial_cmp(rhs),
+            (ValueKind::Variant(lhs), ValueKind::Variant(rhs)) => lhs.partial_cmp(rhs),
+            (ValueKind::Option(lhs), ValueKind::Option(rhs)) => lhs.partial_cmp(rhs),
             _ => None,
         }
     }
@@ -226,19 +323,9 @@ where
 ///
 /// This can represent any of the primitive number types in Rust.
 /// Used internally by the Value enum to store numeric data.
-///
-/// # Examples
-///
-/// ```
-/// use musli::value::Value;
-/// use musli::alloc::Global;
-///
-/// let value: Value<Global> = Value::Number(42u32.into());
-/// # let _ = value;
-/// ```
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 #[non_exhaustive]
-pub enum Number {
+pub(crate) enum Number {
     /// `u8`
     U8(u8),
     /// `u16`
@@ -367,92 +454,92 @@ where
 
     #[inline]
     fn visit_empty(self, _: C) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Unit)
+        Ok(Value::new(ValueKind::Unit))
     }
 
     #[inline]
     fn visit_bool(self, _: C, value: bool) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Bool(value))
+        Ok(Value::new(ValueKind::Bool(value)))
     }
 
     #[inline]
     fn visit_char(self, _: C, value: char) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Char(value))
+        Ok(Value::new(ValueKind::Char(value)))
     }
 
     #[inline]
     fn visit_u8(self, _: C, value: u8) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::U8(value)))
+        Ok(Value::new(ValueKind::Number(Number::U8(value))))
     }
 
     #[inline]
     fn visit_u16(self, _: C, value: u16) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::U16(value)))
+        Ok(Value::new(ValueKind::Number(Number::U16(value))))
     }
 
     #[inline]
     fn visit_u32(self, _: C, value: u32) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::U32(value)))
+        Ok(Value::new(ValueKind::Number(Number::U32(value))))
     }
 
     #[inline]
     fn visit_u64(self, _: C, value: u64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::U64(value)))
+        Ok(Value::new(ValueKind::Number(Number::U64(value))))
     }
 
     #[inline]
     fn visit_u128(self, _: C, value: u128) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::U128(value)))
+        Ok(Value::new(ValueKind::Number(Number::U128(value))))
     }
 
     #[inline]
     fn visit_i8(self, _: C, value: i8) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::I8(value)))
+        Ok(Value::new(ValueKind::Number(Number::I8(value))))
     }
 
     #[inline]
     fn visit_i16(self, _: C, value: i16) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::I16(value)))
+        Ok(Value::new(ValueKind::Number(Number::I16(value))))
     }
 
     #[inline]
     fn visit_i32(self, _: C, value: i32) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::I32(value)))
+        Ok(Value::new(ValueKind::Number(Number::I32(value))))
     }
 
     #[inline]
     fn visit_i64(self, _: C, value: i64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::I64(value)))
+        Ok(Value::new(ValueKind::Number(Number::I64(value))))
     }
 
     #[inline]
     fn visit_i128(self, _: C, value: i128) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::I128(value)))
+        Ok(Value::new(ValueKind::Number(Number::I128(value))))
     }
 
     #[inline]
     fn visit_usize(self, _: C, value: usize) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::Usize(value)))
+        Ok(Value::new(ValueKind::Number(Number::Usize(value))))
     }
 
     #[inline]
     fn visit_isize(self, _: C, value: isize) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::Isize(value)))
+        Ok(Value::new(ValueKind::Number(Number::Isize(value))))
     }
 
     #[inline]
     fn visit_f32(self, _: C, value: f32) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::F32(value)))
+        Ok(Value::new(ValueKind::Number(Number::F32(value))))
     }
 
     #[inline]
     fn visit_f64(self, _: C, value: f64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Number(Number::F64(value)))
+        Ok(Value::new(ValueKind::Number(Number::F64(value))))
     }
 
     #[inline]
     fn visit_none(self, _: C) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Option(None))
+        Ok(Value::new(ValueKind::Option(None)))
     }
 
     #[inline]
@@ -463,7 +550,7 @@ where
         let cx = decoder.cx();
         let value = decoder.decode::<Value<C::Allocator>>()?;
         let value = Box::new_in(value, cx.alloc()).map_err(cx.map())?;
-        Ok(Value::Option(Some(value)))
+        Ok(Value::new(ValueKind::Option(Some(value))))
     }
 
     #[inline]
@@ -480,7 +567,7 @@ where
             out.push(item).map_err(cx.map())?;
         }
 
-        Ok(Value::Sequence(out))
+        Ok(Value::new(ValueKind::Sequence(out)))
     }
 
     #[inline]
@@ -499,7 +586,7 @@ where
             out.push((first, second)).map_err(cx.map())?;
         }
 
-        Ok(Value::Map(out))
+        Ok(Value::new(ValueKind::Map(out)))
     }
 
     #[inline]
@@ -521,7 +608,7 @@ where
         let second = variant.decode_value()?.decode()?;
         let value =
             Box::new_in((first, second), variant.cx().alloc()).map_err(variant.cx().map())?;
-        Ok(Value::Variant(value))
+        Ok(Value::new(ValueKind::Variant(value)))
     }
 }
 
@@ -558,7 +645,7 @@ where
     fn visit_ref(self, cx: C, b: &[u8]) -> Result<Self::Ok, Self::Error> {
         let mut bytes = Vec::with_capacity_in(b.len(), cx.alloc()).map_err(cx.map())?;
         bytes.extend_from_slice(b).map_err(cx.map())?;
-        Ok(Value::Bytes(bytes))
+        Ok(Value::new(ValueKind::Bytes(bytes)))
     }
 }
 
@@ -580,7 +667,7 @@ where
     fn visit_ref(self, cx: C, s: &str) -> Result<Self::Ok, Self::Error> {
         let mut string = String::new_in(cx.alloc());
         string.push_str(s).map_err(cx.map())?;
-        Ok(Value::String(string))
+        Ok(Value::new(ValueKind::String(string)))
     }
 }
 
@@ -596,21 +683,21 @@ where
     where
         E: Encoder<Mode = M>,
     {
-        match self {
-            Value::Unit => encoder.encode_empty(),
-            Value::Bool(b) => encoder.encode_bool(*b),
-            Value::Char(c) => encoder.encode_char(*c),
-            Value::Number(n) => encoder.encode(n),
-            Value::Bytes(bytes) => encoder.encode_bytes(bytes),
-            Value::String(string) => encoder.encode_string(string),
-            Value::Sequence(values) => encoder.encode_sequence_fn(values.len(), |sequence| {
+        match &self.kind {
+            ValueKind::Unit => encoder.encode_empty(),
+            ValueKind::Bool(b) => encoder.encode_bool(*b),
+            ValueKind::Char(c) => encoder.encode_char(*c),
+            ValueKind::Number(n) => encoder.encode(n),
+            ValueKind::Bytes(bytes) => encoder.encode_bytes(bytes),
+            ValueKind::String(string) => encoder.encode_string(string),
+            ValueKind::Sequence(values) => encoder.encode_sequence_fn(values.len(), |sequence| {
                 for value in values.iter() {
                     sequence.encode_next()?.encode(value)?;
                 }
 
                 Ok(())
             }),
-            Value::Map(values) => {
+            ValueKind::Map(values) => {
                 let hint = values.len();
 
                 encoder.encode_map_fn(hint, |map| {
@@ -621,12 +708,12 @@ where
                     Ok(())
                 })
             }
-            Value::Variant(variant) => {
+            ValueKind::Variant(variant) => {
                 let (tag, variant) = &**variant;
                 let encoder = encoder.encode_variant()?;
                 encoder.insert_variant(tag, variant)
             }
-            Value::Option(option) => match option {
+            ValueKind::Option(option) => match option {
                 Some(value) => encoder.encode_some()?.encode(&**value),
                 None => encoder.encode_none(),
             },
@@ -671,7 +758,7 @@ where
     ///
     /// let alloc = Global::new();
     /// let cx = musli::context::new();
-    /// let value: Value<Global> = Value::Unit;
+    /// let value: Value<Global> = Value::from(());
     /// let decoder = IntoValueDecoder::<OPTIONS, _, _, ()>::new(&cx, value);
     /// ```
     #[inline]
@@ -737,7 +824,7 @@ where
     ///
     /// let alloc = Global::new();
     /// let cx = musli::context::new();
-    /// let value: Value<Global> = Value::Unit;
+    /// let value: Value<Global> = Value::from(());
     /// let decoder = AsValueDecoder::<OPTIONS, _, _, ()>::new(&cx, &value);
     /// ```
     #[inline]
@@ -783,7 +870,7 @@ where
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut string = String::new_in(A::new());
         string.push_str(value)?;
-        Ok(Value::String(string))
+        Ok(Value::new(ValueKind::String(string)))
     }
 }
 
@@ -795,7 +882,7 @@ where
 {
     #[inline]
     fn from(value: rust_alloc::string::String) -> Self {
-        Value::String(String::from(value))
+        Value::new(ValueKind::String(String::from(value)))
     }
 }
 
@@ -807,7 +894,7 @@ where
 {
     #[inline]
     fn from(value: rust_alloc::vec::Vec<Value<A>>) -> Self {
-        Value::Sequence(Vec::from(value))
+        Value::new(ValueKind::Sequence(Vec::from(value)))
     }
 }
 
@@ -823,10 +910,21 @@ where
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let mut string = Vec::new_in(A::new());
         string.extend_from_slice(value)?;
-        Ok(Value::Bytes(string))
+        Ok(Value::new(ValueKind::Bytes(string)))
     }
 }
 
+/// Construct a value from a reference to a byte array using a global allocator.
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::Global;
+/// use musli::value::Value;
+///
+/// let value: Value<Global> = Value::try_from(&[1, 2, 3, 4])?;
+/// # Ok::<_, musli::alloc::AllocError>(())
+/// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<const N: usize, A> TryFrom<&[u8; N]> for Value<A>
@@ -841,6 +939,17 @@ where
     }
 }
 
+/// Construct a value from a byte array using a global allocator.
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::Global;
+/// use musli::value::Value;
+///
+/// let value: Value<Global> = Value::try_from([1, 2, 3, 4])?;
+/// # Ok::<_, musli::alloc::AllocError>(())
+/// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 impl<const N: usize, A> TryFrom<[u8; N]> for Value<A>
@@ -852,5 +961,109 @@ where
     #[inline]
     fn try_from(value: [u8; N]) -> Result<Self, Self::Error> {
         Self::try_from(&value[..])
+    }
+}
+
+/// Construct a value from a unit type.
+///
+/// # Examples
+///
+/// ```
+/// use musli::value::Value;
+/// use musli::alloc::Global;
+///
+/// let unit: Value<Global> = Value::from(());
+/// let number: Value<Global> = Value::from(42u32);
+///
+/// assert_eq!(unit, unit);
+/// assert_ne!(unit, number);
+/// ```
+impl<A> From<()> for Value<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn from((): ()) -> Self {
+        Value::new(ValueKind::Unit)
+    }
+}
+
+macro_rules! number_from {
+    ($($ty:ty => $variant:ident, $example:expr, $min:expr, $max:expr),* $(,)?) => {
+        $(
+            /// Convert from a primitive number.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// use musli::value::Value;
+            /// use musli::alloc::Global;
+            ///
+            #[doc = concat!("let value: ", stringify!($ty), " = ", stringify!($example), ";")]
+            /// let value: Value<Global> = Value::from(value);
+            ///
+            #[doc = concat!("let value: ", stringify!($ty), " = ", stringify!($min), ";")]
+            /// let min: Value<Global> = Value::from(value);
+            ///
+            #[doc = concat!("let value: ", stringify!($ty), " = ", stringify!($max), ";")]
+            /// let max: Value<Global> = Value::from(value);
+            ///
+            /// assert_eq!(value, value);
+            /// assert_ne!(min, max);
+            /// ```
+            impl<A> From<$ty> for Value<A>
+            where
+                A: Allocator,
+            {
+                #[inline]
+                fn from(value: $ty) -> Self {
+                    Value::new(ValueKind::Number(Number::$variant(value)))
+                }
+            }
+        )*
+    };
+}
+
+number_from! {
+    i8 => I8, 42, i8::MAX, i8::MIN,
+    i16 => I16, 42, i16::MAX, i16::MIN,
+    i32 => I32, 42, i32::MAX, i32::MIN,
+    i64 => I64, 42, i64::MAX, i64::MIN,
+    i128 => I128, 42, i128::MAX, i128::MIN,
+    isize => Isize, 42, isize::MAX, isize::MIN,
+    u8 => U8, 42, u8::MAX, u8::MIN,
+    u16 => U16, 42, u16::MAX, u16::MIN,
+    u32 => U32, 42, u32::MAX, u32::MIN,
+    u64 => U64, 42, u64::MAX, u64::MIN,
+    u128 => U128, 42, u128::MAX, u128::MIN,
+    usize => Usize, 42, usize::MAX, usize::MIN,
+    f32 => F32, 42.42, 0.42, 100000.42,
+    f64 => F64, 42.42, 0.42, 100000.42,
+}
+
+#[repr(transparent)]
+struct BStr([u8]);
+
+impl BStr {
+    fn new(bytes: &[u8]) -> &Self {
+        unsafe { &*(bytes as *const [u8] as *const Self) }
+    }
+}
+
+impl fmt::Debug for BStr {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_char('"')?;
+
+        for chunk in self.0.utf8_chunks() {
+            f.write_str(chunk.valid())?;
+
+            for b in chunk.invalid() {
+                write!(f, "\\x{:02x}", b)?;
+            }
+        }
+
+        f.write_char('"')?;
+        Ok(())
     }
 }

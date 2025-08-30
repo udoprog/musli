@@ -21,6 +21,7 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[doc(inline)]
 pub use self::value::{AsValueDecoder, IntoValueDecoder, Value};
+use self::value::{Number, ValueKind};
 #[doc(inline)]
 pub use error::Error;
 
@@ -63,7 +64,7 @@ where
 {
     use crate::en::Encoder;
 
-    let mut output = Value::Unit;
+    let mut output = Value::new(ValueKind::Unit);
     let cx = crate::context::new().with_error();
     ValueEncoder::<OPTIONS, _, _, Binary>::new(&cx, &mut output).encode(value)?;
     Ok(output)
