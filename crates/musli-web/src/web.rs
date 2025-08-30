@@ -49,6 +49,8 @@ type StateListeners = Slab<Rc<dyn Callback<State>>>;
 type Broadcasts = HashMap<&'static str, Slab<Rc<dyn Callback<Result<RawPacket>>>>>;
 /// Queue of recycled buffers.
 type Buffers = VecDeque<Box<BufData>>;
+/// Pending requests.
+type Requests = HashMap<u32, Box<Pending<dyn Callback<Result<RawPacket>>>>>;
 
 /// Location information for websocket implementation.
 #[doc(hidden)]
@@ -290,41 +292,6 @@ impl Connect {
     }
 }
 
-struct Requests {
-    serials: HashMap<u32, usize>,
-    pending: Slab<Box<Pending<dyn Callback<Result<RawPacket>>>>>,
-}
-
-impl Requests {
-    fn new() -> Self {
-        Self {
-            serials: HashMap::new(),
-            pending: Slab::new(),
-        }
-    }
-
-    #[inline]
-    fn remove(&mut self, serial: u32) -> Option<Box<Pending<dyn Callback<Result<RawPacket>>>>> {
-        let index = self.serials.remove(&serial)?;
-        self.pending.try_remove(index)
-    }
-
-    #[inline]
-    fn insert(
-        &mut self,
-        serial: u32,
-        pending: Box<Pending<dyn Callback<Result<RawPacket>>>>,
-    ) -> usize {
-        let index = self.pending.insert(pending);
-
-        if let Some(existing) = self.serials.insert(serial, index) {
-            _ = self.pending.try_remove(existing);
-        }
-
-        index
-    }
-}
-
 /// Generic but shared fields which do not depend on specialization over `H`.
 struct Generic {
     state_listeners: RefCell<StateListeners>,
@@ -376,12 +343,8 @@ where
             listener.call(State::Closed);
         }
 
-        requests.serials.clear();
-
-        for pending in requests.pending.drain() {
-            pending
-                .callback
-                .call(Err(Error::msg("Websocket service closed")));
+        for (_, p) in requests.drain() {
+            p.callback.call(Err(Error::msg("Websocket service closed")));
         }
     }
 }
@@ -580,7 +543,7 @@ where
                 let p = {
                     let mut requests = self.g.requests.borrow_mut();
 
-                    let Some(p) = requests.remove(header.serial) else {
+                    let Some(p) = requests.remove(&header.serial) else {
                         tracing::debug!(header.serial, "Missing request");
                         return Ok(());
                     };
@@ -680,6 +643,8 @@ where
             s.close()?;
         }
 
+        self.close_pending();
+
         let timeout = self
             .window
             .set_timeout(self.current_timeout.get(), move || {
@@ -690,6 +655,28 @@ where
 
         drop(self.reconnect_timeout.borrow_mut().replace(timeout));
         Ok(())
+    }
+
+    /// Close an pending requests with an error, since there is no chance they
+    /// will be responded to any more.
+    fn close_pending(self: &Rc<Self>) {
+        loop {
+            let Some(serial) = self.g.requests.borrow().keys().next().copied() else {
+                break;
+            };
+
+            let p = {
+                let mut requests = self.g.requests.borrow_mut();
+
+                let Some(p) = requests.remove(&serial) else {
+                    break;
+                };
+
+                p
+            };
+
+            p.callback.call(Err(Error::msg("Connection closed")));
+        }
     }
 
     fn emit_state_change(&self, state: State) {
@@ -1074,11 +1061,15 @@ where
             callback: self.callback,
         };
 
-        shared
+        let existing = shared
             .g
             .requests
             .borrow_mut()
             .insert(serial, Box::new(pending));
+
+        if let Some(p) = existing {
+            p.callback.call(Err(Error::msg("Request cancelled")));
+        }
 
         Request {
             serial,
@@ -1119,7 +1110,7 @@ impl Request {
 
             self.g = Weak::new();
 
-            let Some(p) = g.requests.borrow_mut().remove(serial) else {
+            let Some(p) = g.requests.borrow_mut().remove(&serial) else {
                 return;
             };
 

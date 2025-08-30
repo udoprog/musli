@@ -144,9 +144,12 @@ impl Component for App {
 
         html! {
             <div class="container">
-                <input key="input" type="text" {oninput} {onkeydown} value={self.text.clone()} />
+                <div>
+                    <input key="input" type="text" {oninput} {onkeydown} value={self.text.clone()} />
+                    <button {onclick}>{"Send Message"}</button>
+                </div>
+
                 <div>{format!("State: {:?}", self.state)}</div>
-                <button {onclick}>{"Send Message"}</button>
                 {for self.responses.iter().enumerate().map(|(index, response)| html!(<div>{format!("Response #{index}: {response}")}</div>))}
                 <div>{format!("Global tick: {}", self.tick)}</div>
             </div>
