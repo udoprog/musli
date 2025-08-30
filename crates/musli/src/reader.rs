@@ -76,7 +76,7 @@ pub trait Reader<'de>: self::sealed::Sealed {
     {
         struct Visitor<'a>(&'a mut [u8]);
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::trait_defaults(crate)]
         impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor<'_>
         where
             C: Context,
@@ -137,7 +137,7 @@ pub trait Reader<'de>: self::sealed::Sealed {
     {
         struct Visitor<const N: usize>([u8; N]);
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::trait_defaults(crate)]
         impl<const N: usize, C> UnsizedVisitor<'_, C, [u8]> for Visitor<N>
         where
             C: Context,

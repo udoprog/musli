@@ -5,7 +5,7 @@ use musli::Context;
 
 struct AnyVisitor;
 
-#[musli::de::visitor]
+#[musli::trait_defaults]
 impl<'de, C> Visitor<'de, C> for AnyVisitor
 where
     C: Context,

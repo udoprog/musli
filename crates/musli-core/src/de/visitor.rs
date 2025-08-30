@@ -8,8 +8,8 @@ use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, Vari
 
 /// Visitor capable of decoding any type into a value [`Visitor::Ok`].
 ///
-/// When implementing this trait you must use the `#[musli::visitor]` attribute
-/// macro.
+/// When implementing this trait you must use the `#[musli::trait_defaults]`
+/// attribute macro.
 ///
 /// Each callback on this visitor indicates the type that should be decoded from
 /// the passed in decoder. A typical implementation would simply call the
@@ -25,7 +25,7 @@ use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, Vari
 ///
 /// struct AnyVisitor;
 ///
-/// #[musli::visitor]
+/// #[musli::trait_defaults]
 /// impl<'de, C> Visitor<'de, C> for AnyVisitor
 /// where
 ///     C: Context,
@@ -71,8 +71,7 @@ where
     >;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::de::visitor]`][musli::de::visitor]
-    /// attribute macro when implementing [`Visitor`].
+    /// should be using the `#[musli::trait_defaults]`.
     #[doc(hidden)]
     type __UseMusliVisitorAttributeMacro;
 

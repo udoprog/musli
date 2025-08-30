@@ -93,7 +93,7 @@ where
     }
 }
 
-#[crate::encoder(crate)]
+#[crate::trait_defaults(crate)]
 impl<const OPT: Options, W, C, M> Encoder for WireEncoder<OPT, W, C, M>
 where
     W: Writer,

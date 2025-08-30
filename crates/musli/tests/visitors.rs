@@ -21,7 +21,7 @@ where
     {
         struct Visitor;
 
-        #[musli::de::unsized_visitor]
+        #[musli::trait_defaults]
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
             C: Context,
@@ -82,7 +82,7 @@ where
     {
         struct Visitor;
 
-        #[musli::de::unsized_visitor]
+        #[musli::trait_defaults]
         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
         where
             C: Context,

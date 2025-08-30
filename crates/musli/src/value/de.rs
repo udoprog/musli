@@ -93,7 +93,7 @@ macro_rules! ensure {
     };
 }
 
-#[crate::decoder(crate)]
+#[crate::trait_defaults(crate)]
 impl<'de, const OPT: Options, C, A, M> Decoder<'de> for ValueDecoder<'de, OPT, C, A, M>
 where
     C: Context,

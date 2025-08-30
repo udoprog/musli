@@ -69,7 +69,7 @@ where
     encoder: &'a mut E,
 }
 
-#[crate::encoder(crate)]
+#[crate::trait_defaults(crate)]
 impl<'a, E> Encoder for AsEncoder<'a, E>
 where
     E: MapEncoder,
