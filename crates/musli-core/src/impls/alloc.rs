@@ -66,7 +66,7 @@ where
     {
         struct Visitor;
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::trait_defaults(crate)]
         impl<C> UnsizedVisitor<'_, C, str> for Visitor
         where
             C: Context,
@@ -179,7 +179,7 @@ macro_rules! cow {
             {
                 struct Visitor;
 
-                #[crate::unsized_visitor(crate)]
+                #[crate::trait_defaults(crate)]
                 impl<'de, C> UnsizedVisitor<'de, C, $source> for Visitor
                 where
                     C: Context,
@@ -659,7 +659,7 @@ where
     {
         struct Visitor;
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::trait_defaults(crate)]
         impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
         where
             C: Context,
@@ -957,7 +957,7 @@ where
 
                     struct Visitor;
 
-                    #[crate::unsized_visitor(crate)]
+                    #[crate::trait_defaults(crate)]
                     impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
                     where
                         C: Context,
@@ -1109,7 +1109,7 @@ where
     {
         struct Visitor;
 
-        #[crate::unsized_visitor(crate)]
+        #[crate::trait_defaults(crate)]
         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
         where
             C: Context,

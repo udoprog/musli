@@ -539,10 +539,159 @@ pub use musli_core::mode;
 pub use musli_core::Context;
 
 #[doc(inline)]
-pub use self::de::{decoder, unsized_visitor, visitor, Decode, Decoder};
+pub use self::de::{Decode, Decoder};
 
 #[doc(inline)]
-pub use self::en::{encoder, Encode, Encoder};
+pub use self::en::{Encode, Encoder};
+
+/// This is an attribute macro that must be used when implementing the following traits:
+///
+/// * [`Decoder`]
+/// * [`de::Visitor`][crate::de::Visitor]
+/// * [`de::UnsizedVisitor`][crate::de::UnsizedVisitor]
+/// * [`Encoder`]
+///
+/// It is required to use because these traits might introduce new associated
+/// types in the future, and this is [not yet supported] on a language level in
+/// Rust. So this attribute macro polyfills any missing types automatically.
+///
+/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
+///
+/// Note that if the `Cx` or `Mode` associated types are not specified, they
+/// will be defaulted to any type parameters which starts with the uppercase `C`
+/// or `M` respectively if the trait uses them.
+///
+/// # Examples
+///
+/// Implementing [`Decoder`]:
+///
+/// ```
+/// use std::fmt;
+/// use std::marker::PhantomData;
+///
+/// use musli::Context;
+/// use musli::de::{Decoder, Decode};
+///
+/// struct MyDecoder<C, M> {
+///     cx: C,
+///     _marker: PhantomData<M>,
+/// }
+///
+/// #[musli::trait_defaults]
+/// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
+/// where
+///     C: Context,
+///     M: 'static,
+/// {
+///     #[inline]
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(f, "32-bit unsigned integers")
+///     }
+///
+///     #[inline]
+///     fn decode_u32(self) -> Result<u32, Self::Error> {
+///         Ok(42)
+///     }
+/// }
+/// ```
+///
+/// Implementing [`Visitor`]:
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::de::Visitor;
+///
+/// struct AnyVisitor;
+///
+/// #[musli::trait_defaults]
+/// impl<'de, C> Visitor<'de, C> for AnyVisitor
+/// where
+///     C: Context,
+/// {
+///     type Ok = ();
+///
+///     #[inline]
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(
+///             f,
+///             "a value that can be decoded into dynamic container"
+///         )
+///     }
+/// }
+/// ```
+///
+/// Implementing [`UnsizedVisitor`]:
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::de::UnsizedVisitor;
+///
+/// struct Visitor;
+///
+/// #[musli::trait_defaults]
+/// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
+/// where
+///     C: Context,
+/// {
+///     type Ok = ();
+///
+///     #[inline]
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(
+///             f,
+///             "a reference of bytes"
+///         )
+///     }
+/// }
+/// ```
+///
+/// Implementing [`Encoder`]:
+///
+/// ```
+/// use std::fmt;
+/// use std::marker::PhantomData;
+///
+/// use musli::Context;
+/// use musli::en::{Encoder, Encode};
+///
+/// struct MyEncoder<'a, C, M> {
+///     value: &'a mut Option<u32>,
+///     cx: C,
+///     _marker: PhantomData<M>,
+/// }
+///
+/// #[musli::trait_defaults]
+/// impl<C, M> Encoder for MyEncoder<'_, C, M>
+/// where
+///     C: Context,
+///     M: 'static,
+/// {
+///     #[inline]
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(f, "32-bit unsigned integers")
+///     }
+///
+///     #[inline]
+///     fn encode<T>(self, value: T) -> Result<(), C::Error>
+///     where
+///         T: Encode<Self::Mode>,
+///     {
+///         value.encode(self)
+///     }
+///
+///     #[inline]
+///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
+///         *self.value = Some(value);
+///         Ok(())
+///     }
+/// }
+/// ```
+#[doc(inline)]
+pub use musli_core::__macros::musli_trait_defaults as trait_defaults;
 
 #[doc(hidden)]
 pub use musli_core::__priv;
