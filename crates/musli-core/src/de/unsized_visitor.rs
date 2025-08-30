@@ -9,6 +9,9 @@ use crate::{Allocator, Context};
 /// A visitor for data where we might need to borrow without copying from the
 /// underlying [`Decoder`].
 ///
+/// When implementing this trait you must use the `#[musli::unsized_visitor]`
+/// attribute macro.
+///
 /// A visitor is needed with [`Decoder::decode_bytes`] and
 /// [`Decoder::decode_string`] because the caller doesn't know if the encoding
 /// format is capable of producing references to the underlying data directly or
@@ -18,14 +21,41 @@ use crate::{Allocator, Context};
 /// [`Decoder::decode_unsized`] method.
 ///
 /// By requiring a visitor we ensure that the caller has to handle both
-/// scenarios, even if one involves erroring. A type like [Cow] is an example of
-/// a type which can comfortably handle both.
+/// scenarios, even if one involves erroring. A type like [`Cow`] is an example
+/// of a type which can comfortably handle both.
 ///
-/// [Cow]: std::borrow::Cow
-/// [`Decoder`]: crate::de::Decoder
+/// # Examples
+///
+/// ```
+/// use std::fmt;
+///
+/// use musli::Context;
+/// use musli::de::UnsizedVisitor;
+///
+/// struct Visitor;
+///
+/// #[musli::unsized_visitor]
+/// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
+/// where
+///     C: Context,
+/// {
+///     type Ok = ();
+///
+///     #[inline]
+///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         write!(
+///             f,
+///             "a reference of bytes"
+///         )
+///     }
+/// }
+/// ```
+///
+/// [`Cow`]: std::borrow::Cow
 /// [`Decoder::decode_bytes`]: crate::de::Decoder::decode_bytes
 /// [`Decoder::decode_string`]: crate::de::Decoder::decode_string
 /// [`Decoder::decode_unsized`]: crate::de::Decoder::decode_unsized
+/// [`Decoder`]: crate::de::Decoder
 #[allow(unused_variables)]
 pub trait UnsizedVisitor<'de, C, T>: Sized
 where
@@ -40,9 +70,8 @@ where
     type Allocator: Allocator;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the
-    /// [`#[musli::de::unsized_visitor]`][musli::de::unsized_visitor] attribute
-    /// macro when implementing [`UnsizedVisitor`].
+    /// should be using the `#[musli::unsized_visitor]` attribute macro when
+    /// implementing [`UnsizedVisitor`].
     #[doc(hidden)]
     type __UseMusliUnsizedVisitorAttributeMacro;
 

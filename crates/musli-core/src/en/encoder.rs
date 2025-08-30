@@ -18,7 +18,10 @@ where
     Unsupported(T, E),
 }
 
-/// Trait governing how the encoder works.
+/// Trait governing how encoding is implemented for a given format.
+///
+/// When implementing this trait you must use the `#[musli::encoder]` attribute
+/// macro.
 #[must_use = "Encoders must be consumed through one of its encode_* methods"]
 #[allow(unused_variables)]
 pub trait Encoder: Sized {
@@ -50,8 +53,8 @@ pub trait Encoder: Sized {
     type EncodeMapVariant: MapEncoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the [`#[musli::encoder]`][musli::encoder]
-    /// attribute macro when implementing [`Encoder`].
+    /// should be using the `#[musli::encoder]` attribute macro when
+    /// implementing [`Encoder`].
     #[doc(hidden)]
     type __UseMusliEncoderAttributeMacro;
 

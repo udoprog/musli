@@ -68,9 +68,6 @@ pub use musli_macros::Encode;
 /// will be defaulted to any type parameters which starts with the uppercase `C`
 /// or `M` respectively.
 ///
-/// Note that using this macro directly from `musli_core` requires you to use
-/// the `#[musli_core::encoder(crate = musli_core)]` attribute.
-///
 /// # Examples
 ///
 /// ```
@@ -86,7 +83,7 @@ pub use musli_macros::Encode;
 ///     _marker: PhantomData<M>,
 /// }
 ///
-/// #[musli_core::encoder(crate = musli_core)]
+/// #[musli_core::encoder]
 /// impl<C, M> Encoder for MyEncoder<'_, C, M>
 /// where
 ///     C: Context,
@@ -113,7 +110,7 @@ pub use musli_macros::Encode;
 /// }
 /// ```
 #[doc(inline)]
-pub use musli_macros::encoder;
+pub use musli_macros::musli_core_encoder as encoder;
 
 #[doc(inline)]
 pub use self::__traits::*;

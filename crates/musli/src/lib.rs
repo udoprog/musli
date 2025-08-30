@@ -539,7 +539,7 @@ pub use musli_core::mode;
 pub use musli_core::Context;
 
 #[doc(inline)]
-pub use self::de::{decoder, Decode, Decoder};
+pub use self::de::{decoder, unsized_visitor, visitor, Decode, Decoder};
 
 #[doc(inline)]
 pub use self::en::{encoder, Encode, Encoder};

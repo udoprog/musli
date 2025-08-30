@@ -57,9 +57,6 @@ pub use musli_macros::Decode;
 /// will be defaulted to any type parameters which starts with the uppercase `C`
 /// or `M` respectively.
 ///
-/// Note that using derives directly from `musli_core` requires you to use the
-/// `#[musli_core::decoder(crate = musli_core)]` attribute.
-///
 /// # Examples
 ///
 /// ```
@@ -74,7 +71,7 @@ pub use musli_macros::Decode;
 ///     _marker: PhantomData<M>,
 /// }
 ///
-/// #[musli_core::decoder(crate = musli_core)]
+/// #[musli_core::decoder]
 /// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
 /// where
 ///     C: Context,
@@ -92,7 +89,7 @@ pub use musli_macros::Decode;
 /// }
 /// ```
 #[doc(inline)]
-pub use musli_macros::decoder;
+pub use musli_macros::musli_core_decoder as decoder;
 
 /// This is an attribute macro that must be used when implementing a
 /// [`Visitor`].
@@ -101,9 +98,6 @@ pub use musli_macros::decoder;
 /// new associated types in the future, and this is [not yet supported] on a
 /// language level in Rust. So this attribute macro polyfills any missing types
 /// automatically.
-///
-/// Note that using derives directly from `musli_core` requires you to use the
-/// `#[musli_core::visitor(crate = musli_core)]` attribute.
 ///
 /// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
 /// [`Visitor`]: crate::de::Visitor
@@ -118,7 +112,7 @@ pub use musli_macros::decoder;
 ///
 /// struct AnyVisitor;
 ///
-/// #[musli_core::de::visitor(crate = musli_core)]
+/// #[musli_core::visitor]
 /// impl<'de, C> Visitor<'de, C> for AnyVisitor
 /// where
 ///     C: Context,
@@ -135,7 +129,7 @@ pub use musli_macros::decoder;
 /// }
 /// ```
 #[doc(inline)]
-pub use musli_macros::visitor;
+pub use musli_macros::musli_core_visitor as visitor;
 
 /// This is an attribute macro that must be used when implementing a
 /// [`UnsizedVisitor`].
@@ -144,9 +138,6 @@ pub use musli_macros::visitor;
 /// introduce new associated types in the future, and this is [not yet
 /// supported] on a language level in Rust. So this attribute macro polyfills
 /// any missing types automatically.
-///
-/// Note that using derives directly from `musli_core` requires you to use the
-/// `#[musli_core::visitor(crate = musli_core)]` attribute.
 ///
 /// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
 /// [`UnsizedVisitor`]: crate::de::UnsizedVisitor
@@ -161,7 +152,7 @@ pub use musli_macros::visitor;
 ///
 /// struct Visitor;
 ///
-/// #[musli_core::de::unsized_visitor(crate = musli_core)]
+/// #[musli_core::unsized_visitor]
 /// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
 /// where
 ///     C: Context,
@@ -178,7 +169,7 @@ pub use musli_macros::visitor;
 /// }
 /// ```
 #[doc(inline)]
-pub use musli_macros::unsized_visitor;
+pub use musli_macros::musli_core_unsized_visitor as unsized_visitor;
 
 #[doc(inline)]
 pub use self::__traits::*;
