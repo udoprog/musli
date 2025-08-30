@@ -4,8 +4,7 @@
 //! This is a private module of musli, and is not intended for use outside of
 //! the implementation attributes:
 //!
-//! * [`#[musli::encoder]`][crate::encoder].
-//! * [`#[musli::decoder]`][crate::decoder].
+//! * [`#[musli::trait_defaults]`][crate::trait_defaults].
 
 use core::fmt;
 use core::marker;
@@ -42,7 +41,7 @@ pub enum NeverMarker {}
 ///     _marker: PhantomData<M>,
 /// }
 ///
-/// #[musli::decoder]
+/// #[musli::trait_defaults]
 /// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
 /// where
 ///     C: Context,

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
-use syn::parse::Parse;
+use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::Token;
 
@@ -87,7 +87,7 @@ pub(super) struct Attr {
 }
 
 impl Parse for Attr {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut crate_path = None;
         let mut done = false;
 
@@ -128,28 +128,94 @@ impl Parse for Attr {
 
 pub(super) struct Types {
     item_impl: syn::ItemImpl,
+    what: &'static str,
+    types: &'static [(&'static str, Extra)],
+    hint: &'static str,
+    kind: Kind,
 }
 
 impl Parse for Types {
     #[inline]
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let item_impl = input.parse::<syn::ItemImpl>()?;
+
+        let what;
+        let types;
+        let hint;
+        let kind;
+
+        'done: {
+            match &item_impl.trait_ {
+                Some((_, path, _)) => {
+                    if let Some(ident) = path.segments.last().map(|s| &s.ident) {
+                        if ident == "Decoder" {
+                            what = "decoder";
+                            types = DECODER_TYPES;
+                            hint = "__UseMusliDecoderAttributeMacro";
+                            kind = Kind::SelfCx;
+                            break 'done;
+                        }
+
+                        if ident == "Visitor" {
+                            what = "visitor";
+                            types = VISITOR_TYPES;
+                            hint = "__UseMusliVisitorAttributeMacro";
+                            kind = Kind::GenericCx;
+                            break 'done;
+                        }
+
+                        if ident == "UnsizedVisitor" {
+                            what = "unsized_visitor";
+                            types = UNSIZED_VISITOR_TYPES;
+                            hint = "__UseMusliUnsizedVisitorAttributeMacro";
+                            kind = Kind::GenericCx;
+                            break 'done;
+                        }
+
+                        if ident == "Encoder" {
+                            what = "encoder";
+                            types = ENCODER_TYPES;
+                            hint = "__UseMusliEncoderAttributeMacro";
+                            kind = Kind::SelfCx;
+                            break 'done;
+                        }
+                    }
+
+                    return Err(syn::Error::new_spanned(
+                        path,
+                        "Could not determine the type being implemented",
+                    ));
+                }
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        item_impl.self_ty,
+                        "Could not determine what is being implemented",
+                    ));
+                }
+            }
+        };
+
         Ok(Self {
-            item_impl: input.parse()?,
+            item_impl,
+            what,
+            types,
+            hint,
+            kind,
         })
     }
 }
 
 impl Types {
     /// Expand encoder types.
-    pub(crate) fn expand(
-        mut self,
-        default_crate: &str,
-        attr: &Attr,
-        what: &str,
-        types: &[(&str, Extra)],
-        hint: &str,
-        kind: Kind,
-    ) -> syn::Result<TokenStream> {
+    pub(crate) fn expand(self, default_crate: &str, attr: &Attr) -> syn::Result<TokenStream> {
+        let Self {
+            mut item_impl,
+            what,
+            types,
+            hint,
+            kind,
+        } = self;
+
         let default_crate_path;
 
         let crate_path = match &attr.crate_path {
@@ -168,7 +234,7 @@ impl Types {
         let mut found_cx = None;
         let mut found_mode = None;
 
-        for p in self.item_impl.generics.type_params() {
+        for p in item_impl.generics.type_params() {
             let name = p.ident.to_string();
 
             if name.starts_with("C") {
@@ -182,7 +248,7 @@ impl Types {
         // attribute so its conditions need to be inverted.
         let mut not_attribute_ty = Vec::new();
 
-        for item in &self.item_impl.items {
+        for item in &item_impl.items {
             match item {
                 syn::ImplItem::Fn(impl_fn) => {
                     missing.remove(&impl_fn.sig.ident);
@@ -236,10 +302,10 @@ impl Types {
 
             impl_type.ty = syn::Type::Path(syn::TypePath {
                 qself: None,
-                path: self.never_type(crate_path, extra, kind)?,
+                path: never_type(crate_path, extra, kind)?,
             });
 
-            self.item_impl.items.push(syn::ImplItem::Type(impl_type));
+            item_impl.items.push(syn::ImplItem::Type(impl_type));
         }
 
         let immediate_cx: syn::Path = match &found_cx {
@@ -259,7 +325,7 @@ impl Types {
 
             match extra {
                 Extra::CxFn => {
-                    self.item_impl.items.push(syn::parse_quote! {
+                    item_impl.items.push(syn::parse_quote! {
                         #[inline]
                         fn cx(&self) -> Self::Cx {
                             self.cx
@@ -269,7 +335,7 @@ impl Types {
                     continue;
                 }
                 Extra::TryCloneFn => {
-                    self.item_impl.items.push(syn::parse_quote! {
+                    item_impl.items.push(syn::parse_quote! {
                         #[inline]
                         fn try_clone(&self) -> Option<Self::TryClone> {
                             None
@@ -296,7 +362,7 @@ impl Types {
                 _ => {
                     ty = syn::Type::Path(syn::TypePath {
                         qself: None,
-                        path: self.never_type(crate_path, extra, kind)?,
+                        path: never_type(crate_path, extra, kind)?,
                     });
                 }
             };
@@ -313,79 +379,72 @@ impl Types {
                 semi_token: <Token![;]>::default(),
             };
 
-            self.item_impl.items.push(syn::ImplItem::Type(ty));
+            item_impl.items.push(syn::ImplItem::Type(ty));
         }
 
-        self.item_impl
-            .items
-            .push(syn::ImplItem::Type(syn::ImplItemType {
-                attrs: Vec::new(),
-                vis: syn::Visibility::Inherited,
-                defaultness: None,
-                type_token: <Token![type]>::default(),
-                ident: syn::Ident::new(hint, Span::call_site()),
-                generics: syn::Generics::default(),
-                eq_token: <Token![=]>::default(),
-                ty: syn::Type::Tuple(syn::TypeTuple {
-                    paren_token: <syn::token::Paren>::default(),
-                    elems: Punctuated::default(),
-                }),
-                semi_token: <Token![;]>::default(),
-            }));
+        item_impl.items.push(syn::ImplItem::Type(syn::ImplItemType {
+            attrs: Vec::new(),
+            vis: syn::Visibility::Inherited,
+            defaultness: None,
+            type_token: <Token![type]>::default(),
+            ident: syn::Ident::new(hint, Span::call_site()),
+            generics: syn::Generics::default(),
+            eq_token: <Token![=]>::default(),
+            ty: syn::Type::Tuple(syn::TypeTuple {
+                paren_token: <syn::token::Paren>::default(),
+                elems: Punctuated::default(),
+            }),
+            semi_token: <Token![;]>::default(),
+        }));
 
-        Ok(self.item_impl.into_token_stream())
+        Ok(item_impl.into_token_stream())
     }
+}
 
-    fn never_type(
-        &self,
-        crate_path: &syn::Path,
-        extra: Extra,
-        kind: Kind,
-    ) -> syn::Result<syn::Path> {
-        let mut never = crate_path.clone();
+fn never_type(crate_path: &syn::Path, extra: Extra, kind: Kind) -> syn::Result<syn::Path> {
+    let mut never = crate_path.clone();
 
-        never.segments.push(syn::PathSegment::from(syn::Ident::new(
-            "__priv",
-            Span::call_site(),
-        )));
+    never.segments.push(syn::PathSegment::from(syn::Ident::new(
+        "__priv",
+        Span::call_site(),
+    )));
 
-        never.segments.push({
-            let mut s = syn::PathSegment::from(syn::Ident::new("Never", Span::call_site()));
+    never.segments.push({
+        let mut s = syn::PathSegment::from(syn::Ident::new("Never", Span::call_site()));
 
-            let mut args = Vec::<syn::GenericArgument>::new();
+        let mut args = Vec::<syn::GenericArgument>::new();
 
-            match extra {
-                Extra::Visitor(ty) => {
-                    args.push(syn::parse_quote!(Self::Ok));
+        match extra {
+            Extra::Visitor(ty) => {
+                args.push(syn::parse_quote!(Self::Ok));
 
-                    match ty {
-                        Ty::Str => {
-                            args.push(syn::parse_quote!(str));
-                        }
-                        Ty::Bytes => {
-                            args.push(syn::parse_quote!([u8]));
-                        }
+                match ty {
+                    Ty::Str => {
+                        args.push(syn::parse_quote!(str));
+                    }
+                    Ty::Bytes => {
+                        args.push(syn::parse_quote!([u8]));
                     }
                 }
-                Extra::None => match kind {
-                    Kind::SelfCx => {
-                        args.push(syn::parse_quote!(Self::Cx));
-                        args.push(syn::parse_quote!(Self::Mode));
-                    }
-                    Kind::GenericCx => {}
-                },
-                _ => {}
             }
+            Extra::None => match kind {
+                Kind::SelfCx => {
+                    args.push(syn::parse_quote!(Self::Cx));
+                    args.push(syn::parse_quote!(Self::Mode));
+                }
+                Kind::GenericCx => {}
+            },
+            _ => {}
+        }
 
-            if !args.is_empty() {
-                s.arguments = syn::PathArguments::AngleBracketed(syn::parse_quote!(<(#(#args,)*)>));
-            }
+        if !args.is_empty() {
+            s.arguments = syn::PathArguments::AngleBracketed(syn::parse_quote!(<(#(#args,)*)>));
+        }
 
-            s
-        });
+        s
+    });
 
-        Ok(never)
-    }
+    Ok(never)
 }
 
 fn ident_path(ident: syn::Ident) -> syn::Path {

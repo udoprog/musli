@@ -37,7 +37,7 @@ where
     }
 }
 
-#[crate::encoder(crate)]
+#[crate::trait_defaults(crate)]
 impl<const OPT: Options, const PACK: bool, W, C, M> Encoder for StorageEncoder<OPT, PACK, W, C, M>
 where
     W: Writer,

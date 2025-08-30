@@ -89,7 +89,7 @@ impl<const OPT: Options, O, C, M> ValueEncoder<OPT, O, C, M> {
     }
 }
 
-#[crate::encoder(crate)]
+#[crate::trait_defaults(crate)]
 impl<const OPT: Options, O, C, M> Encoder for ValueEncoder<OPT, O, C, M>
 where
     O: ValueOutput<C::Allocator>,

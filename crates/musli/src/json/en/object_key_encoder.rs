@@ -32,7 +32,7 @@ macro_rules! format_integer {
     }};
 }
 
-#[crate::encoder(crate)]
+#[crate::trait_defaults(crate)]
 impl<W, C, M> Encoder for JsonObjectKeyEncoder<W, C, M>
 where
     W: Writer,
