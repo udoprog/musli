@@ -54,64 +54,6 @@
 #[doc(inline)]
 pub use musli_macros::Encode;
 
-/// This is an attribute macro that must be used when implementing a
-/// [`Encoder`].
-///
-/// It is required to use because a [`Encoder`] implementation might introduce
-/// new associated types in the future, and this [not yet supported] on a
-/// language level in Rust. So this attribute macro polyfills any missing types
-/// automatically.
-///
-/// [not yet supported]: https://rust-lang.github.io/rfcs/2532-associated-type-defaults.html
-///
-/// Note that if the `Cx` or `Mode` associated types are not specified, they
-/// will be defaulted to any type parameters which starts with the uppercase `C`
-/// or `M` respectively.
-///
-/// # Examples
-///
-/// ```
-/// use std::fmt;
-/// use std::marker::PhantomData;
-///
-/// use musli_core::Context;
-/// use musli_core::en::{Encoder, Encode};
-///
-/// struct MyEncoder<'a, C, M> {
-///     value: &'a mut Option<u32>,
-///     cx: C,
-///     _marker: PhantomData<M>,
-/// }
-///
-/// #[musli_core::encoder]
-/// impl<C, M> Encoder for MyEncoder<'_, C, M>
-/// where
-///     C: Context,
-///     M: 'static,
-/// {
-///     #[inline]
-///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-///         write!(f, "32-bit unsigned integers")
-///     }
-///
-///     #[inline]
-///     fn encode<T>(self, value: T) -> Result<(), C::Error>
-///     where
-///         T: Encode<Self::Mode>,
-///     {
-///         value.encode(self)
-///     }
-///
-///     #[inline]
-///     fn encode_u32(self, value: u32) -> Result<(), Self::Error> {
-///         *self.value = Some(value);
-///         Ok(())
-///     }
-/// }
-/// ```
-#[doc(inline)]
-pub use musli_macros::musli_core_encoder as encoder;
-
 #[doc(inline)]
 pub use self::__traits::*;
 

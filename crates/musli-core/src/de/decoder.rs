@@ -20,8 +20,8 @@ pub enum TryFastDecode<T, D> {
 
 /// Trait governing how decoding is implemented for a given format.
 ///
-/// When implementing this trait you must use the `#[musli::decoder]` attribute
-/// macro.
+/// When implementing this trait you must use the `#[musli::trait_defaults]`
+/// attribute macro.
 #[must_use = "Decoders must be consumed through one of its decode_* methods"]
 #[allow(unused_variables)]
 pub trait Decoder<'de>: Sized {
@@ -98,8 +98,7 @@ pub trait Decoder<'de>: Sized {
     >;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the `#[musli::decoder]` attribute macro when
-    /// implementing [`Decoder`].
+    /// should be using the `#[musli::trait_defaults]`.
     #[doc(hidden)]
     type __UseMusliDecoderAttributeMacro;
 
@@ -124,7 +123,7 @@ pub trait Decoder<'de>: Sized {
     ///     _marker: PhantomData<M>,
     /// }
     ///
-    /// #[musli::decoder]
+    /// #[musli::trait_defaults]
     /// impl<'de, C, M> Decoder<'de> for MyDecoder<C, M>
     /// where
     ///     C: Context,
@@ -1137,7 +1136,7 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         struct Visitor;
     ///
-    ///         #[musli::de::unsized_visitor]
+    ///         #[musli::trait_defaults]
     ///         impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
     ///         where
     ///             C: Context
@@ -1208,7 +1207,7 @@ pub trait Decoder<'de>: Sized {
     ///     {
     ///         struct Visitor;
     ///
-    ///         #[musli::de::unsized_visitor]
+    ///         #[musli::trait_defaults]
     ///         impl<'de, C> UnsizedVisitor<'de, C, str> for Visitor
     ///         where
     ///             C: Context,

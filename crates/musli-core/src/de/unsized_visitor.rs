@@ -9,7 +9,7 @@ use crate::{Allocator, Context};
 /// A visitor for data where we might need to borrow without copying from the
 /// underlying [`Decoder`].
 ///
-/// When implementing this trait you must use the `#[musli::unsized_visitor]`
+/// When implementing this trait you must use the `#[musli::trait_defaults]`
 /// attribute macro.
 ///
 /// A visitor is needed with [`Decoder::decode_bytes`] and
@@ -34,7 +34,7 @@ use crate::{Allocator, Context};
 ///
 /// struct Visitor;
 ///
-/// #[musli::unsized_visitor]
+/// #[musli::trait_defaults]
 /// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
 /// where
 ///     C: Context,
@@ -70,8 +70,7 @@ where
     type Allocator: Allocator;
 
     /// This is a type argument used to hint to any future implementor that they
-    /// should be using the `#[musli::unsized_visitor]` attribute macro when
-    /// implementing [`UnsizedVisitor`].
+    /// should be using the `#[musli::trait_defaults]`.
     #[doc(hidden)]
     type __UseMusliUnsizedVisitorAttributeMacro;
 

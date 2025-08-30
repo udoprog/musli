@@ -27,7 +27,7 @@ mod types;
 use proc_macro::TokenStream;
 
 const MUSLI_CRATE: &str = "musli";
-const MUSLI_CORE_CRATE: &str = "musli";
+const MUSLI_CORE_CRATE: &str = "musli_core";
 
 #[proc_macro_derive(Encode, attributes(musli))]
 #[doc(hidden)]
@@ -63,108 +63,17 @@ fn derive_decode(input: TokenStream, crate_default: &str) -> TokenStream {
 
 #[proc_macro_attribute]
 #[doc(hidden)]
-pub fn musli_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
-    self::decoder(attr, input, MUSLI_CRATE)
+pub fn musli_trait_defaults(attr: TokenStream, input: TokenStream) -> TokenStream {
+    trait_defaults(attr, input, MUSLI_CRATE)
 }
 
 #[proc_macro_attribute]
 #[doc(hidden)]
-pub fn musli_encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
-    self::encoder(attr, input, MUSLI_CRATE)
+pub fn musli_core_trait_defaults(attr: TokenStream, input: TokenStream) -> TokenStream {
+    trait_defaults(attr, input, MUSLI_CORE_CRATE)
 }
 
-#[proc_macro_attribute]
-#[doc(hidden)]
-pub fn musli_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
-    self::visitor(attr, input, MUSLI_CRATE)
-}
-
-#[proc_macro_attribute]
-#[doc(hidden)]
-pub fn musli_unsized_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
-    self::unsized_visitor(attr, input, MUSLI_CRATE)
-}
-
-#[proc_macro_attribute]
-#[doc(hidden)]
-pub fn musli_core_decoder(attr: TokenStream, input: TokenStream) -> TokenStream {
-    self::decoder(attr, input, MUSLI_CORE_CRATE)
-}
-
-#[proc_macro_attribute]
-#[doc(hidden)]
-pub fn musli_core_encoder(attr: TokenStream, input: TokenStream) -> TokenStream {
-    self::encoder(attr, input, MUSLI_CORE_CRATE)
-}
-
-#[proc_macro_attribute]
-#[doc(hidden)]
-pub fn musli_core_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
-    self::visitor(attr, input, MUSLI_CORE_CRATE)
-}
-
-#[proc_macro_attribute]
-#[doc(hidden)]
-pub fn musli_core_unsized_visitor(attr: TokenStream, input: TokenStream) -> TokenStream {
-    self::unsized_visitor(attr, input, MUSLI_CORE_CRATE)
-}
-
-#[doc(hidden)]
-fn decoder(attr: TokenStream, input: TokenStream, default_crate: &'static str) -> TokenStream {
-    let attr = syn::parse_macro_input!(attr as types::Attr);
-    let input = syn::parse_macro_input!(input as types::Types);
-
-    match input.expand(
-        default_crate,
-        &attr,
-        "decoder",
-        types::DECODER_TYPES,
-        "__UseMusliDecoderAttributeMacro",
-        types::Kind::SelfCx,
-    ) {
-        Ok(tokens) => tokens.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-
-#[doc(hidden)]
-fn encoder(attr: TokenStream, input: TokenStream, default_crate: &'static str) -> TokenStream {
-    let attr = syn::parse_macro_input!(attr as types::Attr);
-    let input = syn::parse_macro_input!(input as types::Types);
-
-    match input.expand(
-        default_crate,
-        &attr,
-        "encoder",
-        types::ENCODER_TYPES,
-        "__UseMusliEncoderAttributeMacro",
-        types::Kind::SelfCx,
-    ) {
-        Ok(tokens) => tokens.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-
-#[doc(hidden)]
-fn visitor(attr: TokenStream, input: TokenStream, default_crate: &'static str) -> TokenStream {
-    let attr = syn::parse_macro_input!(attr as types::Attr);
-    let input = syn::parse_macro_input!(input as types::Types);
-
-    match input.expand(
-        default_crate,
-        &attr,
-        "visitor",
-        types::VISITOR_TYPES,
-        "__UseMusliVisitorAttributeMacro",
-        types::Kind::GenericCx,
-    ) {
-        Ok(tokens) => tokens.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
-}
-
-#[doc(hidden)]
-fn unsized_visitor(
+fn trait_defaults(
     attr: TokenStream,
     input: TokenStream,
     default_crate: &'static str,
@@ -172,14 +81,7 @@ fn unsized_visitor(
     let attr = syn::parse_macro_input!(attr as types::Attr);
     let input = syn::parse_macro_input!(input as types::Types);
 
-    match input.expand(
-        default_crate,
-        &attr,
-        "unsized visitor",
-        types::UNSIZED_VISITOR_TYPES,
-        "__UseMusliUnsizedVisitorAttributeMacro",
-        types::Kind::GenericCx,
-    ) {
+    match input.expand(default_crate, &attr) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
     }
