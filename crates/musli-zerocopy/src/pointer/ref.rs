@@ -233,6 +233,7 @@ where
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
     /// * The metadata must describe a valid `Layout`.
+    /// * The `offset` plus this layout's size must not overflow `usize::MAX`.
     ///
     /// To guarantee that this constructor will never panic, [`Ref<T, E,
     /// usize>`] can be used. This also ensures that construction is a no-op.
@@ -273,6 +274,7 @@ where
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
     /// * The metadata must describe a valid `Layout`.
+    /// * The `offset` plus this layout's size must not overflow `usize::MAX`.
     ///
     /// To guarantee that this constructor will never error, [`Ref<T, Native,
     /// usize>`] can be used. This also ensures that construction is a no-op.
