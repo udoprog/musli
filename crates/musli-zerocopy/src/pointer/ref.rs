@@ -1,3 +1,4 @@
+use core::any;
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::Hash;
@@ -952,8 +953,9 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Ref<{}> {{ offset: {:?}, metadata: {:?} }}",
-            core::any::type_name::<T>(),
+            "Ref<{}, {}> {{ offset: {:?}, metadata: {:?} }}",
+            any::type_name::<T>(),
+            E::NAME,
             self.offset,
             self.metadata,
         )

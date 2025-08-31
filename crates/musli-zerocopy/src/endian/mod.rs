@@ -304,7 +304,14 @@ mod sealed {
 /// This trait is implemented by two marker types [`Big`] and
 /// [`Little`], and its internals are intentionally hidden. Do not attempt
 /// to use them yourself.
-pub trait ByteOrder: 'static + Sized + self::sealed::Sealed {
+pub trait ByteOrder
+where
+    Self: 'static + Sized + self::sealed::Sealed,
+{
+    /// The name of the byte order for debugging purposes.
+    #[doc(hidden)]
+    const NAME: &'static str;
+
     /// Maps the `value` through `map`, unless the current byte order is
     /// [`Native`].
     #[doc(hidden)]
@@ -362,6 +369,12 @@ pub trait ByteOrder: 'static + Sized + self::sealed::Sealed {
 }
 
 impl ByteOrder for Little {
+    #[cfg(target_endian = "little")]
+    const NAME: &'static str = "Native (Little)";
+
+    #[cfg(not(target_endian = "little"))]
+    const NAME: &'static str = "Little";
+
     #[cfg(target_endian = "little")]
     #[inline(always)]
     fn try_map<T, F>(value: T, _: F) -> T
@@ -442,6 +455,12 @@ impl ByteOrder for Little {
 }
 
 impl ByteOrder for Big {
+    #[cfg(target_endian = "big")]
+    const NAME: &'static str = "Native (Big)";
+
+    #[cfg(not(target_endian = "big"))]
+    const NAME: &'static str = "Big";
+
     #[cfg(target_endian = "big")]
     #[inline(always)]
     fn try_map<T, F>(value: T, _: F) -> T
