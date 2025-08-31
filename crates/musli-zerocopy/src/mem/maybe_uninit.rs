@@ -3,6 +3,7 @@ use core::mem::{ManuallyDrop, size_of};
 use core::ptr::NonNull;
 use core::slice;
 
+use crate::ByteOrder;
 use crate::buf;
 use crate::pointer::{Pointee, Size};
 use crate::traits::ZeroCopy;
@@ -119,11 +120,30 @@ where
     where
         O: Size;
 
+    #[inline(always)]
+    fn size(metadata: &Self::Metadata) -> Option<usize> {
+        T::size(metadata)
+    }
+
+    #[inline(always)]
+    fn align(metadata: &Self::Metadata) -> usize {
+        T::align(metadata)
+    }
+
     #[inline]
     fn try_from_metadata<O>(metadata: Self::Metadata) -> Option<Self::Stored<O>>
     where
         O: Size,
     {
         T::try_from_metadata(metadata)
+    }
+
+    #[inline]
+    fn to_metadata<O, E>(stored: Self::Stored<O>) -> Self::Metadata
+    where
+        O: Size,
+        E: ByteOrder,
+    {
+        T::to_metadata::<O, E>(stored)
     }
 }

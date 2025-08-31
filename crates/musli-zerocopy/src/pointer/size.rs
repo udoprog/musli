@@ -40,6 +40,7 @@ pub trait Size:
     + fmt::Debug
     + ZeroCopy
     + IntoRepr
+    + Ord
     + self::sealed::Sealed
 {
     /// The default zero pointer.
@@ -64,6 +65,10 @@ pub trait Size:
 
     #[doc(hidden)]
     const N16: Self;
+
+    #[doc(hidden)]
+    /// Perform checked subtraction over the type.
+    fn checked_sub(self, other: Self) -> Option<Self>;
 
     #[doc(hidden)]
     /// Perform wrapping multiplication over the type.
@@ -109,6 +114,11 @@ macro_rules! impl_size {
             const N16: Self = 16;
 
             #[inline(always)]
+            fn checked_sub(self, other: Self) -> Option<Self> {
+                self.checked_sub(other)
+            }
+
+            #[inline(always)]
             fn wrapping_mul(self, other: Self) -> Self {
                 self.wrapping_mul(other)
             }
@@ -132,10 +142,12 @@ macro_rules! impl_size {
             where
                 E: ByteOrder,
             {
-                if self > usize::MAX as $ty {
+                let v = $swap(self);
+
+                if v > usize::MAX as $ty {
                     usize::MAX
                 } else {
-                    $swap(self) as usize
+                    v as usize
                 }
             }
 

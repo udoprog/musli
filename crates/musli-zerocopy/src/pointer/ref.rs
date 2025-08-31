@@ -5,11 +5,11 @@ use core::marker::PhantomData;
 use core::mem::size_of;
 
 use crate::ZeroCopy;
+use crate::buf::{Padder, Validator};
 use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::error::{Error, ErrorKind, IntoRepr};
 use crate::mem::MaybeUninit;
-use crate::pointer::Coerce;
-use crate::pointer::{DefaultSize, Pointee, Size};
+use crate::pointer::{Coerce, DefaultSize, Pointee, Size};
 
 /// A stored reference to a type `T`.
 ///
@@ -40,9 +40,7 @@ use crate::pointer::{DefaultSize, Pointee, Size};
 /// assert_eq!(*buf.load(number)?, u32::from_ne_bytes([1, 2, 3, 4]));
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, swap_bytes_self)]
 pub struct Ref<T, E = Native, O = DefaultSize>
 where
     T: ?Sized + Pointee,
@@ -51,7 +49,6 @@ where
 {
     offset: O,
     metadata: T::Stored<O>,
-    #[zero_copy(ignore)]
     _marker: PhantomData<(E, T)>,
 }
 
@@ -166,6 +163,8 @@ where
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
+    /// * The reference and the length of the value stored would overflow the
+    ///   stored type.
     ///
     /// To guarantee that this constructor will never panic, [`Ref<T, E,
     /// usize>`] can be used. This also ensures that construction is a no-op.
@@ -185,28 +184,12 @@ where
     #[inline]
     pub fn with_metadata<U>(offset: U, metadata: T::Metadata) -> Self
     where
-        U: Copy + fmt::Debug,
+        U: Copy + IntoRepr,
         O: TryFrom<U>,
     {
-        const {
-            assert!(
-                O::CAN_SWAP_BYTES,
-                "Offset cannot be byte-ordered since it would not inhabit valid types"
-            );
-        }
-
-        let Some(offset) = O::try_from(offset).ok() else {
-            panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
-        };
-
-        let Some(metadata) = T::try_from_metadata(metadata) else {
-            panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
-        };
-
-        Self {
-            offset: O::swap_bytes::<E>(offset),
-            metadata: T::Stored::<O>::swap_bytes::<E>(metadata),
-            _marker: PhantomData,
+        match Self::try_with_metadata(offset, metadata) {
+            Ok(r) => r,
+            Err(error) => panic!("{error}"),
         }
     }
 
@@ -221,6 +204,8 @@ where
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
+    /// * The reference and the length of the value stored would overflow the
+    ///   stored type.
     ///
     /// To guarantee that this constructor will never error, [`Ref<T, Native,
     /// usize>`] can be used. This also ensures that construction is a no-op.
@@ -238,9 +223,22 @@ where
     /// assert_eq!(reference.len(), 10);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
+    ///
+    /// Example showcasing when a representation overflows:
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    /// use musli_zerocopy::endian::Native;
+    ///
+    /// let a = Ref::<[u32], Native, usize>::try_with_metadata((isize::MAX as usize) - 32 * 4, 32)?;
+    /// let result = Ref::<[u32], Native, usize>::try_with_metadata((isize::MAX as usize) - 32 * 4 + 1, 32);
+    ///
+    /// assert!(result.is_err());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
     pub fn try_with_metadata<U>(offset: U, metadata: T::Metadata) -> Result<Self, Error>
     where
-        U: Copy + IntoRepr + fmt::Debug,
+        U: Copy + IntoRepr,
         O: TryFrom<U>,
     {
         const {
@@ -262,12 +260,7 @@ where
             }));
         };
 
-        let Some(metadata) = T::try_from_metadata(metadata) else {
-            return Err(Error::new(ErrorKind::InvalidMetadataRange {
-                metadata: T::Metadata::into_repr(metadata),
-                max: O::into_repr(O::MAX),
-            }));
-        };
+        let metadata = check_with_metadata::<T, O, E>(offset, metadata)?;
 
         Ok(Self {
             offset: O::swap_bytes::<E>(offset),
@@ -275,6 +268,53 @@ where
             _marker: PhantomData,
         })
     }
+}
+
+/// Checks that the given offset and metadata are valid pointer-sized types.
+///
+/// This ensures that the last possible computed offset for the reference cannot
+/// overflow `isize::MAX`, which in turn ensures that arithmetic operations over
+/// offsets cannot overflow and therefore do not have to be checked.
+///
+/// This is called during construction and validation.
+#[inline(always)]
+fn check_with_metadata<T, O, E>(offset: O, metadata: T::Metadata) -> Result<T::Stored<O>, Error>
+where
+    T: ?Sized + Pointee,
+    O: Size,
+    E: ByteOrder,
+{
+    let size =
+        T::size(&metadata).and_then(|size| size.checked_next_multiple_of(T::align(&metadata)));
+
+    let Some(size) = size else {
+        return Err(Error::new(ErrorKind::SizeOverflow { size: usize::MAX }));
+    };
+
+    // Calculate the last possible position we can validly store a value of type
+    // `T` on.
+    let Some(type_last) = (isize::MAX as usize).checked_sub(size) else {
+        return Err(Error::new(ErrorKind::UnsupportedPointerType {
+            size: size.into_repr(),
+            max: usize::into_repr(isize::MAX as usize),
+        }));
+    };
+
+    if offset.as_usize::<E>() > type_last {
+        return Err(Error::new(ErrorKind::OffsetOutOfMaxBounds {
+            offset: O::into_repr(offset),
+            type_max: usize::into_repr(type_last),
+        }));
+    }
+
+    let Some(metadata) = T::try_from_metadata(metadata) else {
+        return Err(Error::new(ErrorKind::InvalidMetadataRange {
+            metadata: T::Metadata::into_repr(metadata),
+            max: O::into_repr(O::MAX),
+        }));
+    };
+
+    Ok(metadata)
 }
 
 impl<T, E, O> Ref<[T], E, O>
@@ -585,10 +625,8 @@ where
     ///
     /// # Panics
     ///
-    /// This will panic if:
-    /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
-    ///
-    /// [`offset()`]: Self::offset
+    /// This panics for the same reason as [`Ref::with_metadata()`], where
+    /// metadata is `()` to indicate its a sized value.
     ///
     /// # Examples
     ///
@@ -609,25 +647,10 @@ where
     #[inline]
     pub fn new<U>(offset: U) -> Self
     where
-        U: Copy + fmt::Debug,
+        U: Copy + IntoRepr,
         O: TryFrom<U>,
     {
-        const {
-            assert!(
-                O::CAN_SWAP_BYTES,
-                "Offset cannot be byte-ordered since it would not inhabit valid types",
-            );
-        }
-
-        let Some(offset) = O::try_from(offset).ok() else {
-            panic!("Offset {offset:?} not in the legal range 0-{}", O::MAX);
-        };
-
-        Self {
-            offset: O::swap_bytes::<E>(offset),
-            metadata: (),
-            _marker: PhantomData,
-        }
+        Self::with_metadata(offset, ())
     }
 
     /// Construct a typed reference to the zeroeth offset in a buffer.
@@ -932,5 +955,48 @@ where
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.offset.hash(state);
         self.metadata.hash(state);
+    }
+}
+
+unsafe impl<T, E, O> ZeroCopy for Ref<T, E, O>
+where
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Size,
+{
+    // A `Ref` type cannot inhabit any bit pattern since it must represent a
+    // validly sized reference.
+    const ANY_BITS: bool = false;
+    // A `Ref` type does not contain any padding.
+    const PADDED: bool = false;
+    // Since the ref type statically encodes the byte order, it cannot be byte
+    // swapped with retained semantics.
+    const CAN_SWAP_BYTES: bool = false;
+
+    #[inline]
+    unsafe fn pad(_: &mut Padder<'_, Self>) {}
+
+    #[inline]
+    unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
+        unsafe {
+            let offset = *validator.field::<O>()?;
+            let metadata = *validator.field::<T::Stored<O>>()?;
+
+            if let Err(error) =
+                check_with_metadata::<T, O, E>(offset, T::to_metadata::<O, E>(metadata))
+            {
+                return Err(error);
+            }
+
+            Ok(())
+        }
+    }
+
+    #[inline]
+    fn swap_bytes<U>(self) -> Self
+    where
+        U: ByteOrder,
+    {
+        E::try_map(self, |this| this)
     }
 }

@@ -364,10 +364,10 @@ where
 
     #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        buf.load(Ref::<[T], Native, usize>::with_metadata(
+        buf.load(Ref::<[T], Native, usize>::try_with_metadata(
             self.offset.as_usize::<E>(),
             self.len.as_usize::<E>(),
-        ))
+        )?)
     }
 }
 

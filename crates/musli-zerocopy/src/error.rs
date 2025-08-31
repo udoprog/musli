@@ -216,6 +216,17 @@ pub(crate) enum ErrorKind {
     StackOverflow {
         capacity: usize,
     },
+    OffsetOutOfMaxBounds {
+        offset: Repr,
+        type_max: Repr,
+    },
+    SizeOverflow {
+        size: usize,
+    },
+    UnsupportedPointerType {
+        size: Repr,
+        max: Repr,
+    },
     #[cfg(feature = "alloc")]
     CapacityError,
     #[cfg(feature = "alloc")]
@@ -290,6 +301,18 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::StackOverflow { capacity } => {
                 write!(f, "Stack with capacity {capacity} overflowed")
+            }
+            ErrorKind::OffsetOutOfMaxBounds { offset, type_max } => {
+                write!(f, "Offset {offset} out of supported bound 0-{type_max}")
+            }
+            ErrorKind::SizeOverflow { size } => {
+                write!(
+                    f,
+                    "Reference size overflow with metadata overflows max usize 0-{size}"
+                )
+            }
+            ErrorKind::UnsupportedPointerType { size, max } => {
+                write!(f, "Reference with size {size} is out of bounds 0-{max}")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
             #[cfg(feature = "alloc")]
