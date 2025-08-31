@@ -884,7 +884,7 @@ impl Buf {
         }
 
         let start = a.max(b);
-        let end = start + size_of::<T>();
+        let end = start.saturating_add(size_of::<T>());
 
         if end > self.data.len() {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
