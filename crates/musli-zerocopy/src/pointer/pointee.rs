@@ -1,10 +1,10 @@
 use core::alloc::Layout;
 use core::fmt;
 
+use crate::ByteOrder;
 use crate::error::IntoRepr;
 use crate::pointer::Size;
 use crate::traits::ZeroCopy;
-use crate::ByteOrder;
 
 mod sealed {
     use crate::mem::MaybeUninit;

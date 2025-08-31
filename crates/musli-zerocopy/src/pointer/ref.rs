@@ -69,16 +69,20 @@ where
 
     #[inline]
     unsafe fn pad(padder: &mut Padder<'_, Self>) {
-        padder.pad::<O>();
-        padder.pad::<T::Stored<O>>();
+        unsafe {
+            padder.pad::<O>();
+            padder.pad::<T::Stored<O>>();
+        }
     }
 
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
-        let offset = *validator.field::<O>()?;
-        let metadata = *validator.field::<T::Stored<O>>()?;
-        Self::try_from_parts(offset, metadata)?;
-        Ok(())
+        unsafe {
+            let offset = *validator.field::<O>()?;
+            let metadata = *validator.field::<T::Stored<O>>()?;
+            Self::try_from_parts(offset, metadata)?;
+            Ok(())
+        }
     }
 
     #[inline]

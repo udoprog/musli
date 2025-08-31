@@ -1,4 +1,4 @@
-use crate::{endian::Native, Ref};
+use crate::{Ref, endian::Native};
 
 const MAX: usize = isize::MAX as usize;
 
