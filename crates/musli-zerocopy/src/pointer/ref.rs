@@ -5,6 +5,7 @@ use core::marker::PhantomData;
 use core::mem::size_of;
 
 use crate::ZeroCopy;
+use crate::buf::{Padder, Validator};
 use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::error::{Error, ErrorKind, IntoRepr};
 use crate::mem::MaybeUninit;
@@ -40,9 +41,7 @@ use crate::pointer::{DefaultSize, Pointee, Size};
 /// assert_eq!(*buf.load(number)?, u32::from_ne_bytes([1, 2, 3, 4]));
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-#[derive(ZeroCopy)]
 #[repr(C)]
-#[zero_copy(crate, swap_bytes_self)]
 pub struct Ref<T, E = Native, O = DefaultSize>
 where
     T: ?Sized + Pointee,
@@ -51,8 +50,41 @@ where
 {
     offset: O,
     metadata: T::Stored<O>,
-    #[zero_copy(ignore)]
     _marker: PhantomData<(E, T)>,
+}
+
+unsafe impl<T, E, O> ZeroCopy for Ref<T, E, O>
+where
+    T: ?Sized + Pointee,
+    E: ByteOrder,
+    O: Size,
+{
+    const ANY_BITS: bool = O::ANY_BITS && T::Stored::<O>::ANY_BITS;
+
+    const PADDED: bool = size_of::<Self>() > (size_of::<O>() + size_of::<T::Stored<O>>())
+        || O::PADDED
+        || T::Stored::<O>::PADDED;
+
+    const CAN_SWAP_BYTES: bool = false;
+
+    #[inline]
+    unsafe fn pad(padder: &mut Padder<'_, Self>) {
+        padder.pad::<O>();
+        padder.pad::<T::Stored<O>>();
+    }
+
+    #[inline]
+    unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
+        let offset = *validator.field::<O>()?;
+        let metadata = *validator.field::<T::Stored<O>>()?;
+        Self::try_from_parts(offset, metadata)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn swap_bytes<B: ByteOrder>(self) -> Self {
+        self
+    }
 }
 
 impl<T, E, O> Ref<T, E, O>
@@ -156,6 +188,31 @@ where
     E: ByteOrder,
     O: Size,
 {
+    fn from_parts(offset: O, metadata: T::Stored<O>) -> Self {
+        match Self::try_from_parts(offset, metadata) {
+            Ok(ok) => ok,
+            Err(_) => panic!("Offset plus Size overflows `usize`"),
+        }
+    }
+
+    fn try_from_parts(offset: O, metadata: T::Stored<O>) -> Result<Self, Error> {
+        let size = <T as Pointee>::pointee_size::<E, O>(metadata);
+        let max_offset = usize::MAX - size;
+
+        if offset.as_usize::<E>() <= max_offset {
+            Ok(Self {
+                offset,
+                metadata,
+                _marker: PhantomData,
+            })
+        } else {
+            Err(Error::new(ErrorKind::Overflow {
+                at: offset.as_usize::<E>(),
+                len: <T as Pointee>::pointee_size::<E, O>(metadata),
+            }))
+        }
+    }
+
     /// Construct a reference with custom metadata.
     ///
     /// # Panics
@@ -166,6 +223,7 @@ where
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
+    /// * The offset plus the size computed from `T` and the metadata overflows `usize::MAX`.
     ///
     /// To guarantee that this constructor will never panic, [`Ref<T, E,
     /// usize>`] can be used. This also ensures that construction is a no-op.
@@ -203,11 +261,10 @@ where
             panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
         };
 
-        Self {
-            offset: O::swap_bytes::<E>(offset),
-            metadata: T::Stored::<O>::swap_bytes::<E>(metadata),
-            _marker: PhantomData,
-        }
+        Ref::from_parts(
+            O::swap_bytes::<E>(offset),
+            T::Stored::<O>::swap_bytes::<E>(metadata),
+        )
     }
 
     /// Fallibly try to construct a reference with metadata.
@@ -221,6 +278,7 @@ where
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
+    /// * The offset plus the size computed from `T` and the metadata overflows `usize::MAX`.
     ///
     /// To guarantee that this constructor will never error, [`Ref<T, Native,
     /// usize>`] can be used. This also ensures that construction is a no-op.
@@ -269,11 +327,10 @@ where
             }));
         };
 
-        Ok(Self {
-            offset: O::swap_bytes::<E>(offset),
-            metadata: T::Stored::swap_bytes::<E>(metadata),
-            _marker: PhantomData,
-        })
+        Ref::try_from_parts(
+            O::swap_bytes::<E>(offset),
+            T::Stored::swap_bytes::<E>(metadata),
+        )
     }
 }
 
@@ -623,11 +680,7 @@ where
             panic!("Offset {offset:?} not in the legal range 0-{}", O::MAX);
         };
 
-        Self {
-            offset: O::swap_bytes::<E>(offset),
-            metadata: (),
-            _marker: PhantomData,
-        }
+        Ref::from_parts(O::swap_bytes::<E>(offset), ())
     }
 
     /// Construct a typed reference to the zeroeth offset in a buffer.
@@ -691,11 +744,7 @@ where
         T: Coerce<U>,
         U: ?Sized + Pointee,
     {
-        Ref {
-            offset: self.offset,
-            metadata: T::coerce_metadata(self.metadata),
-            _marker: PhantomData,
-        }
+        Ref::from_parts(self.offset, T::coerce_metadata(self.metadata))
     }
 
     /// Try to coerce from one kind of reference to another ensuring that the
@@ -763,11 +812,7 @@ where
         T: Coerce<U>,
         U: ?Sized + Pointee,
     {
-        Some(Ref {
-            offset: self.offset,
-            metadata: T::try_coerce_metadata(self.metadata)?,
-            _marker: PhantomData,
-        })
+        Ref::try_from_parts(self.offset, T::try_coerce_metadata(self.metadata)?).ok()
     }
 
     #[cfg(test)]
@@ -775,11 +820,7 @@ where
     where
         U: ?Sized + Pointee<Stored<O> = T::Stored<O>>,
     {
-        Ref {
-            offset: self.offset,
-            metadata: self.metadata,
-            _marker: PhantomData,
-        }
+        Ref::from_parts(self.offset, self.metadata)
     }
 }
 

@@ -126,4 +126,9 @@ where
     {
         T::try_from_metadata(metadata)
     }
+
+    #[inline]
+    fn pointee_size<E: crate::ByteOrder, O: Size>(metadata: Self::Stored<O>) -> usize {
+        T::pointee_size::<E, O>(metadata)
+    }
 }

@@ -3,6 +3,7 @@ use core::fmt;
 use crate::error::IntoRepr;
 use crate::pointer::Size;
 use crate::traits::ZeroCopy;
+use crate::ByteOrder;
 
 mod sealed {
     use crate::mem::MaybeUninit;
@@ -38,7 +39,7 @@ pub trait Pointee: self::sealed::Sealed {
 
     /// The stored representation of the pointee metadata.
     #[doc(hidden)]
-    type Stored<O>: Copy + ZeroCopy
+    type Stored<O>: Copy + ZeroCopy + IntoRepr
     where
         O: Size;
 
@@ -47,6 +48,10 @@ pub trait Pointee: self::sealed::Sealed {
     fn try_from_metadata<O>(metadata: Self::Metadata) -> Option<Self::Stored<O>>
     where
         O: Size;
+
+    /// Will return `usize::MAX` as an invalid size.
+    #[doc(hidden)]
+    fn pointee_size<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> usize;
 }
 
 impl<T> Pointee for T
@@ -65,6 +70,11 @@ where
         O: Size,
     {
         Some(())
+    }
+
+    #[inline(always)]
+    fn pointee_size<E: ByteOrder, O: Size>((): Self::Stored<O>) -> usize {
+        size_of::<T>()
     }
 }
 
@@ -85,6 +95,12 @@ where
     {
         O::try_from_usize(metadata)
     }
+
+    #[inline(always)]
+    fn pointee_size<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> usize {
+        let len = metadata.as_usize::<E>();
+        size_of::<T>().saturating_mul(len)
+    }
 }
 
 impl Pointee for str {
@@ -100,5 +116,10 @@ impl Pointee for str {
         O: Size,
     {
         O::try_from_usize(metadata)
+    }
+
+    #[inline(always)]
+    fn pointee_size<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> usize {
+        metadata.as_usize::<E>()
     }
 }
