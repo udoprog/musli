@@ -50,7 +50,7 @@ pub trait Pointee: self::sealed::Sealed {
     where
         O: Size;
 
-    /// Will return `usize::MAX` as an invalid size.
+    /// The layout of `T` with the given stored metadata.
     #[doc(hidden)]
     fn pointee_layout<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> Option<Layout>;
 }
