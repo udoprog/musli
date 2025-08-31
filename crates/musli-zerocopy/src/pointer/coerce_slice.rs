@@ -1,4 +1,3 @@
-use crate::endian::Native;
 use crate::error::{CoerceError, CoerceErrorKind};
 use crate::pointer::Size;
 
@@ -111,8 +110,8 @@ macro_rules! coerce_slice_inner {
                 {
                     let Some(len) = len.checked_mul(O::$factor) else {
                         return Err(CoerceError::new(CoerceErrorKind::SliceLengthOverflow {
-                            item: len.as_usize::<Native>(),
-                            len: O::$factor.as_usize::<Native>(),
+                            item: len.as_usize(),
+                            len: O::$factor.as_usize(),
                         }));
                     };
 

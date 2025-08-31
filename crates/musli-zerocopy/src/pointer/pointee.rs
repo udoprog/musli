@@ -1,8 +1,6 @@
 use core::alloc::{Layout, LayoutError};
-use core::fmt;
 use core::mem::size_of;
 
-use crate::endian::Native;
 use crate::error::CoerceError;
 use crate::pointer::Size;
 use crate::traits::ZeroCopy;
@@ -37,7 +35,7 @@ mod sealed {
 /// [`Ref<T>`]: crate::Ref
 pub trait Pointee: self::sealed::Sealed {
     /// Metadata associated with a pointee.
-    type Metadata: Copy + fmt::Debug;
+    type Metadata: Copy;
 
     /// The stored representation of the pointee metadata.
     #[doc(hidden)]
@@ -136,7 +134,7 @@ where
     where
         O: Size,
     {
-        let len = metadata.as_usize::<Native>();
+        let len = metadata.as_usize();
         size_of::<T>().checked_mul(len)
     }
 
@@ -153,7 +151,7 @@ where
     where
         O: Size,
     {
-        let len = metadata.as_usize::<Native>();
+        let len = metadata.as_usize();
         Layout::array::<T>(len)
     }
 }
@@ -178,7 +176,7 @@ impl Pointee for str {
     where
         O: Size,
     {
-        Some(metadata.as_usize::<Native>())
+        Some(metadata.as_usize())
     }
 
     #[inline(always)]
@@ -194,6 +192,6 @@ impl Pointee for str {
     where
         O: Size,
     {
-        Layout::array::<u8>(metadata.as_usize::<Native>())
+        Layout::array::<u8>(metadata.as_usize())
     }
 }

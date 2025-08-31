@@ -131,7 +131,6 @@ impl core::error::Error for CoerceError {}
 #[cfg_attr(test, derive(PartialEq))]
 #[non_exhaustive]
 pub(crate) enum CoerceErrorKind {
-    InvalidMetadataRange { metadata: usize, end: usize },
     SliceLengthOverflow { item: usize, len: usize },
     LengthOverflow { len: usize, size: usize },
     InvalidLayout { size: Option<usize>, align: usize },
@@ -143,9 +142,6 @@ pub(crate) enum CoerceErrorKind {
 impl fmt::Display for CoerceErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            Self::InvalidMetadataRange { metadata, end } => {
-                write!(f, "Metadata {metadata} not in valid range 0-{end}")
-            }
             Self::SliceLengthOverflow { item, len } => {
                 write!(
                     f,

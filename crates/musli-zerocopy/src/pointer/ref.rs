@@ -37,7 +37,7 @@ use crate::pointer::{DefaultSize, Pointee, Size};
 ///
 /// let buf = buf.as_ref();
 ///
-/// let number = Ref::<u32>::new(0);
+/// let number = Ref::<u32>::new(0u32);
 /// assert_eq!(*buf.load(number)?, u32::from_ne_bytes([1, 2, 3, 4]));
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
@@ -63,9 +63,15 @@ where
     // validly sized reference.
     const ANY_BITS: bool = false;
 
-    const PADDED: bool = size_of::<Self>() > (size_of::<O>() + size_of::<T::Stored<O>>())
-        || O::PADDED
-        || T::Stored::<O>::PADDED;
+    const PADDED: bool = const {
+        debug_assert!(
+            size_of::<Self>() == (size_of::<O>() + size_of::<T::Stored<O>>()),
+            "Size of Ref should equal its fields"
+        );
+        debug_assert!(!O::PADDED, "Offset should not be padded");
+        debug_assert!(!T::Stored::<O>::PADDED, "Metadata should not be padded");
+        false
+    };
 
     // Since the ref type statically encodes the byte order, it cannot be byte
     // swapped with retained meaning.
@@ -108,10 +114,10 @@ where
     /// ```
     /// use musli_zerocopy::{endian, Ref};
     ///
-    /// let r: Ref<u32> = Ref::new(10);
+    /// let r: Ref<u32> = Ref::new(10u32);
     /// assert_eq!(r.offset(), 10);
     ///
-    /// let r: Ref<u32, endian::Little> = Ref::new(10);
+    /// let r: Ref<u32, endian::Little> = Ref::new(10u32);
     /// assert_eq!(r.offset(), 10);
     ///
     /// let r: Ref<u32, endian::Big> = r.to_be();
@@ -129,10 +135,10 @@ where
     /// ```
     /// use musli_zerocopy::{endian, Ref};
     ///
-    /// let r: Ref<u32> = Ref::new(10);
+    /// let r: Ref<u32> = Ref::new(10u32);
     /// assert_eq!(r.offset(), 10);
     ///
-    /// let r: Ref<u32, endian::Big> = Ref::new(10);
+    /// let r: Ref<u32, endian::Big> = Ref::new(10u32);
     /// assert_eq!(r.offset(), 10);
     ///
     /// let r: Ref<u32, endian::Little> = r.to_le();
@@ -150,13 +156,13 @@ where
     /// ```
     /// use musli_zerocopy::{endian, Ref};
     ///
-    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Big>::new(10).to_ne();
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Big>::new(10u32).to_ne();
     /// assert_eq!(r.offset(), 10);
     ///
-    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Little>::new(10).to_ne();
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Little>::new(10u32).to_ne();
     /// assert_eq!(r.offset(), 10);
     ///
-    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Native>::new(10).to_ne();
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Native>::new(10u32).to_ne();
     /// assert_eq!(r.offset(), 10);
     /// ```
     #[inline]
@@ -171,13 +177,13 @@ where
     /// ```
     /// use musli_zerocopy::{endian, Ref};
     ///
-    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Big>::new(10).to_endian();
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Big>::new(10u32).to_endian();
     /// assert_eq!(r.offset(), 10);
     ///
-    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Little>::new(10).to_endian();
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Little>::new(10u32).to_endian();
     /// assert_eq!(r.offset(), 10);
     ///
-    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Native>::new(10).to_endian();
+    /// let r: Ref<u32, endian::Native> = Ref::<u32, endian::Native>::new(10u32).to_endian();
     /// assert_eq!(r.offset(), 10);
     /// ```
     #[inline]
@@ -215,7 +221,7 @@ where
             }));
         };
 
-        let offset_usize = offset.as_usize::<E>();
+        let offset_usize = offset.swap_bytes::<E>().as_usize();
 
         if offset_usize.checked_add(layout.size()).is_none() {
             return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
@@ -280,7 +286,6 @@ where
     pub fn with_metadata<U>(offset: U, metadata: T::Metadata) -> Self
     where
         U: Size,
-        O: TryFrom<U>,
     {
         match Ref::try_with_metadata(offset, metadata) {
             Ok(ok) => ok,
@@ -342,7 +347,6 @@ where
     pub fn try_with_metadata<U>(offset: U, metadata: T::Metadata) -> Result<Self, CoerceError>
     where
         U: Size,
-        O: TryFrom<U>,
     {
         const {
             assert!(
@@ -356,13 +360,7 @@ where
             );
         }
 
-        let Some(offset) = O::try_from(offset).ok() else {
-            return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
-                offset: offset.as_usize::<Native>(),
-                end: O::MAX.as_usize::<Native>(),
-            }));
-        };
-
+        let offset = O::try_from(offset)?;
         let metadata = T::try_from_metadata(metadata)?;
 
         let Ok(layout) = T::pointee_layout::<O>(metadata) else {
@@ -372,7 +370,7 @@ where
             }));
         };
 
-        let offset_usize = offset.as_usize::<Native>();
+        let offset_usize = offset.as_usize();
 
         if offset_usize.checked_add(layout.size()).is_none() {
             return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
@@ -407,7 +405,7 @@ where
     /// ```
     #[inline]
     pub fn len(self) -> usize {
-        self.metadata.as_usize::<E>()
+        self.metadata.swap_bytes::<E>().as_usize()
     }
 
     /// Test if the slice `[T]` is empty.
@@ -453,7 +451,7 @@ where
             return None;
         }
 
-        let offset = self.offset.as_usize::<E>() + size_of::<T>() * index;
+        let offset = self.offset.swap_bytes::<E>().as_usize() + size_of::<T>() * index;
         Some(Ref::new(offset))
     }
 
@@ -484,7 +482,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn get_unchecked(self, index: usize) -> Ref<T, E, O> {
-        let offset = self.offset.as_usize::<E>() + size_of::<T>() * index;
+        let offset = self.offset.swap_bytes::<E>().as_usize() + size_of::<T>() * index;
         Ref::new(offset)
     }
 
@@ -564,8 +562,8 @@ where
     /// ```
     #[inline]
     pub fn iter(self) -> Iter<T, E, O> {
-        let start = self.offset.as_usize::<E>();
-        let end = start + self.metadata.as_usize::<E>() * size_of::<T>();
+        let start = self.offset.swap_bytes::<E>().as_usize();
+        let end = start + self.metadata.swap_bytes::<E>().as_usize() * size_of::<T>();
 
         Iter {
             start,
@@ -592,7 +590,7 @@ where
     /// ```
     #[inline]
     pub fn len(self) -> usize {
-        self.metadata.as_usize::<E>()
+        self.metadata.swap_bytes::<E>().as_usize()
     }
 
     /// Test if the slice `[T]` is empty.
@@ -707,7 +705,7 @@ where
     /// ```
     /// use musli_zerocopy::Ref;
     ///
-    /// let reference = Ref::<u64>::new(42);
+    /// let reference = Ref::<u64>::new(42u32);
     /// assert_eq!(reference.offset(), 42);
     /// ```
     ///
@@ -721,8 +719,7 @@ where
     #[inline]
     pub fn new<U>(offset: U) -> Self
     where
-        U: Copy + fmt::Debug,
-        O: TryFrom<U>,
+        U: Size,
     {
         const {
             assert!(
@@ -731,8 +728,12 @@ where
             );
         }
 
-        let Some(offset) = O::try_from(offset).ok() else {
-            panic!("Offset {offset:?} not in the valid range 0-{}", O::MAX);
+        let Ok(offset) = O::try_from(offset) else {
+            panic!(
+                "Offset {} not in the valid range 0-{}",
+                offset.as_usize(),
+                O::MAX_USIZE
+            );
         };
 
         Ref::from_parts(O::swap_bytes::<E>(offset), ())
@@ -770,13 +771,20 @@ where
     ///
     /// ```
     /// use musli_zerocopy::Ref;
+    /// use musli_zerocopy::endian::{Big, Little, Native};
     ///
-    /// let reference = Ref::<u64>::new(42);
+    /// let reference = Ref::<u64, Native>::new(42u32);
+    /// assert_eq!(reference.offset(), 42);
+    ///
+    /// let reference = Ref::<u64, Little>::new(42u32);
+    /// assert_eq!(reference.offset(), 42);
+    ///
+    /// let reference = Ref::<u64, Big>::new(42u32);
     /// assert_eq!(reference.offset(), 42);
     /// ```
     #[inline]
     pub fn offset(self) -> usize {
-        self.offset.as_usize::<E>()
+        self.offset.swap_bytes::<E>().as_usize()
     }
 
     /// Coerce from one kind of reference to another ensuring that the
