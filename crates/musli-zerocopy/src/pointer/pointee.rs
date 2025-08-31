@@ -1,5 +1,7 @@
+use core::alloc::{Layout, LayoutError};
 use core::fmt;
 
+use crate::ByteOrder;
 use crate::error::IntoRepr;
 use crate::pointer::Size;
 use crate::traits::ZeroCopy;
@@ -38,7 +40,7 @@ pub trait Pointee: self::sealed::Sealed {
 
     /// The stored representation of the pointee metadata.
     #[doc(hidden)]
-    type Stored<O>: Copy + ZeroCopy
+    type Stored<O>: Copy + ZeroCopy + IntoRepr
     where
         O: Size;
 
@@ -46,6 +48,13 @@ pub trait Pointee: self::sealed::Sealed {
     #[doc(hidden)]
     fn try_from_metadata<O>(metadata: Self::Metadata) -> Option<Self::Stored<O>>
     where
+        O: Size;
+
+    /// The layout of `T` with the given stored metadata.
+    #[doc(hidden)]
+    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    where
+        E: ByteOrder,
         O: Size;
 }
 
@@ -66,6 +75,15 @@ where
     {
         Some(())
     }
+
+    #[inline(always)]
+    fn pointee_layout<E, O>((): Self::Stored<O>) -> Result<Layout, LayoutError>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        Ok(Layout::new::<T>())
+    }
 }
 
 impl<T> Pointee for [T]
@@ -85,6 +103,16 @@ where
     {
         O::try_from_usize(metadata)
     }
+
+    #[inline(always)]
+    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        let len = metadata.as_usize::<E>();
+        Layout::array::<T>(len)
+    }
 }
 
 impl Pointee for str {
@@ -100,5 +128,14 @@ impl Pointee for str {
         O: Size,
     {
         O::try_from_usize(metadata)
+    }
+
+    #[inline(always)]
+    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        Layout::array::<u8>(metadata.as_usize::<E>())
     }
 }

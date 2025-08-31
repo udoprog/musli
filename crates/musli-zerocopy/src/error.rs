@@ -216,6 +216,7 @@ pub(crate) enum ErrorKind {
     StackOverflow {
         capacity: usize,
     },
+    InvalidLayout,
     #[cfg(feature = "alloc")]
     CapacityError,
     #[cfg(feature = "alloc")]
@@ -226,10 +227,10 @@ impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ErrorKind::InvalidOffsetRange { offset, max } => {
-                write!(f, "Offset {offset} not in legal range 0-{max}",)
+                write!(f, "Offset {offset} not in valid range 0-{max}")
             }
             ErrorKind::InvalidMetadataRange { metadata, max } => {
-                write!(f, "Metadata {metadata} not in legal range 0-{max}")
+                write!(f, "Metadata {metadata} not in valid range 0-{max}")
             }
             ErrorKind::LengthOverflow { len, size } => {
                 write!(
@@ -292,6 +293,9 @@ impl fmt::Display for ErrorKind {
                 write!(f, "Stack with capacity {capacity} overflowed")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
+            ErrorKind::InvalidLayout => {
+                write!(f, "Invalid layout")
+            }
             #[cfg(feature = "alloc")]
             ErrorKind::CapacityError => {
                 write!(f, "Out of capacity")
