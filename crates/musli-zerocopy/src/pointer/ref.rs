@@ -7,7 +7,7 @@ use core::mem::size_of;
 use crate::ZeroCopy;
 use crate::buf::{Padder, Validator};
 use crate::endian::{Big, ByteOrder, Little, Native};
-use crate::error::{Error, ErrorKind, IntoRepr};
+use crate::error::{CoerceError, CoerceErrorKind, Error, IntoRepr};
 use crate::mem::MaybeUninit;
 use crate::pointer::Coerce;
 use crate::pointer::{DefaultSize, Pointee, Size};
@@ -205,9 +205,9 @@ where
     }
 
     #[inline]
-    fn try_from_parts(offset: O, metadata: T::Stored<O>) -> Result<Self, Error> {
+    fn try_from_parts(offset: O, metadata: T::Stored<O>) -> Result<Self, CoerceError> {
         let Ok(layout) = T::pointee_layout::<E, O>(metadata) else {
-            return Err(Error::new(ErrorKind::InvalidLayout {
+            return Err(CoerceError::new(CoerceErrorKind::InvalidLayout {
                 size: T::size::<E, O>(metadata),
                 align: T::align::<E, O>(metadata),
             }));
@@ -216,9 +216,9 @@ where
         let offset_usize = offset.as_usize::<E>();
 
         if offset_usize.checked_add(layout.size()).is_none() {
-            return Err(Error::new(ErrorKind::InvalidOffsetRange {
-                offset: usize::into_repr(offset_usize),
-                end: usize::into_repr(usize::MAX - layout.size()),
+            return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
+                offset: offset_usize,
+                end: usize::MAX - layout.size(),
             }));
         };
 
@@ -254,7 +254,7 @@ where
     /// ```
     /// use musli_zerocopy::Ref;
     ///
-    /// let reference = Ref::<[u64]>::with_metadata(42, 10);
+    /// let reference = Ref::<[u64]>::with_metadata(42u32, 10);
     /// assert_eq!(reference.offset(), 42);
     /// assert_eq!(reference.len(), 10);
     /// ```
@@ -277,7 +277,7 @@ where
     #[inline]
     pub fn with_metadata<U>(offset: U, metadata: T::Metadata) -> Self
     where
-        U: Copy + IntoRepr,
+        U: Size + IntoRepr,
         O: TryFrom<U>,
     {
         match Ref::try_with_metadata(offset, metadata) {
@@ -312,7 +312,7 @@ where
     /// ```
     /// use musli_zerocopy::Ref;
     ///
-    /// let reference = Ref::<[u64]>::try_with_metadata(42, 10)?;
+    /// let reference = Ref::<[u64]>::try_with_metadata(42u32, 10)?;
     /// assert_eq!(reference.offset(), 42);
     /// assert_eq!(reference.len(), 10);
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -335,11 +335,11 @@ where
     ///
     /// assert!(Ref::<[u8], Big, usize>::try_with_metadata(o + 1, l).is_err());
     /// assert!(Ref::<[u8], Little, usize>::try_with_metadata(o + 1, l).is_err());
-    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// # Ok::<_, musli_zerocopy::CoerceError>(())
     /// ```
-    pub fn try_with_metadata<U>(offset: U, metadata: T::Metadata) -> Result<Self, Error>
+    pub fn try_with_metadata<U>(offset: U, metadata: T::Metadata) -> Result<Self, CoerceError>
     where
-        U: Copy + IntoRepr,
+        U: Size,
         O: TryFrom<U>,
     {
         const {
@@ -355,18 +355,13 @@ where
         }
 
         let Some(offset) = O::try_from(offset).ok() else {
-            return Err(Error::new(ErrorKind::InvalidOffsetRange {
-                offset: U::into_repr(offset),
-                end: O::into_repr(O::MAX),
+            return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
+                offset: offset.as_usize::<Native>(),
+                end: O::MAX.as_usize::<Native>(),
             }));
         };
 
-        let Some(metadata) = T::try_from_metadata(metadata) else {
-            return Err(Error::new(ErrorKind::InvalidMetadataRange {
-                metadata: T::Metadata::into_repr(metadata),
-                end: O::into_repr(O::MAX),
-            }));
-        };
+        let metadata = T::try_from_metadata(metadata)?;
 
         Ref::try_from_parts(
             O::swap_bytes::<E>(offset),
@@ -388,7 +383,7 @@ where
     /// ```
     /// use musli_zerocopy::pointer::Ref;
     ///
-    /// let slice = Ref::<[u32]>::with_metadata(0, 2);
+    /// let slice = Ref::<[u32]>::with_metadata(0u32, 2);
     /// assert_eq!(slice.len(), 2);
     /// ```
     #[inline]
@@ -403,10 +398,10 @@ where
     /// ```
     /// use musli_zerocopy::pointer::Ref;
     ///
-    /// let slice = Ref::<[u32]>::with_metadata(0, 0);
+    /// let slice = Ref::<[u32]>::with_metadata(0u32, 0);
     /// assert!(slice.is_empty());
     ///
-    /// let slice = Ref::<[u32]>::with_metadata(0, 2);
+    /// let slice = Ref::<[u32]>::with_metadata(0u32, 2);
     /// assert!(!slice.is_empty());
     /// ```
     #[inline]
@@ -573,7 +568,7 @@ where
     /// ```
     /// use musli_zerocopy::pointer::Ref;
     ///
-    /// let slice = Ref::<str>::with_metadata(0, 2);
+    /// let slice = Ref::<str>::with_metadata(0u32, 2);
     /// assert_eq!(slice.len(), 2);
     /// ```
     #[inline]
@@ -588,10 +583,10 @@ where
     /// ```
     /// use musli_zerocopy::pointer::Ref;
     ///
-    /// let slice = Ref::<str>::with_metadata(0, 0);
+    /// let slice = Ref::<str>::with_metadata(0u32, 0);
     /// assert!(slice.is_empty());
     ///
-    /// let slice = Ref::<str>::with_metadata(0, 2);
+    /// let slice = Ref::<str>::with_metadata(0u32, 2);
     /// assert!(!slice.is_empty());
     /// ```
     #[inline]
@@ -659,7 +654,7 @@ where
     /// ```
     /// use musli_zerocopy::pointer::Ref;
     ///
-    /// let slice = Ref::<str>::with_metadata(0, 10);
+    /// let slice = Ref::<str>::with_metadata(0u32, 10);
     /// assert_eq!(slice.metadata(), 10);
     /// ```
     #[inline]
@@ -824,14 +819,14 @@ where
     /// ```
     /// use musli_zerocopy::Ref;
     ///
-    /// let reference: Ref<[u32]> = Ref::with_metadata(0, 1);
-    /// let reference2 = reference.try_coerce::<[u8]>().ok_or("bad coercion")?;
+    /// let reference: Ref<[u32]> = Ref::with_metadata(0u32, 1);
+    /// let reference2 = reference.try_coerce::<[u8]>()?;
     /// assert_eq!(reference2.len(), 4);
     ///
-    /// let reference: Ref<str> = Ref::with_metadata(0, 12);
-    /// let reference2 = reference.try_coerce::<[u8]>().ok_or("bad coercion")?;
+    /// let reference: Ref<str> = Ref::with_metadata(0u32, 12);
+    /// let reference2 = reference.try_coerce::<[u8]>()?;
     /// assert_eq!(reference2.len(), 12);
-    /// # Ok::<_, &'static str>(())
+    /// # Ok::<_, musli_zerocopy::CoerceError>(())
     /// ```
     ///
     /// This does mean that numerical overflow might occur if the packed
@@ -841,19 +836,19 @@ where
     /// use musli_zerocopy::Ref;
     /// use musli_zerocopy::endian::Native;
     ///
-    /// let reference = Ref::<[u32], Native, u8>::with_metadata(0, 64);
+    /// let reference = Ref::<[u32], Native, u8>::with_metadata(0u32, 64);
     /// let reference2 = reference.try_coerce::<[u8]>();
-    /// assert!(reference2.is_none()); // 64 * 4 would overflow u8 packed metadata.
+    /// assert!(reference2.is_err()); // 64 * 4 would overflow u8 packed metadata.
     /// ```
     ///
     /// Coercion of non-zero types are supported, but do not guarantee that the
     /// destination data is valid.
-    pub fn try_coerce<U>(self) -> Option<Ref<U, E, O>>
+    pub fn try_coerce<U>(self) -> Result<Ref<U, E, O>, CoerceError>
     where
         T: Coerce<U>,
         U: ?Sized + Pointee,
     {
-        Ref::try_from_parts(self.offset, T::try_coerce_metadata(self.metadata)?).ok()
+        Ref::try_from_parts(self.offset, T::try_coerce_metadata(self.metadata)?)
     }
 
     #[cfg(test)]

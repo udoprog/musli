@@ -101,6 +101,85 @@ impl fmt::Display for Repr {
     }
 }
 
+/// Errors produced through coercion.
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct CoerceError {
+    kind: CoerceErrorKind,
+}
+
+impl CoerceError {
+    #[inline]
+    pub(crate) const fn new(kind: CoerceErrorKind) -> Self {
+        Self { kind }
+    }
+}
+
+impl fmt::Display for CoerceError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
+    }
+}
+
+impl core::error::Error for CoerceError {}
+
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+#[non_exhaustive]
+pub(crate) enum CoerceErrorKind {
+    InvalidMetadataRange { metadata: usize, end: usize },
+    SliceLengthOverflow { item: usize, len: usize },
+    LengthOverflow { len: usize, size: usize },
+    InvalidLayout { size: Option<usize>, align: usize },
+    InvalidOffsetRange { offset: usize, end: usize },
+    Underflow { at: usize, len: usize },
+    Overflow { at: usize, len: usize },
+}
+
+impl fmt::Display for CoerceErrorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::InvalidMetadataRange { metadata, end } => {
+                write!(f, "Metadata {metadata} not in valid range 0-{end}")
+            }
+            Self::SliceLengthOverflow { item, len } => {
+                write!(
+                    f,
+                    "Length overflowed when trying to take {item} elements of size {len}"
+                )
+            }
+            Self::LengthOverflow { len, size } => {
+                write!(
+                    f,
+                    "Length overflowed when trying to take {len} elements of size {size}"
+                )
+            }
+            Self::InvalidLayout {
+                size: Some(size),
+                align,
+            } => {
+                write!(f, "Invalid layout for size {size} and alignment {align}")
+            }
+            Self::InvalidLayout { size: None, align } => {
+                write!(
+                    f,
+                    "Invalid layout for overflowing size and alignment {align}"
+                )
+            }
+            Self::InvalidOffsetRange { offset, end } => {
+                write!(f, "Offset {offset} not in valid range 0-{end}")
+            }
+            Self::Underflow { at, len } => {
+                write!(f, "Arithmetic underflow calculating {at} - {len}")
+            }
+            Self::Overflow { at, len } => {
+                write!(f, "Arithmetic overflow calculating {at} + {len}")
+            }
+        }
+    }
+}
+
 /// Müsli's zero copy error type.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -131,12 +210,12 @@ impl fmt::Display for Error {
     }
 }
 
-impl core::error::Error for Error {
-    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match &self.kind {
-            ErrorKind::Utf8Error { error } => Some(error),
-            _ => None,
-        }
+impl core::error::Error for Error {}
+
+impl From<CoerceError> for Error {
+    #[inline]
+    fn from(error: CoerceError) -> Self {
+        Self::new(ErrorKind::CoerceError { error })
     }
 }
 
@@ -144,17 +223,11 @@ impl core::error::Error for Error {
 #[cfg_attr(test, derive(PartialEq))]
 #[non_exhaustive]
 pub(crate) enum ErrorKind {
-    InvalidOffsetRange {
-        offset: Repr,
-        end: Repr,
+    Utf8Error {
+        error: Utf8Error,
     },
-    InvalidMetadataRange {
-        metadata: Repr,
-        end: Repr,
-    },
-    LengthOverflow {
-        len: usize,
-        size: usize,
+    CoerceError {
+        error: CoerceError,
     },
     AlignmentRangeMismatch {
         addr: usize,
@@ -202,23 +275,8 @@ pub(crate) enum ErrorKind {
     IllegalBool {
         repr: u8,
     },
-    Utf8Error {
-        error: Utf8Error,
-    },
-    Underflow {
-        at: usize,
-        len: usize,
-    },
-    Overflow {
-        at: usize,
-        len: usize,
-    },
     StackOverflow {
         capacity: usize,
-    },
-    InvalidLayout {
-        size: Option<usize>,
-        align: usize,
     },
     #[cfg(feature = "alloc")]
     CapacityError,
@@ -229,18 +287,8 @@ pub(crate) enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorKind::InvalidOffsetRange { offset, end } => {
-                write!(f, "Offset {offset} not in valid range 0-{end}")
-            }
-            ErrorKind::InvalidMetadataRange { metadata, end } => {
-                write!(f, "Metadata {metadata} not in valid range 0-{end}")
-            }
-            ErrorKind::LengthOverflow { len, size } => {
-                write!(
-                    f,
-                    "Length overflowed when trying to take {len} elements of size {size}"
-                )
-            }
+            ErrorKind::Utf8Error { error } => error.fmt(f),
+            ErrorKind::CoerceError { error } => error.fmt(f),
             ErrorKind::AlignmentRangeMismatch { addr, range, align } => {
                 write!(
                     f,
@@ -286,27 +334,8 @@ impl fmt::Display for ErrorKind {
             ErrorKind::IllegalBool { repr } => {
                 write!(f, "Illegal bool representation {repr}")
             }
-            ErrorKind::Underflow { at, len } => {
-                write!(f, "Arithmetic underflow calculating {at} - {len}")
-            }
-            ErrorKind::Overflow { at, len } => {
-                write!(f, "Arithmetic overflow calculating {at} + {len}")
-            }
             ErrorKind::StackOverflow { capacity } => {
                 write!(f, "Stack with capacity {capacity} overflowed")
-            }
-            ErrorKind::Utf8Error { error } => error.fmt(f),
-            ErrorKind::InvalidLayout {
-                size: Some(size),
-                align,
-            } => {
-                write!(f, "Invalid layout for size {size} and alignment {align}")
-            }
-            ErrorKind::InvalidLayout { size: None, align } => {
-                write!(
-                    f,
-                    "Invalid layout for overflowing size and alignment {align}"
-                )
             }
             #[cfg(feature = "alloc")]
             ErrorKind::CapacityError => {

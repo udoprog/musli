@@ -437,14 +437,14 @@
 //! # #[derive(ZeroCopy)]
 //! # #[repr(C)]
 //! # struct Custom;
-//! Ref::<[Custom]>::with_metadata(0, 1usize << 32);
+//! Ref::<[Custom]>::with_metadata(0u32, 1usize << 32);
 //! ```
 //!
 //! Example panic using an [`Ref<str>`] value with a size larger than `2^32`:
 //!
 //! ```should_panic
 //! # use musli_zerocopy::Ref;
-//! Ref::<str>::with_metadata(0, 1usize << 32);
+//! Ref::<str>::with_metadata(0u32, 1usize << 32);
 //! ```
 //!
 //! If you want to address data larger than this limit, it is recommended that
@@ -465,8 +465,8 @@
 //! # struct Custom;
 //! // These no longer panic:
 //! let reference = Ref::<Custom, Native, usize>::new(1usize << 32);
-//! let slice = Ref::<[Custom], Native, usize>::with_metadata(0, 1usize << 32);
-//! let unsize = Ref::<str, Native, usize>::with_metadata(0, 1usize << 32);
+//! let slice = Ref::<[Custom], Native, usize>::with_metadata(0u32, 1usize << 32);
+//! let unsize = Ref::<str, Native, usize>::with_metadata(0u32, 1usize << 32);
 //! ```
 //!
 //! To initialize an [`OwnedBuf`] with a custom [`Size`], you can use
@@ -556,7 +556,7 @@ pub mod slice;
 pub mod trie;
 
 #[doc(inline)]
-pub use self::error::Error;
+pub use self::error::{CoerceError, Error};
 mod error;
 
 /// `Result` alias provided for convenience.

@@ -1,7 +1,7 @@
 use core::fmt;
 
 use crate::endian::ByteOrder;
-use crate::error::IntoRepr;
+use crate::error::{CoerceError, CoerceErrorKind, IntoRepr};
 use crate::traits::ZeroCopy;
 
 /// The default [`Size`] to use.
@@ -74,7 +74,7 @@ pub trait Size:
     fn checked_mul(self, other: Self) -> Option<Self>;
 
     /// Try to construct this value from usize.
-    fn try_from_usize(value: usize) -> Option<Self>;
+    fn try_from_usize(value: usize) -> Result<Self, CoerceError>;
 
     /// Convert the pointer to a usize.
     #[doc(hidden)]
@@ -119,11 +119,14 @@ macro_rules! impl_size {
             }
 
             #[inline]
-            fn try_from_usize(value: usize) -> Option<Self> {
+            fn try_from_usize(value: usize) -> Result<Self, CoerceError> {
                 if value > <$ty>::MAX as usize {
-                    None
+                    Err(CoerceError::new(CoerceErrorKind::LengthOverflow {
+                        len: value,
+                        size: <$ty>::MAX as usize,
+                    }))
                 } else {
-                    Some(value as $ty)
+                    Ok(value as $ty)
                 }
             }
 

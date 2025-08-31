@@ -3,7 +3,7 @@ use core::mem::size_of;
 
 use crate::buf::{Buf, Load};
 use crate::endian::{ByteOrder, Native};
-use crate::error::{Error, ErrorKind, IntoRepr};
+use crate::error::{CoerceError, CoerceErrorKind, Error, IntoRepr};
 use crate::pointer::{Ref, Size};
 use crate::slice::Slice;
 use crate::{DefaultSize, ZeroCopy};
@@ -67,7 +67,7 @@ where
     }
 
     #[inline]
-    fn try_from_ref<A, B>(slice: Ref<[T], A, B>) -> Result<Self, Error>
+    fn try_from_ref<A, B>(slice: Ref<[T], A, B>) -> Result<Self, CoerceError>
     where
         A: ByteOrder,
         B: Size,
@@ -81,7 +81,7 @@ where
     }
 
     #[inline]
-    fn try_with_metadata(offset: usize, len: usize) -> Result<Self, Error> {
+    fn try_with_metadata(offset: usize, len: usize) -> Result<Self, CoerceError> {
         Packed::try_from_raw_parts(offset, len)
     }
 
@@ -178,22 +178,22 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn try_from_raw_parts(offset: usize, len: usize) -> Result<Self, Error>
+    pub fn try_from_raw_parts(offset: usize, len: usize) -> Result<Self, CoerceError>
     where
         O: TryFrom<usize> + IntoRepr,
         L: TryFrom<usize> + IntoRepr,
     {
         let Some(offset) = O::try_from(offset).ok() else {
-            return Err(Error::new(ErrorKind::InvalidOffsetRange {
-                offset: usize::into_repr(offset),
-                end: O::into_repr(O::MAX),
+            return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
+                offset: offset,
+                end: O::MAX.as_usize::<Native>(),
             }));
         };
 
         let Some(len) = L::try_from(len).ok() else {
-            return Err(Error::new(ErrorKind::InvalidMetadataRange {
-                metadata: usize::into_repr(len),
-                end: L::into_repr(L::MAX),
+            return Err(CoerceError::new(CoerceErrorKind::InvalidMetadataRange {
+                metadata: len,
+                end: L::MAX.as_usize::<Native>(),
             }));
         };
 

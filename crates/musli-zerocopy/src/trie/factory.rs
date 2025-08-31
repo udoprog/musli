@@ -157,8 +157,9 @@ where
         let mut this = &mut self.links;
 
         loop {
-            let search =
-                try_binary_search_by(&this.children, |c| Ok(buf.load(c.string)?.cmp(current)))?;
+            let search = try_binary_search_by(&this.children, |c| {
+                Ok::<_, Error>(buf.load(c.string)?.cmp(current))
+            })?;
 
             match search {
                 BinarySearch::Found(n) => {

@@ -393,13 +393,13 @@ Ref::<Custom>::new(1usize << 32);
 Example panic using a [`Ref<\[T\]>`] with a length larger than `2^32`:
 
 ```rust
-Ref::<[Custom]>::with_metadata(0, 1usize << 32);
+Ref::<[Custom]>::with_metadata(0u32, 1usize << 32);
 ```
 
 Example panic using an [`Ref<str>`] value with a size larger than `2^32`:
 
 ```rust
-Ref::<str>::with_metadata(0, 1usize << 32);
+Ref::<str>::with_metadata(0u32, 1usize << 32);
 ```
 
 If you want to address data larger than this limit, it is recommended that
@@ -415,8 +415,8 @@ The available [`Size`] implementations are:
 ```rust
 // These no longer panic:
 let reference = Ref::<Custom, Native, usize>::new(1usize << 32);
-let slice = Ref::<[Custom], Native, usize>::with_metadata(0, 1usize << 32);
-let unsize = Ref::<str, Native, usize>::with_metadata(0, 1usize << 32);
+let slice = Ref::<[Custom], Native, usize>::with_metadata(0u32, 1usize << 32);
+let unsize = Ref::<str, Native, usize>::with_metadata(0u32, 1usize << 32);
 ```
 
 To initialize an [`OwnedBuf`] with a custom [`Size`], you can use

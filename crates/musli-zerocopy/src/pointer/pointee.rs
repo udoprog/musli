@@ -3,7 +3,7 @@ use core::fmt;
 use core::mem::size_of;
 
 use crate::ByteOrder;
-use crate::error::IntoRepr;
+use crate::error::{CoerceError, IntoRepr};
 use crate::pointer::Size;
 use crate::traits::ZeroCopy;
 
@@ -47,7 +47,7 @@ pub trait Pointee: self::sealed::Sealed {
 
     /// Try to construct packed value from its metadata.
     #[doc(hidden)]
-    fn try_from_metadata<O>(metadata: Self::Metadata) -> Option<Self::Stored<O>>
+    fn try_from_metadata<O>(metadata: Self::Metadata) -> Result<Self::Stored<O>, CoerceError>
     where
         O: Size;
 
@@ -84,11 +84,11 @@ where
         O: Size;
 
     #[inline(always)]
-    fn try_from_metadata<O>((): ()) -> Option<Self::Stored<O>>
+    fn try_from_metadata<O>((): ()) -> Result<Self::Stored<O>, CoerceError>
     where
         O: Size,
     {
-        Some(())
+        Ok(())
     }
 
     #[inline(always)]
@@ -130,7 +130,7 @@ where
         O: Size;
 
     #[inline(always)]
-    fn try_from_metadata<O>(metadata: usize) -> Option<O>
+    fn try_from_metadata<O>(metadata: usize) -> Result<O, CoerceError>
     where
         O: Size,
     {
@@ -175,7 +175,7 @@ impl Pointee for str {
         O: Size;
 
     #[inline(always)]
-    fn try_from_metadata<O>(metadata: usize) -> Option<O>
+    fn try_from_metadata<O>(metadata: usize) -> Result<O, CoerceError>
     where
         O: Size,
     {
