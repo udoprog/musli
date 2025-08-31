@@ -4,7 +4,7 @@ use core::mem::size_of;
 use crate::buf::{Buf, Load};
 use crate::endian::{ByteOrder, Native};
 use crate::error::{CoerceError, Error};
-use crate::pointer::{Ref, Size};
+use crate::pointer::{Pointee, Ref, Size};
 use crate::slice::Slice;
 use crate::{DefaultSize, ZeroCopy};
 
@@ -138,21 +138,13 @@ where
     ///
     /// # Panics
     ///
-    /// This panics in case any components in the path overflow its representation.
+    /// This panics in case any components in the path overflow its
+    /// representation.
     #[inline]
     pub fn from_raw_parts(offset: usize, len: usize) -> Self {
-        let Ok(offset) = O::try_from_usize(offset) else {
-            panic!("Offset {offset:?} not in valid range 0-{}", O::MAX_USIZE);
-        };
-
-        let Ok(len) = L::try_from_usize(len) else {
-            panic!("Length {len:?} not in valid range 0-{}", L::MAX_USIZE);
-        };
-
-        Self {
-            offset: O::swap_bytes::<E>(offset),
-            len: L::swap_bytes::<E>(len),
-            _marker: PhantomData,
+        match Self::try_from_raw_parts(offset, len) {
+            Ok(slice) => slice,
+            Err(error) => panic!("{error}"),
         }
     }
 
@@ -160,7 +152,8 @@ where
     ///
     /// # Errors
     ///
-    /// This errors in case any components in the path overflow its representation.
+    /// This errors in case any components in the path overflow its
+    /// representation.
     ///
     /// # Examples
     ///
@@ -175,12 +168,11 @@ where
     /// ```
     #[inline]
     pub fn try_from_raw_parts(offset: usize, len: usize) -> Result<Self, CoerceError> {
-        let offset = O::try_from(offset)?;
-        let len = L::try_from(len)?;
+        <[T]>::check_layout(offset, len)?;
 
         Ok(Self {
-            offset: O::swap_bytes::<E>(offset),
-            len: L::swap_bytes::<E>(len),
+            offset: O::try_from(offset)?.swap_bytes::<E>(),
+            len: L::try_from(len)?.swap_bytes::<E>(),
             _marker: PhantomData,
         })
     }
@@ -345,10 +337,16 @@ where
 
     #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        buf.load(Ref::<[T], Native, usize>::try_with_metadata(
-            self.offset.swap_bytes::<E>().as_usize(),
-            self.len.swap_bytes::<E>().as_usize(),
-        )?)
+        // SAFETY: We ensure the same invariants as Ref<[T]> through
+        // construction.
+        let r = unsafe {
+            Ref::<[T], Native, usize>::new_unchecked(
+                self.offset.swap_bytes::<E>().as_usize(),
+                self.len.swap_bytes::<E>().as_usize(),
+            )
+        };
+
+        buf.load(r)
     }
 }
 

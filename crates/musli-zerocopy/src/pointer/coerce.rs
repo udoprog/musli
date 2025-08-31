@@ -236,8 +236,7 @@ where
     where
         O: Size,
     {
-        let factor = O::try_from_usize(N).unwrap_or(O::MAX);
-        <[T]>::resize(factor)
+        <[T]>::resize(O::from_usize(N))
     }
 
     #[inline]
@@ -245,8 +244,7 @@ where
     where
         O: Size,
     {
-        let factor = O::try_from_usize(N)?;
-        <[T]>::try_resize(factor)
+        <[T]>::try_resize(O::try_from_usize(N)?)
     }
 }
 

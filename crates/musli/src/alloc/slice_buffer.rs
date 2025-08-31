@@ -45,7 +45,7 @@ pub trait SliceBuffer: self::sealed::Sealed {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
 /// use musli::alloc::Slice;
 ///
 /// let mut bytes = [0u8; 128];
@@ -63,7 +63,7 @@ impl SliceBuffer for [u8] {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
 /// use musli::alloc::Slice;
 ///
 /// let mut bytes = [0u8; 128];
@@ -80,7 +80,7 @@ impl<const N: usize> SliceBuffer for [u8; N] {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
 /// use core::mem::MaybeUninit;
 ///
 /// use musli::alloc::Slice;
@@ -99,7 +99,7 @@ impl SliceBuffer for [MaybeUninit<u8>] {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
 /// use core::mem::MaybeUninit;
 ///
 /// # use musli::alloc::SliceBuffer as _;
@@ -120,7 +120,7 @@ impl<const N: usize> SliceBuffer for [MaybeUninit<u8>; N] {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```
 /// use core::mem::MaybeUninit;
 ///
 /// use musli::alloc::{ArrayBuffer, Slice};
@@ -142,7 +142,7 @@ macro_rules! primitive {
             ///
             /// # Examples
             ///
-            /// ```rust
+            /// ```
             /// use musli::alloc::Slice;
             /// # use musli::alloc::SliceBuffer as _;
             ///
@@ -165,7 +165,7 @@ macro_rules! primitive {
             ///
             /// # Examples
             ///
-            /// ```rust
+            /// ```
             /// use core::mem::MaybeUninit;
             ///
             /// use musli::alloc::Slice;
@@ -190,7 +190,7 @@ macro_rules! primitive {
             ///
             /// # Examples
             ///
-            /// ```rust
+            /// ```
             /// use core::mem::MaybeUninit;
             ///
             /// use musli::alloc::Slice;
@@ -211,7 +211,7 @@ macro_rules! primitive {
             ///
             /// # Examples
             ///
-            /// ```rust
+            /// ```
             /// use musli::alloc::Slice;
             /// # use musli::alloc::SliceBuffer as _;
             ///

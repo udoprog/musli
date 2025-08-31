@@ -90,7 +90,7 @@ where
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use musli::storage::{OPTIONS, Encoding};
     ///
     /// enum Custom {}

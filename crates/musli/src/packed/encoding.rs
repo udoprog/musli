@@ -82,7 +82,7 @@ where
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use musli::packed::{OPTIONS, Encoding};
     ///
     /// enum Custom {}

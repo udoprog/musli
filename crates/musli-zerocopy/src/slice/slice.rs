@@ -30,7 +30,10 @@ mod sealed {
 }
 
 /// A trait implemented by slice-like types.
-pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::Item]> {
+pub trait Slice
+where
+    Self: Copy + ZeroCopy + Load<Target = [Self::Item]> + self::sealed::Sealed,
+{
     /// The item in an unsized slice, or the `T` in `[T]`.
     type Item;
 

@@ -37,13 +37,9 @@ where
     #[doc(hidden)]
     const ZERO: Self;
 
-    /// The max size of a pointer.
-    #[doc(hidden)]
-    const MAX: Self;
-
     /// The max size of a pointer in usize.
     #[doc(hidden)]
-    const MAX_USIZE: usize;
+    const MAX: usize;
 
     #[doc(hidden)]
     const ONE: Self;
@@ -77,6 +73,9 @@ where
     /// Perform checked multiplication over the type.
     fn checked_mul(self, other: Self) -> Option<Self>;
 
+    /// Construct this value from a usize.
+    fn from_usize(value: usize) -> Self;
+
     /// Try to construct this value from usize.
     fn try_from_usize(value: usize) -> Result<Self, CoerceError>;
 
@@ -102,8 +101,7 @@ macro_rules! impl_size {
         /// ```
         impl Size for $ty {
             const ZERO: Self = 0;
-            const MAX: Self = <$ty>::MAX;
-            const MAX_USIZE: usize = <$ty>::MAX as usize;
+            const MAX: usize = <$ty>::MAX as usize;
             const ONE: Self = 1;
             const N2: Self = 2;
             const N4: Self = 4;
@@ -120,7 +118,16 @@ macro_rules! impl_size {
                 self.checked_mul(other)
             }
 
-            #[inline]
+            #[inline(always)]
+            fn from_usize(value: usize) -> Self {
+                debug_assert!(
+                    value <= <$ty>::MAX as usize,
+                    "Value {value} cannot be represented on this platform"
+                );
+                value as $ty
+            }
+
+            #[inline(always)]
             fn try_from_usize(value: usize) -> Result<Self, CoerceError> {
                 if value > <$ty>::MAX as usize {
                     Err(CoerceError::new(CoerceErrorKind::LengthOverflow {
@@ -132,7 +139,7 @@ macro_rules! impl_size {
                 }
             }
 
-            #[inline]
+            #[inline(always)]
             fn as_usize(self) -> usize {
                 debug_assert!(
                     <usize as TryFrom<_>>::try_from(self).is_ok(),
@@ -141,7 +148,7 @@ macro_rules! impl_size {
                 self as usize
             }
 
-            #[inline]
+            #[inline(always)]
             fn is_zero(self) -> bool {
                 self == 0
             }
