@@ -196,20 +196,14 @@ where
     }
 
     fn try_from_parts(offset: O, metadata: T::Stored<O>) -> Result<Self, Error> {
-        let size = <T as Pointee>::pointee_size::<E, O>(metadata);
-        let max_offset = usize::MAX - size;
-
-        if offset.as_usize::<E>() <= max_offset {
+        if <T as Pointee>::pointee_layout::<E, O>(metadata.swap_bytes::<E>()).is_some() {
             Ok(Self {
                 offset,
                 metadata,
                 _marker: PhantomData,
             })
         } else {
-            Err(Error::new(ErrorKind::Overflow {
-                at: offset.as_usize::<E>(),
-                len: <T as Pointee>::pointee_size::<E, O>(metadata),
-            }))
+            Err(Error::new(ErrorKind::InvalidLayout))
         }
     }
 
@@ -223,7 +217,7 @@ where
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
-    /// * The offset plus the size computed from `T` and the metadata overflows `usize::MAX`.
+    /// * The metadata must describe a valid `Layout`.
     ///
     /// To guarantee that this constructor will never panic, [`Ref<T, E,
     /// usize>`] can be used. This also ensures that construction is a no-op.
@@ -278,7 +272,7 @@ where
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
-    /// * The offset plus the size computed from `T` and the metadata overflows `usize::MAX`.
+    /// * The metadata must describe a valid `Layout`.
     ///
     /// To guarantee that this constructor will never error, [`Ref<T, Native,
     /// usize>`] can be used. This also ensures that construction is a no-op.

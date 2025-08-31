@@ -1,3 +1,4 @@
+use core::alloc::Layout;
 use core::fmt;
 use core::mem::{ManuallyDrop, size_of};
 use core::ptr::NonNull;
@@ -128,7 +129,7 @@ where
     }
 
     #[inline]
-    fn pointee_size<E: crate::ByteOrder, O: Size>(metadata: Self::Stored<O>) -> usize {
-        T::pointee_size::<E, O>(metadata)
+    fn pointee_layout<E: crate::ByteOrder, O: Size>(metadata: Self::Stored<O>) -> Option<Layout> {
+        T::pointee_layout::<E, O>(metadata)
     }
 }

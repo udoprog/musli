@@ -1,3 +1,4 @@
+use core::alloc::Layout;
 use core::fmt;
 
 use crate::error::IntoRepr;
@@ -51,7 +52,7 @@ pub trait Pointee: self::sealed::Sealed {
 
     /// Will return `usize::MAX` as an invalid size.
     #[doc(hidden)]
-    fn pointee_size<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> usize;
+    fn pointee_layout<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> Option<Layout>;
 }
 
 impl<T> Pointee for T
@@ -73,8 +74,8 @@ where
     }
 
     #[inline(always)]
-    fn pointee_size<E: ByteOrder, O: Size>((): Self::Stored<O>) -> usize {
-        size_of::<T>()
+    fn pointee_layout<E: ByteOrder, O: Size>((): Self::Stored<O>) -> Option<Layout> {
+        Some(Layout::new::<T>())
     }
 }
 
@@ -97,9 +98,9 @@ where
     }
 
     #[inline(always)]
-    fn pointee_size<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> usize {
+    fn pointee_layout<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> Option<Layout> {
         let len = metadata.as_usize::<E>();
-        size_of::<T>().saturating_mul(len)
+        Layout::array::<T>(len).ok()
     }
 }
 
@@ -119,7 +120,7 @@ impl Pointee for str {
     }
 
     #[inline(always)]
-    fn pointee_size<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> usize {
-        metadata.as_usize::<E>()
+    fn pointee_layout<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> Option<Layout> {
+        Layout::array::<u8>(metadata.as_usize::<E>()).ok()
     }
 }
