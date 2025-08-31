@@ -59,7 +59,7 @@ where
     E: ByteOrder,
     O: Size,
 {
-    const ANY_BITS: bool = O::ANY_BITS && T::Stored::<O>::ANY_BITS;
+    const ANY_BITS: bool = false;
 
     const PADDED: bool = size_of::<Self>() > (size_of::<O>() + size_of::<T::Stored<O>>())
         || O::PADDED
@@ -192,23 +192,34 @@ where
     E: ByteOrder,
     O: Size,
 {
+    #[inline]
     fn from_parts(offset: O, metadata: T::Stored<O>) -> Self {
         match Self::try_from_parts(offset, metadata) {
             Ok(ok) => ok,
-            Err(_) => panic!("Metadata describes an invalid layout"),
+            Err(error) => panic!("{error}"),
         }
     }
 
+    #[inline]
     fn try_from_parts(offset: O, metadata: T::Stored<O>) -> Result<Self, Error> {
-        if <T as Pointee>::pointee_layout::<E, O>(metadata.swap_bytes::<E>()).is_some() {
-            Ok(Self {
-                offset,
-                metadata,
-                _marker: PhantomData,
-            })
-        } else {
-            Err(Error::new(ErrorKind::InvalidLayout))
-        }
+        let Some(layout) = T::pointee_layout::<E, O>(metadata.swap_bytes::<E>()) else {
+            return Err(Error::new(ErrorKind::InvalidLayout));
+        };
+
+        let offset_usize = offset.as_usize::<E>();
+
+        if offset_usize.checked_add(layout.size()).is_none() {
+            return Err(Error::new(ErrorKind::InvalidOffsetRange {
+                offset: usize::into_repr(offset_usize),
+                max: usize::into_repr(usize::MAX - layout.size()),
+            }));
+        };
+
+        Ok(Self {
+            offset,
+            metadata,
+            _marker: PhantomData,
+        })
     }
 
     /// Construct a reference with custom metadata.
