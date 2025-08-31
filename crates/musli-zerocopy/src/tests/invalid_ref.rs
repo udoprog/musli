@@ -2,17 +2,18 @@ use alloc::string::ToString;
 
 use musli_zerocopy_macros::ZeroCopy;
 
-use crate::Ref;
-use crate::endian::{Big, Little, Native};
+use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::mem::MaybeUninit;
+use crate::traits::ZeroCopy;
+use crate::{Buf, Error, Ref};
 
 const MAX: usize = isize::MAX as usize;
 
 macro_rules! each_byte_order {
-    ($macro:path) => {
-        $macro!(Native);
-        $macro!(Little);
-        $macro!(Big);
+    ($macro:path $(, $($tt:tt)*)?) => {
+        $macro!(Native $(, $($tt:tt)*)?);
+        $macro!(Little $(, $($tt:tt)*)?);
+        $macro!(Big $(, $($tt:tt)*)?);
     };
 }
 
@@ -86,4 +87,136 @@ fn test_swap() {
     }
 
     each_byte_order!(test);
+}
+
+#[test]
+fn test_bit_pattern() -> Result<(), Error> {
+    #[derive(Debug, ZeroCopy)]
+    #[repr(C)]
+    #[zero_copy(crate)]
+    struct Empty;
+
+    #[derive(Debug, ZeroCopy)]
+    #[repr(C)]
+    #[zero_copy(crate)]
+    struct SizedValue {
+        a: u64,
+        b: u64,
+    }
+
+    macro_rules! each_size {
+        ($macro:path $(, $($tt:tt)*)?) => {
+            #[cfg(target_pointer_width = "32")]
+            $macro!(u32, swap_u32 $(, $($tt)*)*);
+            #[cfg(target_pointer_width = "64")]
+            $macro!(u64, swap_u64 $(, $($tt)*)*);
+            $macro!(usize, swap_usize $(, $($tt)*)*);
+        };
+    }
+
+    macro_rules! test {
+        ($size:ty, $swap:ident, $order:path) => {{
+            // A raw representation of a Ref used for testing invalid bit patterns.
+            #[derive(ZeroCopy)]
+            #[repr(C)]
+            #[zero_copy(crate)]
+            struct RawRef {
+                offset: $size,
+                metadata: $size,
+            }
+
+            let mut invalid_ref = RawRef {
+                offset: <$size>::MAX,
+                metadata: <$order as ByteOrder>::$swap(<$size>::MAX / 2),
+            };
+
+            let buf = Buf::new(invalid_ref.to_bytes());
+
+            assert!(buf.load(Ref::<Ref<Empty, $order, $size>>::zero()).is_ok());
+            let slice = buf.load(Ref::<Ref<[Empty], $order, $size>>::zero())?;
+
+            assert_eq!(
+                slice.len() as $size,
+                <$size>::MAX / 2,
+                "{}: {}: Slice length should match metadata",
+                stringify!($size),
+                stringify!($order),
+            );
+
+            // Loading a sized value should fail, since it has a layout requirements
+            // which cannot be satisfied by the given offset (`<$size>::MAX`).
+            let e = buf
+                .load(Ref::<Ref<SizedValue, $order, $size>>::zero())
+                .unwrap_err();
+
+            assert_eq!(
+                e.to_string(),
+                "Offset 18446744073709551615 not in valid range 0-18446744073709551599",
+                "{}: {}: Error should match",
+                stringify!($size),
+                stringify!($order),
+            );
+
+            let e = buf
+                .load(Ref::<Ref<[SizedValue], $order, $size>>::zero())
+                .unwrap_err();
+
+            assert_eq!(
+                e.to_string(),
+                "Invalid layout for overflowing size and alignment 8",
+                "{}: {}: Error should match",
+                stringify!($size),
+                stringify!($order),
+            );
+
+            let e = Ref::<SizedValue, $order, $size>::try_with_metadata(invalid_ref.offset, ())
+                .unwrap_err();
+
+            assert_eq!(
+                e.to_string(),
+                "Offset 18446744073709551615 not in valid range 0-18446744073709551599",
+                "{}: {}: Error should match",
+                stringify!($size),
+                stringify!($order),
+            );
+
+            let e = Ref::<[SizedValue], $order, $size>::try_with_metadata(
+                invalid_ref.offset,
+                invalid_ref.metadata as usize,
+            )
+            .unwrap_err();
+
+            assert_eq!(
+                e.to_string(),
+                "Invalid layout for overflowing size and alignment 8",
+                "{}: {}: Error should match",
+                stringify!($size),
+                stringify!($order),
+            );
+
+            let mut valid_ref = RawRef {
+                offset: <$order as ByteOrder>::$swap(
+                    <$size>::MAX - size_of::<SizedValue>() as $size,
+                ),
+                metadata: <$order as ByteOrder>::$swap(<$size>::MAX / 2),
+            };
+
+            let buf = Buf::new(valid_ref.to_bytes());
+
+            // Loading a sized value should fail, since it has a layout requirements
+            // which cannot be satisfied by the given offset (`usize::MAX`).
+            let r = buf.load(Ref::<Ref<SizedValue, $order, $size>>::zero())?;
+
+            assert_eq!(r.offset(), <$size>::MAX as usize - size_of::<SizedValue>());
+        }};
+    }
+
+    macro_rules! inner {
+        ($order:path) => {
+            each_size!(test, $order);
+        };
+    }
+
+    each_byte_order!(inner);
+    Ok(())
 }

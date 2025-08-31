@@ -64,6 +64,7 @@ where
     // validly sized reference.
     const ANY_BITS: bool = false;
 
+    /// The `Ref` type is never padded.
     const PADDED: bool = const {
         debug_assert!(
             size_of::<Self>() == (size_of::<O>() + size_of::<T::Stored<O>>()),
@@ -953,9 +954,10 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Ref<{}, {}> {{ offset: {:?}, metadata: {:?} }}",
+            "Ref<{}, {}, {}> {{ offset: {:?}, metadata: {:?} }}",
             any::type_name::<T>(),
             E::NAME,
+            any::type_name::<O>(),
             self.offset,
             self.metadata,
         )

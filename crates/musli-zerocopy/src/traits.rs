@@ -414,7 +414,10 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 42, ignore: () });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub unsafe trait ZeroCopy: Sized {
+pub unsafe trait ZeroCopy
+where
+    Self: Sized,
+{
     /// Indicates if the type can inhabit all possible bit patterns within its
     /// [`size_of::<Self>()`] bytes.
     const ANY_BITS: bool;
@@ -851,12 +854,12 @@ macro_rules! impl_number {
 
 impl_number!(usize, E::swap_usize);
 impl_number!(isize, E::swap_isize);
-impl_number!(u8, core::convert::identity);
+impl_number!(u8, E::swap_u8);
 impl_number!(u16, E::swap_u16);
 impl_number!(u32, E::swap_u32);
 impl_number!(u64, E::swap_u64);
 impl_number!(u128, E::swap_u128);
-impl_number!(i8, core::convert::identity);
+impl_number!(i8, E::swap_i8);
 impl_number!(i16, E::swap_i16);
 impl_number!(i32, E::swap_i32);
 impl_number!(i64, E::swap_i64);

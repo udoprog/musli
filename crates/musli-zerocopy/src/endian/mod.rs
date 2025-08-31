@@ -327,6 +327,20 @@ where
     #[doc(hidden)]
     fn swap_isize(value: isize) -> isize;
 
+    /// Swap the bytes of a `u8` with the current byte order.
+    #[doc(hidden)]
+    #[inline]
+    fn swap_u8(value: u8) -> u8 {
+        value
+    }
+
+    /// Swap the bytes of a `i8` with the current byte order.
+    #[doc(hidden)]
+    #[inline]
+    fn swap_i8(value: i8) -> i8 {
+        value
+    }
+
     /// Swap the bytes of a `u16` with the current byte order.
     #[doc(hidden)]
     fn swap_u16(value: u16) -> u16;
