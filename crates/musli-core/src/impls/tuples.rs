@@ -1,8 +1,8 @@
 //! Implementations for variously lengthed tuples.
 
+use crate::Allocator;
 use crate::de::{Decode, DecodePacked, Decoder, SequenceDecoder};
 use crate::en::{Encode, EncodePacked, Encoder, SequenceEncoder};
-use crate::Allocator;
 
 macro_rules! count {
     (_) => { 1 };

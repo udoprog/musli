@@ -1,4 +1,4 @@
-use crate::dec2flt::decimal_seq::{parse_decimal_seq, DecimalSeq};
+use crate::dec2flt::decimal_seq::{DecimalSeq, parse_decimal_seq};
 
 #[test]
 fn test_trim() {

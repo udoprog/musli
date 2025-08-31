@@ -14,22 +14,22 @@ pub trait MapDecoder<'de> {
     type Mode: 'static;
     /// The decoder to use for a key.
     type DecodeEntry<'this>: EntryDecoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >
     where
         Self: 'this;
     /// Decoder returned by [`MapDecoder::decode_remaining_entries`].
     type DecodeRemainingEntries<'this>: EntriesDecoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >
     where
         Self: 'this;
 
@@ -49,7 +49,7 @@ pub trait MapDecoder<'de> {
 
     /// Return simplified decoder for remaining entries.
     fn decode_remaining_entries(&mut self)
-        -> Result<Self::DecodeRemainingEntries<'_>, Self::Error>;
+    -> Result<Self::DecodeRemainingEntries<'_>, Self::Error>;
 
     /// Decode the next map entry as a tuple.
     fn entry<K, V>(&mut self) -> Result<Option<(K, V)>, Self::Error>

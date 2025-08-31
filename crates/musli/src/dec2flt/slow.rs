@@ -1,7 +1,7 @@
 //! Slow, fallback algorithm for cases the Eisel-Lemire algorithm cannot round.
 
 use crate::dec2flt::common::BiasedFp;
-use crate::dec2flt::decimal_seq::{parse_decimal_seq, DecimalSeq};
+use crate::dec2flt::decimal_seq::{DecimalSeq, parse_decimal_seq};
 use crate::dec2flt::float::RawFloat;
 
 /// Parse the significant digits and biased, binary exponent of a float.

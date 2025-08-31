@@ -2,6 +2,7 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::mem::take;
 
+use crate::Context;
 use crate::alloc::Vec;
 use crate::de::{
     Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, Skip,
@@ -12,11 +13,10 @@ use crate::options;
 use crate::reader::Limit;
 use crate::storage::de::StorageDecoder;
 use crate::value::{IntoValueDecoder, Value};
-use crate::Context;
 use crate::{Options, Reader};
 
 use super::integer_encoding::{decode_typed_signed, decode_typed_unsigned};
-use super::tag::{Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, U128, U16, U32, U64, U8};
+use super::tag::{F32, F64, I8, I16, I32, I64, I128, Kind, Mark, Tag, U8, U16, U32, U64, U128};
 
 const BUFFER_OPTIONS: Options = options::new().build();
 

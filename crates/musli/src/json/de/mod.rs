@@ -23,13 +23,13 @@ use core::fmt;
 use core::marker::PhantomData;
 use core::str;
 
+use crate::Context;
+use crate::Options;
 use crate::alloc::Vec;
 use crate::de::{Decoder, SequenceDecoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 use crate::hint::{MapHint, SequenceHint};
 use crate::options;
 use crate::value::{IntoValueDecoder, Value};
-use crate::Context;
-use crate::Options;
 
 #[cfg(not(feature = "parse-full"))]
 use super::parser::integer::{
@@ -39,7 +39,7 @@ use super::parser::integer::{
 use super::parser::integer::{
     parse_signed_full as parse_signed, parse_unsigned_full as parse_unsigned,
 };
-use super::parser::{integer, Parser, StringReference, Token};
+use super::parser::{Parser, StringReference, Token, integer};
 
 const BUFFER_OPTIONS: Options = options::new().map_keys_as_numbers().build();
 

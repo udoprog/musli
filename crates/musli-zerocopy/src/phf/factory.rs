@@ -2,12 +2,12 @@
 
 use core::hash::Hash;
 
+use crate::Ref;
+use crate::ZeroCopy;
 use crate::buf::{StoreBuf, Visit};
 use crate::error::Error;
 use crate::phf::hashing::HashKey;
 use crate::phf::{Entry, MapRef, SetRef};
-use crate::Ref;
-use crate::ZeroCopy;
 
 /// Store a map based on a perfect hash function into a buffer.
 ///

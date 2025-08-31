@@ -4,7 +4,7 @@
 mod tests;
 
 #[cfg(feature = "alloc")]
-pub use self::factory::{store, Builder};
+pub use self::factory::{Builder, store};
 #[cfg(feature = "alloc")]
 mod factory;
 
@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 
 use crate::endian::Native;
 use crate::lossy_str::LossyStr;
-use crate::slice::{binary_search_by, BinarySearch, Slice};
+use crate::slice::{BinarySearch, Slice, binary_search_by};
 use crate::stack::ArrayStack;
 use crate::{Buf, ByteOrder, DefaultSize, Error, Ref, Size, ZeroCopy};
 

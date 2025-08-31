@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::path::Path;
 
-use anyhow::{ensure, Context, Result};
+use anyhow::{Context, Result, ensure};
 use clap::Parser;
 
 use crate::bins::BinArgs;

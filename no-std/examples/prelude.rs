@@ -3,11 +3,11 @@
 
 #[cfg(all(windows, target_env = "msvc"))]
 #[link(name = "msvcrt")]
-extern "C" {}
+unsafe extern "C" {}
 
 #[cfg(unix)]
 #[link(name = "c")]
-extern "C" {}
+unsafe extern "C" {}
 
 #[panic_handler]
 #[lang = "panic_impl"]
@@ -16,8 +16,8 @@ fn rust_begin_panic(_: &core::panic::PanicInfo) -> ! {
 }
 
 #[lang = "eh_personality"]
-extern "C" fn eh_personality() {}
+unsafe extern "C" fn eh_personality() {}
 
 #[cfg(unix)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn _Unwind_Resume() {}

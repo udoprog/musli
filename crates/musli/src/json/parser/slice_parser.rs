@@ -1,8 +1,8 @@
+use crate::Context;
 use crate::alloc::Vec;
 use crate::json::error::ErrorMessage;
 use crate::json::parser::{Parser, StringReference};
 use crate::reader::SliceUnderflow;
-use crate::Context;
 
 use super::string::SliceAccess;
 

@@ -49,23 +49,16 @@ where
     /// The allocator associated with the visitor.
     type Allocator: Allocator;
     /// String decoder to use.
-    type String: UnsizedVisitor<
-        'de,
-        C,
-        str,
-        Ok = Self::Ok,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-    >;
+    type String: UnsizedVisitor<'de, C, str, Ok = Self::Ok, Error = Self::Error, Allocator = Self::Allocator>;
     /// Bytes decoder to use.
     type Bytes: UnsizedVisitor<
-        'de,
-        C,
-        [u8],
-        Ok = Self::Ok,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-    >;
+            'de,
+            C,
+            [u8],
+            Ok = Self::Ok,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+        >;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the `#[musli::trait_defaults]`.

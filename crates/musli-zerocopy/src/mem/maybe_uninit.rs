@@ -1,5 +1,5 @@
 use core::fmt;
-use core::mem::{size_of, ManuallyDrop};
+use core::mem::{ManuallyDrop, size_of};
 use core::ptr::NonNull;
 use core::slice;
 

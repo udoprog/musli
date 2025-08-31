@@ -37,9 +37,9 @@ pub mod serde_json {
 pub mod simd_json {
     use alloc::vec::Vec;
 
-    use serde::de::DeserializeOwned;
     use serde::Serialize;
-    use simd_json::{from_slice, to_writer, Error};
+    use serde::de::DeserializeOwned;
+    use simd_json::{Error, from_slice, to_writer};
 
     pub fn buffer() -> Vec<u8> {
         Vec::with_capacity(4096)
@@ -71,7 +71,7 @@ pub mod simd_json {
 pub mod bincode1 {
     use alloc::vec::Vec;
 
-    use bincode1::{deserialize, serialize_into, Error};
+    use bincode1::{Error, deserialize, serialize_into};
     use serde::{Deserialize, Serialize};
 
     pub fn buffer() -> Vec<u8> {
@@ -103,8 +103,8 @@ pub mod bincode1 {
 pub mod bincode_serde {
     use alloc::vec::Vec;
 
-    use serde::de::DeserializeOwned;
     use serde::Serialize;
+    use serde::de::DeserializeOwned;
 
     use bincode::config::Configuration;
     use bincode::error::{DecodeError, EncodeError};

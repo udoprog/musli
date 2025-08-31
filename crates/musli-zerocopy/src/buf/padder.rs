@@ -33,7 +33,7 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     /// This is only allowed if `T` is `#[repr(transparent)]` over `U`.
     #[inline]
     pub unsafe fn transparent<U>(&mut self) -> &mut Padder<'a, U> {
-        transmute(self)
+        unsafe { transmute(self) }
     }
 
     /// Pad around the given field with zeros.
@@ -56,7 +56,9 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     where
         F: ZeroCopy,
     {
-        self.pad_with::<F>(align_of::<F>());
+        unsafe {
+            self.pad_with::<F>(align_of::<F>());
+        }
     }
 
     /// Pad around the given field with zeros using a custom alignment `align`.
@@ -80,19 +82,21 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     where
         F: ZeroCopy,
     {
-        let count = buf::padding_to(self.offset, align);
-        // zero out padding.
-        self.data.as_ptr().add(self.offset).write_bytes(0, count);
-        self.offset += count;
+        unsafe {
+            let count = buf::padding_to(self.offset, align);
+            // zero out padding.
+            self.data.as_ptr().add(self.offset).write_bytes(0, count);
+            self.offset += count;
 
-        if F::PADDED {
-            let ptr = NonNull::new_unchecked(self.data.as_ptr().add(self.offset));
-            let mut padder = Padder::new(ptr);
-            F::pad(&mut padder);
-            padder.remaining();
+            if F::PADDED {
+                let ptr = NonNull::new_unchecked(self.data.as_ptr().add(self.offset));
+                let mut padder = Padder::new(ptr);
+                F::pad(&mut padder);
+                padder.remaining();
+            }
+
+            self.offset += size_of::<F>();
         }
-
-        self.offset += size_of::<F>();
     }
 
     /// Specific method to both pad for a discriminant and load it
@@ -108,13 +112,15 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     where
         D: ZeroCopy,
     {
-        let count = buf::padding_to(self.offset, align_of::<D>());
-        // zero out padding.
-        self.data.as_ptr().add(self.offset).write_bytes(0, count);
-        let at = self.offset + count;
-        let value = self.data.as_ptr().add(at).cast::<D>().read_unaligned();
-        self.offset = at + size_of::<D>();
-        value
+        unsafe {
+            let count = buf::padding_to(self.offset, align_of::<D>());
+            // zero out padding.
+            self.data.as_ptr().add(self.offset).write_bytes(0, count);
+            let at = self.offset + count;
+            let value = self.data.as_ptr().add(at).cast::<D>().read_unaligned();
+            self.offset = at + size_of::<D>();
+            value
+        }
     }
 
     /// Finish writing the current buffer.
@@ -141,15 +147,19 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     where
         T: Sized,
     {
-        let count = size_of::<T>() - self.offset;
-        self.data.as_ptr().add(self.offset).write_bytes(0, count);
+        unsafe {
+            let count = size_of::<T>() - self.offset;
+            self.data.as_ptr().add(self.offset).write_bytes(0, count);
+        }
     }
 
     /// Finalize remaining padding based on the size of an unsized value.
     #[inline]
     pub(crate) unsafe fn remaining_unsized(self, value: &T) {
-        let count = size_of_val(value) - self.offset;
-        self.data.as_ptr().add(self.offset).write_bytes(0, count);
+        unsafe {
+            let count = size_of_val(value) - self.offset;
+            self.data.as_ptr().add(self.offset).write_bytes(0, count);
+        }
     }
 }
 
@@ -159,7 +169,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use crate::{buf, OwnedBuf, ZeroCopy};
+    use crate::{OwnedBuf, ZeroCopy, buf};
 
     #[test]
     fn ensure_padding() -> Result<()> {

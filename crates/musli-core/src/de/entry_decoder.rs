@@ -14,22 +14,22 @@ pub trait EntryDecoder<'de> {
     type Mode: 'static;
     /// The decoder to use for a tuple field index.
     type DecodeKey<'this>: Decoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >
     where
         Self: 'this;
     /// The decoder to use for a tuple field value.
     type DecodeValue: Decoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >;
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >;
 
     /// Access the context associated with the decoder.
     fn cx(&self) -> Self::Cx;

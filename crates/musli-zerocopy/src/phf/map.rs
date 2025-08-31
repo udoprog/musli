@@ -18,8 +18,8 @@ use core::hash::Hash;
 use crate::buf::{Bindable, Buf, Visit};
 use crate::endian::{ByteOrder, Native};
 use crate::error::Error;
-use crate::phf::hashing::HashKey;
 use crate::phf::Entry;
+use crate::phf::hashing::HashKey;
 use crate::pointer::{DefaultSize, Ref, Size};
 use crate::{Endian, ZeroCopy};
 

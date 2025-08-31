@@ -1,7 +1,7 @@
 use crate::{Decode, Encode};
 
-use super::tag::{Kind, Tag};
 use super::MAX_INLINE_LEN;
+use super::tag::{Kind, Tag};
 
 #[derive(Debug, PartialEq, Encode, Decode)]
 #[musli(crate, name(type = usize))]

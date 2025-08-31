@@ -1,10 +1,10 @@
 use core::fmt;
 use core::marker;
 
-use crate::de::UnsizedVisitor;
-use crate::json::parser::integer::Signed;
-use crate::json::parser::SliceParser;
 use crate::Context;
+use crate::de::UnsizedVisitor;
+use crate::json::parser::SliceParser;
+use crate::json::parser::integer::Signed;
 
 use super::parse_signed;
 

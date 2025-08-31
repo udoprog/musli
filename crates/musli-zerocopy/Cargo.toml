@@ -2,7 +2,7 @@
 name = "musli-zerocopy"
 version = "0.0.145"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
-edition = "2021"
+edition = "2024"
 rust-version = "1.85"
 description = """
 Refreshingly simple zero copy primitives by Müsli.

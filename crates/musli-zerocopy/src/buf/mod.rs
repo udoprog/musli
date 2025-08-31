@@ -237,12 +237,14 @@ pub(crate) unsafe fn store_unaligned<T>(data: NonNull<u8>, value: *const T)
 where
     T: ZeroCopy,
 {
-    data.as_ptr()
-        .copy_from_nonoverlapping(value.cast(), size_of::<T>());
+    unsafe {
+        data.as_ptr()
+            .copy_from_nonoverlapping(value.cast(), size_of::<T>());
 
-    if T::PADDED {
-        let mut padder = Padder::new(data);
-        T::pad(&mut padder);
-        padder.remaining();
+        if T::PADDED {
+            let mut padder = Padder::new(data);
+            T::pad(&mut padder);
+            padder.remaining();
+        }
     }
 }

@@ -9,7 +9,7 @@ use quote::quote;
 use syn::meta::ParseNestedMeta;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parenthesized, Token};
+use syn::{Token, parenthesized};
 
 #[derive(Default)]
 struct Ctxt {

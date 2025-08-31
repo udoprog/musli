@@ -80,7 +80,7 @@ mod tests;
 
 mod default;
 #[doc(inline)]
-pub use self::default::{DefaultAllocator, DEFAULT_ARRAY_BUFFER};
+pub use self::default::{DEFAULT_ARRAY_BUFFER, DefaultAllocator};
 
 #[doc(inline)]
 pub use musli_core::alloc::{

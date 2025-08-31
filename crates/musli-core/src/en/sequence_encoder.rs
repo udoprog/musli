@@ -1,6 +1,6 @@
 use crate::Context;
 
-use super::{utils, Encode, Encoder};
+use super::{Encode, Encoder, utils};
 
 /// Trait governing how to encode a sequence.
 pub trait SequenceEncoder {

@@ -7,8 +7,8 @@ use std::path::Path;
 use anyhow::Result;
 use serde::Deserialize;
 
-use crate::bins::{BinArgs, Bins};
 use crate::SharedArgs;
+use crate::bins::{BinArgs, Bins};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Manifest {
@@ -61,23 +61,25 @@ impl Manifest {
     ) -> impl Iterator<Item = ReportRef<'a>> + 'this {
         let mut it = self.reports.iter();
 
-        iter::from_fn(move || loop {
-            let report = it.next()?;
+        iter::from_fn(move || {
+            loop {
+                let report = it.next()?;
 
-            if report.skip {
-                continue;
-            }
-
-            if let Some(id) = args.report.as_deref() {
-                if id != report.id {
+                if report.skip {
                     continue;
                 }
-            }
 
-            return Some(ReportRef {
-                manifest: self,
-                report,
-            });
+                if let Some(id) = args.report.as_deref()
+                    && id != report.id
+                {
+                    continue;
+                }
+
+                return Some(ReportRef {
+                    manifest: self,
+                    report,
+                });
+            }
         })
     }
 }

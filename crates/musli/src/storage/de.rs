@@ -4,8 +4,8 @@ use core::mem::MaybeUninit;
 
 use crate::alloc::Vec;
 use crate::de::{
-    utils, DecodeSliceBuilder, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
-    SizeHint, TryFastDecode, UnsizedVisitor, VariantDecoder,
+    DecodeSliceBuilder, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
+    SizeHint, TryFastDecode, UnsizedVisitor, VariantDecoder, utils,
 };
 use crate::{Context, Decode, Options, Reader};
 

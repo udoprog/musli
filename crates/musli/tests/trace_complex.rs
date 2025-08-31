@@ -62,7 +62,10 @@ fn trace_complex() {
 
         let Ok(..) = encoding.from_slice_with::<_, To>(&cx, &bytes) else {
             if let Some(error) = cx.errors().next() {
-                assert_eq!(error.to_string(), ".field[hello] = Variant2 { .vector[0] }: Expected string, found <number> (at byte 49)");
+                assert_eq!(
+                    error.to_string(),
+                    ".field[hello] = Variant2 { .vector[0] }: Expected string, found <number> (at byte 49)"
+                );
                 return;
             }
 

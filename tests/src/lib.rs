@@ -33,7 +33,7 @@ macro_rules! options {
         ///
         /// Must only be called ONCE at the start of a program.
         $init_vis unsafe fn $init() {
-            $({
+            $(unsafe {
                 let key = concat!("MUSLI_", stringify!($ident));
 
                 if let Ok(var) = ::std::env::var(key) {
@@ -117,8 +117,10 @@ pub fn parse<T: Parse>(input: &str) -> Option<T> {
 ///
 /// Must only be called ONCE at the start of a program.
 pub unsafe fn init_statics() {
-    self::models::init_ranges();
-    self::generate::init_ranges();
+    unsafe {
+        self::models::init_ranges();
+        self::generate::init_ranges();
+    }
 }
 
 /// Enumerate all available statics.

@@ -21,11 +21,7 @@ impl<T> Alloc<T> for EmptyBuf<T> {
 
     #[inline]
     fn capacity(&self) -> usize {
-        if size_of::<T>() == 0 {
-            usize::MAX
-        } else {
-            0
-        }
+        if size_of::<T>() == 0 { usize::MAX } else { 0 }
     }
 
     #[inline]

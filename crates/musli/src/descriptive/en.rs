@@ -12,7 +12,7 @@ use crate::{Context, Options, Writer};
 
 use super::integer_encoding::{encode_typed_signed, encode_typed_unsigned};
 use super::tag::{
-    Kind, Mark, Tag, F32, F64, I128, I16, I32, I64, I8, ISIZE, U128, U16, U32, U64, U8, USIZE,
+    F32, F64, I8, I16, I32, I64, I128, ISIZE, Kind, Mark, Tag, U8, U16, U32, U64, U128, USIZE,
 };
 
 const VARIANT: Tag = Tag::from_mark(Mark::Variant);

@@ -14,22 +14,22 @@ pub trait VariantDecoder<'de> {
     type Mode: 'static;
     /// The decoder to use for the variant tag.
     type DecodeTag<'this>: Decoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >
     where
         Self: 'this;
     /// The decoder to use for the variant value.
     type DecodeValue<'this>: Decoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >
     where
         Self: 'this;
 

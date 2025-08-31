@@ -1,5 +1,5 @@
 use super::imp::{
-    BitMaskWord, NonZeroBitMaskWord, BITMASK_ITER_MASK, BITMASK_MASK, BITMASK_STRIDE,
+    BITMASK_ITER_MASK, BITMASK_MASK, BITMASK_STRIDE, BitMaskWord, NonZeroBitMaskWord,
 };
 
 /// A bit mask which contains the result of a `Match` operation on a `Group` and

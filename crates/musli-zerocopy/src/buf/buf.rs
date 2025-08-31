@@ -1,8 +1,8 @@
 use core::alloc::Layout;
 use core::fmt;
-use core::mem::{align_of, size_of, MaybeUninit};
+use core::mem::{MaybeUninit, align_of, size_of};
 use core::ops::{Index, IndexMut, Range};
-use core::ptr::{read_unaligned, NonNull};
+use core::ptr::{NonNull, read_unaligned};
 use core::slice::SliceIndex;
 
 #[cfg(feature = "alloc")]
@@ -550,7 +550,7 @@ impl Buf {
     /// contains a valid bit pattern for the destination type.
     #[inline]
     pub unsafe fn cast<T>(&self) -> &T {
-        &*self.data.as_ptr().cast()
+        unsafe { &*self.data.as_ptr().cast() }
     }
 
     /// Cast the current buffer into the given mutable type.
@@ -565,7 +565,7 @@ impl Buf {
     /// contains a valid bit pattern for the destination type.
     #[inline]
     pub unsafe fn cast_mut<T>(&mut self) -> &mut T {
-        &mut *self.data.as_mut_ptr().cast()
+        unsafe { &mut *self.data.as_mut_ptr().cast() }
     }
 
     /// Construct a validator over the current buffer.
@@ -620,7 +620,7 @@ impl Buf {
             }));
         };
 
-        let ptr = NonNull::new_unchecked(self.data.as_ptr().add(start) as *mut _);
+        let ptr = unsafe { NonNull::new_unchecked(self.data.as_ptr().add(start) as *mut _) };
         let remaining = self.data.len() - start;
 
         if !buf::is_aligned_with(ptr.as_ptr(), align) {
@@ -645,7 +645,7 @@ impl Buf {
             }));
         };
 
-        let ptr = NonNull::new_unchecked(self.data.as_mut_ptr().add(start));
+        let ptr = unsafe { NonNull::new_unchecked(self.data.as_mut_ptr().add(start)) };
         let remaining = self.data.len() - start;
 
         if !buf::is_aligned_with(ptr.as_ptr(), align) {

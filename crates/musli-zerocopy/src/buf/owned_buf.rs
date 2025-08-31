@@ -1,7 +1,7 @@
 use core::alloc::Layout;
 use core::borrow::Borrow;
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of, size_of_val, ManuallyDrop};
+use core::mem::{ManuallyDrop, align_of, size_of, size_of_val};
 use core::ops::Deref;
 use core::ptr::NonNull;
 use core::slice::{self, SliceIndex};
@@ -242,7 +242,7 @@ where
         if capacity == 0 {
             return Self {
                 // SAFETY: Alignment is asserted through `T`.
-                data: dangling(align),
+                data: unsafe { dangling(align) },
                 len: 0,
                 capacity: 0,
                 requested: align,
@@ -468,7 +468,7 @@ where
     /// See [`Buf::new_mut`] for more information.
     #[inline]
     pub unsafe fn as_mut_buf(&mut self) -> &mut Buf {
-        Buf::new_mut(self.as_mut_slice())
+        unsafe { Buf::new_mut(self.as_mut_slice()) }
     }
 
     /// Store an uninitialized value.
@@ -736,9 +736,13 @@ where
         T: ZeroCopy,
     {
         let offset = self.len;
-        let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
-        buf::store_unaligned(ptr, value);
-        self.len += size_of::<T>();
+
+        unsafe {
+            let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
+            buf::store_unaligned(ptr, value);
+            self.len += size_of::<T>();
+        }
+
         Ref::new(offset)
     }
 
@@ -903,9 +907,11 @@ where
     where
         T: ZeroCopy,
     {
-        let dst = self.as_mut_ptr().add(self.len);
-        dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
-        self.len += size_of_val(values);
+        unsafe {
+            let dst = self.as_mut_ptr().add(self.len);
+            dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
+            self.len += size_of_val(values);
+        }
     }
 
     /// Align a buffer in place if necessary.
@@ -1292,7 +1298,7 @@ where
 }
 
 const unsafe fn dangling(align: usize) -> NonNull<u8> {
-    NonNull::new_unchecked(invalid_mut(align))
+    unsafe { NonNull::new_unchecked(invalid_mut(align)) }
 }
 
 // Replace with `core::ptr::invalid_mut` once stable.
@@ -1390,7 +1396,7 @@ where
     where
         I: SliceIndex<[u8]>,
     {
-        OwnedBuf::as_mut_buf(self).get_mut(index)
+        unsafe { OwnedBuf::as_mut_buf(self).get_mut(index) }
     }
 
     #[inline]
@@ -1400,7 +1406,7 @@ where
 
     #[inline]
     unsafe fn as_mut_buf(&mut self) -> &mut Buf {
-        OwnedBuf::as_mut_buf(self)
+        unsafe { OwnedBuf::as_mut_buf(self) }
     }
 }
 

@@ -935,6 +935,8 @@ pub mod __private {
     where
         D: fmt::Display,
     {
-        core::unreachable!("Unknown discriminant `{discriminant}`, this is a bug since it should be present in the type being padded.")
+        core::unreachable!(
+            "Unknown discriminant `{discriminant}`, this is a bug since it should be present in the type being padded."
+        )
     }
 }

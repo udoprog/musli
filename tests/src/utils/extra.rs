@@ -46,7 +46,7 @@ pub mod serde_dlhn {
 #[crate::benchmarker]
 pub mod rkyv {
     use rkyv::api::high::{
-        to_bytes_in_with_alloc, HighDeserializer, HighSerializer, HighValidator,
+        HighDeserializer, HighSerializer, HighValidator, to_bytes_in_with_alloc,
     };
     use rkyv::bytecheck::CheckBytes;
     use rkyv::rancor::Failure;
@@ -175,7 +175,7 @@ pub mod zerocopy {
 #[crate::benchmarker]
 pub mod miniserde {
     use alloc::vec::Vec;
-    use miniserde::{json, Deserialize, Serialize};
+    use miniserde::{Deserialize, Serialize, json};
 
     pub fn encode<T>(value: &T) -> Result<Vec<u8>, miniserde::Error>
     where

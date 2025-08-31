@@ -102,11 +102,7 @@ impl Tag {
     pub(crate) const fn data(self) -> Option<u8> {
         let data = self.data_raw();
 
-        if data == DATA_MASK {
-            None
-        } else {
-            Some(data)
-        }
+        if data == DATA_MASK { None } else { Some(data) }
     }
 
     /// Attempt to construct a type tag with the given length embedded.

@@ -220,12 +220,14 @@ where
 
     #[inline]
     unsafe fn pad(padder: &mut Padder<'_, Self>) {
-        padder.pad::<T>();
+        unsafe {
+            padder.pad::<T>();
+        }
     }
 
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
-        validator.validate::<T>()
+        unsafe { validator.validate::<T>() }
     }
 
     #[inline]
@@ -586,7 +588,7 @@ pub unsafe trait ZeroCopy: Sized {
     /// See [`Buf::new_mut`] for more information.
     #[inline]
     unsafe fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Self, Error> {
-        Buf::new_mut(bytes).load_at_mut::<Self>(0)
+        unsafe { Buf::new_mut(bytes).load_at_mut::<Self>(0) }
     }
 
     /// Swap the bytes of `self` using the specified byte ordering to match the
@@ -679,21 +681,25 @@ unsafe impl UnsizedZeroCopy for str {
             }));
         };
 
-        let buf = slice::from_raw_parts(data.as_ptr(), metadata);
+        let buf = unsafe { slice::from_raw_parts(data.as_ptr(), metadata) };
         str::from_utf8(buf).map_err(|error| Error::new(ErrorKind::Utf8Error { error }))?;
         Ok(metadata)
     }
 
     #[inline]
     unsafe fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self {
-        let slice = slice::from_raw_parts(data.as_ptr(), metadata);
-        str::from_utf8_unchecked(slice)
+        unsafe {
+            let slice = slice::from_raw_parts(data.as_ptr(), metadata);
+            str::from_utf8_unchecked(slice)
+        }
     }
 
     #[inline]
     unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self {
-        let slice = slice::from_raw_parts_mut(data.as_ptr(), metadata);
-        str::from_utf8_unchecked_mut(slice)
+        unsafe {
+            let slice = slice::from_raw_parts_mut(data.as_ptr(), metadata);
+            str::from_utf8_unchecked_mut(slice)
+        }
     }
 }
 
@@ -712,7 +718,9 @@ where
     #[inline]
     unsafe fn pad(&self, padder: &mut Padder<'_, Self>) {
         for _ in 0..self.len() {
-            padder.pad::<T>();
+            unsafe {
+                padder.pad::<T>();
+            }
         }
     }
 
@@ -748,10 +756,12 @@ where
         };
 
         if !T::ANY_BITS {
-            let mut validator = Validator::<[T]>::new(data);
+            unsafe {
+                let mut validator = Validator::<[T]>::new(data);
 
-            for _ in 0..metadata {
-                validator.validate_only::<T>()?;
+                for _ in 0..metadata {
+                    validator.validate_only::<T>()?;
+                }
             }
         }
 
@@ -760,12 +770,12 @@ where
 
     #[inline]
     unsafe fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self {
-        slice::from_raw_parts(data.cast().as_ptr(), metadata)
+        unsafe { slice::from_raw_parts(data.cast().as_ptr(), metadata) }
     }
 
     #[inline]
     unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self {
-        slice::from_raw_parts_mut(data.cast().as_ptr(), metadata)
+        unsafe { slice::from_raw_parts_mut(data.cast().as_ptr(), metadata) }
     }
 }
 
@@ -904,7 +914,7 @@ unsafe impl ZeroCopy for char {
 
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
-        let repr = validator.load_unaligned::<u32>()?;
+        let repr = unsafe { validator.load_unaligned::<u32>()? };
 
         if char::try_from(repr).is_err() {
             return Err(Error::new(ErrorKind::IllegalChar { repr }));
@@ -944,7 +954,9 @@ unsafe impl ZeroCopy for bool {
 
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
-        match validator.byte() {
+        let b = unsafe { validator.byte() };
+
+        match b {
             0 | 1 => (),
             repr => return Err(Error::new(ErrorKind::IllegalBool { repr })),
         }
@@ -1014,8 +1026,10 @@ macro_rules! impl_nonzero_number {
 
             #[inline]
             unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
+                let value = unsafe { validator.load_unaligned::<$inner>()? };
+
                 // NB: A zeroed bit-pattern is byte-order independent.
-                if validator.load_unaligned::<$inner>()? == 0 {
+                if value == 0 {
                     return Err(Error::new(ErrorKind::NonZeroZeroed {
                         range: validator.range::<::core::num::$ty>(),
                     }));
@@ -1237,14 +1251,18 @@ where
     #[inline]
     unsafe fn pad(padder: &mut Padder<'_, Self>) {
         for _ in 0..N {
-            padder.pad::<T>();
+            unsafe {
+                padder.pad::<T>();
+            }
         }
     }
 
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
         for _ in 0..N {
-            validator.validate_only::<T>()?;
+            unsafe {
+                validator.validate_only::<T>()?;
+            }
         }
 
         Ok(())

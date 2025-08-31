@@ -1,8 +1,8 @@
 use core::marker::PhantomData;
 
+use crate::Context;
 use crate::de::VariantDecoder;
 use crate::json::parser::{Parser, Token};
-use crate::Context;
 
 use super::{JsonDecoder, JsonKeyDecoder};
 

@@ -1,6 +1,6 @@
+use crate::Context;
 use crate::json::error::IntegerError;
 use crate::json::parser::Parser;
-use crate::Context;
 
 use self::traits::FromUnsigned;
 pub(crate) use self::traits::{Float, Signed, Unsigned};
@@ -87,11 +87,7 @@ where
         } = self;
         let value = parts.compute_float::<F>();
 
-        if is_negative {
-            value.negate()
-        } else {
-            value
-        }
+        if is_negative { value.negate() } else { value }
     }
 }
 
@@ -741,7 +737,9 @@ mod traits {
     unsigned!(
         u32,
         i32,
-        [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,]
+        [
+            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
+        ]
     );
 
     unsigned!(
@@ -814,7 +812,9 @@ mod traits {
     unsigned!(
         usize,
         isize,
-        [1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,]
+        [
+            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000,
+        ]
     );
 
     #[cfg(target_pointer_width = "64")]

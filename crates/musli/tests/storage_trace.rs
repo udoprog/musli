@@ -53,7 +53,10 @@ fn storage_trace() {
 
         let Ok(..) = encoding.from_slice_with::<_, To>(&cx, &bytes) else {
             if let Some(error) = cx.errors().next() {
-                assert_eq!(error.to_string(), ".field = Variant2 { .vector[0] }: Tried to read 42 bytes from slice, with 0 byte remaining (at byte 11)");
+                assert_eq!(
+                    error.to_string(),
+                    ".field = Variant2 { .vector[0] }: Tried to read 42 bytes from slice, with 0 byte remaining (at byte 11)"
+                );
                 return;
             }
 

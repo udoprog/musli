@@ -22,8 +22,8 @@ use crate::endian::{ByteOrder, Native};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{DefaultSize, Ref, Size};
 use crate::sip::SipHasher13;
-use crate::swiss::raw::{h2, probe_seq, Group};
 use crate::swiss::Entry;
+use crate::swiss::raw::{Group, h2, probe_seq};
 use crate::{Endian, ZeroCopy};
 
 /// A map bound to a [`Buf`] through [`Buf::bind`] for convenience.
