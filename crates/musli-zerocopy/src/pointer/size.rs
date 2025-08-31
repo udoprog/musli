@@ -1,7 +1,7 @@
 use core::fmt;
 
 use crate::endian::ByteOrder;
-use crate::error::{CoerceError, CoerceErrorKind, IntoRepr};
+use crate::error::{CoerceError, CoerceErrorKind};
 use crate::traits::ZeroCopy;
 
 /// The default [`Size`] to use.
@@ -39,7 +39,6 @@ pub trait Size:
     + fmt::Display
     + fmt::Debug
     + ZeroCopy
-    + IntoRepr
     + self::sealed::Sealed
 {
     /// The default zero pointer.

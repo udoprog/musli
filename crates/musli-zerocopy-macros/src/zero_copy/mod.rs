@@ -558,7 +558,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                 // validating over fields within the size of this type.
                 match *#validator::field::<#ty>(validator)? {
                     #(#validate_variants,)*
-                    value => return #result::Err(#error::__illegal_enum_discriminant::<Self>(value)),
+                    value => return #result::Err(#error::__invalid_enum_discriminant::<Self>(value)),
                 }
             };
 

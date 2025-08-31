@@ -250,7 +250,7 @@ fn enum_boundaries() -> Result<()> {
             assert_eq!(buf.load(after_min)?, &$name::AfterMin);
             assert_eq!(
                 buf.load(v4),
-                Err(Error::__illegal_enum_discriminant::<$name>(<$num>::MAX - 1))
+                Err(Error::__invalid_enum_discriminant::<$name>(<$num>::MAX - 1))
             );
         }};
     }
@@ -320,7 +320,7 @@ fn test_signed_wraparound() -> Result<()> {
             assert_eq!(buf.load(one)?, &$name::One);
             assert_eq!(
                 buf.load(v4),
-                Err(Error::__illegal_enum_discriminant::<$name>(<$num>::MAX))
+                Err(Error::__invalid_enum_discriminant::<$name>(<$num>::MAX))
             );
         }};
     }
@@ -365,7 +365,7 @@ fn test_neg0() -> Result<()> {
             assert_eq!(buf.load(one)?, &$name::One);
             assert_eq!(
                 buf.load(v4),
-                Err(Error::__illegal_enum_discriminant::<$name>(<$num>::MAX))
+                Err(Error::__invalid_enum_discriminant::<$name>(<$num>::MAX))
             );
         }};
     }

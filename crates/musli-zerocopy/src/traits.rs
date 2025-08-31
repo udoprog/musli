@@ -919,7 +919,7 @@ unsafe impl ZeroCopy for char {
         let repr = unsafe { validator.load_unaligned::<u32>()? };
 
         if char::try_from(repr).is_err() {
-            return Err(Error::new(ErrorKind::IllegalChar { repr }));
+            return Err(Error::new(ErrorKind::InvalidCharRepr { repr }));
         }
 
         Ok(())
@@ -960,7 +960,7 @@ unsafe impl ZeroCopy for bool {
 
         match b {
             0 | 1 => (),
-            repr => return Err(Error::new(ErrorKind::IllegalBool { repr })),
+            repr => return Err(Error::new(ErrorKind::InvalidBoolRepr { repr })),
         }
 
         Ok(())
