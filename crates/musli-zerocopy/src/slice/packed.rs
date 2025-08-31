@@ -186,14 +186,14 @@ where
         let Some(offset) = O::try_from(offset).ok() else {
             return Err(Error::new(ErrorKind::InvalidOffsetRange {
                 offset: usize::into_repr(offset),
-                max: O::into_repr(O::MAX),
+                end: O::into_repr(O::MAX),
             }));
         };
 
         let Some(len) = L::try_from(len).ok() else {
             return Err(Error::new(ErrorKind::InvalidMetadataRange {
                 metadata: usize::into_repr(len),
-                max: L::into_repr(L::MAX),
+                end: L::into_repr(L::MAX),
             }));
         };
 

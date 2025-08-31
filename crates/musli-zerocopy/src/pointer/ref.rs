@@ -207,7 +207,10 @@ where
     #[inline]
     fn try_from_parts(offset: O, metadata: T::Stored<O>) -> Result<Self, Error> {
         let Ok(layout) = T::pointee_layout::<E, O>(metadata) else {
-            return Err(Error::new(ErrorKind::InvalidLayout));
+            return Err(Error::new(ErrorKind::InvalidLayout {
+                size: T::size::<E, O>(metadata),
+                align: T::align::<E, O>(metadata),
+            }));
         };
 
         let offset_usize = offset.as_usize::<E>();
@@ -215,7 +218,7 @@ where
         if offset_usize.checked_add(layout.size()).is_none() {
             return Err(Error::new(ErrorKind::InvalidOffsetRange {
                 offset: usize::into_repr(offset_usize),
-                max: usize::into_repr(usize::MAX - layout.size()),
+                end: usize::into_repr(usize::MAX - layout.size()),
             }));
         };
 
@@ -354,14 +357,14 @@ where
         let Some(offset) = O::try_from(offset).ok() else {
             return Err(Error::new(ErrorKind::InvalidOffsetRange {
                 offset: U::into_repr(offset),
-                max: O::into_repr(O::MAX),
+                end: O::into_repr(O::MAX),
             }));
         };
 
         let Some(metadata) = T::try_from_metadata(metadata) else {
             return Err(Error::new(ErrorKind::InvalidMetadataRange {
                 metadata: T::Metadata::into_repr(metadata),
-                max: O::into_repr(O::MAX),
+                end: O::into_repr(O::MAX),
             }));
         };
 

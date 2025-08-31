@@ -1,5 +1,6 @@
 use core::alloc::{Layout, LayoutError};
 use core::fmt;
+use core::mem::size_of;
 
 use crate::ByteOrder;
 use crate::error::IntoRepr;
@@ -50,6 +51,20 @@ pub trait Pointee: self::sealed::Sealed {
     where
         O: Size;
 
+    /// The size of `T` with the given stored metadata.
+    #[doc(hidden)]
+    fn size<E, O>(metadata: Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size;
+
+    /// The alignment of `T` with the given stored metadata.
+    #[doc(hidden)]
+    fn align<E, O>(metadata: Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size;
+
     /// The layout of `T` with the given stored metadata.
     #[doc(hidden)]
     fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
@@ -74,6 +89,24 @@ where
         O: Size,
     {
         Some(())
+    }
+
+    #[inline(always)]
+    fn size<E, O>((): Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        size_of::<T>()
+    }
+
+    #[inline(always)]
+    fn align<E, O>((): Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        align_of::<T>()
     }
 
     #[inline(always)]
@@ -105,6 +138,25 @@ where
     }
 
     #[inline(always)]
+    fn size<E, O>(metadata: Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        let len = metadata.as_usize::<E>();
+        size_of::<T>().wrapping_mul(len)
+    }
+
+    #[inline(always)]
+    fn align<E, O>(_: Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        align_of::<T>()
+    }
+
+    #[inline(always)]
     fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
     where
         E: ByteOrder,
@@ -128,6 +180,24 @@ impl Pointee for str {
         O: Size,
     {
         O::try_from_usize(metadata)
+    }
+
+    #[inline(always)]
+    fn size<E, O>(metadata: Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        metadata.as_usize::<E>()
+    }
+
+    #[inline(always)]
+    fn align<E, O>(_: Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        align_of::<u8>()
     }
 
     #[inline(always)]
