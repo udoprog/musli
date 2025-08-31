@@ -24,7 +24,7 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 /// use musli_zerocopy::{Buf, Ref};
 ///
 /// let buf = Buf::new(b"Hello World!");
-/// let unsize: Ref<str> = Ref::with_metadata(0, 12);
+/// let unsize: Ref<str> = Ref::with_metadata(0u32, 12);
 ///
 /// assert_eq!(buf.load(unsize)?, "Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
@@ -43,7 +43,7 @@ impl Buf {
     /// use musli_zerocopy::{Buf, Ref};
     ///
     /// let buf = Buf::new(b"Hello World!");
-    /// let unsize: Ref<str> = Ref::with_metadata(0, 12);
+    /// let unsize: Ref<str> = Ref::with_metadata(0u32, 12);
     ///
     /// assert_eq!(buf.load(unsize)?, "Hello World!");
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -65,7 +65,7 @@ impl Buf {
     ///
     /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
     /// let buf = unsafe { Buf::new_mut(&mut bytes[..]) };
-    /// let unsize = Ref::<str>::with_metadata(0, 12);
+    /// let unsize = Ref::<str>::with_metadata(0u32, 12);
     ///
     /// buf.load_mut(unsize)?.make_ascii_uppercase();
     /// assert_eq!(buf.load(unsize)?, "HELLO WORLD!");
@@ -828,8 +828,8 @@ impl Buf {
     /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
     /// let mut buf = unsafe { Buf::new_mut(&mut buf) };
     ///
-    /// let mut a = Ref::<u32>::new(0);
-    /// let mut b = Ref::<u32>::new(4);
+    /// let mut a = Ref::<u32>::new(0u32);
+    /// let mut b = Ref::<u32>::new(4u32);
     ///
     /// assert!(buf.swap(a, b).is_err());
     /// ```

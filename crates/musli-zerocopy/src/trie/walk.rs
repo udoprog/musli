@@ -1,7 +1,7 @@
 use core::slice;
 
 use crate::endian::Native;
-use crate::error::ErrorKind;
+use crate::error::{CoerceError, CoerceErrorKind, ErrorKind};
 use crate::slice::{BinarySearch, Slice, binary_search_by};
 use crate::stack::Stack;
 use crate::{Buf, Error, Ref, ZeroCopy};
@@ -172,7 +172,7 @@ where
 /// We use the fact that during construction the trie must have been provided a
 /// complete string reference, so any substring that we constructed must be
 /// prefixed with its complete counterpart.
-fn prefix_string<S>(string: S, prefix_len: usize) -> Result<Ref<[u8], Native, usize>, Error>
+fn prefix_string<S>(string: S, prefix_len: usize) -> Result<Ref<[u8], Native, usize>, CoerceError>
 where
     S: Slice<Item = u8>,
 {
@@ -183,14 +183,14 @@ where
     let string_len = string.len();
 
     let Some(real_start) = string_offset.checked_sub(prefix_len) else {
-        return Err(Error::new(ErrorKind::Underflow {
+        return Err(CoerceError::new(CoerceErrorKind::Underflow {
             at: string_offset,
             len: prefix_len,
         }));
     };
 
     let Some(real_end) = string_offset.checked_add(string_len) else {
-        return Err(Error::new(ErrorKind::Overflow {
+        return Err(CoerceError::new(CoerceErrorKind::Overflow {
             at: string_offset,
             len: string_len,
         }));

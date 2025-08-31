@@ -6,6 +6,7 @@ use core::slice;
 
 use crate::ByteOrder;
 use crate::buf;
+use crate::error::CoerceError;
 use crate::pointer::{Pointee, Size};
 use crate::traits::ZeroCopy;
 
@@ -122,7 +123,7 @@ where
         O: Size;
 
     #[inline]
-    fn try_from_metadata<O>(metadata: Self::Metadata) -> Option<Self::Stored<O>>
+    fn try_from_metadata<O>(metadata: Self::Metadata) -> Result<Self::Stored<O>, CoerceError>
     where
         O: Size,
     {

@@ -1,3 +1,4 @@
+use crate::error::CoerceError;
 use crate::pointer::{CoerceSlice, Pointee, Size};
 use crate::traits::ZeroCopy;
 
@@ -12,7 +13,8 @@ pub trait Coerce<U: ?Sized + Pointee>: Pointee {
     /// Try to coerce metadata from `Self` to `U`.
     ///
     /// Any overflow will result in `None`.
-    fn try_coerce_metadata<O: Size>(metadata: Self::Stored<O>) -> Option<U::Stored<O>>;
+    fn try_coerce_metadata<O: Size>(metadata: Self::Stored<O>)
+    -> Result<U::Stored<O>, CoerceError>;
 }
 
 /// Defines a coercion from a slice `[T]` to `[U]`.
@@ -31,7 +33,7 @@ where
     }
 
     #[inline]
-    fn try_coerce_metadata<O: Size>(metadata: O) -> Option<O> {
+    fn try_coerce_metadata<O: Size>(metadata: O) -> Result<O, CoerceError> {
         <[T]>::try_resize(metadata)
     }
 }
@@ -46,7 +48,7 @@ where
 /// ```
 /// use musli_zerocopy::Ref;
 ///
-/// let reference: Ref<str> = Ref::with_metadata(0, 12);
+/// let reference: Ref<str> = Ref::with_metadata(0u32, 12);
 /// let reference2 = reference.coerce::<[u8]>();
 /// let reference3 = reference.coerce::<[i8]>();
 /// assert_eq!(reference2.len(), 12);
@@ -63,7 +65,7 @@ where
     }
 
     #[inline]
-    fn try_coerce_metadata<O: Size>(metadata: O) -> Option<O> {
+    fn try_coerce_metadata<O: Size>(metadata: O) -> Result<O, CoerceError> {
         <[u8]>::try_resize(metadata)
     }
 }
@@ -78,7 +80,7 @@ where
 /// ```
 /// use musli_zerocopy::Ref;
 ///
-/// let reference: Ref<[u32]> = Ref::with_metadata(0, 12);
+/// let reference: Ref<[u32]> = Ref::with_metadata(0u32, 12);
 /// let reference2 = reference.coerce::<str>();
 /// assert_eq!(reference2.len(), 12 * 4);
 /// ```
@@ -93,7 +95,7 @@ where
     }
 
     #[inline]
-    fn try_coerce_metadata<O: Size>(metadata: O) -> Option<O> {
+    fn try_coerce_metadata<O: Size>(metadata: O) -> Result<O, CoerceError> {
         <[T]>::try_resize(metadata)
     }
 }
@@ -119,8 +121,8 @@ macro_rules! same_size_inner {
                 }
 
                 #[inline(always)]
-                fn try_coerce_metadata<O: Size>(metadata: ()) -> Option<()> {
-                    Some(metadata)
+                fn try_coerce_metadata<O: Size>(metadata: ()) -> Result<(), CoerceError> {
+                    Ok(metadata)
                 }
             }
         )*
@@ -187,7 +189,7 @@ where
     }
 
     #[inline]
-    fn try_coerce_metadata<O: Size>((): ()) -> Option<O> {
+    fn try_coerce_metadata<O: Size>((): ()) -> Result<O, CoerceError> {
         <[T]>::try_resize(O::ONE)
     }
 }
@@ -217,13 +219,19 @@ where
     [T]: CoerceSlice<[U]>,
 {
     #[inline]
-    fn coerce_metadata<O: Size>((): ()) -> <[T] as Pointee>::Stored<O> {
+    fn coerce_metadata<O>((): ()) -> <[T] as Pointee>::Stored<O>
+    where
+        O: Size,
+    {
         let factor = O::try_from_usize(N).unwrap_or(O::MAX);
         <[T]>::resize(factor)
     }
 
     #[inline]
-    fn try_coerce_metadata<O: Size>((): ()) -> Option<<[T] as Pointee>::Stored<O>> {
+    fn try_coerce_metadata<O>((): ()) -> Result<<[T] as Pointee>::Stored<O>, CoerceError>
+    where
+        O: Size,
+    {
         let factor = O::try_from_usize(N)?;
         <[T]>::try_resize(factor)
     }
@@ -252,8 +260,8 @@ macro_rules! non_zero_inner {
                 }
 
                 #[inline(always)]
-                fn try_coerce_metadata<O: Size>(metadata: ()) -> Option<()> {
-                    Some(metadata)
+                fn try_coerce_metadata<O: Size>(metadata: ()) -> Result<(), CoerceError> {
+                    Ok(metadata)
                 }
             }
         )*
@@ -305,7 +313,7 @@ where
     }
 
     #[inline(always)]
-    fn try_coerce_metadata<O: Size>(metadata: ()) -> Option<()> {
-        Some(metadata)
+    fn try_coerce_metadata<O: Size>(metadata: ()) -> Result<(), CoerceError> {
+        Ok(metadata)
     }
 }

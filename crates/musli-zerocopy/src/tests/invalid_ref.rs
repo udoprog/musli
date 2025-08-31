@@ -18,19 +18,20 @@ macro_rules! each_byte_order {
 
 #[test]
 fn test_slice_with_metadata() {
-    Ref::<[()], Native, usize>::try_with_metadata(0, usize::MAX).unwrap();
+    Ref::<[()], Native, usize>::try_with_metadata(0u32, usize::MAX).unwrap();
 
     macro_rules! test {
         ($order:path) => {
-            Ref::<[u8], $order, usize>::try_with_metadata(0, MAX).unwrap();
-            let e = Ref::<[u8], $order, usize>::try_with_metadata(0, MAX + 1).unwrap_err();
+            Ref::<[u8], $order, usize>::try_with_metadata(0u32, MAX).unwrap();
+            let e = Ref::<[u8], $order, usize>::try_with_metadata(0u32, MAX + 1).unwrap_err();
             assert_eq!(
                 e.to_string(),
                 "Invalid layout for size 9223372036854775808 and alignment 1"
             );
 
-            Ref::<[u16], $order, usize>::try_with_metadata(0, MAX / 2).unwrap();
-            let e = Ref::<[u16], $order, usize>::try_with_metadata(0, (MAX / 2) + 1).unwrap_err();
+            Ref::<[u16], $order, usize>::try_with_metadata(0u32, MAX / 2).unwrap();
+            let e =
+                Ref::<[u16], $order, usize>::try_with_metadata(0u32, (MAX / 2) + 1).unwrap_err();
             assert_eq!(
                 e.to_string(),
                 "Invalid layout for size 9223372036854775808 and alignment 2"
@@ -52,8 +53,8 @@ fn test_metadata_byte_order() {
 
     macro_rules! test {
         ($order:path) => {
-            Ref::<[BigStruct], $order, usize>::try_with_metadata(0, BIG_MAX_LEN).unwrap();
-            let e = Ref::<[BigStruct], $order, usize>::try_with_metadata(0, BIG_MAX_LEN + 1)
+            Ref::<[BigStruct], $order, usize>::try_with_metadata(0u32, BIG_MAX_LEN).unwrap();
+            let e = Ref::<[BigStruct], $order, usize>::try_with_metadata(0u32, BIG_MAX_LEN + 1)
                 .unwrap_err();
             assert_eq!(
                 e.to_string(),
@@ -72,15 +73,16 @@ fn test_swap() {
             let e = Ref::<u8, $order, usize>::try_with_metadata(usize::MAX, ()).unwrap_err();
             assert_eq!(
                 e.to_string(),
-                "Offset 18446744073709551615 (usize) not in valid range 0-18446744073709551614 (usize)"
+                "Offset 18446744073709551615 not in valid range 0-18446744073709551614"
             );
 
-            let e = Ref::<MaybeUninit<u8>, $order, usize>::try_with_metadata(usize::MAX, ()).unwrap_err();
+            let e = Ref::<MaybeUninit<u8>, $order, usize>::try_with_metadata(usize::MAX, ())
+                .unwrap_err();
             assert_eq!(
                 e.to_string(),
-                "Offset 18446744073709551615 (usize) not in valid range 0-18446744073709551614 (usize)"
+                "Offset 18446744073709551615 not in valid range 0-18446744073709551614"
             );
-        }
+        };
     }
 
     each_byte_order!(test);

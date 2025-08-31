@@ -1,6 +1,6 @@
 use crate::buf::Load;
 use crate::endian::ByteOrder;
-use crate::error::Error;
+use crate::error::CoerceError;
 use crate::pointer::{Ref, Size};
 use crate::traits::ZeroCopy;
 
@@ -81,10 +81,10 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     /// where
     ///     S: Slice<Item: ZeroCopy>
     /// {
-    ///     S::try_from_ref(r)
+    ///     Ok(S::try_from_ref(r)?)
     /// }
     /// ```
-    fn try_from_ref<E, O>(slice: Ref<[Self::Item], E, O>) -> Result<Self, Error>
+    fn try_from_ref<E, O>(slice: Ref<[Self::Item], E, O>) -> Result<Self, CoerceError>
     where
         Self::Item: ZeroCopy,
         E: ByteOrder,
@@ -104,7 +104,7 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     /// use musli_zerocopy::slice::Slice;
     ///
     /// fn generic<S>() -> S where S: Slice {
-    ///     S::with_metadata(0, 10)
+    ///     S::with_metadata(0usize, 10)
     /// }
     /// ```
     fn with_metadata(offset: usize, len: usize) -> Self;
@@ -123,10 +123,10 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     /// use musli_zerocopy::slice::Slice;
     ///
     /// fn generic<S>() -> S where S: Slice {
-    ///     S::with_metadata(0, 10)
+    ///     S::with_metadata(0usize, 10)
     /// }
     /// ```
-    fn try_with_metadata(offset: usize, len: usize) -> Result<Self, Error>;
+    fn try_with_metadata(offset: usize, len: usize) -> Result<Self, CoerceError>;
 
     /// Try to get a reference directly out of the slice without validation.
     ///
@@ -245,7 +245,7 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     ///     assert_eq!(slice.offset(), 42);
     /// }
     ///
-    /// let slice = Ref::<[i32]>::with_metadata(42, 2);
+    /// let slice = Ref::<[i32]>::with_metadata(42u32, 2);
     /// generic(slice);
     /// ```
     fn offset(self) -> usize;
@@ -263,7 +263,7 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     ///     assert_eq!(slice.len(), 2);
     /// }
     ///
-    /// let slice = Ref::<[i32]>::with_metadata(0, 2);
+    /// let slice = Ref::<[i32]>::with_metadata(0u32, 2);
     /// generic(slice);
     /// ```
     fn len(self) -> usize;
@@ -282,8 +282,8 @@ pub trait Slice: self::sealed::Sealed + Copy + ZeroCopy + Load<Target = [Self::I
     ///     assert!(!b.is_empty());
     /// }
     ///
-    /// let a = Ref::<[u32]>::with_metadata(0, 0);
-    /// let b = Ref::<[u32]>::with_metadata(0, 2);
+    /// let a = Ref::<[u32]>::with_metadata(0u32, 0);
+    /// let b = Ref::<[u32]>::with_metadata(0u32, 2);
     /// generic(a, b);
     /// ```
     fn is_empty(self) -> bool;
@@ -307,7 +307,7 @@ where
     }
 
     #[inline]
-    fn try_from_ref<E, O>(slice: Ref<[T], E, O>) -> Result<Self, Error>
+    fn try_from_ref<E, O>(slice: Ref<[T], E, O>) -> Result<Self, CoerceError>
     where
         T: ZeroCopy,
         E: ByteOrder,
@@ -322,7 +322,7 @@ where
     }
 
     #[inline]
-    fn try_with_metadata(offset: usize, len: usize) -> Result<Self, Error> {
+    fn try_with_metadata(offset: usize, len: usize) -> Result<Self, CoerceError> {
         Ref::try_with_metadata(offset, len)
     }
 

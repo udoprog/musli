@@ -1,3 +1,5 @@
+use crate::endian::Native;
+use crate::error::{CoerceError, CoerceErrorKind};
 use crate::pointer::Size;
 
 mod sealed {
@@ -17,7 +19,7 @@ pub trait CoerceSlice<U: ?Sized>: self::sealed::Sealed<U> {
 
     /// Try to resize with the given `factor`.
     #[doc(hidden)]
-    fn try_resize<O: Size>(factor: O) -> Option<O>;
+    fn try_resize<O: Size>(factor: O) -> Result<O, CoerceError>;
 }
 
 macro_rules! self_impl_inner {
@@ -47,8 +49,8 @@ macro_rules! self_impl_inner {
                 }
 
                 #[inline]
-                fn try_resize<O: Size>(len: O) -> Option<O> {
-                    Some(len)
+                fn try_resize<O: Size>(len: O) -> Result<O, CoerceError> {
+                    Ok(len)
                 }
             }
         )*
@@ -81,19 +83,32 @@ macro_rules! coerce_slice_inner {
             #[doc = concat!("let reference2 = reference.coerce::<[", stringify!($to), "]>();")]
             #[doc = concat!("assert_eq!(reference2.len(), ", stringify!($value), ");")]
             ///
-            #[doc = concat!("let reference: Ref<[", stringify!($from), "]> = Ref::with_metadata(0, 5);")]
+            #[doc = concat!("let reference: Ref<[", stringify!($from), "]> = Ref::with_metadata(0u32, 5);")]
             #[doc = concat!("let reference2 = reference.coerce::<[", stringify!($to), "]>();")]
             #[doc = concat!("assert_eq!(reference2.len(), 5 * ", stringify!($value), ");")]
             /// ```
             impl CoerceSlice<[$to]> for [$from] {
                 #[inline]
-                fn resize<O: Size>(len: O) -> O {
+                fn resize<O>(len: O) -> O
+                where
+                    O: Size,
+                {
                     len.wrapping_mul(O::$factor)
                 }
 
                 #[inline]
-                fn try_resize<O: Size>(len: O) -> Option<O> {
-                    len.checked_mul(O::$factor)
+                fn try_resize<O>(len: O) -> Result<O, CoerceError>
+                where
+                    O: Size,
+                {
+                    let Some(len) = len.checked_mul(O::$factor) else {
+                        return Err(CoerceError::new(CoerceErrorKind::SliceLengthOverflow {
+                            item: len.as_usize::<Native>(),
+                            len: O::$factor.as_usize::<Native>(),
+                        }));
+                    };
+
+                    Ok(len)
                 }
             }
         )*

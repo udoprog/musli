@@ -26,7 +26,7 @@ use core::str;
 
 use crate::buf::{Buf, Padder, Validator, Visit};
 use crate::endian::ByteOrder;
-use crate::error::{Error, ErrorKind};
+use crate::error::{CoerceError, CoerceErrorKind, Error, ErrorKind};
 use crate::pointer::{Pointee, Size};
 
 mod sealed {
@@ -742,10 +742,12 @@ where
         let metadata = metadata.as_usize::<E>();
 
         let Some(size) = metadata.checked_mul(size_of::<T>()) else {
-            return Err(Error::new(ErrorKind::LengthOverflow {
-                len: metadata,
-                size: size_of::<T>(),
-            }));
+            return Err(Error::from(CoerceError::new(
+                CoerceErrorKind::LengthOverflow {
+                    len: metadata,
+                    size: size_of::<T>(),
+                },
+            )));
         };
 
         if size > len {
