@@ -843,8 +843,8 @@ impl Buf {
     /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
     /// let mut buf = unsafe { Buf::new_mut(&mut buf) };
     ///
-    /// let mut a = Ref::<u32>::new(2);
-    /// let mut b = Ref::<u32>::new(6);
+    /// let mut a = Ref::<u32>::new(2u32);
+    /// let mut b = Ref::<u32>::new(6u32);
     ///
     /// buf.swap(a, b)?;
     ///
@@ -861,8 +861,8 @@ impl Buf {
     /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
     /// let mut buf = unsafe { Buf::new_mut(&mut buf) };
     ///
-    /// let mut a = Ref::<u32>::new(1);
-    /// let mut b = Ref::<u32>::new(2);
+    /// let mut a = Ref::<u32>::new(1u32);
+    /// let mut b = Ref::<u32>::new(2u32);
     ///
     /// buf.swap(a, b)?;
     ///

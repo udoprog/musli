@@ -3,7 +3,7 @@ use core::mem::size_of;
 
 use crate::buf::{Buf, Load};
 use crate::endian::{ByteOrder, Native};
-use crate::error::{CoerceError, CoerceErrorKind, Error};
+use crate::error::{CoerceError, Error};
 use crate::pointer::{Ref, Size};
 use crate::slice::Slice;
 use crate::{DefaultSize, ZeroCopy};
@@ -140,17 +140,13 @@ where
     ///
     /// This panics in case any components in the path overflow its representation.
     #[inline]
-    pub fn from_raw_parts(offset: usize, len: usize) -> Self
-    where
-        O: TryFrom<usize>,
-        L: TryFrom<usize>,
-    {
-        let Some(offset) = O::try_from(offset).ok() else {
-            panic!("Offset {offset:?} not in valid range 0-{}", O::MAX);
+    pub fn from_raw_parts(offset: usize, len: usize) -> Self {
+        let Ok(offset) = O::try_from_usize(offset) else {
+            panic!("Offset {offset:?} not in valid range 0-{}", O::MAX_USIZE);
         };
 
-        let Some(len) = L::try_from(len).ok() else {
-            panic!("Length {len:?} not in valid range 0-{}", L::MAX);
+        let Ok(len) = L::try_from_usize(len) else {
+            panic!("Length {len:?} not in valid range 0-{}", L::MAX_USIZE);
         };
 
         Self {
@@ -178,24 +174,9 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn try_from_raw_parts(offset: usize, len: usize) -> Result<Self, CoerceError>
-    where
-        O: TryFrom<usize>,
-        L: TryFrom<usize>,
-    {
-        let Some(offset) = O::try_from(offset).ok() else {
-            return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
-                offset: offset,
-                end: O::MAX.as_usize::<Native>(),
-            }));
-        };
-
-        let Some(len) = L::try_from(len).ok() else {
-            return Err(CoerceError::new(CoerceErrorKind::InvalidMetadataRange {
-                metadata: len,
-                end: L::MAX.as_usize::<Native>(),
-            }));
-        };
+    pub fn try_from_raw_parts(offset: usize, len: usize) -> Result<Self, CoerceError> {
+        let offset = O::try_from(offset)?;
+        let len = L::try_from(len)?;
 
         Ok(Self {
             offset: O::swap_bytes::<E>(offset),
@@ -263,8 +244,8 @@ where
     /// ```
     #[inline]
     pub fn split_at(self, at: usize) -> (Self, Self) {
-        let offset = self.offset.as_usize::<E>();
-        let len = self.len.as_usize::<E>();
+        let offset = self.offset.swap_bytes::<E>().as_usize();
+        let len = self.len.swap_bytes::<E>().as_usize();
         assert!(at <= len, "Split point {at} is out of bounds 0..={len}");
         let a = Self::from_raw_parts(offset, at);
         let b = Self::from_raw_parts(offset + at * size_of::<T>(), len - at);
@@ -301,7 +282,7 @@ where
     /// ```
     #[inline]
     pub fn get_unchecked(self, index: usize) -> Ref<T, E, usize> {
-        let offset = self.offset.as_usize::<E>() + size_of::<T>() * index;
+        let offset = self.offset.swap_bytes::<E>().as_usize() + size_of::<T>() * index;
         Ref::new(offset)
     }
 
@@ -316,7 +297,7 @@ where
     /// assert_eq!(slice.offset(), 42);
     /// ```
     pub fn offset(self) -> usize {
-        self.offset.as_usize::<E>()
+        self.offset.swap_bytes::<E>().as_usize()
     }
 
     /// Return the number of elements in the packed slice.
@@ -331,7 +312,7 @@ where
     /// ```
     #[inline]
     pub fn len(self) -> usize {
-        self.len.as_usize::<E>()
+        self.len.swap_bytes::<E>().as_usize()
     }
 
     /// Test if the packed slice is empty.
@@ -365,8 +346,8 @@ where
     #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
         buf.load(Ref::<[T], Native, usize>::try_with_metadata(
-            self.offset.as_usize::<E>(),
-            self.len.as_usize::<E>(),
+            self.offset.swap_bytes::<E>().as_usize(),
+            self.len.swap_bytes::<E>().as_usize(),
         )?)
     }
 }

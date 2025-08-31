@@ -672,7 +672,7 @@ unsafe impl UnsizedZeroCopy for str {
         E: ByteOrder,
         O: Size,
     {
-        let metadata = metadata.as_usize::<E>();
+        let metadata = metadata.swap_bytes::<E>().as_usize();
 
         if metadata > len {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
@@ -739,7 +739,7 @@ where
         E: ByteOrder,
         O: Size,
     {
-        let metadata = metadata.as_usize::<E>();
+        let metadata = metadata.swap_bytes::<E>().as_usize();
 
         let Some(size) = metadata.checked_mul(size_of::<T>()) else {
             return Err(Error::from(CoerceError::new(

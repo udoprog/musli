@@ -1,6 +1,3 @@
-use core::fmt;
-
-use crate::endian::ByteOrder;
 use crate::error::{CoerceError, CoerceErrorKind};
 use crate::traits::ZeroCopy;
 
@@ -31,15 +28,9 @@ mod sealed {
 ///
 /// This trait is sealed and its internals hidden. Publicly it's only used as a
 /// marker trait.
-pub trait Size:
-    'static
-    + Sized
-    + TryFrom<usize>
-    + Copy
-    + fmt::Display
-    + fmt::Debug
-    + ZeroCopy
-    + self::sealed::Sealed
+pub trait Size
+where
+    Self: 'static + Copy + ZeroCopy + self::sealed::Sealed,
 {
     /// The default zero pointer.
     #[doc(hidden)]
@@ -48,6 +39,10 @@ pub trait Size:
     /// The max size of a pointer.
     #[doc(hidden)]
     const MAX: Self;
+
+    /// The max size of a pointer in usize.
+    #[doc(hidden)]
+    const MAX_USIZE: usize;
 
     #[doc(hidden)]
     const ONE: Self;
@@ -64,6 +59,15 @@ pub trait Size:
     #[doc(hidden)]
     const N16: Self;
 
+    /// Try to perform a conversion from one `usize` type to another.
+    #[inline(always)]
+    fn try_from<U>(other: U) -> Result<Self, CoerceError>
+    where
+        U: Size,
+    {
+        Self::try_from_usize(other.as_usize())
+    }
+
     #[doc(hidden)]
     /// Perform wrapping multiplication over the type.
     fn wrapping_mul(self, other: Self) -> Self;
@@ -77,9 +81,7 @@ pub trait Size:
 
     /// Convert the pointer to a usize.
     #[doc(hidden)]
-    fn as_usize<E>(self) -> usize
-    where
-        E: ByteOrder;
+    fn as_usize(self) -> usize;
 
     /// Test if the value is zero.
     #[doc(hidden)]
@@ -87,7 +89,7 @@ pub trait Size:
 }
 
 macro_rules! impl_size {
-    ($ty:ty, $swap:path) => {
+    ($ty:ty) => {
         #[doc = concat!("Size implementation for `", stringify!($ty), "`")]
         ///
         /// # Examples
@@ -95,12 +97,12 @@ macro_rules! impl_size {
         /// ```
         /// use musli_zerocopy::{endian, Size};
         ///
-        #[doc = concat!("let max = ", stringify!($ty), "::MAX.as_usize::<endian::Big>();")]
-        #[doc = concat!("let min = ", stringify!($ty), "::MIN.as_usize::<endian::Little>();")]
+        #[doc = concat!("let max = ", stringify!($ty), "::MAX;")]
         /// ```
         impl Size for $ty {
             const ZERO: Self = 0;
             const MAX: Self = <$ty>::MAX;
+            const MAX_USIZE: usize = <$ty>::MAX as usize;
             const ONE: Self = 1;
             const N2: Self = 2;
             const N4: Self = 4;
@@ -130,15 +132,12 @@ macro_rules! impl_size {
             }
 
             #[inline]
-            fn as_usize<E>(self) -> usize
-            where
-                E: ByteOrder,
-            {
+            fn as_usize(self) -> usize {
                 debug_assert!(
-                    usize::try_from($swap(self)).is_ok(),
+                    <usize as TryFrom<_>>::try_from(self).is_ok(),
                     "Value {self} cannot be represented on this platform"
                 );
-                $swap(self) as usize
+                self as usize
             }
 
             #[inline]
@@ -149,10 +148,10 @@ macro_rules! impl_size {
     };
 }
 
-impl_size!(u8, core::convert::identity);
-impl_size!(u16, E::swap_u16);
+impl_size!(u8);
+impl_size!(u16);
 #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
-impl_size!(u32, E::swap_u32);
+impl_size!(u32);
 #[cfg(target_pointer_width = "64")]
-impl_size!(u64, E::swap_u64);
-impl_size!(usize, E::swap_usize);
+impl_size!(u64);
+impl_size!(usize);
