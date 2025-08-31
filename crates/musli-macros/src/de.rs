@@ -1,7 +1,7 @@
 use proc_macro2::{Ident, Literal, Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
-use syn::punctuated::Punctuated;
+use quote::{ToTokens, quote, quote_spanned};
 use syn::Token;
+use syn::punctuated::Punctuated;
 
 use crate::expander::{Name, NameMethod, StructKind, UnsizedMethod};
 use crate::internals::apply;

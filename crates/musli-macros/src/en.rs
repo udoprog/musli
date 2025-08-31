@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
-use syn::punctuated::Punctuated;
+use quote::{ToTokens, quote};
 use syn::Token;
+use syn::punctuated::Punctuated;
 
 use crate::expander::Name;
 use crate::internals::attr::{EnumTagging, Packing};

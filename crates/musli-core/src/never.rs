@@ -33,7 +33,7 @@ pub enum NeverMarker {}
 /// use std::marker::PhantomData;
 ///
 /// use musli::Context;
-/// use musli::de::{Decoder, Decode};
+/// use musli::de::Decoder;
 ///
 /// struct MyDecoder<C, M> {
 ///     cx: C,
@@ -47,13 +47,6 @@ pub enum NeverMarker {}
 ///     C: Context,
 ///     M: 'static,
 /// {
-///     type Cx = C;
-///
-///     #[inline]
-///     fn cx(&self) -> Self::Cx {
-///         self.cx
-///     }
-///
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")

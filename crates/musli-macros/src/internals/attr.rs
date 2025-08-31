@@ -4,17 +4,17 @@ use std::mem;
 
 use proc_macro2::Span;
 use quote::ToTokens;
+use syn::Token;
 use syn::ext::IdentExt;
 use syn::meta::ParseNestedMeta;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
-use syn::Token;
 
 use crate::expander::{Name, NameMethod};
 
-use super::build;
 use super::ATTR;
+use super::build;
 use super::{Ctxt, ImportedMethod, Mode, NameAll};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

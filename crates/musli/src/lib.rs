@@ -570,7 +570,7 @@ pub use self::en::{Encode, Encoder};
 /// use std::marker::PhantomData;
 ///
 /// use musli::Context;
-/// use musli::de::{Decoder, Decode};
+/// use musli::de::Decoder;
 ///
 /// struct MyDecoder<C, M> {
 ///     cx: C,
@@ -603,10 +603,10 @@ pub use self::en::{Encode, Encoder};
 /// use musli::Context;
 /// use musli::de::Visitor;
 ///
-/// struct AnyVisitor;
+/// struct MyVisitor;
 ///
 /// #[musli::trait_defaults]
-/// impl<'de, C> Visitor<'de, C> for AnyVisitor
+/// impl<'de, C> Visitor<'de, C> for MyVisitor
 /// where
 ///     C: Context,
 /// {
@@ -614,10 +614,7 @@ pub use self::en::{Encode, Encoder};
 ///
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-///         write!(
-///             f,
-///             "a value that can be decoded into dynamic container"
-///         )
+///         write!(f, "a value that can be decoded into dynamic container")
 ///     }
 /// }
 /// ```
@@ -630,10 +627,10 @@ pub use self::en::{Encode, Encoder};
 /// use musli::Context;
 /// use musli::de::UnsizedVisitor;
 ///
-/// struct Visitor;
+/// struct MyVisitor;
 ///
 /// #[musli::trait_defaults]
-/// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
+/// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for MyVisitor
 /// where
 ///     C: Context,
 /// {
@@ -641,10 +638,7 @@ pub use self::en::{Encode, Encoder};
 ///
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-///         write!(
-///             f,
-///             "a reference of bytes"
-///         )
+///         write!(f, "a reference of bytes")
 ///     }
 /// }
 /// ```
@@ -656,7 +650,7 @@ pub use self::en::{Encode, Encoder};
 /// use std::marker::PhantomData;
 ///
 /// use musli::Context;
-/// use musli::en::{Encoder, Encode};
+/// use musli::en::Encoder;
 ///
 /// struct MyEncoder<'a, C, M> {
 ///     value: &'a mut Option<u32>,
@@ -673,14 +667,6 @@ pub use self::en::{Encode, Encoder};
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
-///     }
-///
-///     #[inline]
-///     fn encode<T>(self, value: T) -> Result<(), C::Error>
-///     where
-///         T: Encode<Self::Mode>,
-///     {
-///         value.encode(self)
 ///     }
 ///
 ///     #[inline]

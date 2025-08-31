@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{ToTokens, quote, quote_spanned};
+use syn::Token;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::Token;
 
 use crate::expander::{
     self, Data, EnumData, Expander, FieldData, Name, NameMethod, StructData, StructKind,
@@ -14,7 +14,7 @@ use crate::expander::{
 use super::attr::{DefaultOrCustom, EnumTagging, FieldEncoding, ModeKind, MusliBound, Packing};
 use super::mode::ImportedMethod;
 use super::name::NameAll;
-use super::{Ctxt, Expansion, Mode, Only, Result, Tokens, ATTR};
+use super::{ATTR, Ctxt, Expansion, Mode, Only, Result, Tokens};
 
 pub(crate) struct Parameters {
     pub(crate) lt: syn::Lifetime,

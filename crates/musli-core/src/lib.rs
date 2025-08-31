@@ -69,7 +69,7 @@ pub use musli_macros as __macros;
 /// use std::marker::PhantomData;
 ///
 /// use musli_core::Context;
-/// use musli_core::de::{Decoder, Decode};
+/// use musli_core::de::Decoder;
 ///
 /// struct MyDecoder<C, M> {
 ///     cx: C,
@@ -102,10 +102,10 @@ pub use musli_macros as __macros;
 /// use musli_core::Context;
 /// use musli_core::de::UnsizedVisitor;
 ///
-/// struct Visitor;
+/// struct MyVisitor;
 ///
 /// #[musli_core::trait_defaults]
-/// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for Visitor
+/// impl<'de, C> UnsizedVisitor<'de, C, [u8]> for MyVisitor
 /// where
 ///     C: Context,
 /// {
@@ -113,10 +113,7 @@ pub use musli_macros as __macros;
 ///
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-///         write!(
-///             f,
-///             "a reference of bytes"
-///         )
+///         write!(f, "a reference of bytes")
 ///     }
 /// }
 /// ```
@@ -129,10 +126,10 @@ pub use musli_macros as __macros;
 /// use musli_core::Context;
 /// use musli_core::de::Visitor;
 ///
-/// struct AnyVisitor;
+/// struct MyVisitor;
 ///
 /// #[musli_core::trait_defaults]
-/// impl<'de, C> Visitor<'de, C> for AnyVisitor
+/// impl<'de, C> Visitor<'de, C> for MyVisitor
 /// where
 ///     C: Context,
 /// {
@@ -140,10 +137,7 @@ pub use musli_macros as __macros;
 ///
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-///         write!(
-///             f,
-///             "a value that can be decoded into dynamic container"
-///         )
+///         write!(f, "a value that can be decoded into dynamic container")
 ///     }
 /// }
 /// ```
@@ -155,7 +149,7 @@ pub use musli_macros as __macros;
 /// use std::marker::PhantomData;
 ///
 /// use musli_core::Context;
-/// use musli_core::en::{Encoder, Encode};
+/// use musli_core::en::Encoder;
 ///
 /// struct MyEncoder<'a, C, M> {
 ///     value: &'a mut Option<u32>,
@@ -172,14 +166,6 @@ pub use musli_macros as __macros;
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 ///         write!(f, "32-bit unsigned integers")
-///     }
-///
-///     #[inline]
-///     fn encode<T>(self, value: T) -> Result<(), C::Error>
-///     where
-///         T: Encode<Self::Mode>,
-///     {
-///         value.encode(self)
 ///     }
 ///
 ///     #[inline]
