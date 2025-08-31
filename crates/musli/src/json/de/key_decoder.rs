@@ -1,9 +1,9 @@
 use core::fmt;
 use core::marker::PhantomData;
 
+use crate::Context;
 use crate::alloc::Vec;
 use crate::de::{Decoder, SizeHint, Skip, UnsizedVisitor, Visitor};
-use crate::Context;
 
 use super::super::parser::{Parser, Token};
 use super::{JsonDecoder, KeySignedVisitor, KeyUnsignedVisitor, StringReference};

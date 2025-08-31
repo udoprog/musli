@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use clap::Parser;
 
 use crate::tests::{self};

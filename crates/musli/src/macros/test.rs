@@ -68,6 +68,8 @@ macro_rules! test_fns {
 
             $crate::macros::test_include_if! {
                 $($(#[$option])*)* =>
+                let value_encoding = crate::value::Encoding::new().with_mode::<M>();
+
                 let value_decode: $crate::value::Value<_> = match encoding.from_slice_with(&cx, out.as_slice()) {
                     Ok(decoded) => decoded,
                     Err(..) => {
@@ -77,7 +79,7 @@ macro_rules! test_fns {
                     }
                 };
 
-                let value_decoded: T = match $crate::value::decode_with(&cx, &value_decode) {
+                let value_decoded: T = match value_encoding.decode_with(&cx, &value_decode) {
                     Ok(decoded) => decoded,
                     Err(..) => {
                         let out = FormatBytes(&out);

@@ -1,10 +1,10 @@
 //! A variable-length 7-bit encoder where each bit indicates if there is a
 //! continuation of the sequence or not.
 
+use crate::Context;
 use crate::int;
 use crate::reader::Reader;
 use crate::writer::Writer;
-use crate::Context;
 
 const MASK_BYTE: u8 = 0b0111_1111;
 const CONT_BYTE: u8 = 0b1000_0000;

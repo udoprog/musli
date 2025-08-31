@@ -2,11 +2,11 @@ use core::slice;
 
 use crate::endian::Native;
 use crate::error::ErrorKind;
-use crate::slice::{binary_search_by, BinarySearch, Slice};
+use crate::slice::{BinarySearch, Slice, binary_search_by};
 use crate::stack::Stack;
 use crate::{Buf, Error, Ref, ZeroCopy};
 
-use super::{prefix, Flavor, LinksRef, StackEntry};
+use super::{Flavor, LinksRef, StackEntry, prefix};
 
 pub(super) struct Walk<'a, 'buf, T, F, S>
 where

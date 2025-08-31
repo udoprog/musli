@@ -7,7 +7,7 @@ use std::process::{ExitStatus, Stdio};
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-use crate::{command, ReportRef};
+use crate::{ReportRef, command};
 
 pub(crate) struct CustomBuild<'a> {
     pub(crate) status: ExitStatus,

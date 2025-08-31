@@ -1,8 +1,8 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use musli::de::Decoder;
 use musli::Context;
+use musli::de::Decoder;
 
 pub struct MyDecoder<C, M> {
     cx: C,

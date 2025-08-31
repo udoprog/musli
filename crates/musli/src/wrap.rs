@@ -4,9 +4,9 @@
 //! adapter around an I/O type to work with musli.
 
 #[cfg(feature = "std")]
-use crate::alloc::Vec;
-#[cfg(feature = "std")]
 use crate::Context;
+#[cfg(feature = "std")]
+use crate::alloc::Vec;
 
 /// Wrap a type so that it implements [`Reader`] and [`Writer`].
 ///

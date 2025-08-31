@@ -26,7 +26,7 @@ impl<T> Opt<T> {
     #[inline]
     #[doc(hidden)]
     pub unsafe fn replace(&self, value: T) -> T {
-        self.inner.get().replace(value)
+        unsafe { self.inner.get().replace(value) }
     }
 
     /// Get the value.

@@ -1,8 +1,8 @@
+use crate::Context;
 use crate::alloc::Vec;
 use crate::de::Visitor;
 use crate::json::parser::integer::decode_signed_full;
 use crate::json::parser::{StringReference, Token};
-use crate::Context;
 
 mod private {
     pub trait Sealed {}

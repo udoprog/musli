@@ -2,9 +2,9 @@ use std::hint::black_box;
 
 use criterion::Criterion;
 
+use tests::Generate;
 use tests::models::*;
 use tests::utils;
-use tests::Generate;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut rng = tests::rng();

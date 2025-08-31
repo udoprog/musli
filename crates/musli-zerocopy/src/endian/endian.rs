@@ -2,8 +2,8 @@ use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::{any, fmt};
 
-use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::ZeroCopy;
+use crate::endian::{Big, ByteOrder, Little, Native};
 
 /// Wrapper capable of enforcing a custom [`ByteOrder`].
 ///

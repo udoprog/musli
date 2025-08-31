@@ -4,10 +4,10 @@
 //! * [`Bytes`] corresponds to using `#[musli(bytes)]` on a field.
 //! * [`Packed`] corresponds to using `#[musli(packed)]` on a field.
 
+use crate::Allocator;
 use crate::de::{Decode, DecodeBytes, DecodePacked, Decoder};
 use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder};
 use crate::mode::{Binary, Text};
-use crate::Allocator;
 
 /// Ensures that the given value `T` is encoded as a sequence.
 ///

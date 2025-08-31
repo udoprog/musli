@@ -1,7 +1,7 @@
 use core::fmt;
 
-use crate::hint::MapHint;
 use crate::Context;
+use crate::hint::MapHint;
 
 use super::{Encode, Encoder, EntryEncoder};
 

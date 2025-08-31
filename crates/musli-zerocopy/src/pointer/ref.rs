@@ -4,12 +4,12 @@ use core::hash::Hash;
 use core::marker::PhantomData;
 use core::mem::size_of;
 
+use crate::ZeroCopy;
 use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::error::{Error, ErrorKind, IntoRepr};
 use crate::mem::MaybeUninit;
 use crate::pointer::Coerce;
 use crate::pointer::{DefaultSize, Pointee, Size};
-use crate::ZeroCopy;
 
 /// A stored reference to a type `T`.
 ///

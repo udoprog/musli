@@ -4,8 +4,8 @@ use core::mem::size_of_val;
 use core::slice;
 
 use crate::en::{
-    utils, Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder,
-    TryFastEncode, VariantEncoder,
+    Encode, Encoder, EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, TryFastEncode,
+    VariantEncoder, utils,
 };
 use crate::hint::{MapHint, SequenceHint};
 use crate::{Context, Options, Writer};
@@ -566,7 +566,7 @@ where
     writer.write_bytes(cx, &len)?;
 
     if size_of::<T>() > 0 {
-        let slice = {
+        let slice = unsafe {
             let at = slice.as_ptr().cast::<u8>();
             let size = size_of_val(slice);
             slice::from_raw_parts(at, size)
@@ -602,7 +602,7 @@ where
         for slice in slices {
             let slice = slice.as_ref();
 
-            let slice = {
+            let slice = unsafe {
                 let at = slice.as_ptr().cast::<u8>();
                 let size = size_of_val(slice);
                 slice::from_raw_parts(at, size)
@@ -634,7 +634,7 @@ where
     if size_of::<T>() > 0 {
         let slice = slice.as_ref();
 
-        let slice = {
+        let slice = unsafe {
             let at = slice.as_ptr().cast::<u8>();
             let size = size_of_val(slice);
             slice::from_raw_parts(at, size)
@@ -666,7 +666,7 @@ where
         for slice in slices {
             let slice = slice.as_ref();
 
-            let slice = {
+            let slice = unsafe {
                 let at = slice.as_ptr().cast::<u8>();
                 let size = size_of_val(slice);
                 slice::from_raw_parts(at, size)

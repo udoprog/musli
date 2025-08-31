@@ -1,6 +1,7 @@
 use core::hash::{Hash, Hasher};
 use core::mem::size_of;
 
+use crate::ZeroCopy;
 use crate::buf::{Buf, OwnedBuf, StoreBuf, Visit};
 use crate::endian::ByteOrder;
 use crate::error::Error;
@@ -10,7 +11,6 @@ use crate::swiss::constructor::Constructor;
 use crate::swiss::map::RawTableRef;
 use crate::swiss::raw::{self};
 use crate::swiss::{Entry, MapRef, SetRef};
-use crate::ZeroCopy;
 
 const FIXED_SEED: u64 = 1234567890;
 

@@ -5,7 +5,7 @@ use crate::en::{EntriesEncoder, EntryEncoder, MapEncoder, SequenceEncoder, Varia
 use crate::mode::Text;
 use crate::{Context, Encoder};
 
-use super::error::{err, SerdeError};
+use super::error::{SerdeError, err};
 
 use serde::ser::{self, Serialize};
 

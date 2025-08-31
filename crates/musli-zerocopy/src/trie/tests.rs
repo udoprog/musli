@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{Error, OwnedBuf};
 
-use super::{store, Builder};
+use super::{Builder, store};
 
 #[test]
 fn regular_trie() -> Result<(), Error> {

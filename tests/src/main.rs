@@ -16,11 +16,11 @@ use std::path::PathBuf;
 use std::prelude::v1::*;
 use std::time::Instant;
 
-use anyhow::{bail, Context as _, Result};
-use tests::models::*;
-use tests::utils;
+use anyhow::{Context as _, Result, bail};
 use tests::AlignedBuf;
 use tests::Generate;
+use tests::models::*;
+use tests::utils;
 
 const ALIGNMENT: usize = align_of::<u128>();
 
@@ -73,10 +73,10 @@ impl Ctxt<'_> {
             writeln!(self.o, "Saving: {}", path.display())?;
         }
 
-        if let Some(dir) = path.parent() {
-            if !dir.is_dir() {
-                fs::create_dir_all(dir).with_context(|| path.display().to_string())?;
-            }
+        if let Some(dir) = path.parent()
+            && !dir.is_dir()
+        {
+            fs::create_dir_all(dir).with_context(|| path.display().to_string())?;
         }
 
         fs::write(&path, bytes).with_context(|| path.display().to_string())?;

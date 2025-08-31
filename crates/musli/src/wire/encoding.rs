@@ -43,7 +43,7 @@ impl Default for Encoding<OPTIONS, Binary> {
 }
 
 impl Encoding<OPTIONS, Binary> {
-    /// Construct a new [`Encoding`] instance with the [`OPTIONS`]
+    /// Construct a new [`Encoding`]. with the [`OPTIONS`]
     /// configuration.
     ///
     /// You can modify this using the available factory methods:

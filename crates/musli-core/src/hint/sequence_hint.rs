@@ -1,5 +1,5 @@
-use crate::de::SizeHint;
 use crate::Context;
+use crate::de::SizeHint;
 
 mod sealed {
     pub trait Sealed {}

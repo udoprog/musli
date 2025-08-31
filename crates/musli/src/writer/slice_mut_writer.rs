@@ -1,8 +1,8 @@
 use core::marker::PhantomData;
 use core::ptr::NonNull;
 
-use crate::alloc::Vec;
 use crate::Context;
+use crate::alloc::Vec;
 
 use super::{SliceOverflow, Writer};
 

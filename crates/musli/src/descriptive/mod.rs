@@ -117,11 +117,11 @@ pub use self::encoding::to_vec;
 #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
 #[doc(inline)]
 pub use self::encoding::to_writer;
+#[doc(inline)]
+pub use self::encoding::{Encoding, OPTIONS};
 #[cfg(feature = "alloc")]
 #[doc(inline)]
 pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, to_slice};
-#[doc(inline)]
-pub use self::encoding::{Encoding, OPTIONS};
 #[doc(inline)]
 pub use self::error::Error;
 

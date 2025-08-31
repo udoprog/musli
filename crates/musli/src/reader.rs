@@ -7,8 +7,8 @@ use core::ops::Range;
 use core::ptr;
 use core::slice;
 
-use crate::de::UnsizedVisitor;
 use crate::Context;
+use crate::de::UnsizedVisitor;
 
 mod sealed {
     use super::{Limit, Reader};
@@ -265,7 +265,10 @@ impl<'de> Reader<'de> for &'de [u8] {
             return Err(cx.custom(SliceUnderflow::new(n, self.len())));
         }
 
-        ptr.copy_from_nonoverlapping(self.as_ptr(), n);
+        unsafe {
+            ptr.copy_from_nonoverlapping(self.as_ptr(), n);
+        }
+
         *self = &self[n..];
         cx.advance(n);
         Ok(())
@@ -456,7 +459,11 @@ impl<'de> Reader<'de> for SliceReader<'de> {
         C: Context,
     {
         let outcome = bounds_check_add(cx, &self.range, n)?;
-        ptr.copy_from_nonoverlapping(self.range.start, n);
+
+        unsafe {
+            ptr.copy_from_nonoverlapping(self.range.start, n);
+        }
+
         self.range.start = outcome;
         cx.advance(n);
         Ok(())
@@ -640,7 +647,8 @@ where
         C: Context,
     {
         self.bounds_check(cx, n)?;
-        self.reader.read_bytes_uninit(cx, ptr, n)
+
+        unsafe { self.reader.read_bytes_uninit(cx, ptr, n) }
     }
 
     #[inline]
@@ -740,7 +748,7 @@ where
     where
         C: Context,
     {
-        (**self).read_bytes_uninit(cx, ptr, n)
+        unsafe { (**self).read_bytes_uninit(cx, ptr, n) }
     }
 
     #[inline]

@@ -3,8 +3,8 @@
 use rust_alloc::format;
 
 use crate::context;
-use crate::json::parser::integer::{parse_signed_full, parse_unsigned_full};
 use crate::json::parser::SliceParser;
+use crate::json::parser::integer::{parse_signed_full, parse_unsigned_full};
 
 #[test]
 fn test_decode_exponent() {
@@ -86,11 +86,13 @@ fn test_decode_unsigned() {
                     $num
                 );
 
-                assert!(parse_unsigned_full::<$ty, _, _>(
-                    &cx,
-                    &mut SliceParser::new(format!("{}.1", $num).as_bytes())
-                )
-                .is_err());
+                assert!(
+                    parse_unsigned_full::<$ty, _, _>(
+                        &cx,
+                        &mut SliceParser::new(format!("{}.1", $num).as_bytes())
+                    )
+                    .is_err()
+                );
             };
         }
 
@@ -154,11 +156,13 @@ fn test_decode_signed() {
                     $num
                 );
 
-                assert!(parse_signed_full::<$ty, _, _>(
-                    &cx,
-                    &mut SliceParser::new(format!("{}.1", $num).as_bytes())
-                )
-                .is_err());
+                assert!(
+                    parse_signed_full::<$ty, _, _>(
+                        &cx,
+                        &mut SliceParser::new(format!("{}.1", $num).as_bytes())
+                    )
+                    .is_err()
+                );
             };
         }
 

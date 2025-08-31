@@ -1,5 +1,5 @@
-use crate::wire::tag::{Kind, Tag};
 use crate::wire::MAX_INLINE_LEN;
+use crate::wire::tag::{Kind, Tag};
 use crate::{Decode, Encode};
 
 #[derive(Debug, PartialEq, Encode, Decode)]

@@ -3,9 +3,9 @@ use std::slice;
 
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
+use syn::Token;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::Token;
 
 enum AsBytes {
     Default,
@@ -700,21 +700,21 @@ fn argument_attrs(
         new_attrs.push(attr);
     }
 
-    if argument.is_none() {
-        if let syn::Pat::Ident(ident) = &*ty.pat {
-            let ident = &ident.ident;
+    if argument.is_none()
+        && let syn::Pat::Ident(ident) = &*ty.pat
+    {
+        let ident = &ident.ident;
 
-            if ident == "buf" || ident == "buffer" {
-                argument = Some(Argument::Buffer(ident.clone()));
-            } else if ident == "size_hint" {
-                if size_hint {
-                    argument = Some(Argument::SizeHint(ident.clone()));
-                }
-            } else if ident == "value" {
-                argument = Some(Argument::Value(ident.clone()));
-            } else {
-                argument = Some(Argument::Provided(ident.clone()));
+        if ident == "buf" || ident == "buffer" {
+            argument = Some(Argument::Buffer(ident.clone()));
+        } else if ident == "size_hint" {
+            if size_hint {
+                argument = Some(Argument::SizeHint(ident.clone()));
             }
+        } else if ident == "value" {
+            argument = Some(Argument::Value(ident.clone()));
+        } else {
+            argument = Some(Argument::Provided(ident.clone()));
         }
     }
 

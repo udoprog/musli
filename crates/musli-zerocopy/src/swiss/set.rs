@@ -15,13 +15,13 @@
 use core::borrow::Borrow;
 use core::hash::{Hash, Hasher};
 
+use crate::ZeroCopy;
 use crate::buf::{Bindable, Buf, Visit};
 use crate::endian::{ByteOrder, Native};
 use crate::error::Error;
 use crate::pointer::{DefaultSize, Size};
 use crate::sip::SipHasher13;
 use crate::swiss::map::{RawTable, RawTableRef};
-use crate::ZeroCopy;
 
 /// A set bound to a [`Buf`] through [`Buf::bind`] for convenience.
 ///

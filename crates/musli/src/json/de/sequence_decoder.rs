@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
 use core::mem;
 
+use crate::Context;
 use crate::de::{Decoder, SequenceDecoder, SizeHint};
 use crate::json::parser::{Parser, Token};
-use crate::Context;
 
 use super::JsonDecoder;
 

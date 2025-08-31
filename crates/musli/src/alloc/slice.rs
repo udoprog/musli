@@ -1,6 +1,6 @@
 use core::cell::UnsafeCell;
 use core::marker::PhantomData;
-use core::mem::{align_of, forget, replace, size_of, MaybeUninit};
+use core::mem::{MaybeUninit, align_of, forget, replace, size_of};
 use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
@@ -493,7 +493,7 @@ struct HeaderId(NonZeroU16);
 impl HeaderId {
     #[cfg(test)]
     const unsafe fn new_unchecked(value: u16) -> Self {
-        Self(NonZeroU16::new_unchecked(value))
+        Self(unsafe { NonZeroU16::new_unchecked(value) })
     }
 
     /// Create a new region identifier.
@@ -599,48 +599,56 @@ impl Internal {
     }
 
     unsafe fn unlink(&mut self, header: &Header) {
-        if let Some(next) = header.next {
-            (*self.header_mut(next)).prev = header.prev;
-        } else {
-            self.tail = header.prev;
-        }
+        unsafe {
+            if let Some(next) = header.next {
+                (*self.header_mut(next)).prev = header.prev;
+            } else {
+                self.tail = header.prev;
+            }
 
-        if let Some(prev) = header.prev {
-            (*self.header_mut(prev)).next = header.next;
+            if let Some(prev) = header.prev {
+                (*self.header_mut(prev)).next = header.next;
+            }
         }
     }
 
     unsafe fn replace_back(&mut self, region: &mut Region) {
-        let prev = region.prev.take();
-        let next = region.next.take();
+        unsafe {
+            let prev = region.prev.take();
+            let next = region.next.take();
 
-        if let Some(prev) = prev {
-            (*self.header_mut(prev)).next = next;
+            if let Some(prev) = prev {
+                (*self.header_mut(prev)).next = next;
+            }
+
+            if let Some(next) = next {
+                (*self.header_mut(next)).prev = prev;
+            }
+
+            self.push_back(region);
         }
-
-        if let Some(next) = next {
-            (*self.header_mut(next)).prev = prev;
-        }
-
-        self.push_back(region);
     }
 
     unsafe fn push_back(&mut self, region: &mut Region) {
-        if let Some(tail) = self.tail.replace(region.id) {
-            region.prev = Some(tail);
-            (*self.header_mut(tail)).next = Some(region.id);
+        unsafe {
+            if let Some(tail) = self.tail.replace(region.id) {
+                region.prev = Some(tail);
+                (*self.header_mut(tail)).next = Some(region.id);
+            }
         }
     }
 
     /// Free a region.
     unsafe fn free_region(&mut self, region: Region) -> Header {
-        self.unlink(&region);
+        unsafe {
+            self.unlink(&region);
 
-        region.ptr.replace(Header {
-            range: self.full.head(),
-            next: self.free_head.replace(region.id),
-            prev: None,
-        })
+            region.ptr.replace(Header {
+                range: self.full.head(),
+                next: self.free_head.replace(region.id),
+                prev: None,
+            })
+        }
     }
 
     /// Allocate a new header.
@@ -671,16 +679,18 @@ impl Internal {
             return None;
         }
 
-        let id = HeaderId::new(self.full.end.cast::<Header>().offset_from(ptr))?;
+        unsafe {
+            let id = HeaderId::new(self.full.end.cast::<Header>().offset_from(ptr))?;
 
-        ptr.write(Header {
-            range: Range::new(self.free.start..end),
-            prev: None,
-            next: None,
-        });
+            ptr.write(Header {
+                range: Range::new(self.free.start..end),
+                prev: None,
+                next: None,
+            });
 
-        self.free.end = ptr.cast();
-        Some(Region { id, ptr })
+            self.free.end = ptr.cast();
+            Some(Region { id, ptr })
+        }
     }
 
     /// Allocate a region.
@@ -698,20 +708,22 @@ impl Internal {
             }
         }
 
-        self.align(align)?;
+        unsafe {
+            self.align(align)?;
 
-        if self.remaining() < requested {
-            return None;
+            if self.remaining() < requested {
+                return None;
+            }
+
+            let end = self.free.start.wrapping_add(requested);
+
+            let mut region = self.alloc_header(end)?;
+
+            self.free.start = end;
+            debug_assert!(self.free.start <= self.free.end);
+            self.push_back(&mut region);
+            Some(region)
         }
-
-        let end = self.free.start.wrapping_add(requested);
-
-        let mut region = self.alloc_header(end)?;
-
-        self.free.start = end;
-        debug_assert!(self.free.start <= self.free.end);
-        self.push_back(&mut region);
-        Some(region)
     }
 
     /// Align the free region by the specified alignment.
@@ -736,12 +748,14 @@ impl Internal {
             // Simply expand the tail region to fill the gap created.
             self.region(tail).range.end = aligned_start;
         } else {
-            // We need to construct a new occupied header to fill in the gap
-            // which we just aligned from since there is no previous region to
-            // expand.
-            let mut region = self.alloc_header(aligned_start)?;
+            unsafe {
+                // We need to construct a new occupied header to fill in the gap
+                // which we just aligned from since there is no previous region
+                // to expand.
+                let mut region = self.alloc_header(aligned_start)?;
 
-            self.push_back(&mut region);
+                self.push_back(&mut region);
+            }
         }
 
         self.free.start = aligned_start;
@@ -753,7 +767,10 @@ impl Internal {
 
         // Just free up the last region in the slab.
         if region.next.is_none() {
-            self.free_tail(region);
+            unsafe {
+                self.free_tail(region);
+            }
+
             return;
         }
 
@@ -771,7 +788,7 @@ impl Internal {
         let mut prev = self.region(prev);
 
         // Move allocation to the previous region.
-        let region = self.free_region(region);
+        let region = unsafe { self.free_region(region) };
 
         prev.range.end = region.range.end;
 
@@ -785,22 +802,26 @@ impl Internal {
     unsafe fn free_tail(&mut self, current: Region) {
         debug_assert_eq!(self.tail, Some(current.id));
 
-        let current = self.free_region(current);
-        debug_assert_eq!(current.next, None);
+        unsafe {
+            let current = self.free_region(current);
+            debug_assert_eq!(current.next, None);
 
-        self.free.start = match current.prev {
-            // The prior region is occupied, so we can free that as well.
-            Some(prev) if self.occupied == Some(prev) => {
-                self.occupied = None;
-                let prev = self.region(prev);
-                self.free_region(prev).range.start
-            }
-            _ => current.range.start,
-        };
+            self.free.start = match current.prev {
+                // The prior region is occupied, so we can free that as well.
+                Some(prev) if self.occupied == Some(prev) => {
+                    self.occupied = None;
+                    let prev = self.region(prev);
+                    self.free_region(prev).range.start
+                }
+                _ => current.range.start,
+            };
+        }
     }
 
     unsafe fn reserve(&mut self, additional: usize, align: usize) -> Option<*mut MaybeUninit<u8>> {
-        self.align(align)?;
+        unsafe {
+            self.align(align)?;
+        }
 
         let free_start = self.free.start.wrapping_add(additional);
 
@@ -824,19 +845,26 @@ impl Internal {
         if from.next.is_none() {
             // Before we call realloc, we check the capacity of the current
             // region. So we know that it is <= requested.
-            let additional = requested - from.capacity();
-            self.free.start = self.reserve(additional, align)?;
-            from.range.end = from.range.end.add(additional);
+
+            unsafe {
+                let additional = requested - from.capacity();
+                self.free.start = self.reserve(additional, align)?;
+                from.range.end = from.range.end.add(additional);
+            }
+
             return Some(from);
         }
 
         // There is no data allocated in the current region, so we can simply
         // re-link it to the end of the chain of allocation.
         if from.range.start == from.range.end {
-            let free_start = self.reserve(requested, align)?;
-            from.range.start = replace(&mut self.free.start, free_start);
-            from.range.end = free_start;
-            self.replace_back(&mut from);
+            unsafe {
+                let free_start = self.reserve(requested, align)?;
+                from.range.start = replace(&mut self.free.start, free_start);
+                from.range.end = free_start;
+                self.replace_back(&mut from);
+            }
+
             return Some(from);
         }
 
@@ -862,18 +890,22 @@ impl Internal {
                 break 'bail;
             }
 
-            let from = self.free_region(from);
+            unsafe {
+                let from = self.free_region(from);
 
-            from.range.start.copy_to(prev.range.start, len);
-            prev.range.end = from.range.end;
-            self.occupied = None;
-            return Some(prev);
+                from.range.start.copy_to(prev.range.start, len);
+                prev.range.end = from.range.end;
+                self.occupied = None;
+                return Some(prev);
+            }
         }
 
-        let to = self.alloc(requested, align)?;
-        from.range.start.copy_to_nonoverlapping(to.range.start, len);
-        self.free(from.id);
-        Some(to)
+        unsafe {
+            let to = self.alloc(requested, align)?;
+            from.range.start.copy_to_nonoverlapping(to.range.start, len);
+            self.free(from.id);
+            Some(to)
+        }
     }
 }
 

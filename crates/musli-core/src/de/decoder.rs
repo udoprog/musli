@@ -5,8 +5,8 @@ use crate::hint::{MapHint, SequenceHint};
 use crate::{Allocator, Context};
 
 use super::{
-    utils, AsDecoder, Decode, DecodeSliceBuilder, DecodeUnsized, DecodeUnsizedBytes,
-    EntriesDecoder, MapDecoder, SequenceDecoder, Skip, UnsizedVisitor, VariantDecoder, Visitor,
+    AsDecoder, Decode, DecodeSliceBuilder, DecodeUnsized, DecodeUnsizedBytes, EntriesDecoder,
+    MapDecoder, SequenceDecoder, Skip, UnsizedVisitor, VariantDecoder, Visitor, utils,
 };
 
 /// An outcome of a fast decode attempt.
@@ -35,67 +35,67 @@ pub trait Decoder<'de>: Sized {
     type Mode: 'static;
     /// A clone of the current decoder.
     type TryClone: Decoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >;
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >;
     /// Decoder returned by [`Decoder::decode_buffer`].
     type DecodeBuffer: AsDecoder<
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >;
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >;
     /// Decoder returned by [`Decoder::decode_option`].
     type DecodeSome: Decoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >;
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >;
     /// Decoder used by [`Decoder::decode_pack`].
     type DecodePack: SequenceDecoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >;
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >;
     /// Decoder returned by [`Decoder::decode_sequence`].
     type DecodeSequence: SequenceDecoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >;
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >;
     /// Decoder returned by [`Decoder::decode_map`].
     type DecodeMap: MapDecoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >;
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >;
     /// Decoder returned by [`Decoder::decode_map_entries`].
     type DecodeMapEntries: EntriesDecoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >;
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >;
     /// Decoder used by [`Decoder::decode_variant`].
     type DecodeVariant: VariantDecoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >;
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >;
 
     /// This is a type argument used to hint to any future implementor that they
     /// should be using the `#[musli::trait_defaults]`.

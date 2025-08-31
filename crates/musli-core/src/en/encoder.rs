@@ -1,10 +1,10 @@
 use core::fmt;
 
+use crate::Context;
 use crate::expecting::{self, Expecting};
 use crate::hint::{MapHint, SequenceHint};
-use crate::Context;
 
-use super::{utils, Encode, EntriesEncoder, MapEncoder, SequenceEncoder, VariantEncoder};
+use super::{Encode, EntriesEncoder, MapEncoder, SequenceEncoder, VariantEncoder, utils};
 
 /// An outcome of a fast encode attempt.
 #[non_exhaustive]
@@ -44,11 +44,7 @@ pub trait Encoder: Sized {
     /// Encoder for a variant.
     type EncodeVariant: VariantEncoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
     /// Encoder for a sequence variant.
-    type EncodeSequenceVariant: SequenceEncoder<
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Mode = Self::Mode,
-    >;
+    type EncodeSequenceVariant: SequenceEncoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
     /// Encoder for a map variant.
     type EncodeMapVariant: MapEncoder<Cx = Self::Cx, Error = Self::Error, Mode = Self::Mode>;
 

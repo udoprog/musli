@@ -3,7 +3,7 @@ use crate::int::zigzag as zig;
 use crate::int::{Signed, Unsigned, UnsignedOps};
 use crate::{Context, Options, Reader, Writer};
 
-use super::tag::{Kind, Tag, DATA_MASK};
+use super::tag::{DATA_MASK, Kind, Tag};
 
 /// Governs how usize lengths are encoded into a [`Writer`].
 #[inline]

@@ -3,6 +3,7 @@ use core::fmt;
 
 use serde::de;
 
+use crate::Context;
 #[cfg(feature = "alloc")]
 use crate::alloc::{String, Vec};
 use crate::de::{
@@ -10,9 +11,8 @@ use crate::de::{
     Visitor,
 };
 use crate::mode::Text;
-use crate::Context;
 
-use super::error::{err, SerdeError};
+use super::error::{SerdeError, err};
 
 pub(super) struct Deserializer<D> {
     decoder: D,

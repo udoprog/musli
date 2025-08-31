@@ -1,7 +1,7 @@
 #[cfg(feature = "musli-zerocopy")]
 pub mod musli_zerocopy_store {
-    use musli_zerocopy::endian;
     use musli_zerocopy::OwnedBuf;
+    use musli_zerocopy::endian;
     use tests::models::*;
 
     macro_rules! build {
@@ -21,8 +21,8 @@ pub mod musli_zerocopy_store {
 
 #[cfg(feature = "musli-zerocopy")]
 pub mod musli_zerocopy_store_unchecked {
-    use musli_zerocopy::endian;
     use musli_zerocopy::OwnedBuf;
+    use musli_zerocopy::endian;
     use tests::models::*;
 
     macro_rules! build {

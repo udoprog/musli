@@ -25,7 +25,7 @@ struct Value<'a> {
     serde: Serde,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn main(_argc: c_int, _argv: *const *const u8) -> c_int {
     let mut buf = ArrayBuffer::new();
     let alloc = Slice::new(&mut buf);

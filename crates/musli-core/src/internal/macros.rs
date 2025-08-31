@@ -103,7 +103,9 @@ macro_rules! __slice_sequence {
 
                     #[inline]
                     unsafe fn set_len(&mut self, len: usize) {
-                        self.vec.set_len(len);
+                        unsafe {
+                            self.vec.set_len(len);
+                        }
                     }
 
                     #[inline]

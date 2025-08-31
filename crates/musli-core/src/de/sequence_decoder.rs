@@ -14,12 +14,12 @@ pub trait SequenceDecoder<'de> {
     type Mode: 'static;
     /// The decoder for individual items.
     type DecodeNext<'this>: Decoder<
-        'de,
-        Cx = Self::Cx,
-        Error = Self::Error,
-        Allocator = Self::Allocator,
-        Mode = Self::Mode,
-    >
+            'de,
+            Cx = Self::Cx,
+            Error = Self::Error,
+            Allocator = Self::Allocator,
+            Mode = Self::Mode,
+        >
     where
         Self: 'this;
 

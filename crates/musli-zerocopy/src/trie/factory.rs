@@ -10,7 +10,7 @@ use crate::pointer::{Coerce, Pointee};
 use crate::slice::{BinarySearch, Slice};
 use crate::{Buf, ByteOrder, Error, OwnedBuf, Ref, Size, ZeroCopy};
 
-use super::{prefix, DefaultFlavor, Flavor, LinksRef, NodeRef, TrieRef};
+use super::{DefaultFlavor, Flavor, LinksRef, NodeRef, TrieRef, prefix};
 
 /// Store the given collection in a trie.
 ///

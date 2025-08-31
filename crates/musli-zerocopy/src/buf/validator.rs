@@ -47,7 +47,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// This is only allowed if `T` is `#[repr(transparent)]` over `U`.
     #[inline]
     pub unsafe fn transparent<U>(&mut self) -> &mut Validator<'a, U> {
-        transmute(self)
+        unsafe { transmute(self) }
     }
 
     /// Validate an additional field in the struct and return a reference to it.
@@ -113,9 +113,11 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// walk out of bounds.
     #[inline]
     pub unsafe fn byte(&mut self) -> u8 {
-        let b = ptr::read(self.data.as_ptr());
-        self.data = NonNull::new_unchecked(self.data.as_ptr().add(1));
-        b
+        unsafe {
+            let b = ptr::read(self.data.as_ptr());
+            self.data = NonNull::new_unchecked(self.data.as_ptr().add(1));
+            b
+        }
     }
 
     /// Perform an unaligned load of the given field.
@@ -183,7 +185,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     where
         F: ZeroCopy,
     {
-        self.validate_with::<F>(align_of::<F>())
+        unsafe { self.validate_with::<F>(align_of::<F>()) }
     }
 
     /// Validate an additional field in the struct with alignment `align`.
@@ -233,10 +235,12 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     where
         F: ZeroCopy,
     {
-        self.align_with(align);
-        F::validate(&mut Validator::new(self.data))?;
-        self.advance::<F>();
-        Ok(())
+        unsafe {
+            self.align_with(align);
+            F::validate(&mut Validator::new(self.data))?;
+            self.advance::<F>();
+            Ok(())
+        }
     }
 
     /// Only validate the given field without aligning it.
@@ -252,24 +256,28 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     where
         F: ZeroCopy,
     {
-        // SAFETY: We've ensured that the provided buffer is aligned and sized
-        // appropriately above.
-        F::validate(&mut Validator::new(self.data))?;
-        self.advance::<F>();
-        Ok(())
+        unsafe {
+            F::validate(&mut Validator::new(self.data))?;
+            self.advance::<F>();
+            Ok(())
+        }
     }
 
     /// Align the current pointer by `F`.
     #[inline]
     pub(crate) unsafe fn align_with(&mut self, align: usize) {
-        let offset = self.data.as_ptr().align_offset(align);
-        self.data = NonNull::new_unchecked(self.data.as_ptr().add(offset));
+        unsafe {
+            let offset = self.data.as_ptr().align_offset(align);
+            self.data = NonNull::new_unchecked(self.data.as_ptr().add(offset));
+        }
     }
 
     /// Advance the current pointer by `F`.
     #[inline]
     pub(crate) unsafe fn advance<F>(&mut self) {
-        self.data = NonNull::new_unchecked(self.data.as_ptr().add(size_of::<F>()));
+        unsafe {
+            self.data = NonNull::new_unchecked(self.data.as_ptr().add(size_of::<F>()));
+        }
     }
 
     /// Return the address range associated with a just read `F` for diagnostics.

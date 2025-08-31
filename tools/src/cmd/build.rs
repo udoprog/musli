@@ -1,9 +1,9 @@
 use std::ffi::OsString;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use clap::Parser;
 
-use crate::{tests, Manifest, SharedArgs};
+use crate::{Manifest, SharedArgs, tests};
 
 #[derive(Parser)]
 pub(crate) struct Args {

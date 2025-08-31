@@ -58,6 +58,7 @@ where
 /// ```
 /// use musli::{Decode, Encode};
 /// use musli::value::{self, Value};
+/// use musli::mode::Binary;
 ///
 /// #[derive(Decode, Encode)]
 /// struct Person {
@@ -67,6 +68,7 @@ where
 ///
 /// let person = Person { name: "Alice".to_string(), age: 30 };
 /// let value = value::encode(person)?;
+///
 /// let person: Person = value::decode(&value)?;
 ///
 /// assert_eq!(person.name, "Alice");
@@ -162,7 +164,8 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli::{context, value};
+    /// use musli::context;
+    /// use musli::value;
     /// use musli::mode::Binary;
     ///
     /// let cx = context::new();

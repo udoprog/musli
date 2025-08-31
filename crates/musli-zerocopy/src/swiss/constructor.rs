@@ -10,7 +10,7 @@ use core::ptr::NonNull;
 
 use crate::buf::{self, Buf, StoreBuf};
 use crate::error::{Error, ErrorKind};
-use crate::swiss::raw::{h2, is_full, probe_seq, special_is_empty, Group, ProbeSeq};
+use crate::swiss::raw::{Group, ProbeSeq, h2, is_full, probe_seq, special_is_empty};
 use crate::traits::ZeroCopy;
 
 /// Construction of a raw swiss table.
@@ -428,7 +428,7 @@ impl<'a, T> Bucket<'a, T> {
         debug_assert!(data.len() == size_of::<T>());
 
         Self {
-            data: NonNull::new_unchecked(data.as_mut_ptr()),
+            data: unsafe { NonNull::new_unchecked(data.as_mut_ptr()) },
             _marker: PhantomData,
         }
     }

@@ -25,9 +25,9 @@ mod context_error;
 #[doc(inline)]
 pub use self::context_error::ContextError;
 
+use crate::Allocator;
 #[cfg(feature = "alloc")]
 use crate::alloc::Global;
-use crate::Allocator;
 
 /// Construct a new default context using the [`Global`] allocator.
 ///

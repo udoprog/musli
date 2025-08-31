@@ -1,6 +1,6 @@
 use core::borrow::Borrow;
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of, size_of_val, ManuallyDrop};
+use core::mem::{ManuallyDrop, align_of, size_of, size_of_val};
 use core::ops::Deref;
 use core::ptr::NonNull;
 use core::slice::{self, SliceIndex};
@@ -351,7 +351,7 @@ where
     /// See [`Buf::new_mut`] for more information.
     #[inline]
     pub unsafe fn as_mut_buf(&mut self) -> &mut Buf {
-        Buf::new_mut(self.as_mut_slice())
+        unsafe { Buf::new_mut(self.as_mut_slice()) }
     }
 
     /// Store an uninitialized value.
@@ -633,9 +633,12 @@ where
     {
         let offset = self.len;
 
-        let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
-        buf::store_unaligned(ptr, value);
-        self.len += size_of::<T>();
+        unsafe {
+            let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
+            buf::store_unaligned(ptr, value);
+            self.len += size_of::<T>();
+        }
+
         Ref::new(offset)
     }
 
@@ -813,9 +816,11 @@ where
     where
         T: ZeroCopy,
     {
-        let dst = self.as_mut_ptr().add(self.len);
-        dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
-        self.len += size_of_val(values);
+        unsafe {
+            let dst = self.as_mut_ptr().add(self.len);
+            dst.copy_from_nonoverlapping(values.as_ptr().cast(), size_of_val(values));
+            self.len += size_of_val(values);
+        }
     }
 
     /// Request that the current buffer should have at least the specified
@@ -1076,7 +1081,7 @@ where
     where
         I: SliceIndex<[u8]>,
     {
-        SliceMut::as_mut_buf(self).get_mut(index)
+        unsafe { SliceMut::as_mut_buf(self).get_mut(index) }
     }
 
     #[inline]
@@ -1086,6 +1091,6 @@ where
 
     #[inline]
     unsafe fn as_mut_buf(&mut self) -> &mut Buf {
-        SliceMut::as_mut_buf(self)
+        unsafe { SliceMut::as_mut_buf(self) }
     }
 }

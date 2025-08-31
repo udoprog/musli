@@ -3,7 +3,7 @@ use std::mem::take;
 use std::str::FromStr;
 
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::Token;
 
 #[derive(Clone, Copy)]

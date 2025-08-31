@@ -8,9 +8,9 @@ use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
+use crate::Context;
 use crate::alloc::Vec;
 use crate::writer::Writer;
-use crate::Context;
 
 /// A fixed-size bytes storage which keeps track of how much has been
 /// initialized.

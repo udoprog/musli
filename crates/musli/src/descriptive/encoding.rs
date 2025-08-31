@@ -43,7 +43,7 @@ impl Default for Encoding<OPTIONS, Binary> {
 }
 
 impl Encoding<OPTIONS, Binary> {
-    /// Construct a new [`Encoding`] instance.
+    /// Construct a new [`Encoding`].
     ///
     /// ```
     /// use musli::{Encode, Decode};

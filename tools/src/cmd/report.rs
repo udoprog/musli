@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use clap::Parser;
 use criterion::Criterion;
 use serde::{Deserialize, Serialize};
@@ -15,7 +15,7 @@ use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 
 use crate::bins::{BinArgs, Binary, Bins};
 use crate::manifest::{Group, Kind, Link, ReportEnv};
-use crate::{command, Manifest, Report, ReportRef, SharedArgs, REPO};
+use crate::{Manifest, REPO, Report, ReportRef, SharedArgs, command};
 
 #[derive(Default, Parser)]
 pub(crate) struct Args {
@@ -141,7 +141,10 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
     }
 
     if !reports.is_empty() {
-        writeln!(o, "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons.")?;
+        writeln!(
+            o,
+            "The following are one section for each kind of benchmark we perform. They range from \"Full features\" to more specialized ones like zerocopy comparisons."
+        )?;
 
         for bins in &bins {
             let Report {
@@ -192,10 +195,10 @@ pub(crate) fn entry(args: &Args, manifest: &Manifest, target: &Path, output: &Pa
 
     println!("Writing: {}", report.display());
 
-    if let Some(dir) = report.parent() {
-        if !dir.is_dir() {
-            fs::create_dir_all(dir).with_context(|| dir.display().to_string())?;
-        }
+    if let Some(dir) = report.parent()
+        && !dir.is_dir()
+    {
+        fs::create_dir_all(dir).with_context(|| dir.display().to_string())?;
     }
 
     fs::write(report, o.as_bytes())?;
@@ -432,9 +435,15 @@ where
 {
     writeln!(o, "## Size comparisons")?;
     writeln!(o)?;
-    writeln!(o, "This is not yet an area which has received much focus, but because people are bound to ask the following section performs a raw size comparison between different formats.")?;
+    writeln!(
+        o,
+        "This is not yet an area which has received much focus, but because people are bound to ask the following section performs a raw size comparison between different formats."
+    )?;
 
-    writeln!(o, "Each test suite serializes a collection of values, which have all been randomly populated.")?;
+    writeln!(
+        o,
+        "Each test suite serializes a collection of values, which have all been randomly populated."
+    )?;
 
     for Group {
         id, description, ..
@@ -538,7 +547,10 @@ where
                 let ss = set.samples.iter().map(|s| (*s as f64 - mean).powf(2.0));
                 let stddev = (ss.sum::<f64>() / len).sqrt();
 
-                write!(o, " <a title=\"samples: {len}, min: {mn}, max: {mx}, stddev: {stddev}\">{mean:.2} ± {stddev:.2}</a> |")?;
+                write!(
+                    o,
+                    " <a title=\"samples: {len}, min: {mn}, max: {mx}, stddev: {stddev}\">{mean:.2} ± {stddev:.2}</a> |"
+                )?;
             }
 
             writeln!(o)?;
