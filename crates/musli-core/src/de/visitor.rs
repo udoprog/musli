@@ -34,10 +34,7 @@ use super::{Decoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, Vari
 ///
 ///     #[inline]
 ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-///         write!(
-///             f,
-///             "a value that can be decoded into dynamic container"
-///         )
+///         write!(f, "a value that can be decoded into dynamic container")
 ///     }
 /// }
 /// ```

@@ -6,10 +6,10 @@ use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use syn::Token;
 
+use super::ATTR;
+use super::Only;
 use super::attr::{FieldEncoding, ModeKind};
 use super::tokens::Import;
-use super::Only;
-use super::ATTR;
 
 #[derive(Clone, Copy)]
 pub(crate) enum ModePath<'a> {

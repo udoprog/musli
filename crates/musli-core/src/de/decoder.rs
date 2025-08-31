@@ -116,7 +116,7 @@ pub trait Decoder<'de>: Sized {
     /// use std::marker::PhantomData;
     ///
     /// use musli::Context;
-    /// use musli::de::{self, Decoder, Decode};
+    /// use musli::de::Decoder;
     ///
     /// struct MyDecoder<C, M> {
     ///     cx: C,
@@ -130,11 +130,6 @@ pub trait Decoder<'de>: Sized {
     ///     M: 'static,
     /// {
     ///     type Cx = C;
-    ///
-    ///     #[inline]
-    ///     fn cx(&self) -> Self::Cx {
-    ///         self.cx
-    ///     }
     ///
     ///     #[inline]
     ///     fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1145,7 +1140,7 @@ pub trait Decoder<'de>: Sized {
     ///
     ///             #[inline]
     ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    ///                 write!(f, "a literal byte reference")
+    ///                 write!(f, "borrowed bytes")
     ///             }
     ///
     ///             #[inline]
@@ -1216,7 +1211,7 @@ pub trait Decoder<'de>: Sized {
     ///
     ///             #[inline]
     ///             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    ///                 write!(f, "exact bytes reference")
+    ///                 write!(f, "a borrowed string")
     ///             }
     ///
     ///             #[inline]

@@ -25,6 +25,8 @@ mod internals;
 mod types;
 
 use proc_macro::TokenStream;
+use quote::ToTokens;
+use syn::parse::ParseStream;
 
 const MUSLI_CRATE: &str = "musli";
 const MUSLI_CORE_CRATE: &str = "musli_core";
@@ -79,10 +81,10 @@ fn trait_defaults(
     default_crate: &'static str,
 ) -> TokenStream {
     let attr = syn::parse_macro_input!(attr as types::Attr);
-    let input = syn::parse_macro_input!(input as types::Types);
+    let parser = move |input: ParseStream| types::parse(input, attr, default_crate);
 
-    match input.expand(default_crate, &attr) {
-        Ok(tokens) => tokens.into(),
+    match syn::parse::Parser::parse(parser, input) {
+        Ok(types) => types.to_token_stream().into(),
         Err(err) => err.to_compile_error().into(),
     }
 }
