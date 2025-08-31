@@ -59,12 +59,16 @@ where
     E: ByteOrder,
     O: Size,
 {
+    // A `Ref` type cannot inhabit any bit pattern since it must represent a
+    // validly sized reference.
     const ANY_BITS: bool = false;
 
     const PADDED: bool = size_of::<Self>() > (size_of::<O>() + size_of::<T::Stored<O>>())
         || O::PADDED
         || T::Stored::<O>::PADDED;
 
+    // Since the ref type statically encodes the byte order, it cannot be byte
+    // swapped with retained meaning.
     const CAN_SWAP_BYTES: bool = false;
 
     #[inline]
@@ -202,7 +206,7 @@ where
 
     #[inline]
     fn try_from_parts(offset: O, metadata: T::Stored<O>) -> Result<Self, Error> {
-        let Some(layout) = T::pointee_layout::<E, O>(metadata.swap_bytes::<E>()) else {
+        let Ok(layout) = T::pointee_layout::<E, O>(metadata) else {
             return Err(Error::new(ErrorKind::InvalidLayout));
         };
 
@@ -226,18 +230,19 @@ where
     ///
     /// # Panics
     ///
-    /// This will panic if either:
+    /// This will panic if:
     /// * The `offset` or `metadata` can't be byte swapped as per
     ///   [`ZeroCopy::CAN_SWAP_BYTES`].
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
-    /// * The metadata must describe a valid `Layout`.
-    /// * The `offset` plus this layout's size must not overflow `usize::MAX`.
+    /// * The metadata does not describe a valid [`Layout`].
+    /// * The `offset` plus this layout's size overflow `usize::MAX`.
     ///
     /// To guarantee that this constructor will never panic, [`Ref<T, E,
     /// usize>`] can be used. This also ensures that construction is a no-op.
     ///
+    /// [`Layout`]: core::alloc::Layout
     /// [`offset()`]: Ref::offset
     /// [`metadata()`]: Ref::metadata
     ///
@@ -249,6 +254,22 @@ where
     /// let reference = Ref::<[u64]>::with_metadata(42, 10);
     /// assert_eq!(reference.offset(), 42);
     /// assert_eq!(reference.len(), 10);
+    /// ```
+    ///
+    /// Using maximally sized metadata with different byte orderings:
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    /// use musli_zerocopy::endian::{Big, Little};
+    ///
+    /// let o = usize::MAX - isize::MAX as usize;
+    /// let l = isize::MAX as usize;
+    ///
+    /// let a = Ref::<[u8], Big, usize>::with_metadata(o, l);
+    /// let b = Ref::<[u8], Little, usize>::with_metadata(o, l);
+    ///
+    /// assert_eq!(a.len(), l);
+    /// assert_eq!(a.len(), b.len());
     /// ```
     #[inline]
     pub fn with_metadata<U>(offset: U, metadata: T::Metadata) -> Self
@@ -269,16 +290,17 @@ where
     /// This will not compile through a constant assertion if the `offset` or
     ///   `metadata` can't be byte swapped as per [`ZeroCopy::CAN_SWAP_BYTES`].
     ///
-    /// This will error if either:
+    /// This will error if:
     /// * Packed [`offset()`] cannot be constructed from `U` (out of range).
     /// * Packed [`metadata()`] cannot be constructed from `T::Metadata` (reason
     ///   depends on the exact metadata).
-    /// * The metadata must describe a valid `Layout`.
-    /// * The `offset` plus this layout's size must not overflow `usize::MAX`.
+    /// * The metadata does not describe a valid [`Layout`].
+    /// * The `offset` plus this layout's overflows `usize::MAX`.
     ///
     /// To guarantee that this constructor will never error, [`Ref<T, Native,
     /// usize>`] can be used. This also ensures that construction is a no-op.
     ///
+    /// [`Layout`]: core::alloc::Layout
     /// [`offset()`]: Ref::offset
     /// [`metadata()`]: Ref::metadata
     ///
@@ -290,6 +312,26 @@ where
     /// let reference = Ref::<[u64]>::try_with_metadata(42, 10)?;
     /// assert_eq!(reference.offset(), 42);
     /// assert_eq!(reference.len(), 10);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    ///
+    /// Using maximally sized metadata with different byte orderings:
+    ///
+    /// ```
+    /// use musli_zerocopy::Ref;
+    /// use musli_zerocopy::endian::{Big, Little};
+    ///
+    /// let o = usize::MAX - isize::MAX as usize;
+    /// let l = isize::MAX as usize;
+    ///
+    /// let a = Ref::<[u8], Big, usize>::try_with_metadata(o, l)?;
+    /// let b = Ref::<[u8], Little, usize>::try_with_metadata(o, l)?;
+    ///
+    /// assert_eq!(a.len(), l);
+    /// assert_eq!(a.len(), b.len());
+    ///
+    /// assert!(Ref::<[u8], Big, usize>::try_with_metadata(o + 1, l).is_err());
+    /// assert!(Ref::<[u8], Little, usize>::try_with_metadata(o + 1, l).is_err());
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     pub fn try_with_metadata<U>(offset: U, metadata: T::Metadata) -> Result<Self, Error>
@@ -673,7 +715,7 @@ where
         }
 
         let Some(offset) = O::try_from(offset).ok() else {
-            panic!("Offset {offset:?} not in the legal range 0-{}", O::MAX);
+            panic!("Offset {offset:?} not in the valid range 0-{}", O::MAX);
         };
 
         Ref::from_parts(O::swap_bytes::<E>(offset), ())

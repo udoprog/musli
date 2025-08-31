@@ -227,10 +227,10 @@ impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ErrorKind::InvalidOffsetRange { offset, max } => {
-                write!(f, "Offset {offset} not in legal range 0-{max}",)
+                write!(f, "Offset {offset} not in valid range 0-{max}")
             }
             ErrorKind::InvalidMetadataRange { metadata, max } => {
-                write!(f, "Metadata {metadata} not in legal range 0-{max}")
+                write!(f, "Metadata {metadata} not in valid range 0-{max}")
             }
             ErrorKind::LengthOverflow { len, size } => {
                 write!(

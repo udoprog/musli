@@ -146,11 +146,11 @@ where
         L: TryFrom<usize>,
     {
         let Some(offset) = O::try_from(offset).ok() else {
-            panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
+            panic!("Offset {offset:?} not in valid range 0-{}", O::MAX);
         };
 
         let Some(len) = L::try_from(len).ok() else {
-            panic!("Length {len:?} not in legal range 0-{}", L::MAX);
+            panic!("Length {len:?} not in valid range 0-{}", L::MAX);
         };
 
         Self {
@@ -364,10 +364,10 @@ where
 
     #[inline]
     fn load<'buf>(&self, buf: &'buf Buf) -> Result<&'buf Self::Target, Error> {
-        buf.load(Ref::<[T], Native, usize>::with_metadata(
+        buf.load(Ref::<[T], Native, usize>::try_with_metadata(
             self.offset.as_usize::<E>(),
             self.len.as_usize::<E>(),
-        ))
+        )?)
     }
 }
 

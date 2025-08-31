@@ -132,11 +132,11 @@ macro_rules! impl_size {
             where
                 E: ByteOrder,
             {
-                if self > usize::MAX as $ty {
-                    usize::MAX
-                } else {
-                    $swap(self) as usize
-                }
+                debug_assert!(
+                    usize::try_from($swap(self)).is_ok(),
+                    "Value {self} cannot be represented on this platform"
+                );
+                $swap(self) as usize
             }
 
             #[inline]
@@ -149,7 +149,8 @@ macro_rules! impl_size {
 
 impl_size!(u8, core::convert::identity);
 impl_size!(u16, E::swap_u16);
+#[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
 impl_size!(u32, E::swap_u32);
 #[cfg(target_pointer_width = "64")]
 impl_size!(u64, E::swap_u64);
-impl_size!(usize, core::convert::identity);
+impl_size!(usize, E::swap_usize);

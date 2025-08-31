@@ -1,4 +1,4 @@
-use core::alloc::Layout;
+use core::alloc::{Layout, LayoutError};
 use core::fmt;
 
 use crate::ByteOrder;
@@ -52,7 +52,10 @@ pub trait Pointee: self::sealed::Sealed {
 
     /// The layout of `T` with the given stored metadata.
     #[doc(hidden)]
-    fn pointee_layout<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> Option<Layout>;
+    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    where
+        E: ByteOrder,
+        O: Size;
 }
 
 impl<T> Pointee for T
@@ -74,8 +77,12 @@ where
     }
 
     #[inline(always)]
-    fn pointee_layout<E: ByteOrder, O: Size>((): Self::Stored<O>) -> Option<Layout> {
-        Some(Layout::new::<T>())
+    fn pointee_layout<E, O>((): Self::Stored<O>) -> Result<Layout, LayoutError>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        Ok(Layout::new::<T>())
     }
 }
 
@@ -98,9 +105,13 @@ where
     }
 
     #[inline(always)]
-    fn pointee_layout<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> Option<Layout> {
+    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
         let len = metadata.as_usize::<E>();
-        Layout::array::<T>(len).ok()
+        Layout::array::<T>(len)
     }
 }
 
@@ -120,7 +131,11 @@ impl Pointee for str {
     }
 
     #[inline(always)]
-    fn pointee_layout<E: ByteOrder, O: Size>(metadata: Self::Stored<O>) -> Option<Layout> {
-        Layout::array::<u8>(metadata.as_usize::<E>()).ok()
+    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        Layout::array::<u8>(metadata.as_usize::<E>())
     }
 }

@@ -1,9 +1,10 @@
-use core::alloc::Layout;
+use core::alloc::{Layout, LayoutError};
 use core::fmt;
 use core::mem::{ManuallyDrop, size_of};
 use core::ptr::NonNull;
 use core::slice;
 
+use crate::ByteOrder;
 use crate::buf;
 use crate::pointer::{Pointee, Size};
 use crate::traits::ZeroCopy;
@@ -129,7 +130,11 @@ where
     }
 
     #[inline]
-    fn pointee_layout<E: crate::ByteOrder, O: Size>(metadata: Self::Stored<O>) -> Option<Layout> {
+    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    where
+        E: ByteOrder,
+        O: Size,
+    {
         T::pointee_layout::<E, O>(metadata)
     }
 }
