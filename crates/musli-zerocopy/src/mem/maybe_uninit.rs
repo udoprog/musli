@@ -130,6 +130,24 @@ where
     }
 
     #[inline]
+    fn size<E, O>(metadata: Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        T::size::<E, O>(metadata)
+    }
+
+    #[inline]
+    fn align<E, O>(metadata: Self::Stored<O>) -> usize
+    where
+        E: ByteOrder,
+        O: Size,
+    {
+        T::align::<E, O>(metadata)
+    }
+
+    #[inline]
     fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
     where
         E: ByteOrder,

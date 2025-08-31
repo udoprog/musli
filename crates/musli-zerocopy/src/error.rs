@@ -85,18 +85,18 @@ impl fmt::Display for Repr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             ReprKind::Unit => write!(f, "()"),
-            ReprKind::U8(value) => write!(f, "{value}u8"),
-            ReprKind::U16(value) => write!(f, "{value}u16"),
-            ReprKind::U32(value) => write!(f, "{value}u32"),
-            ReprKind::U64(value) => write!(f, "{value}u64"),
-            ReprKind::U128(value) => write!(f, "{value}u128"),
-            ReprKind::I8(value) => write!(f, "{value}i8"),
-            ReprKind::I16(value) => write!(f, "{value}i16"),
-            ReprKind::I32(value) => write!(f, "{value}i32"),
-            ReprKind::I64(value) => write!(f, "{value}i64"),
-            ReprKind::I128(value) => write!(f, "{value}i128"),
-            ReprKind::Usize(value) => write!(f, "{value}usize"),
-            ReprKind::Isize(value) => write!(f, "{value}isize"),
+            ReprKind::U8(value) => write!(f, "{value} (u8)"),
+            ReprKind::U16(value) => write!(f, "{value} (u16)"),
+            ReprKind::U32(value) => write!(f, "{value} (u32)"),
+            ReprKind::U64(value) => write!(f, "{value} (u64)"),
+            ReprKind::U128(value) => write!(f, "{value} (u128)"),
+            ReprKind::I8(value) => write!(f, "{value} (i8)"),
+            ReprKind::I16(value) => write!(f, "{value} (i16)"),
+            ReprKind::I32(value) => write!(f, "{value} (i32)"),
+            ReprKind::I64(value) => write!(f, "{value} (i64)"),
+            ReprKind::I128(value) => write!(f, "{value} (i128)"),
+            ReprKind::Usize(value) => write!(f, "{value} (usize)"),
+            ReprKind::Isize(value) => write!(f, "{value} (isize)"),
         }
     }
 }
@@ -146,11 +146,11 @@ impl core::error::Error for Error {
 pub(crate) enum ErrorKind {
     InvalidOffsetRange {
         offset: Repr,
-        max: Repr,
+        end: Repr,
     },
     InvalidMetadataRange {
         metadata: Repr,
-        max: Repr,
+        end: Repr,
     },
     LengthOverflow {
         len: usize,
@@ -216,7 +216,10 @@ pub(crate) enum ErrorKind {
     StackOverflow {
         capacity: usize,
     },
-    InvalidLayout,
+    InvalidLayout {
+        size: usize,
+        align: usize,
+    },
     #[cfg(feature = "alloc")]
     CapacityError,
     #[cfg(feature = "alloc")]
@@ -226,11 +229,11 @@ pub(crate) enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrorKind::InvalidOffsetRange { offset, max } => {
-                write!(f, "Offset {offset} not in valid range 0-{max}")
+            ErrorKind::InvalidOffsetRange { offset, end } => {
+                write!(f, "Offset {offset} not in valid range 0-{end}")
             }
-            ErrorKind::InvalidMetadataRange { metadata, max } => {
-                write!(f, "Metadata {metadata} not in valid range 0-{max}")
+            ErrorKind::InvalidMetadataRange { metadata, end } => {
+                write!(f, "Metadata {metadata} not in valid range 0-{end}")
             }
             ErrorKind::LengthOverflow { len, size } => {
                 write!(
@@ -293,8 +296,8 @@ impl fmt::Display for ErrorKind {
                 write!(f, "Stack with capacity {capacity} overflowed")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
-            ErrorKind::InvalidLayout => {
-                write!(f, "Invalid layout")
+            ErrorKind::InvalidLayout { size, align } => {
+                write!(f, "Invalid layout for size {size} and alignment {align}")
             }
             #[cfg(feature = "alloc")]
             ErrorKind::CapacityError => {
