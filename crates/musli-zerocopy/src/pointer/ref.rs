@@ -252,28 +252,13 @@ where
     #[inline]
     pub fn with_metadata<U>(offset: U, metadata: T::Metadata) -> Self
     where
-        U: Copy + fmt::Debug,
+        U: Copy + IntoRepr,
         O: TryFrom<U>,
     {
-        const {
-            assert!(
-                O::CAN_SWAP_BYTES,
-                "Offset cannot be byte-ordered since it would not inhabit valid types"
-            );
+        match Ref::try_with_metadata(offset, metadata) {
+            Ok(ok) => ok,
+            Err(error) => panic!("{error}"),
         }
-
-        let Some(offset) = O::try_from(offset).ok() else {
-            panic!("Offset {offset:?} not in legal range 0-{}", O::MAX);
-        };
-
-        let Some(metadata) = T::try_from_metadata(metadata) else {
-            panic!("Metadata {metadata:?} not in legal range 0-{}", O::MAX);
-        };
-
-        Ref::from_parts(
-            O::swap_bytes::<E>(offset),
-            T::Stored::<O>::swap_bytes::<E>(metadata),
-        )
     }
 
     /// Fallibly try to construct a reference with metadata.
@@ -307,7 +292,7 @@ where
     /// ```
     pub fn try_with_metadata<U>(offset: U, metadata: T::Metadata) -> Result<Self, Error>
     where
-        U: Copy + IntoRepr + fmt::Debug,
+        U: Copy + IntoRepr,
         O: TryFrom<U>,
     {
         const {
