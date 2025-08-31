@@ -597,9 +597,12 @@ where
     {
         let at = reference.offset();
 
-        // Note: We only need this as debug assertion, because `MaybeUninit<T>`
+        // Note: We only need this as an assertion, because `MaybeUninit<T>`
         // does not implement `ZeroCopy`, so there is no way to construct.
-        assert!(at + size_of::<T>() <= self.len, "Length overflow");
+        assert!(
+            at.saturating_add(size_of::<T>()) <= self.len,
+            "Length overflow"
+        );
 
         // SAFETY: `MaybeUninit<T>` has no representation requirements and is
         // unaligned.
