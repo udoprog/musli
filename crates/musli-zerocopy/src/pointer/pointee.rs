@@ -53,7 +53,7 @@ pub trait Pointee: self::sealed::Sealed {
 
     /// The size of `T` with the given stored metadata.
     #[doc(hidden)]
-    fn size<E, O>(metadata: Self::Stored<O>) -> usize
+    fn size<E, O>(metadata: Self::Stored<O>) -> Option<usize>
     where
         E: ByteOrder,
         O: Size;
@@ -92,12 +92,12 @@ where
     }
 
     #[inline(always)]
-    fn size<E, O>((): Self::Stored<O>) -> usize
+    fn size<E, O>((): Self::Stored<O>) -> Option<usize>
     where
         E: ByteOrder,
         O: Size,
     {
-        size_of::<T>()
+        Some(size_of::<T>())
     }
 
     #[inline(always)]
@@ -138,13 +138,13 @@ where
     }
 
     #[inline(always)]
-    fn size<E, O>(metadata: Self::Stored<O>) -> usize
+    fn size<E, O>(metadata: Self::Stored<O>) -> Option<usize>
     where
         E: ByteOrder,
         O: Size,
     {
         let len = metadata.as_usize::<E>();
-        size_of::<T>().wrapping_mul(len)
+        size_of::<T>().checked_mul(len)
     }
 
     #[inline(always)]
@@ -183,12 +183,12 @@ impl Pointee for str {
     }
 
     #[inline(always)]
-    fn size<E, O>(metadata: Self::Stored<O>) -> usize
+    fn size<E, O>(metadata: Self::Stored<O>) -> Option<usize>
     where
         E: ByteOrder,
         O: Size,
     {
-        metadata.as_usize::<E>()
+        Some(metadata.as_usize::<E>())
     }
 
     #[inline(always)]

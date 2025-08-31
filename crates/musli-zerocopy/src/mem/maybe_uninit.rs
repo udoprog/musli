@@ -130,7 +130,7 @@ where
     }
 
     #[inline]
-    fn size<E, O>(metadata: Self::Stored<O>) -> usize
+    fn size<E, O>(metadata: Self::Stored<O>) -> Option<usize>
     where
         E: ByteOrder,
         O: Size,

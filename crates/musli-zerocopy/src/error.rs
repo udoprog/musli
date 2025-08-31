@@ -217,7 +217,7 @@ pub(crate) enum ErrorKind {
         capacity: usize,
     },
     InvalidLayout {
-        size: usize,
+        size: Option<usize>,
         align: usize,
     },
     #[cfg(feature = "alloc")]
@@ -296,8 +296,17 @@ impl fmt::Display for ErrorKind {
                 write!(f, "Stack with capacity {capacity} overflowed")
             }
             ErrorKind::Utf8Error { error } => error.fmt(f),
-            ErrorKind::InvalidLayout { size, align } => {
+            ErrorKind::InvalidLayout {
+                size: Some(size),
+                align,
+            } => {
                 write!(f, "Invalid layout for size {size} and alignment {align}")
+            }
+            ErrorKind::InvalidLayout { size: None, align } => {
+                write!(
+                    f,
+                    "Invalid layout for overflowing size and alignment {align}"
+                )
             }
             #[cfg(feature = "alloc")]
             ErrorKind::CapacityError => {
