@@ -2,8 +2,8 @@ use core::alloc::{Layout, LayoutError};
 use core::fmt;
 use core::mem::size_of;
 
-use crate::ByteOrder;
-use crate::error::{CoerceError, IntoRepr};
+use crate::endian::Native;
+use crate::error::CoerceError;
 use crate::pointer::Size;
 use crate::traits::ZeroCopy;
 
@@ -37,11 +37,11 @@ mod sealed {
 /// [`Ref<T>`]: crate::Ref
 pub trait Pointee: self::sealed::Sealed {
     /// Metadata associated with a pointee.
-    type Metadata: Copy + fmt::Debug + IntoRepr;
+    type Metadata: Copy + fmt::Debug;
 
     /// The stored representation of the pointee metadata.
     #[doc(hidden)]
-    type Stored<O>: Copy + ZeroCopy + IntoRepr
+    type Stored<O>: Copy + ZeroCopy
     where
         O: Size;
 
@@ -53,23 +53,20 @@ pub trait Pointee: self::sealed::Sealed {
 
     /// The size of `T` with the given stored metadata.
     #[doc(hidden)]
-    fn size<E, O>(metadata: Self::Stored<O>) -> Option<usize>
+    fn size<O>(metadata: Self::Stored<O>) -> Option<usize>
     where
-        E: ByteOrder,
         O: Size;
 
     /// The alignment of `T` with the given stored metadata.
     #[doc(hidden)]
-    fn align<E, O>(metadata: Self::Stored<O>) -> usize
+    fn align<O>(metadata: Self::Stored<O>) -> usize
     where
-        E: ByteOrder,
         O: Size;
 
     /// The layout of `T` with the given stored metadata.
     #[doc(hidden)]
-    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    fn pointee_layout<O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
     where
-        E: ByteOrder,
         O: Size;
 }
 
@@ -92,27 +89,24 @@ where
     }
 
     #[inline(always)]
-    fn size<E, O>((): Self::Stored<O>) -> Option<usize>
+    fn size<O>((): Self::Stored<O>) -> Option<usize>
     where
-        E: ByteOrder,
         O: Size,
     {
         Some(size_of::<T>())
     }
 
     #[inline(always)]
-    fn align<E, O>((): Self::Stored<O>) -> usize
+    fn align<O>((): Self::Stored<O>) -> usize
     where
-        E: ByteOrder,
         O: Size,
     {
         align_of::<T>()
     }
 
     #[inline(always)]
-    fn pointee_layout<E, O>((): Self::Stored<O>) -> Result<Layout, LayoutError>
+    fn pointee_layout<O>((): Self::Stored<O>) -> Result<Layout, LayoutError>
     where
-        E: ByteOrder,
         O: Size,
     {
         Ok(Layout::new::<T>())
@@ -138,31 +132,28 @@ where
     }
 
     #[inline(always)]
-    fn size<E, O>(metadata: Self::Stored<O>) -> Option<usize>
+    fn size<O>(metadata: Self::Stored<O>) -> Option<usize>
     where
-        E: ByteOrder,
         O: Size,
     {
-        let len = metadata.as_usize::<E>();
+        let len = metadata.as_usize::<Native>();
         size_of::<T>().checked_mul(len)
     }
 
     #[inline(always)]
-    fn align<E, O>(_: Self::Stored<O>) -> usize
+    fn align<O>(_: Self::Stored<O>) -> usize
     where
-        E: ByteOrder,
         O: Size,
     {
         align_of::<T>()
     }
 
     #[inline(always)]
-    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    fn pointee_layout<O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
     where
-        E: ByteOrder,
         O: Size,
     {
-        let len = metadata.as_usize::<E>();
+        let len = metadata.as_usize::<Native>();
         Layout::array::<T>(len)
     }
 }
@@ -183,29 +174,26 @@ impl Pointee for str {
     }
 
     #[inline(always)]
-    fn size<E, O>(metadata: Self::Stored<O>) -> Option<usize>
+    fn size<O>(metadata: Self::Stored<O>) -> Option<usize>
     where
-        E: ByteOrder,
         O: Size,
     {
-        Some(metadata.as_usize::<E>())
+        Some(metadata.as_usize::<Native>())
     }
 
     #[inline(always)]
-    fn align<E, O>(_: Self::Stored<O>) -> usize
+    fn align<O>(_: Self::Stored<O>) -> usize
     where
-        E: ByteOrder,
         O: Size,
     {
         align_of::<u8>()
     }
 
     #[inline(always)]
-    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    fn pointee_layout<O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
     where
-        E: ByteOrder,
         O: Size,
     {
-        Layout::array::<u8>(metadata.as_usize::<E>())
+        Layout::array::<u8>(metadata.as_usize::<Native>())
     }
 }

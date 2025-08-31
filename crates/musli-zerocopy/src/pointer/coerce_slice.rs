@@ -12,14 +12,22 @@ mod sealed {
 /// adjusted. We can only perform upwards adjustments such as `[u32]` to `[u16]`
 /// since independent of the length of the slice we know that it defines a
 /// region of memory which is appropriately sized.
-pub trait CoerceSlice<U: ?Sized>: self::sealed::Sealed<U> {
+pub trait CoerceSlice<U>
+where
+    Self: self::sealed::Sealed<U>,
+    U: ?Sized,
+{
     /// Resize with the given `factor`.
     #[doc(hidden)]
-    fn resize<O: Size>(factor: O) -> O;
+    fn resize<O>(factor: O) -> O
+    where
+        O: Size;
 
     /// Try to resize with the given `factor`.
     #[doc(hidden)]
-    fn try_resize<O: Size>(factor: O) -> Result<O, CoerceError>;
+    fn try_resize<O>(factor: O) -> Result<O, CoerceError>
+    where
+        O: Size;
 }
 
 macro_rules! self_impl_inner {

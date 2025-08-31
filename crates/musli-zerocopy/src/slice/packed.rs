@@ -3,7 +3,7 @@ use core::mem::size_of;
 
 use crate::buf::{Buf, Load};
 use crate::endian::{ByteOrder, Native};
-use crate::error::{CoerceError, CoerceErrorKind, Error, IntoRepr};
+use crate::error::{CoerceError, CoerceErrorKind, Error};
 use crate::pointer::{Ref, Size};
 use crate::slice::Slice;
 use crate::{DefaultSize, ZeroCopy};
@@ -180,8 +180,8 @@ where
     #[inline]
     pub fn try_from_raw_parts(offset: usize, len: usize) -> Result<Self, CoerceError>
     where
-        O: TryFrom<usize> + IntoRepr,
-        L: TryFrom<usize> + IntoRepr,
+        O: TryFrom<usize>,
+        L: TryFrom<usize>,
     {
         let Some(offset) = O::try_from(offset).ok() else {
             return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {

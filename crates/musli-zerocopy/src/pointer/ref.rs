@@ -7,7 +7,7 @@ use core::mem::size_of;
 use crate::ZeroCopy;
 use crate::buf::{Padder, Validator};
 use crate::endian::{Big, ByteOrder, Little, Native};
-use crate::error::{CoerceError, CoerceErrorKind, Error, IntoRepr};
+use crate::error::{CoerceError, CoerceErrorKind, Error};
 use crate::mem::MaybeUninit;
 use crate::pointer::Coerce;
 use crate::pointer::{DefaultSize, Pointee, Size};
@@ -206,10 +206,12 @@ where
 
     #[inline]
     fn try_from_parts(offset: O, metadata: T::Stored<O>) -> Result<Self, CoerceError> {
-        let Ok(layout) = T::pointee_layout::<E, O>(metadata) else {
+        let m = metadata.swap_bytes::<E>();
+
+        let Ok(layout) = T::pointee_layout::<O>(m) else {
             return Err(CoerceError::new(CoerceErrorKind::InvalidLayout {
-                size: T::size::<E, O>(metadata),
-                align: T::align::<E, O>(metadata),
+                size: T::size::<O>(m),
+                align: T::align::<O>(m),
             }));
         };
 
@@ -277,7 +279,7 @@ where
     #[inline]
     pub fn with_metadata<U>(offset: U, metadata: T::Metadata) -> Self
     where
-        U: Size + IntoRepr,
+        U: Size,
         O: TryFrom<U>,
     {
         match Ref::try_with_metadata(offset, metadata) {
@@ -363,10 +365,27 @@ where
 
         let metadata = T::try_from_metadata(metadata)?;
 
-        Ref::try_from_parts(
-            O::swap_bytes::<E>(offset),
-            T::Stored::swap_bytes::<E>(metadata),
-        )
+        let Ok(layout) = T::pointee_layout::<O>(metadata) else {
+            return Err(CoerceError::new(CoerceErrorKind::InvalidLayout {
+                size: T::size::<O>(metadata),
+                align: T::align::<O>(metadata),
+            }));
+        };
+
+        let offset_usize = offset.as_usize::<Native>();
+
+        if offset_usize.checked_add(layout.size()).is_none() {
+            return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
+                offset: offset_usize,
+                end: usize::MAX - layout.size(),
+            }));
+        };
+
+        Ok(Ref {
+            offset: O::swap_bytes::<E>(offset),
+            metadata: T::Stored::swap_bytes::<E>(metadata),
+            _marker: PhantomData,
+        })
     }
 }
 
@@ -780,7 +799,11 @@ where
         T: Coerce<U>,
         U: ?Sized + Pointee,
     {
-        Ref::from_parts(self.offset, T::coerce_metadata(self.metadata))
+        // NB: Since the metadata representation is byte-swapped, we need to
+        // swap it back and forth to convert to native representation during
+        // coercion.
+        let metadata = T::coerce_metadata(self.metadata.swap_bytes::<E>()).swap_bytes::<E>();
+        Ref::from_parts(self.offset, metadata)
     }
 
     /// Try to coerce from one kind of reference to another ensuring that the
@@ -848,7 +871,11 @@ where
         T: Coerce<U>,
         U: ?Sized + Pointee,
     {
-        Ref::try_from_parts(self.offset, T::try_coerce_metadata(self.metadata)?)
+        // NB: Since the metadata representation is byte-swapped, we need to
+        // swap it back and forth to convert to native representation during
+        // coercion.
+        let metadata = T::try_coerce_metadata(self.metadata.swap_bytes::<E>())?.swap_bytes::<E>();
+        Ref::try_from_parts(self.offset, metadata)
     }
 
     #[cfg(test)]

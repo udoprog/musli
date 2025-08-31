@@ -10,7 +10,10 @@ mod sealed {
 }
 
 /// Helper trait to convert any type into a type-erased [`Repr`] used for diagnostics.
-pub trait IntoRepr: self::sealed::Sealed {
+pub trait IntoRepr
+where
+    Self: self::sealed::Sealed,
+{
     #[doc(hidden)]
     fn into_repr(self) -> Repr;
 }
@@ -195,8 +198,8 @@ impl Error {
 
     #[inline(always)]
     #[doc(hidden)]
-    pub fn __illegal_enum_discriminant<T>(discriminant: impl IntoRepr) -> Self {
-        Self::new(ErrorKind::IllegalDiscriminant {
+    pub fn __invalid_enum_discriminant<T>(discriminant: impl IntoRepr) -> Self {
+        Self::new(ErrorKind::InvalidDiscriminant {
             name: type_name::<T>(),
             discriminant: discriminant.into_repr(),
         })
@@ -265,14 +268,14 @@ pub(crate) enum ErrorKind {
         index: usize,
         len: usize,
     },
-    IllegalDiscriminant {
+    InvalidDiscriminant {
         name: &'static str,
         discriminant: Repr,
     },
-    IllegalChar {
+    InvalidCharRepr {
         repr: u32,
     },
-    IllegalBool {
+    InvalidBoolRepr {
         repr: u8,
     },
     StackOverflow {
@@ -325,14 +328,14 @@ impl fmt::Display for ErrorKind {
             ErrorKind::StrideOutOfBounds { index, len } => {
                 write!(f, "Stride at index {index} out of bound 0-{len}")
             }
-            ErrorKind::IllegalDiscriminant { name, discriminant } => {
-                write!(f, "Illegal discriminant {discriminant} for enum {name}")
+            ErrorKind::InvalidDiscriminant { name, discriminant } => {
+                write!(f, "Invalid discriminant {discriminant} for enum {name}")
             }
-            ErrorKind::IllegalChar { repr } => {
-                write!(f, "Illegal char representation {repr}")
+            ErrorKind::InvalidCharRepr { repr } => {
+                write!(f, "Invalid char representation {repr}")
             }
-            ErrorKind::IllegalBool { repr } => {
-                write!(f, "Illegal bool representation {repr}")
+            ErrorKind::InvalidBoolRepr { repr } => {
+                write!(f, "Invalid bool representation {repr}")
             }
             ErrorKind::StackOverflow { capacity } => {
                 write!(f, "Stack with capacity {capacity} overflowed")

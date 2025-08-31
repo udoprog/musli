@@ -4,7 +4,6 @@ use core::mem::{ManuallyDrop, size_of};
 use core::ptr::NonNull;
 use core::slice;
 
-use crate::ByteOrder;
 use crate::buf;
 use crate::error::CoerceError;
 use crate::pointer::{Pointee, Size};
@@ -131,29 +130,26 @@ where
     }
 
     #[inline]
-    fn size<E, O>(metadata: Self::Stored<O>) -> Option<usize>
+    fn size<O>(metadata: Self::Stored<O>) -> Option<usize>
     where
-        E: ByteOrder,
         O: Size,
     {
-        T::size::<E, O>(metadata)
+        T::size::<O>(metadata)
     }
 
     #[inline]
-    fn align<E, O>(metadata: Self::Stored<O>) -> usize
+    fn align<O>(metadata: Self::Stored<O>) -> usize
     where
-        E: ByteOrder,
         O: Size,
     {
-        T::align::<E, O>(metadata)
+        T::align::<O>(metadata)
     }
 
     #[inline]
-    fn pointee_layout<E, O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
+    fn pointee_layout<O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
     where
-        E: ByteOrder,
         O: Size,
     {
-        T::pointee_layout::<E, O>(metadata)
+        T::pointee_layout::<O>(metadata)
     }
 }

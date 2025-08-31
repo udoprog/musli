@@ -4,17 +4,24 @@ use crate::traits::ZeroCopy;
 
 /// A trait indicating that a coercion from `Self` to `U` is correct from a size
 /// perspective.
-pub trait Coerce<U: ?Sized + Pointee>: Pointee {
+pub trait Coerce<U>
+where
+    Self: Pointee,
+    U: ?Sized + Pointee,
+{
     /// Coerce metadata from `Self` to `U`.
     ///
     /// Any overflow will wrap around.
-    fn coerce_metadata<O: Size>(metadata: Self::Stored<O>) -> U::Stored<O>;
+    fn coerce_metadata<O>(metadata: Self::Stored<O>) -> U::Stored<O>
+    where
+        O: Size;
 
     /// Try to coerce metadata from `Self` to `U`.
     ///
     /// Any overflow will result in `None`.
-    fn try_coerce_metadata<O: Size>(metadata: Self::Stored<O>)
-    -> Result<U::Stored<O>, CoerceError>;
+    fn try_coerce_metadata<O>(metadata: Self::Stored<O>) -> Result<U::Stored<O>, CoerceError>
+    where
+        O: Size;
 }
 
 /// Defines a coercion from a slice `[T]` to `[U]`.
@@ -28,12 +35,18 @@ where
     [T]: CoerceSlice<[U]>,
 {
     #[inline]
-    fn coerce_metadata<O: Size>(metadata: O) -> O {
+    fn coerce_metadata<O>(metadata: O) -> O
+    where
+        O: Size,
+    {
         <[T]>::resize(metadata)
     }
 
     #[inline]
-    fn try_coerce_metadata<O: Size>(metadata: O) -> Result<O, CoerceError> {
+    fn try_coerce_metadata<O>(metadata: O) -> Result<O, CoerceError>
+    where
+        O: Size,
+    {
         <[T]>::try_resize(metadata)
     }
 }
