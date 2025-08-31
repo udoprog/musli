@@ -8,7 +8,7 @@ use core::mem::size_of;
 use crate::ZeroCopy;
 use crate::buf::{Padder, Validator};
 use crate::endian::{Big, ByteOrder, Little, Native};
-use crate::error::{CoerceError, CoerceErrorKind, Error};
+use crate::error::{CoerceError, Error};
 use crate::mem::MaybeUninit;
 use crate::pointer::Coerce;
 use crate::pointer::{DefaultSize, Pointee, Size};
@@ -109,6 +109,22 @@ where
     E: ByteOrder,
     O: Size,
 {
+    /// Construct a new reference from raw representation.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the reference follows all layout
+    /// requirements documented under the Errors section in
+    /// [`Ref::with_metadata`].
+    #[inline]
+    pub(crate) const unsafe fn new_unchecked(offset: O, metadata: T::Stored<O>) -> Self {
+        Self {
+            offset,
+            metadata,
+            _marker: PhantomData,
+        }
+    }
+
     /// Convert this reference into a [`Big`]-endian [`ByteOrder`].
     ///
     /// # Examples
@@ -214,23 +230,10 @@ where
 
     #[inline]
     fn try_from_parts(offset: O, metadata: T::Stored<O>) -> Result<Self, CoerceError> {
-        let m = metadata.swap_bytes::<E>();
-
-        let Ok(layout) = T::pointee_layout::<O>(m) else {
-            return Err(CoerceError::new(CoerceErrorKind::InvalidLayout {
-                size: T::size::<O>(m),
-                align: T::align::<O>(m),
-            }));
-        };
-
-        let offset_usize = offset.swap_bytes::<E>().as_usize();
-
-        if offset_usize.checked_add(layout.size()).is_none() {
-            return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
-                offset: offset_usize,
-                end: usize::MAX - layout.size(),
-            }));
-        };
+        T::check_layout(
+            offset.swap_bytes::<E>().as_usize(),
+            T::to_metadata(metadata.swap_bytes::<E>()),
+        )?;
 
         Ok(Self {
             offset,
@@ -350,40 +353,11 @@ where
     where
         U: Size,
     {
-        const {
-            assert!(
-                O::CAN_SWAP_BYTES,
-                "Offset cannot be byte-ordered since it would not inhabit valid types"
-            );
-
-            assert!(
-                T::Stored::<O>::CAN_SWAP_BYTES,
-                "Packed offset cannot be byte-ordered since it would not inhabit valid types"
-            );
-        }
-
-        let offset = O::try_from(offset)?;
-        let metadata = T::try_from_metadata(metadata)?;
-
-        let Ok(layout) = T::pointee_layout::<O>(metadata) else {
-            return Err(CoerceError::new(CoerceErrorKind::InvalidLayout {
-                size: T::size::<O>(metadata),
-                align: T::align::<O>(metadata),
-            }));
-        };
-
-        let offset_usize = offset.as_usize();
-
-        if offset_usize.checked_add(layout.size()).is_none() {
-            return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
-                offset: offset_usize,
-                end: usize::MAX - layout.size(),
-            }));
-        };
+        T::check_layout(offset.as_usize(), metadata)?;
 
         Ok(Ref {
-            offset: O::swap_bytes::<E>(offset),
-            metadata: T::Stored::swap_bytes::<E>(metadata),
+            offset: O::try_from(offset)?.swap_bytes::<E>(),
+            metadata: T::try_from_metadata(metadata)?.swap_bytes::<E>(),
             _marker: PhantomData,
         })
     }
@@ -734,7 +708,7 @@ where
             panic!(
                 "Offset {} not in the valid range 0-{}",
                 offset.as_usize(),
-                O::MAX_USIZE
+                O::MAX
             );
         };
 

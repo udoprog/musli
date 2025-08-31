@@ -1,7 +1,7 @@
 use core::alloc::{Layout, LayoutError};
 use core::mem::size_of;
 
-use crate::error::CoerceError;
+use crate::error::{CoerceError, CoerceErrorKind};
 use crate::pointer::Size;
 use crate::traits::ZeroCopy;
 
@@ -33,8 +33,12 @@ mod sealed {
 /// ```
 ///
 /// [`Ref<T>`]: crate::Ref
-pub trait Pointee: self::sealed::Sealed {
+pub trait Pointee
+where
+    Self: self::sealed::Sealed,
+{
     /// Metadata associated with a pointee.
+    #[doc(hidden)]
     type Metadata: Copy;
 
     /// The stored representation of the pointee metadata.
@@ -49,23 +53,43 @@ pub trait Pointee: self::sealed::Sealed {
     where
         O: Size;
 
-    /// The size of `T` with the given stored metadata.
+    /// Convert packed metadata to metadata.
     #[doc(hidden)]
-    fn size<O>(metadata: Self::Stored<O>) -> Option<usize>
+    fn to_metadata<O>(stored: Self::Stored<O>) -> Self::Metadata
     where
         O: Size;
+
+    /// The size of `T` with the given stored metadata.
+    #[doc(hidden)]
+    fn size(metadata: Self::Metadata) -> Option<usize>;
 
     /// The alignment of `T` with the given stored metadata.
     #[doc(hidden)]
-    fn align<O>(metadata: Self::Stored<O>) -> usize
-    where
-        O: Size;
+    fn align(metadata: Self::Metadata) -> usize;
 
     /// The layout of `T` with the given stored metadata.
     #[doc(hidden)]
-    fn pointee_layout<O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
-    where
-        O: Size;
+    fn pointee_layout(metadata: Self::Metadata) -> Result<Layout, LayoutError>;
+
+    #[inline(always)]
+    #[doc(hidden)]
+    fn check_layout(offset: usize, metadata: Self::Metadata) -> Result<(), CoerceError> {
+        let Ok(layout) = Self::pointee_layout(metadata) else {
+            return Err(CoerceError::new(CoerceErrorKind::InvalidLayout {
+                size: Self::size(metadata),
+                align: Self::align(metadata),
+            }));
+        };
+
+        if offset.checked_add(layout.size()).is_none() {
+            return Err(CoerceError::new(CoerceErrorKind::InvalidOffsetRange {
+                offset,
+                end: usize::MAX - layout.size(),
+            }));
+        };
+
+        Ok(())
+    }
 }
 
 impl<T> Pointee for T
@@ -87,26 +111,24 @@ where
     }
 
     #[inline(always)]
-    fn size<O>((): Self::Stored<O>) -> Option<usize>
+    fn to_metadata<O>((): ()) -> Self::Metadata
     where
         O: Size,
     {
+    }
+
+    #[inline(always)]
+    fn size((): Self::Metadata) -> Option<usize> {
         Some(size_of::<T>())
     }
 
     #[inline(always)]
-    fn align<O>((): Self::Stored<O>) -> usize
-    where
-        O: Size,
-    {
+    fn align((): Self::Metadata) -> usize {
         align_of::<T>()
     }
 
     #[inline(always)]
-    fn pointee_layout<O>((): Self::Stored<O>) -> Result<Layout, LayoutError>
-    where
-        O: Size,
-    {
+    fn pointee_layout((): Self::Metadata) -> Result<Layout, LayoutError> {
         Ok(Layout::new::<T>())
     }
 }
@@ -130,29 +152,26 @@ where
     }
 
     #[inline(always)]
-    fn size<O>(metadata: Self::Stored<O>) -> Option<usize>
+    fn to_metadata<O>(metadata: Self::Stored<O>) -> Self::Metadata
     where
         O: Size,
     {
-        let len = metadata.as_usize();
-        size_of::<T>().checked_mul(len)
+        metadata.as_usize()
     }
 
     #[inline(always)]
-    fn align<O>(_: Self::Stored<O>) -> usize
-    where
-        O: Size,
-    {
+    fn size(metadata: Self::Metadata) -> Option<usize> {
+        size_of::<T>().checked_mul(metadata)
+    }
+
+    #[inline(always)]
+    fn align(_: Self::Metadata) -> usize {
         align_of::<T>()
     }
 
     #[inline(always)]
-    fn pointee_layout<O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
-    where
-        O: Size,
-    {
-        let len = metadata.as_usize();
-        Layout::array::<T>(len)
+    fn pointee_layout(metadata: Self::Metadata) -> Result<Layout, LayoutError> {
+        Layout::array::<T>(metadata)
     }
 }
 
@@ -172,26 +191,25 @@ impl Pointee for str {
     }
 
     #[inline(always)]
-    fn size<O>(metadata: Self::Stored<O>) -> Option<usize>
+    fn to_metadata<O>(metadata: Self::Stored<O>) -> Self::Metadata
     where
         O: Size,
     {
+        metadata.as_usize()
+    }
+
+    #[inline(always)]
+    fn size(metadata: Self::Metadata) -> Option<usize> {
         Some(metadata.as_usize())
     }
 
     #[inline(always)]
-    fn align<O>(_: Self::Stored<O>) -> usize
-    where
-        O: Size,
-    {
+    fn align(_: Self::Metadata) -> usize {
         align_of::<u8>()
     }
 
     #[inline(always)]
-    fn pointee_layout<O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
-    where
-        O: Size,
-    {
-        Layout::array::<u8>(metadata.as_usize())
+    fn pointee_layout(metadata: Self::Metadata) -> Result<Layout, LayoutError> {
+        Layout::array::<u8>(metadata)
     }
 }

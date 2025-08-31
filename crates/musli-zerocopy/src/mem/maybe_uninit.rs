@@ -121,7 +121,7 @@ where
     where
         O: Size;
 
-    #[inline]
+    #[inline(always)]
     fn try_from_metadata<O>(metadata: Self::Metadata) -> Result<Self::Stored<O>, CoerceError>
     where
         O: Size,
@@ -129,27 +129,26 @@ where
         T::try_from_metadata(metadata)
     }
 
-    #[inline]
-    fn size<O>(metadata: Self::Stored<O>) -> Option<usize>
+    #[inline(always)]
+    fn to_metadata<O>(stored: Self::Stored<O>) -> Self::Metadata
     where
         O: Size,
     {
-        T::size::<O>(metadata)
+        T::to_metadata(stored)
     }
 
-    #[inline]
-    fn align<O>(metadata: Self::Stored<O>) -> usize
-    where
-        O: Size,
-    {
-        T::align::<O>(metadata)
+    #[inline(always)]
+    fn size(metadata: Self::Metadata) -> Option<usize> {
+        T::size(metadata)
     }
 
-    #[inline]
-    fn pointee_layout<O>(metadata: Self::Stored<O>) -> Result<Layout, LayoutError>
-    where
-        O: Size,
-    {
-        T::pointee_layout::<O>(metadata)
+    #[inline(always)]
+    fn align(metadata: Self::Metadata) -> usize {
+        T::align(metadata)
+    }
+
+    #[inline(always)]
+    fn pointee_layout(metadata: Self::Metadata) -> Result<Layout, LayoutError> {
+        T::pointee_layout(metadata)
     }
 }
