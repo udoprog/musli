@@ -195,7 +195,7 @@ where
     fn from_parts(offset: O, metadata: T::Stored<O>) -> Self {
         match Self::try_from_parts(offset, metadata) {
             Ok(ok) => ok,
-            Err(_) => panic!("Offset plus Size overflows `usize`"),
+            Err(_) => panic!("Metadata describes an invalid layout"),
         }
     }
 
