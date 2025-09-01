@@ -18,7 +18,7 @@
 
 use core::array;
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of, transmute};
+use core::mem::{MaybeUninit, align_of, size_of, transmute};
 use core::num::Wrapping;
 use core::ptr::NonNull;
 use core::slice;
@@ -463,7 +463,7 @@ where
     fn initialize_padding(&mut self) {
         unsafe {
             if Self::PADDED {
-                let ptr = NonNull::new_unchecked((self as *mut Self).cast::<u8>());
+                let ptr = NonNull::new_unchecked((self as *mut Self).cast::<MaybeUninit<u8>>());
                 let mut padder = Padder::new(ptr);
                 Self::pad(&mut padder);
                 padder.remaining();

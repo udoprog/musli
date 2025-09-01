@@ -1,6 +1,6 @@
 use core::borrow::Borrow;
 use core::marker::PhantomData;
-use core::mem::{ManuallyDrop, align_of, size_of, size_of_val};
+use core::mem::{self, ManuallyDrop, align_of, size_of, size_of_val};
 use core::ops::Deref;
 use core::ptr::NonNull;
 use core::slice::{self, SliceIndex};
@@ -43,7 +43,7 @@ where
     O: Size,
 {
     /// Base data pointer.
-    data: NonNull<u8>,
+    data: NonNull<mem::MaybeUninit<u8>>,
     /// The initialized length of the buffer.
     len: usize,
     /// The capacity of the buffer.
@@ -51,7 +51,7 @@ where
     /// The requested alignment.
     requested: usize,
     /// Sticky endianness and pointer size.
-    _marker: PhantomData<(&'a mut [u8], E, O)>,
+    _marker: PhantomData<(&'a mut [mem::MaybeUninit<u8>], E, O)>,
 }
 
 impl<'a> SliceMut<'a> {
@@ -72,8 +72,30 @@ impl<'a> SliceMut<'a> {
         Self::with_alignment::<DefaultAlignment>(bytes)
     }
 
+    /// Construct a new empty buffer with a requested default alignment from an
+    /// uninitialized buffer.
+    ///
+    /// The default alignment is guaranteed to be larger than 0.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::mem::MaybeUninit;
+    /// use musli_zerocopy::SliceMut;
+    ///
+    /// let mut buf: [MaybeUninit<u8>; 1024] = unsafe { MaybeUninit::uninit().assume_init() };
+    /// let mut buf = SliceMut::new_uninit(&mut buf);
+    /// assert!(buf.is_empty());
+    ///
+    /// let number = buf.store(&42u32)?;
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    pub fn new_uninit(bytes: &'a mut [mem::MaybeUninit<u8>]) -> Self {
+        Self::with_alignment_uninit::<DefaultAlignment>(bytes)
+    }
+
     /// Construct a new empty buffer with the an alignment request matching that
-    /// of `T`
+    /// of `T`.
     ///
     /// Note that this does not guarantee that the underlying buffer is aligned.
     ///
@@ -88,6 +110,34 @@ impl<'a> SliceMut<'a> {
     /// assert_eq!(buf.requested(), 8);
     /// ```
     pub fn with_alignment<T>(bytes: &'a mut [u8]) -> Self {
+        let align = align_of::<T>();
+        let capacity = bytes.len();
+
+        Self {
+            data: unsafe { NonNull::new_unchecked(bytes.as_mut_ptr().cast()) },
+            len: 0,
+            capacity,
+            requested: align,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Construct a new empty buffer with the an alignment request matching that
+    /// of `T` from an uninitialized buffer.
+    ///
+    /// Note that this does not guarantee that the underlying buffer is aligned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::SliceMut;
+    ///
+    /// let mut buf = [0; 1024];
+    /// let buf = SliceMut::with_alignment::<u64>(&mut buf);
+    /// assert!(buf.is_empty());
+    /// assert_eq!(buf.requested(), 8);
+    /// ```
+    pub fn with_alignment_uninit<T>(bytes: &'a mut [mem::MaybeUninit<u8>]) -> Self {
         let align = align_of::<T>();
         let capacity = bytes.len();
 
@@ -282,13 +332,13 @@ where
 
     /// Get get a raw pointer to the current buffer.
     #[inline]
-    pub fn as_ptr(&self) -> *const u8 {
+    pub fn as_ptr(&self) -> *const mem::MaybeUninit<u8> {
         self.data.as_ptr() as *const _
     }
 
     /// Get get a raw mutable pointer to the current buffer.
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
+    pub fn as_mut_ptr(&mut self) -> *mut mem::MaybeUninit<u8> {
         self.data.as_ptr()
     }
 
@@ -307,7 +357,8 @@ where
     /// ```
     #[inline]
     pub fn as_slice(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self.as_ptr(), self.len()) }
+        // SAFETY: We only expose the initialized part of the buffer.
+        unsafe { slice::from_raw_parts(self.as_ptr().cast(), self.len()) }
     }
 
     /// Extract a mutable slice containing the entire buffer.
@@ -326,7 +377,8 @@ where
     /// ```
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
+        // SAFETY: We only expose the initialized part of the buffer.
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr().cast(), self.len()) }
     }
 
     /// Access the buffer mutably.
@@ -708,7 +760,8 @@ where
             self.next_offset_with_and_reserve(T::ALIGN, size)?;
             let offset = self.len;
             let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
-            ptr.as_ptr().copy_from_nonoverlapping(value.as_ptr(), size);
+            ptr.as_ptr()
+                .copy_from_nonoverlapping(value.as_ptr().cast(), size);
 
             if T::PADDED {
                 let mut padder = Padder::new(ptr);

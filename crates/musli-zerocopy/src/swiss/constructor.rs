@@ -444,7 +444,7 @@ impl<'a, T> Bucket<'a, T> {
     {
         // SAFETY: During bucket construction we've asserted that a buffer of
         // the appropriate size (that is not guaranteed to be aligned) is used.
-        unsafe { buf::store_unaligned(self.data, value) }
+        unsafe { buf::store_unaligned(self.data.cast(), value) }
     }
 }
 
