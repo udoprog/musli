@@ -203,7 +203,13 @@ impl Benchmarker {
         }
 
         let buffer_ty = match buffer_fn.as_ref().map(|f| &f.sig.output) {
-            Some(syn::ReturnType::Type(_, ty)) => *ty.clone(),
+            Some(ret @ syn::ReturnType::Type(_, ty)) => {
+                if let Some((ty, _)) = unpack_output_result(ret) {
+                    ty.clone()
+                } else {
+                    (**ty).clone()
+                }
+            }
             _ => syn::parse_quote!(()),
         };
 
@@ -243,28 +249,43 @@ impl Benchmarker {
         let provider_fns = providers.iter().map(|p| &p.f);
 
         if let Some(buffer_fn) = buffer_fn {
-            let buffer_fn_call = &buffer_fn.sig.ident;
+            let ident = &buffer_fn.sig.ident;
 
-            new_content.push(syn::parse_quote! {
-                #[inline(always)]
-                #visibility fn new() -> Benchmarker {
-                    #buffer_fn
-                    #(#provider_fns)*
+            if let Some((_, error)) = unpack_output_result(&buffer_fn.sig.output) {
+                new_content.push(syn::parse_quote! {
+                    #[inline(always)]
+                    #visibility fn setup() -> Result<Benchmarker, #error> {
+                        #buffer_fn
+                        #(#provider_fns)*
 
-                    Benchmarker {
-                        buffer: #buffer_fn_call(),
-                        #(#provider_field: #provider_field(),)*
+                        Ok(Benchmarker {
+                            buffer: #ident()?,
+                            #(#provider_field: #provider_field(),)*
+                        })
                     }
-                }
-            });
+                });
+            } else {
+                new_content.push(syn::parse_quote! {
+                    #[inline(always)]
+                    #visibility fn setup() -> Result<Benchmarker, ::core::convert::Infallible> {
+                        #buffer_fn
+                        #(#provider_fns)*
+
+                        Ok(Benchmarker {
+                            buffer: #ident(),
+                            #(#provider_field: #provider_field(),)*
+                        })
+                    }
+                });
+            }
         } else {
             new_content.push(syn::parse_quote! {
                 #[inline(always)]
-                #visibility fn new() -> Benchmarker {
-                    Benchmarker {
+                #visibility fn setup() -> Result<Benchmarker, ::core::convert::Infallible> {
+                    Ok(Benchmarker {
                         buffer: (),
                         #(#provider_field: #provider_field(),)*
-                    }
+                    })
                 }
             });
         }
@@ -283,27 +304,42 @@ impl Benchmarker {
             }
         });
 
-        let reset_item_fn = if let Some((reset_fn, reset_args)) = reset_fn {
-            let reset_inner = &reset_fn.sig.ident;
-            let (size_hint, value) = reset_idents(&reset_args);
-            let reset_args = convert_arguments(reset_args, ReferenceType::Encode);
+        let reset_item_fn;
+
+        if let Some((reset_fn, args)) = reset_fn {
+            let (size_hint, value) = reset_idents(&args);
+            let reset_args = convert_arguments(args, ReferenceType::Encode);
             let (reset_generics, reset_param) = mangle_reset_lifetimes(&reset_fn, encode_lifetime);
-            let mut reset_item_fn = reset_fn.clone();
-            reset_item_fn.sig.inputs =
+
+            let mut item = reset_fn.clone();
+            item.sig.inputs =
                 syn::parse_quote!(&mut self, #size_hint: usize, #value: &#reset_param);
-            reset_item_fn.sig.generics = reset_generics;
-            reset_item_fn.block = syn::parse_quote! {
-                {
+            item.sig.generics = reset_generics;
+
+            let reset_inner = &reset_fn.sig.ident;
+
+            if unpack_output_result(&reset_fn.sig.output).is_some() {
+                item.block = syn::parse_quote! {{
                     #reset_fn
                     #reset_inner(#reset_args)
+                }};
+            } else {
+                item.sig.output = syn::parse_quote!(-> Result<(), ::core::convert::Infallible>);
+
+                item.block = syn::parse_quote! {{
+                    #reset_fn
+                    #reset_inner(#reset_args);
+                    Ok(())
+                }};
+            }
+
+            reset_item_fn = item;
+        } else {
+            reset_item_fn = syn::parse_quote! {
+                #visibility fn reset<T>(&mut self, _: usize, _: &T) -> Result<(), ::core::convert::Infallible> {
+                    Ok(())
                 }
             };
-
-            reset_item_fn
-        } else {
-            syn::parse_quote! {
-                #visibility fn reset<T>(&mut self, _: usize, _: &T) {}
-            }
         };
 
         let encode_args = convert_arguments(encode_args, ReferenceType::Encode);
@@ -359,12 +395,10 @@ impl Benchmarker {
         decode_item_fn.sig.inputs = syn::parse_quote!(&mut self);
         decode_item_fn.sig.generics =
             mangle_decode_lifetimes(&decode_fn, encode_lifetime, &extra_lts);
-        decode_item_fn.block = syn::parse_quote! {
-            {
-                #decode_fn
-                #decode_inner(#decode_args)
-            }
-        };
+        decode_item_fn.block = syn::parse_quote! {{
+            #decode_fn
+            #decode_inner(#decode_args)
+        }};
 
         let as_bytes_fn = match &attrs.as_bytes {
             AsBytes::Disabled => {
@@ -834,18 +868,23 @@ fn public_decode_mangling(decode_fn: &syn::ItemFn, arguments: &[Argument]) -> Op
     let mut inner_fn_ident = syn::PathSegment::from(decode_fn.sig.ident.clone());
     inner_fn_ident.arguments = generics_to_path_arguments(&decode_fn.sig.generics);
 
-    let needs_b = needs_b.then(|| quote::quote!(let mut b = new();));
+    let needs_b = needs_b.then(|| {
+        quote::quote! {
+            let mut b = match self::setup() {
+                Ok(b) => b,
+                Err(error) => match error {},
+            };
+        }
+    });
 
     let mut outer_fn = decode_fn.clone();
-    outer_fn.sig.inputs = new_inputs;
-    outer_fn.block = syn::parse_quote! {
-        {
-            #decode_fn
 
-            #needs_b;
-            #inner_fn_ident(#inner_arguments)
-        }
-    };
+    outer_fn.sig.inputs = new_inputs;
+    outer_fn.block = syn::parse_quote! {{
+        #decode_fn
+        #needs_b;
+        #inner_fn_ident(#inner_arguments)
+    }};
 
     Some(outer_fn)
 }

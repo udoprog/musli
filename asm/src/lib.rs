@@ -1,7 +1,7 @@
 #[cfg(feature = "musli-zerocopy")]
 pub mod musli_zerocopy_store {
-    use musli_zerocopy::OwnedBuf;
     use musli_zerocopy::endian;
+    use musli_zerocopy::{Error, OwnedBuf};
     use tests::models::*;
 
     macro_rules! build {
@@ -9,8 +9,9 @@ pub mod musli_zerocopy_store {
             tests::if_supported! {
                 musli_zerocopy, $id,
                 #[inline(never)]
-                pub fn $id(buf: &mut OwnedBuf<endian::Native, usize>, primitives: &$ty) {
-                    buf.store(primitives);
+                pub fn $id(buf: &mut OwnedBuf<endian::Native, usize>, primitives: &$ty) -> Result<(), Error> {
+                    buf.store(primitives)?;
+                    Ok(())
                 }
             }
         };
@@ -21,8 +22,8 @@ pub mod musli_zerocopy_store {
 
 #[cfg(feature = "musli-zerocopy")]
 pub mod musli_zerocopy_store_unchecked {
-    use musli_zerocopy::OwnedBuf;
     use musli_zerocopy::endian;
+    use musli_zerocopy::{Error, OwnedBuf};
     use tests::models::*;
 
     macro_rules! build {
@@ -30,10 +31,12 @@ pub mod musli_zerocopy_store_unchecked {
             tests::if_supported! {
                 musli_zerocopy, $id,
                 #[inline(never)]
-                pub fn $id(buf: &mut OwnedBuf<endian::Native, usize>, primitives: &$ty) {
+                pub fn $id(buf: &mut OwnedBuf<endian::Native, usize>, primitives: &$ty) -> Result<(), Error> {
                     unsafe {
-                        buf.store_unchecked(primitives);
+                        buf.store_unchecked(primitives)?;
                     }
+
+                    Ok(())
                 }
             }
         };
