@@ -4,7 +4,7 @@ use core::array;
 
 use anyhow::Result;
 
-use crate::mem::MaybeUninit;
+use crate::mem::PackedMaybeUninit;
 use crate::{Ref, ZeroCopy};
 
 use super::OwnedBuf;
@@ -98,7 +98,7 @@ fn test_unaligned_write() -> Result<()> {
     let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128)?;
     buf.extend_from_slice(&[1])?;
 
-    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
+    let reference: Ref<PackedMaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 
     let string = buf.store_unsized("Hello World!")?;
 
@@ -150,7 +150,7 @@ fn inner_padding() -> Result<()> {
     let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128)?;
     buf.extend_from_slice(&[1])?;
 
-    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
+    let reference: Ref<PackedMaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 
     buf.load_uninit_mut(reference)?.write(&custom);
 

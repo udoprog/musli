@@ -6,13 +6,13 @@ use crate::pointer::Size;
 use crate::traits::ZeroCopy;
 
 mod sealed {
-    use crate::mem::MaybeUninit;
+    use crate::mem::PackedMaybeUninit;
     use crate::pointer::Pointee;
     use crate::traits::ZeroCopy;
 
     pub trait Sealed {}
 
-    impl<T> Sealed for MaybeUninit<T> where T: Pointee {}
+    impl<T> Sealed for PackedMaybeUninit<T> where T: Pointee {}
     impl<T> Sealed for T where T: ZeroCopy {}
     impl<T> Sealed for [T] where T: ZeroCopy {}
     impl Sealed for str {}

@@ -9,7 +9,7 @@ use crate::ZeroCopy;
 use crate::buf::{Padder, Validator};
 use crate::endian::{Big, ByteOrder, Little, Native};
 use crate::error::{CoerceError, Error};
-use crate::mem::MaybeUninit;
+use crate::mem::PackedMaybeUninit;
 use crate::pointer::Coerce;
 use crate::pointer::{DefaultSize, Pointee, Size};
 
@@ -912,7 +912,7 @@ where
     }
 }
 
-impl<T, E, O> Ref<MaybeUninit<T>, E, O>
+impl<T, E, O> Ref<PackedMaybeUninit<T>, E, O>
 where
     T: Pointee,
     E: ByteOrder,

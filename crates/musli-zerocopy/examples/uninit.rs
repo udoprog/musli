@@ -1,4 +1,4 @@
-use musli_zerocopy::mem::MaybeUninit;
+use musli_zerocopy::mem::PackedMaybeUninit;
 use musli_zerocopy::{Error, OwnedBuf, Ref, ZeroCopy};
 
 fn main() -> Result<(), Error> {
@@ -11,7 +11,7 @@ fn main() -> Result<(), Error> {
     let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128)?;
     buf.extend_from_slice(&[1])?;
 
-    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
+    let reference: Ref<PackedMaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 
     let string = buf.store_unsized("Hello World!")?;
 

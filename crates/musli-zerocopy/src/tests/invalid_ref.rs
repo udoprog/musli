@@ -3,7 +3,7 @@ use alloc::string::ToString;
 use musli_zerocopy_macros::ZeroCopy;
 
 use crate::endian::{Big, ByteOrder, Little, Native};
-use crate::mem::MaybeUninit;
+use crate::mem::PackedMaybeUninit;
 use crate::traits::ZeroCopy;
 use crate::{Buf, Error, Ref};
 
@@ -77,8 +77,9 @@ fn test_swap() {
                 "Offset 18446744073709551615 not in valid range 0-18446744073709551614"
             );
 
-            let e = Ref::<MaybeUninit<u8>, $order, usize>::try_with_metadata(usize::MAX, ())
+            let e = Ref::<PackedMaybeUninit<u8>, $order, usize>::try_with_metadata(usize::MAX, ())
                 .unwrap_err();
+
             assert_eq!(
                 e.to_string(),
                 "Offset 18446744073709551615 not in valid range 0-18446744073709551614"

@@ -1,6 +1,6 @@
 use core::alloc::{Layout, LayoutError};
 use core::fmt;
-use core::mem::{self, ManuallyDrop, size_of};
+use core::mem::{ManuallyDrop, MaybeUninit, size_of};
 use core::ptr::NonNull;
 use core::slice;
 
@@ -11,10 +11,9 @@ use crate::traits::ZeroCopy;
 
 /// A value which might or might not have been initialized.
 ///
-/// This differs from the standard library
-/// [`MaybeUninit`][core::mem::MaybeUninit] in that its methods does not inherit
-/// the alignment of the inner value so it can correctly refer to elements of
-/// `T` in unaligned memory. Which [`OwnedBuf`] might refer to.
+/// This differs from the standard library [`MaybeUninit`] in that its methods
+/// does not inherit the alignment of the inner value so it can correctly refer
+/// to elements of `T` in unaligned memory. Which [`OwnedBuf`] might refer to.
 ///
 /// # Examples
 ///
@@ -24,7 +23,7 @@ use crate::traits::ZeroCopy;
 ///
 /// ```
 /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
-/// use musli_zerocopy::mem::MaybeUninit;
+/// use musli_zerocopy::mem::PackedMaybeUninit;
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C)]
@@ -32,7 +31,7 @@ use crate::traits::ZeroCopy;
 ///
 /// let mut buf = OwnedBuf::new();
 ///
-/// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
+/// let reference: Ref<PackedMaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 ///
 /// let string = buf.store_unsized("Hello World!")?;
 ///
@@ -47,12 +46,12 @@ use crate::traits::ZeroCopy;
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 #[repr(C, packed)]
-pub union MaybeUninit<T> {
+pub union PackedMaybeUninit<T> {
     uninit: (),
     value: ManuallyDrop<T>,
 }
 
-impl<T> MaybeUninit<T> {
+impl<T> PackedMaybeUninit<T> {
     /// Creates a new `MaybeUninit<T>` in an uninitialized state.
     ///
     /// Note that dropping a `MaybeUninit<T>` will never call `T`'s drop code.
@@ -64,12 +63,12 @@ impl<T> MaybeUninit<T> {
     /// # Example
     ///
     /// ```
-    /// use musli_zerocopy::mem::MaybeUninit;
+    /// use musli_zerocopy::mem::PackedMaybeUninit;
     ///
-    /// let mut v: MaybeUninit<u32> = MaybeUninit::uninit();
+    /// let mut v: PackedMaybeUninit<u32> = PackedMaybeUninit::uninit();
     /// ```
     pub const fn uninit() -> Self {
-        MaybeUninit { uninit: () }
+        PackedMaybeUninit { uninit: () }
     }
 
     /// Write a value to the current location being pointed to.
@@ -87,9 +86,9 @@ impl<T> MaybeUninit<T> {
     /// Writing to an uninitialized location on the stack:
     ///
     /// ```
-    /// use musli_zerocopy::mem::MaybeUninit;
+    /// use musli_zerocopy::mem::PackedMaybeUninit;
     ///
-    /// let mut v: MaybeUninit<u32> = MaybeUninit::uninit();
+    /// let mut v: PackedMaybeUninit<u32> = PackedMaybeUninit::uninit();
     /// assert_eq!(v.write(&10u32.to_le()), &[10, 0, 0, 0]);
     /// ```
     #[inline]
@@ -98,20 +97,20 @@ impl<T> MaybeUninit<T> {
         T: ZeroCopy,
     {
         unsafe {
-            let ptr = NonNull::new_unchecked(self as *mut Self as *mut mem::MaybeUninit<u8>);
+            let ptr = NonNull::new_unchecked(self as *mut Self as *mut MaybeUninit<u8>);
             buf::store_unaligned(ptr, value);
             slice::from_raw_parts_mut(ptr.as_ptr().cast(), size_of::<T>())
         }
     }
 }
 
-impl<T> fmt::Debug for MaybeUninit<T> {
+impl<T> fmt::Debug for PackedMaybeUninit<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MaybeUninit").finish_non_exhaustive()
     }
 }
 
-impl<T> Pointee for MaybeUninit<T>
+impl<T> Pointee for PackedMaybeUninit<T>
 where
     T: Pointee,
 {

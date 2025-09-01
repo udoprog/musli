@@ -1,7 +1,7 @@
 use core::alloc::Layout;
 use core::borrow::Borrow;
 use core::marker::PhantomData;
-use core::mem::{self, ManuallyDrop, align_of, size_of, size_of_val};
+use core::mem::{ManuallyDrop, MaybeUninit, align_of, size_of, size_of_val};
 use core::ops::Deref;
 use core::ptr::NonNull;
 use core::slice::{self, SliceIndex};
@@ -14,7 +14,7 @@ use alloc::alloc;
 use crate::buf::{self, AllocError, Buf, DefaultAlignment, Padder, StoreBuf};
 use crate::endian::{ByteOrder, Native};
 use crate::error::{Error, ErrorKind};
-use crate::mem::MaybeUninit;
+use crate::mem::PackedMaybeUninit;
 use crate::pointer::{DefaultSize, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
@@ -45,7 +45,7 @@ where
     E: ByteOrder,
     O: Size,
 {
-    data: NonNull<mem::MaybeUninit<u8>>,
+    data: NonNull<MaybeUninit<u8>>,
     /// The initialized length of the buffer.
     len: usize,
     /// The capacity of the buffer.
@@ -411,14 +411,14 @@ where
 
     /// Get get a raw mutable pointer to the current buffer.
     #[inline]
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut mem::MaybeUninit<u8> {
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut MaybeUninit<u8> {
         self.data.as_ptr()
     }
 
     /// Get get a raw mutable pointer to the current buffer.
     #[inline]
     #[cfg(test)]
-    pub(crate) fn as_nonnull(&mut self) -> NonNull<mem::MaybeUninit<u8>> {
+    pub(crate) fn as_nonnull(&mut self) -> NonNull<MaybeUninit<u8>> {
         self.data
     }
 
@@ -505,8 +505,8 @@ where
     /// To get the offset where the value will be written, call
     /// [`next_offset<T>()`] before storing the value.
     ///
-    /// > **Note:** this does not return [`std::mem::MaybeUninit`], instead we
-    /// > use an internal [`MaybeUninit`] which is similar but has different
+    /// > **Note:** this does not return [`MaybeUninit`], instead we use an
+    /// > internal [`MaybeUninit`] which is similar but has different
     /// > properties. See [its documentation][MaybeUninit] for more.
     ///
     /// [`next_offset<T>()`]: Self::next_offset()
@@ -515,7 +515,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::mem::MaybeUninit;
+    /// use musli_zerocopy::mem::PackedMaybeUninit;
     /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
@@ -523,7 +523,7 @@ where
     /// struct Custom { field: u32, string: Ref<str> }
     ///
     /// let mut buf = OwnedBuf::new();
-    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
+    /// let reference: Ref<PackedMaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
     ///
     /// let string = buf.store_unsized("Hello World!")?;
     ///
@@ -534,7 +534,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_uninit<T>(&mut self) -> Result<Ref<MaybeUninit<T>, E, O>, Error>
+    pub fn store_uninit<T>(&mut self) -> Result<Ref<PackedMaybeUninit<T>, E, O>, Error>
     where
         T: ZeroCopy,
     {
@@ -587,14 +587,14 @@ where
     ///
     /// ```
     /// use musli_zerocopy::{OwnedBuf, Ref, ZeroCopy};
-    /// use musli_zerocopy::mem::MaybeUninit;
+    /// use musli_zerocopy::mem::PackedMaybeUninit;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
     /// struct Custom { field: u32, string: Ref<str> }
     ///
     /// let mut buf = OwnedBuf::new();
-    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
+    /// let reference: Ref<PackedMaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
     ///
     /// let string = buf.store_unsized("Hello World!")?;
     ///
@@ -607,8 +607,8 @@ where
     #[inline]
     pub fn load_uninit_mut<T, U, I>(
         &mut self,
-        at: Ref<MaybeUninit<T>, U, I>,
-    ) -> Result<&mut MaybeUninit<T>, Error>
+        at: Ref<PackedMaybeUninit<T>, U, I>,
+    ) -> Result<&mut PackedMaybeUninit<T>, Error>
     where
         T: ZeroCopy,
         U: ByteOrder,
@@ -625,7 +625,7 @@ where
 
         // SAFETY: `MaybeUninit<T>` has no representation requirements and is
         // unaligned.
-        Ok(unsafe { &mut *(self.data.as_ptr().add(offset) as *mut MaybeUninit<T>) })
+        Ok(unsafe { &mut *(self.data.as_ptr().add(offset) as *mut PackedMaybeUninit<T>) })
     }
 
     /// Insert a value with the given size.
@@ -1345,7 +1345,7 @@ where
     }
 }
 
-const unsafe fn dangling(align: usize) -> NonNull<mem::MaybeUninit<u8>> {
+const unsafe fn dangling(align: usize) -> NonNull<MaybeUninit<u8>> {
     unsafe { NonNull::new_unchecked(invalid_mut(align)) }
 }
 
