@@ -217,18 +217,19 @@ pub mod musli_zerocopy {
     use musli_zerocopy::endian;
     use musli_zerocopy::{Buf, Error, OwnedBuf, Ref, ZeroCopy};
 
-    fn buffer() -> OwnedBuf<endian::Native, usize> {
-        OwnedBuf::with_capacity(4096).unwrap().with_size()
+    fn buffer() -> Result<OwnedBuf<endian::Native, usize>, Error> {
+        Ok(OwnedBuf::with_capacity(4096)?.with_size())
     }
 
     #[inline(always)]
-    pub fn reset<T>(buf: &mut OwnedBuf<endian::Native, usize>, #[value] _: &T)
+    pub fn reset<T>(buf: &mut OwnedBuf<endian::Native, usize>, #[value] _: &T) -> Result<(), Error>
     where
         T: ZeroCopy,
     {
         buf.clear();
-        buf.request_align::<T>().unwrap();
-        buf.align_in_place().unwrap();
+        buf.request_align::<T>()?;
+        buf.align_in_place()?;
+        Ok(())
     }
 
     pub fn encode<'buf, T>(

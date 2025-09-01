@@ -300,30 +300,42 @@ fn main() -> Result<()> {
                 $framework, $name, {
                 let name = concat!(stringify!($framework), "/", stringify!($name), "/size");
 
-                if utils::$framework::is_enabled() && $cx.condition(name) {
-                    let mut buf = utils::$framework::new();
-
-                    let mut set = SizeSet {
-                        framework: stringify!($framework),
-                        suite: stringify!($name),
-                        samples: Vec::new(),
-                    };
-
-                    for var in $values.iter() {
-                        let mut state = buf.state();
-                        state.reset($size_hint, var);
-
-                        match state.encode(var) {
-                            Ok(value) => {
-                                set.samples.push(value.len() as i64);
-                            }
+                'bail: {
+                    if utils::$framework::is_enabled() && $cx.condition(name) {
+                        let mut buf = match utils::$framework::setup() {
+                            Ok(buf) => buf,
                             Err(error) => {
-                                writeln!($cx, "{name}: error during encode: {error}")?;
+                                writeln!($cx, "{name}: error during setup: {error}")?;
+                                break 'bail;
+                            }
+                        };
+
+                        let mut set = SizeSet {
+                            framework: stringify!($framework),
+                            suite: stringify!($name),
+                            samples: Vec::new(),
+                        };
+
+                        for var in $values.iter() {
+                            let mut state = buf.state();
+
+                            if let Err(error) = state.reset($size_hint, var) {
+                                writeln!($cx, "{name}: error during reset: {error}")?;
+                                continue;
+                            };
+
+                            match state.encode(var) {
+                                Ok(value) => {
+                                    set.samples.push(value.len() as i64);
+                                }
+                                Err(error) => {
+                                    writeln!($cx, "{name}: error during encode: {error}")?;
+                                }
                             }
                         }
-                    }
 
-                    $out.push(set);
+                        $out.push(set);
+                    }
                 }
             }}
         }};
@@ -341,7 +353,15 @@ fn main() -> Result<()> {
                     let start = Instant::now();
                     let step = $cx.iter / 10;
 
-                    let mut buf = utils::$framework::new();
+                    let mut buf = match utils::$framework::setup() {
+                        Ok(buf) => buf,
+                        Err(error) => {
+                            writeln!($cx, "E")?;
+                            writeln!($cx)?;
+                            writeln!($cx, "error during setup: {error}")?;
+                            return Ok(());
+                        }
+                    };
 
                     'outer:
                     for n in 0..$cx.iter {
@@ -352,7 +372,13 @@ fn main() -> Result<()> {
 
                         for (index, var) in $values.iter().enumerate() {
                             let mut state = buf.state();
-                            state.reset($size_hint, var);
+
+                            if let Err(error) = state.reset($size_hint, var) {
+                                write!($cx, "E")?;
+                                writeln!($cx)?;
+                                writeln!($cx, "{index}: error during reset: {error}")?;
+                                break 'outer;
+                            };
 
                             let result = state.encode(var);
 

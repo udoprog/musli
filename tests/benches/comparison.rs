@@ -57,14 +57,32 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let mut frameworks = Vec::with_capacity(values.len());
 
                     for _ in &values {
-                        frameworks.push(utils::$framework::new());
+                        let framework = match utils::$framework::setup() {
+                            Ok(framework) => framework,
+                            Err(error) => {
+                                panic! {
+                                    "{} / {}: error during setup: {error:?}",
+                                    stringify!($framework),
+                                    stringify!($name)
+                                };
+                            }
+                        };
+
+                        frameworks.push(framework);
                     }
 
                     for (index, (value, framework)) in
                         values.iter().zip(&mut frameworks).enumerate()
                     {
                         let mut state = framework.state();
-                        state.reset($size_hint, value);
+
+                        if let Err(error) = state.reset($size_hint, value) {
+                            panic! {
+                                "{} / {}: resetting for value[{index}] failed: {error:?}",
+                                stringify!($framework),
+                                stringify!($name)
+                            };
+                        }
 
                         let mut out = match state.encode(value) {
                             Ok(out) => out,
@@ -112,13 +130,24 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let mut frameworks = Vec::with_capacity(values.len());
 
                     for _ in &values {
-                        frameworks.push(utils::$framework::new());
+                        let framework = match utils::$framework::setup() {
+                            Ok(framework) => framework,
+                            Err(error) => {
+                                panic! {
+                                    "{} / {}: error during setup: {error:?}",
+                                    stringify!($framework),
+                                    stringify!($name)
+                                };
+                            }
+                        };
+
+                        frameworks.push(framework);
                     }
 
                     $b.iter(|| {
                         for (value, framework) in values.iter().zip(&mut frameworks) {
                             let mut state = framework.state();
-                            state.reset($size_hint, value);
+                            state.reset($size_hint, value).unwrap();
                             black_box(state.encode(value).unwrap());
                         }
                     });
@@ -132,7 +161,18 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let mut frameworks = Vec::with_capacity(values.len());
 
                     for _ in &values {
-                        frameworks.push(utils::$framework::new());
+                        let framework = match utils::$framework::setup() {
+                            Ok(framework) => framework,
+                            Err(error) => {
+                                panic! {
+                                    "{} / {}: error during setup: {error:?}",
+                                    stringify!($framework),
+                                    stringify!($name)
+                                };
+                            }
+                        };
+
+                        frameworks.push(framework);
                     }
 
                     let mut states = Vec::with_capacity(values.len());
@@ -144,7 +184,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                     let mut inputs = Vec::with_capacity(values.len());
 
                     for (value, state) in values.iter().zip(&mut states) {
-                        state.reset($size_hint, value);
+                        state.reset($size_hint, value).unwrap();
                         inputs.push(state.encode(value).unwrap());
                     }
 
@@ -165,13 +205,24 @@ fn criterion_benchmark(c: &mut Criterion) {
                         let mut frameworks = Vec::with_capacity(values.len());
 
                         for _ in &values {
-                            frameworks.push(utils::$framework::new());
+                            let framework = match utils::$framework::setup() {
+                                Ok(framework) => framework,
+                                Err(error) => {
+                                    panic! {
+                                        "{} / {}: error during setup: {error:?}",
+                                        stringify!($framework),
+                                        stringify!($name)
+                                    };
+                                }
+                            };
+
+                            frameworks.push(framework);
                         }
 
                         $b.iter(|| {
                             for (value, framework) in values.iter().zip(&mut frameworks) {
                                 let mut state = framework.state();
-                                state.reset($size_hint, value);
+                                state.reset($size_hint, value).unwrap();
                                 let mut out = black_box(state.encode(value).unwrap());
                                 let actual = black_box(out.decode::<$ty>().unwrap());
                                 tests::debug_assert_eq!(&actual, value);
