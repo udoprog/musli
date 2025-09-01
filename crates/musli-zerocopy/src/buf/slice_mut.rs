@@ -8,9 +8,9 @@ use core::slice::{self, SliceIndex};
 #[cfg(feature = "alloc")]
 use alloc::borrow::Cow;
 
-use crate::buf::{self, Buf, DefaultAlignment, Padder, StoreBuf};
+use crate::buf::{self, AllocError, Buf, DefaultAlignment, Padder, StoreBuf};
 use crate::endian::{ByteOrder, Native};
-use crate::error::Error;
+use crate::error::{Error, ErrorKind};
 use crate::mem::MaybeUninit;
 use crate::pointer::{DefaultSize, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
@@ -28,11 +28,14 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 ///
 /// #[derive(ZeroCopy)]
 /// #[repr(C, align(128))]
-/// struct Custom { field: u32 }
+/// struct Custom {
+///     field: u32,
+/// }
 ///
 /// let mut buf = [0; 1024];
 /// let mut buf = SliceMut::new(&mut buf);
-/// buf.store(&Custom { field: 10 });
+/// buf.store(&Custom { field: 10 })?;
+/// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 pub struct SliceMut<'a, E = Native, O = DefaultSize>
 where
@@ -115,7 +118,10 @@ where
     ///     .with_size::<u8>();
     /// ```
     #[inline]
-    pub fn with_size<U: Size>(self) -> SliceMut<'a, E, U> {
+    pub fn with_size<U>(self) -> SliceMut<'a, E, U>
+    where
+        U: Size,
+    {
         let this = ManuallyDrop::new(self);
 
         SliceMut {
@@ -181,12 +187,13 @@ where
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
     /// assert_eq!(buf.capacity(), 1024);
-    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    /// buf.extend_from_slice(&[1, 2, 3, 4])?;
     ///
     /// assert_eq!(buf.len(), 4);
     /// buf.clear();
     /// assert_eq!(buf.capacity(), 1024);
     /// assert_eq!(buf.len(), 0);
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     pub fn clear(&mut self) {
@@ -257,9 +264,9 @@ where
     /// assert!(buf.capacity() >= 10);
     /// ```
     #[inline]
-    pub fn reserve(&mut self, capacity: usize) {
+    pub fn reserve(&mut self, capacity: usize) -> Result<(), AllocError> {
         let new_capacity = self.len + capacity;
-        self.ensure_capacity(new_capacity);
+        self.ensure_capacity(new_capacity)
     }
 
     /// Advance the length of the owned buffer by `size`.
@@ -294,8 +301,9 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// buf.extend_from_slice(b"hello world");
+    /// buf.extend_from_slice(b"hello world")?;
     /// assert_eq!(buf.as_slice(), b"hello world");
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     pub fn as_slice(&self) -> &[u8] {
@@ -311,9 +319,10 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// buf.extend_from_slice(b"hello world");
+    /// buf.extend_from_slice(b"hello world")?;
     /// buf.as_mut_slice().make_ascii_uppercase();
     /// assert_eq!(buf.as_slice(), b"HELLO WORLD");
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
@@ -329,7 +338,7 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// let slice = buf.store_unsized("hello world");
+    /// let slice = buf.store_unsized("hello world")?;
     ///
     /// // SAFETY: We don't manipulate the underlying buffer in a way which leaves uninitialized data.
     /// let mut buf = unsafe { buf.as_mut_buf() };
@@ -387,31 +396,31 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
     ///
-    /// let string = buf.store_unsized("Hello World!");
+    /// let string = buf.store_unsized("Hello World!")?;
     ///
-    /// buf.load_uninit_mut(reference).write(&Custom { field: 42, string });
+    /// buf.load_uninit_mut(reference)?.write(&Custom { field: 42, string });
     ///
     /// let reference = reference.assume_init();
     /// assert_eq!(reference.offset(), 0);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_uninit<T>(&mut self) -> Ref<MaybeUninit<T>, E, O>
+    pub fn store_uninit<T>(&mut self) -> Result<Ref<MaybeUninit<T>, E, O>, Error>
     where
         T: ZeroCopy,
     {
         // SAFETY: We've just reserved capacity for this write.
         unsafe {
-            self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
+            self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>())?;
             let offset = self.len;
             self.data
                 .as_ptr()
                 .add(self.len)
                 .write_bytes(0, size_of::<T>());
             self.len += size_of::<T>();
-            Ref::new(offset)
+            Ok(Ref::try_with_metadata_unchecked(offset, ())?)
         }
     }
 
@@ -438,16 +447,15 @@ where
     /// use musli_zerocopy::SliceMut;
     ///
     /// let mut buf = [0; 1024];
-    /// let mut buf1 = SliceMut::new(&mut buf);
-    /// buf1.store(&1u32);
-    ///
-    /// let mut buf = [0; 1024];
     /// let mut buf2 = SliceMut::new(&mut buf);
     /// buf2.store(&10u32);
     ///
-    /// let number = buf2.store_uninit::<u32>();
+    /// let number = buf2.store_uninit::<u32>()?;
     ///
-    /// buf1.load_uninit_mut(number);
+    /// let mut buf = [0; 0];
+    /// let mut buf1 = SliceMut::new(&mut buf);
+    /// buf1.load_uninit_mut(number)?;
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     ///
     /// # Examples
@@ -462,11 +470,11 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
     ///
-    /// let string = buf.store_unsized("Hello World!");
+    /// let string = buf.store_unsized("Hello World!")?;
     ///
-    /// buf.load_uninit_mut(reference).write(&Custom { field: 42, string });
+    /// buf.load_uninit_mut(reference)?.write(&Custom { field: 42, string });
     ///
     /// let reference = reference.assume_init();
     /// assert_eq!(reference.offset(), 0);
@@ -476,7 +484,7 @@ where
     pub fn load_uninit_mut<T, U, I>(
         &mut self,
         reference: Ref<MaybeUninit<T>, U, I>,
-    ) -> &mut MaybeUninit<T>
+    ) -> Result<&mut MaybeUninit<T>, Error>
     where
         T: ZeroCopy,
         U: ByteOrder,
@@ -484,13 +492,16 @@ where
     {
         let at = reference.offset();
 
-        // Note: We only need this as debug assertion, because `MaybeUninit<T>`
-        // does not implement `ZeroCopy`, so there is no way to construct.
-        assert!(at + size_of::<T>() <= self.len, "Length overflow");
+        if at > self.len {
+            return Err(Error::new(ErrorKind::OutOfRangeBounds {
+                range: (at..at + size_of::<T>()),
+                len: self.len,
+            }));
+        }
 
         // SAFETY: `MaybeUninit<T>` has no representation requirements and is
         // unaligned.
-        unsafe { &mut *(self.data.as_ptr().add(at) as *mut MaybeUninit<T>) }
+        Ok(unsafe { &mut *(self.data.as_ptr().add(at) as *mut MaybeUninit<T>) })
     }
 
     /// Insert a value with the given size.
@@ -517,11 +528,11 @@ where
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
     ///
-    /// let string = buf.store_unsized("string");
-    /// let custom = buf.store(&Custom { field: 1, string });
-    /// let custom2 = buf.store(&Custom { field: 2, string });
+    /// let string = buf.store_unsized("string")?;
+    /// let custom = buf.store(&Custom { field: 1, string })?;
+    /// let custom2 = buf.store(&Custom { field: 2, string })?;
     ///
-    /// let buf = buf.to_requested();
+    /// let buf = buf.to_requested()?;
     ///
     /// let custom = buf.load(custom)?;
     /// assert_eq!(custom.field, 1);
@@ -554,19 +565,19 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// let array = buf.store(&values);
+    /// let array = buf.store(&values)?;
     ///
-    /// let buf = buf.to_requested();
+    /// let buf = buf.to_requested()?;
     ///
     /// assert_eq!(buf.load(array)?, &values);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store<T>(&mut self, value: &T) -> Ref<T, E, O>
+    pub fn store<T>(&mut self, value: &T) -> Result<Ref<T, E, O>, Error>
     where
         T: ZeroCopy,
     {
-        self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
+        self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>())?;
 
         // SAFETY: We're ensuring to both align the internal buffer and store
         // the value.
@@ -606,16 +617,16 @@ where
     /// let mut buf = [0; 12288];
     /// let mut buf = SliceMut::new(&mut buf);
     ///
-    /// let string = buf.store_unsized("string");
+    /// let string = buf.store_unsized("string")?;
     ///
-    /// buf.request_align::<Custom>();
-    /// buf.reserve(2 * size_of::<Custom>());
+    /// buf.request_align::<Custom>()?;
+    /// buf.reserve(2 * size_of::<Custom>())?;
     ///
     /// // SAFETY: We've ensure that the buffer is internally aligned and sized just above.
-    /// let custom = unsafe { buf.store_unchecked(&Custom { field: 1, string }) };
-    /// let custom2 = unsafe { buf.store_unchecked(&Custom { field: 2, string }) };
+    /// let custom = unsafe { buf.store_unchecked(&Custom { field: 1, string })? };
+    /// let custom2 = unsafe { buf.store_unchecked(&Custom { field: 2, string })? };
     ///
-    /// let buf = buf.to_requested();
+    /// let buf = buf.to_requested()?;
     ///
     /// let custom = buf.load(custom)?;
     /// assert_eq!(custom.field, 1);
@@ -627,7 +638,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub unsafe fn store_unchecked<T>(&mut self, value: &T) -> Ref<T, E, O>
+    pub unsafe fn store_unchecked<T>(&mut self, value: &T) -> Result<Ref<T, E, O>, Error>
     where
         T: ZeroCopy,
     {
@@ -637,9 +648,8 @@ where
             let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
             buf::store_unaligned(ptr, value);
             self.len += size_of::<T>();
+            Ok(Ref::try_with_metadata_unchecked(offset, ())?)
         }
-
-        Ref::new(offset)
     }
 
     /// Either return the current buffer, or allocate one which has a
@@ -655,17 +665,17 @@ where
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
     ///
-    /// let first = buf.store_unsized("first");
-    /// let second = buf.store_unsized("second");
+    /// let first = buf.store_unsized("first")?;
+    /// let second = buf.store_unsized("second")?;
     ///
-    /// let buf = buf.to_requested();
+    /// let buf = buf.to_requested()?;
     ///
     /// assert_eq!(buf.load(first)?, "first");
     /// assert_eq!(buf.load(second)?, "second");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[cfg(feature = "alloc")]
-    pub fn to_requested(&self) -> Cow<'_, Buf> {
+    pub fn to_requested(&self) -> Result<Cow<'_, Buf>, AllocError> {
         self.to_aligned_with(self.requested)
     }
 
@@ -679,23 +689,23 @@ where
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
     ///
-    /// let first = buf.store_unsized("first");
-    /// let second = buf.store_unsized("second");
+    /// let first = buf.store_unsized("first")?;
+    /// let second = buf.store_unsized("second")?;
     ///
-    /// let buf = buf.to_requested();
+    /// let buf = buf.to_requested()?;
     ///
     /// assert_eq!(buf.load(first)?, "first");
     /// assert_eq!(buf.load(second)?, "second");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_unsized<T>(&mut self, value: &T) -> Ref<T, E, O>
+    pub fn store_unsized<T>(&mut self, value: &T) -> Result<Ref<T, E, O>, Error>
     where
         T: ?Sized + UnsizedZeroCopy,
     {
         unsafe {
             let size = size_of_val(value);
-            self.next_offset_with_and_reserve(T::ALIGN, size);
+            self.next_offset_with_and_reserve(T::ALIGN, size)?;
             let offset = self.len;
             let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
             ptr.as_ptr().copy_from_nonoverlapping(value.as_ptr(), size);
@@ -707,7 +717,7 @@ where
             }
 
             self.len += size;
-            Ref::with_metadata(offset, value.metadata())
+            Ok(Ref::try_with_metadata_unchecked(offset, value.metadata())?)
         }
     }
 
@@ -721,28 +731,17 @@ where
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
     ///
-    /// let mut values = Vec::new();
+    /// let values = [buf.store_unsized("first")?, buf.store_unsized("second")?];
+    /// let slice = buf.store_slice(&values)?;
+    /// let buf = buf.to_requested()?;
     ///
-    /// values.push(buf.store_unsized("first"));
-    /// values.push(buf.store_unsized("second"));
-    ///
-    /// let slice_ref = buf.store_slice(&values);
-    ///
-    /// let buf = buf.to_requested();
-    ///
-    /// let slice = buf.load(slice_ref)?;
-    ///
-    /// let mut strings = Vec::new();
-    ///
-    /// for value in slice {
-    ///     strings.push(buf.load(*value)?);
-    /// }
-    ///
-    /// assert_eq!(&strings, &["first", "second"][..]);
+    /// let slice = buf.load(slice)?;
+    /// assert_eq!(buf.load(slice[0])?, "first");
+    /// assert_eq!(buf.load(slice[1])?, "second");
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline(always)]
-    pub fn store_slice<T>(&mut self, values: &[T]) -> Ref<[T], E, O>
+    pub fn store_slice<T>(&mut self, values: &[T]) -> Result<Ref<[T], E, O>, Error>
     where
         T: ZeroCopy,
     {
@@ -774,34 +773,38 @@ where
     /// let mut buf = SliceMut::with_alignment::<()>(&mut buf);
     ///
     /// // Add one byte of padding to throw of any incidental alignment.
-    /// buf.extend_from_slice(&[1]);
+    /// buf.extend_from_slice(&[1])?;
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_offset::<u32>());
-    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    /// let ptr: Ref<u32> = Ref::new(buf.next_offset::<u32>()?);
+    /// buf.extend_from_slice(&[1, 2, 3, 4])?;
     ///
-    /// let buf = buf.to_requested();
+    /// let buf = buf.to_requested()?;
     ///
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn extend_from_slice(&mut self, bytes: &[u8]) {
-        self.reserve(bytes.len());
+    pub fn extend_from_slice(&mut self, bytes: &[u8]) -> Result<(), AllocError> {
+        self.reserve(bytes.len())?;
 
         // SAFETY: We just checked that there is space in the slice.
         unsafe {
             self.store_bytes(bytes);
         }
+
+        Ok(())
     }
 
     /// Fill and initialize the buffer with `byte` up to `len`.
-    pub(crate) fn fill(&mut self, byte: u8, len: usize) {
-        self.reserve(len);
+    pub(crate) fn fill(&mut self, byte: u8, len: usize) -> Result<(), AllocError> {
+        self.reserve(len)?;
 
         unsafe {
             let ptr = self.data.as_ptr().add(self.len);
             ptr.write_bytes(byte, len);
             self.len += len;
         }
+
+        Ok(())
     }
 
     /// Store the slice without allocating.
@@ -835,10 +838,11 @@ where
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
     ///
-    /// buf.extend_from_slice(&[1, 2]);
-    /// buf.request_align::<u32>();
+    /// buf.extend_from_slice(&[1, 2])?;
+    /// buf.request_align::<u32>()?;
     ///
     /// assert_eq!(buf.as_slice(), &[1, 2, 0, 0]);
+    /// # Ok::<_, musli_zerocopy::buf::AllocError>(())
     /// ```
     ///
     /// # Safety
@@ -852,41 +856,54 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// buf.extend_from_slice(&[1, 2, 3, 4]);
-    /// buf.request_align::<u64>();
-    /// buf.extend_from_slice(&[5, 6, 7, 8]);
+    /// buf.extend_from_slice(&[1, 2, 3, 4])?;
+    /// buf.request_align::<u64>()?;
+    /// buf.extend_from_slice(&[5, 6, 7, 8])?;
     ///
     /// assert_eq!(buf.as_slice(), &[1, 2, 3, 4, 0, 0, 0, 0, 5, 6, 7, 8]);
+    /// # Ok::<_, musli_zerocopy::buf::AllocError>(())
     /// ```
     #[inline]
-    pub fn request_align<T>(&mut self)
+    pub fn request_align<T>(&mut self) -> Result<(), AllocError>
     where
         T: ZeroCopy,
     {
         self.requested = self.requested.max(align_of::<T>());
-        self.ensure_aligned_and_reserve(align_of::<T>(), size_of::<T>());
+        self.ensure_aligned_and_reserve(align_of::<T>(), size_of::<T>())?;
+        Ok(())
     }
 
     /// Ensure that the current buffer is aligned under the assumption that it
     /// needs to be allocated.
     #[inline]
-    fn ensure_aligned_and_reserve(&mut self, align: usize, reserve: usize) {
+    fn ensure_aligned_and_reserve(
+        &mut self,
+        align: usize,
+        reserve: usize,
+    ) -> Result<(), AllocError> {
         let extra = buf::padding_to(self.len, align);
-        self.reserve(extra + reserve);
+        self.reserve(extra + reserve)?;
 
         // SAFETY: The length is ensures to be within the address space.
         unsafe {
             self.data.as_ptr().add(self.len).write_bytes(0, extra);
             self.len += extra;
         }
+
+        Ok(())
     }
 
     /// Construct a pointer aligned for `align` into the current buffer which
     /// points to the next location that will be written.
     #[inline]
-    pub(crate) fn next_offset_with_and_reserve(&mut self, align: usize, reserve: usize) {
+    pub(crate) fn next_offset_with_and_reserve(
+        &mut self,
+        align: usize,
+        reserve: usize,
+    ) -> Result<(), AllocError> {
         self.requested = self.requested.max(align);
-        self.ensure_aligned_and_reserve(align, reserve);
+        self.ensure_aligned_and_reserve(align, reserve)?;
+        Ok(())
     }
 
     /// Construct a pointer aligned for `T` into the current buffer which points
@@ -904,36 +921,35 @@ where
     /// let mut buf = SliceMut::new(&mut buf);
     ///
     /// // Add one byte of padding to throw of any incidental alignment.
-    /// buf.extend_from_slice(&[1]);
+    /// buf.extend_from_slice(&[1])?;
     ///
-    /// let ptr: Ref<u32> = Ref::new(buf.next_offset::<u32>());
-    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    /// let ptr: Ref<u32> = Ref::new(buf.next_offset::<u32>()?);
+    /// buf.extend_from_slice(&[1, 2, 3, 4])?;
     ///
-    /// let buf = buf.to_requested();
+    /// let buf = buf.to_requested()?;
     ///
     /// assert_eq!(*buf.load(ptr)?, u32::from_ne_bytes([1, 2, 3, 4]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn next_offset<T>(&mut self) -> usize {
+    pub fn next_offset<T>(&mut self) -> Result<usize, AllocError> {
         // SAFETY: The alignment of `T` is guaranteed to be a power of two. We
         // also make sure to reserve space for `T` since it is very likely that
         // it will be written immediately after this.
-        self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>());
-        self.len
+        self.next_offset_with_and_reserve(align_of::<T>(), size_of::<T>())?;
+        Ok(self.len)
     }
 
     // Ensure that the new capacity is available or panic.
     #[inline]
-    fn ensure_capacity(&mut self, new_capacity: usize) {
+    fn ensure_capacity(&mut self, new_capacity: usize) -> Result<(), AllocError> {
         let new_capacity = new_capacity.max(self.requested);
 
         if self.capacity < new_capacity {
-            panic!(
-                "Underlying slice has the capacity {}, but {} bytes are needed",
-                self.capacity, new_capacity
-            )
+            return Err(AllocError::capacity(self.capacity, new_capacity));
         }
+
+        Ok(())
     }
 }
 
@@ -970,9 +986,9 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// let slice = buf.store_unsized("hello world");
+    /// let slice = buf.store_unsized("hello world")?;
     ///
-    /// let buf = buf.to_requested();
+    /// let buf = buf.to_requested()?;
     ///
     /// assert_eq!(buf.load(slice)?, "hello world");
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -1015,7 +1031,7 @@ where
     }
 
     #[inline]
-    fn store_unsized<T>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
+    fn store_unsized<T>(&mut self, value: &T) -> Result<Ref<T, Self::ByteOrder, Self::Size>, Error>
     where
         T: ?Sized + UnsizedZeroCopy,
     {
@@ -1023,7 +1039,7 @@ where
     }
 
     #[inline]
-    fn store<T>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
+    fn store<T>(&mut self, value: &T) -> Result<Ref<T, Self::ByteOrder, Self::Size>, Error>
     where
         T: ZeroCopy,
     {
@@ -1046,26 +1062,32 @@ where
     }
 
     #[inline]
-    fn align_in_place(&mut self) {
+    fn align_in_place(&mut self) -> Result<(), AllocError> {
         // SAFETY: self.requested is guaranteed to be a power of two.
         if !buf::is_aligned_with(self.as_ptr(), self.requested) {
-            panic!("Slice is not aligned by {}", self.requested);
+            return Err(AllocError::misaligned(self.as_ptr(), self.requested));
         }
+
+        Ok(())
     }
 
     #[inline]
-    fn next_offset<T>(&mut self) -> usize {
+    fn next_offset<T>(&mut self) -> Result<usize, AllocError> {
         SliceMut::next_offset::<T>(self)
     }
 
     #[inline]
-    fn next_offset_with_and_reserve(&mut self, align: usize, reserve: usize) {
+    fn next_offset_with_and_reserve(
+        &mut self,
+        align: usize,
+        reserve: usize,
+    ) -> Result<(), AllocError> {
         SliceMut::next_offset_with_and_reserve(self, align, reserve)
     }
 
     #[inline]
-    fn fill(&mut self, byte: u8, len: usize) {
-        SliceMut::fill(self, byte, len);
+    fn fill(&mut self, byte: u8, len: usize) -> Result<(), AllocError> {
+        SliceMut::fill(self, byte, len)
     }
 
     #[inline]

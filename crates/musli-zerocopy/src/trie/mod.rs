@@ -4,8 +4,10 @@
 mod tests;
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub use self::factory::{Builder, store};
 #[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 mod factory;
 
 use self::walk::Walk;
@@ -57,8 +59,8 @@ type StackEntry<'buf, T, F> = (LinksRef<T, F>, usize, &'buf [u8]);
 /// where
 ///     F: trie::Flavor
 /// {
-///     let a = buf.store_unsized("hello");
-///     let b = buf.store_unsized("hello world");
+///     let a = buf.store_unsized("hello")?;
+///     let b = buf.store_unsized("hello world")?;
 ///     trie.insert(buf, a, 1)?;
 ///     trie.insert(buf, b, 2)?;
 ///     trie.build(buf)
@@ -149,8 +151,8 @@ where
     /// use musli_zerocopy::{trie, OwnedBuf};
     ///
     /// let mut buf = OwnedBuf::new();
-    /// let a = buf.store(b"\xe2\x28\xa1").array_into_slice();
-    /// let b = buf.store_unsized("食べない");
+    /// let a = buf.store(b"\xe2\x28\xa1")?.array_into_slice()?;
+    /// let b = buf.store_unsized("食べない")?;
     ///
     /// let mut trie = trie::Builder::new();
     ///
@@ -180,8 +182,8 @@ where
     /// use musli_zerocopy::{trie, OwnedBuf};
     ///
     /// let mut buf = OwnedBuf::new();
-    /// let a = buf.store(b"\xe2\x28\xa1").array_into_slice();
-    /// let b = buf.store_unsized("食べない");
+    /// let a = buf.store(b"\xe2\x28\xa1")?.array_into_slice()?;
+    /// let b = buf.store_unsized("食べない")?;
     ///
     /// let mut trie = trie::Builder::new();
     ///
@@ -212,12 +214,12 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
-    ///     (buf.store_unsized("work"), 1),
-    ///     (buf.store_unsized("worker"), 2),
-    ///     (buf.store_unsized("workers"), 3),
-    ///     (buf.store_unsized("working"), 4),
-    ///     (buf.store_unsized("working"), 5),
-    ///     (buf.store_unsized("working man"), 6),
+    ///     (buf.store_unsized("work")?, 1),
+    ///     (buf.store_unsized("worker")?, 2),
+    ///     (buf.store_unsized("workers")?, 3),
+    ///     (buf.store_unsized("working")?, 4),
+    ///     (buf.store_unsized("working")?, 5),
+    ///     (buf.store_unsized("working man")?, 6),
     /// ];
     ///
     /// let trie = trie::store(&mut buf, values)?;
@@ -284,14 +286,14 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
-    ///     (buf.store_unsized("work"), 1),
-    ///     (buf.store_unsized("worker"), 2),
-    ///     (buf.store_unsized("workers"), 3),
-    ///     (buf.store_unsized("working"), 4),
-    ///     (buf.store_unsized("working"), 5),
-    ///     (buf.store_unsized("working man"), 6),
-    ///     (buf.store_unsized("run"), 7),
-    ///     (buf.store_unsized("running"), 8),
+    ///     (buf.store_unsized("work")?, 1),
+    ///     (buf.store_unsized("worker")?, 2),
+    ///     (buf.store_unsized("workers")?, 3),
+    ///     (buf.store_unsized("working")?, 4),
+    ///     (buf.store_unsized("working")?, 5),
+    ///     (buf.store_unsized("working man")?, 6),
+    ///     (buf.store_unsized("run")?, 7),
+    ///     (buf.store_unsized("running")?, 8),
     /// ];
     ///
     /// let trie = trie::store(&mut buf, values)?;
@@ -327,14 +329,14 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
-    ///     (buf.store_unsized("work"), 1),
-    ///     (buf.store_unsized("worker"), 2),
-    ///     (buf.store_unsized("workers"), 3),
-    ///     (buf.store_unsized("working"), 4),
-    ///     (buf.store_unsized("working"), 5),
-    ///     (buf.store_unsized("working man"), 6),
-    ///     (buf.store_unsized("run"), 7),
-    ///     (buf.store_unsized("running"), 8),
+    ///     (buf.store_unsized("work")?, 1),
+    ///     (buf.store_unsized("worker")?, 2),
+    ///     (buf.store_unsized("workers")?, 3),
+    ///     (buf.store_unsized("working")?, 4),
+    ///     (buf.store_unsized("working")?, 5),
+    ///     (buf.store_unsized("working man")?, 6),
+    ///     (buf.store_unsized("run")?, 7),
+    ///     (buf.store_unsized("running")?, 8),
     /// ];
     ///
     /// let trie = trie::store(&mut buf, values)?;
@@ -369,14 +371,14 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
-    ///     (buf.store_unsized("work"), 1),
-    ///     (buf.store_unsized("worker"), 2),
-    ///     (buf.store_unsized("workers"), 3),
-    ///     (buf.store_unsized("working"), 4),
-    ///     (buf.store_unsized("working"), 5),
-    ///     (buf.store_unsized("working man"), 6),
-    ///     (buf.store_unsized("run"), 7),
-    ///     (buf.store_unsized("running"), 8),
+    ///     (buf.store_unsized("work")?, 1),
+    ///     (buf.store_unsized("worker")?, 2),
+    ///     (buf.store_unsized("workers")?, 3),
+    ///     (buf.store_unsized("working")?, 4),
+    ///     (buf.store_unsized("working")?, 5),
+    ///     (buf.store_unsized("working man")?, 6),
+    ///     (buf.store_unsized("run")?, 7),
+    ///     (buf.store_unsized("running")?, 8),
     /// ];
     ///
     /// let trie = trie::store(&mut buf, values)?;
@@ -420,14 +422,14 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
-    ///     (buf.store_unsized("work"), 1),
-    ///     (buf.store_unsized("worker"), 2),
-    ///     (buf.store_unsized("workers"), 3),
-    ///     (buf.store_unsized("working"), 4),
-    ///     (buf.store_unsized("working"), 5),
-    ///     (buf.store_unsized("working man"), 6),
-    ///     (buf.store_unsized("run"), 7),
-    ///     (buf.store_unsized("running"), 8),
+    ///     (buf.store_unsized("work")?, 1),
+    ///     (buf.store_unsized("worker")?, 2),
+    ///     (buf.store_unsized("workers")?, 3),
+    ///     (buf.store_unsized("working")?, 4),
+    ///     (buf.store_unsized("working")?, 5),
+    ///     (buf.store_unsized("working man")?, 6),
+    ///     (buf.store_unsized("run")?, 7),
+    ///     (buf.store_unsized("running")?, 8),
     /// ];
     ///
     /// let trie = trie::store(&mut buf, values)?;
@@ -485,14 +487,14 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
-    ///     (buf.store_unsized("work"), 1),
-    ///     (buf.store_unsized("worker"), 2),
-    ///     (buf.store_unsized("workers"), 3),
-    ///     (buf.store_unsized("working"), 4),
-    ///     (buf.store_unsized("working"), 5),
-    ///     (buf.store_unsized("working man"), 6),
-    ///     (buf.store_unsized("run"), 7),
-    ///     (buf.store_unsized("running"), 8),
+    ///     (buf.store_unsized("work")?, 1),
+    ///     (buf.store_unsized("worker")?, 2),
+    ///     (buf.store_unsized("workers")?, 3),
+    ///     (buf.store_unsized("working")?, 4),
+    ///     (buf.store_unsized("working")?, 5),
+    ///     (buf.store_unsized("working man")?, 6),
+    ///     (buf.store_unsized("run")?, 7),
+    ///     (buf.store_unsized("running")?, 8),
     /// ];
     ///
     /// let trie = trie::store(&mut buf, values)?;
@@ -555,14 +557,14 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
-    ///     (buf.store_unsized("work"), 1),
-    ///     (buf.store_unsized("worker"), 2),
-    ///     (buf.store_unsized("workers"), 3),
-    ///     (buf.store_unsized("working"), 4),
-    ///     (buf.store_unsized("working"), 5),
-    ///     (buf.store_unsized("working man"), 6),
-    ///     (buf.store_unsized("run"), 7),
-    ///     (buf.store_unsized("running"), 8),
+    ///     (buf.store_unsized("work")?, 1),
+    ///     (buf.store_unsized("worker")?, 2),
+    ///     (buf.store_unsized("workers")?, 3),
+    ///     (buf.store_unsized("working")?, 4),
+    ///     (buf.store_unsized("working")?, 5),
+    ///     (buf.store_unsized("working man")?, 6),
+    ///     (buf.store_unsized("run")?, 7),
+    ///     (buf.store_unsized("running")?, 8),
     /// ];
     ///
     /// let trie = trie::store(&mut buf, values)?;
@@ -624,14 +626,14 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
-    ///     (buf.store_unsized("work"), 1),
-    ///     (buf.store_unsized("worker"), 2),
-    ///     (buf.store_unsized("workers"), 3),
-    ///     (buf.store_unsized("working"), 4),
-    ///     (buf.store_unsized("working"), 5),
-    ///     (buf.store_unsized("working man"), 6),
-    ///     (buf.store_unsized("run"), 7),
-    ///     (buf.store_unsized("running"), 8),
+    ///     (buf.store_unsized("work")?, 1),
+    ///     (buf.store_unsized("worker")?, 2),
+    ///     (buf.store_unsized("workers")?, 3),
+    ///     (buf.store_unsized("working")?, 4),
+    ///     (buf.store_unsized("working")?, 5),
+    ///     (buf.store_unsized("working man")?, 6),
+    ///     (buf.store_unsized("run")?, 7),
+    ///     (buf.store_unsized("running")?, 8),
     /// ];
     ///
     /// let trie = trie::store(&mut buf, values)?;
@@ -713,14 +715,14 @@ where
     /// let mut buf = OwnedBuf::new();
     ///
     /// let values = [
-    ///     (buf.store_unsized("work"), 1),
-    ///     (buf.store_unsized("worker"), 2),
-    ///     (buf.store_unsized("workers"), 3),
-    ///     (buf.store_unsized("working"), 4),
-    ///     (buf.store_unsized("working"), 5),
-    ///     (buf.store_unsized("working man"), 6),
-    ///     (buf.store_unsized("run"), 7),
-    ///     (buf.store_unsized("running"), 8),
+    ///     (buf.store_unsized("work")?, 1),
+    ///     (buf.store_unsized("worker")?, 2),
+    ///     (buf.store_unsized("workers")?, 3),
+    ///     (buf.store_unsized("working")?, 4),
+    ///     (buf.store_unsized("working")?, 5),
+    ///     (buf.store_unsized("working man")?, 6),
+    ///     (buf.store_unsized("run")?, 7),
+    ///     (buf.store_unsized("running")?, 8),
     /// ];
     ///
     /// let trie = trie::store(&mut buf, values)?;

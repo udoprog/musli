@@ -6,7 +6,7 @@ fn main() -> Result<(), Error> {
 
     let values = swiss::store_map(&mut buf, [(10u32, 1u32), (20u32, 2u32)])?;
 
-    buf.align_in_place();
+    buf.align_in_place()?;
 
     let values = buf.bind(values)?;
 

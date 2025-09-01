@@ -31,12 +31,12 @@ use super::{DefaultFlavor, Flavor, LinksRef, NodeRef, TrieRef, prefix};
 /// let mut buf = OwnedBuf::new();
 ///
 /// let values = [
-///     (buf.store_unsized("work"), 1),
-///     (buf.store_unsized("worker"), 2),
-///     (buf.store_unsized("workers"), 3),
-///     (buf.store_unsized("working"), 4),
-///     (buf.store_unsized("working"), 5),
-///     (buf.store_unsized("working man"), 6),
+///     (buf.store_unsized("work")?, 1),
+///     (buf.store_unsized("worker")?, 2),
+///     (buf.store_unsized("workers")?, 3),
+///     (buf.store_unsized("working")?, 4),
+///     (buf.store_unsized("working")?, 5),
+///     (buf.store_unsized("working man")?, 6),
 /// ];
 ///
 /// let trie = trie::store(&mut buf, values)?;
@@ -121,17 +121,17 @@ where
     ///
     /// let mut trie = trie::Builder::new();
     ///
-    /// let key = buf.store_unsized("working");
+    /// let key = buf.store_unsized("working")?;
     /// trie.insert(&buf, key, 4)?;
-    /// let key = buf.store_unsized("working man");
+    /// let key = buf.store_unsized("working man")?;
     /// trie.insert(&buf, key, 6)?;
-    /// let key = buf.store_unsized("work");
+    /// let key = buf.store_unsized("work")?;
     /// trie.insert(&buf, key, 1)?;
-    /// let key = buf.store_unsized("worker");
+    /// let key = buf.store_unsized("worker")?;
     /// trie.insert(&buf, key, 2)?;
-    /// let key = buf.store_unsized("workers");
+    /// let key = buf.store_unsized("workers")?;
     /// trie.insert(&buf, key, 3)?;
-    /// let key = buf.store_unsized("working");
+    /// let key = buf.store_unsized("working")?;
     /// trie.insert(&buf, key, 5)?;
     ///
     /// let trie = trie.build(&mut buf)?;
@@ -239,9 +239,9 @@ where
     ///
     /// let mut trie = trie::Builder::new();
     ///
-    /// let key = buf.store_unsized("work");
+    /// let key = buf.store_unsized("work")?;
     /// trie.insert(&buf, key, 1)?;
-    /// let key = buf.store_unsized("working");
+    /// let key = buf.store_unsized("working")?;
     /// trie.insert(&buf, key, 4)?;
     ///
     /// let trie = trie.build(&mut buf)?;
@@ -292,7 +292,7 @@ impl<T> Links<T> {
         O: Size,
         F: Flavor,
     {
-        let values = F::Values::try_from_ref(buf.store_slice(&self.values))?;
+        let values = F::Values::try_from_ref(buf.store_slice(&self.values)?)?;
 
         let mut children = Vec::with_capacity(self.children.len());
 
@@ -300,7 +300,7 @@ impl<T> Links<T> {
             children.push(node.into_ref(buf)?);
         }
 
-        let children = F::Children::try_from_ref(buf.store_slice(&children))?;
+        let children = F::Children::try_from_ref(buf.store_slice(&children)?)?;
         Ok(LinksRef { values, children })
     }
 }

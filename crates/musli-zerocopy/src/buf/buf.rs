@@ -8,9 +8,9 @@ use core::slice::SliceIndex;
 #[cfg(feature = "alloc")]
 use alloc::borrow::{Cow, ToOwned};
 
-#[cfg(feature = "alloc")]
-use crate::buf::OwnedBuf;
 use crate::buf::{self, Bindable, Load, LoadMut, Validator};
+#[cfg(feature = "alloc")]
+use crate::buf::{AllocError, OwnedBuf};
 use crate::endian::ByteOrder;
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{Ref, Size};
@@ -131,14 +131,14 @@ impl Buf {
     /// }
     ///
     /// let bytes = read("person.bin")?;
-    /// let buf = Buf::new(&bytes).to_aligned::<u128>();
+    /// let buf = Buf::new(&bytes).to_aligned::<u128>()?;
     ///
     /// let s = buf.load(Ref::<Person>::zero())?;
     /// # Ok::<_, anyhow::Error>(())
     /// ```
     #[cfg(feature = "alloc")]
     #[inline]
-    pub fn to_aligned<T>(&self) -> Cow<'_, Buf> {
+    pub fn to_aligned<T>(&self) -> Result<Cow<'_, Buf>, AllocError> {
         self.to_aligned_with(align_of::<T>())
     }
 
@@ -165,29 +165,29 @@ impl Buf {
     /// }
     ///
     /// let bytes = read("person.bin")?;
-    /// let buf = Buf::new(&bytes).to_aligned_with(16);
+    /// let buf = Buf::new(&bytes).to_aligned_with(16)?;
     ///
     /// let s = buf.load(Ref::<Person>::zero())?;
     /// # Ok::<_, anyhow::Error>(())
     /// ```
     #[cfg(feature = "alloc")]
     #[inline]
-    pub fn to_aligned_with(&self, align: usize) -> Cow<'_, Buf> {
+    pub fn to_aligned_with(&self, align: usize) -> Result<Cow<'_, Buf>, AllocError> {
         assert!(align.is_power_of_two(), "Alignment must be power of two");
 
         // SAFETY: align is checked as a power of two just above.
         if unsafe { self.is_aligned_with_unchecked(align) } {
-            Cow::Borrowed(self)
+            Ok(Cow::Borrowed(self))
         } else {
             let mut buf =
-                unsafe { OwnedBuf::with_capacity_and_custom_alignment(self.len(), align) };
+                unsafe { OwnedBuf::with_capacity_and_custom_alignment(self.len(), align)? };
 
             // SAFETY: Space for the slice has been allocated.
             unsafe {
                 buf.store_bytes(&self.data);
             }
 
-            Cow::Owned(buf)
+            Ok(Cow::Owned(buf))
         }
     }
 
@@ -205,10 +205,11 @@ impl Buf {
     /// use musli_zerocopy::OwnedBuf;
     ///
     /// let mut buf = OwnedBuf::with_alignment::<u32>();
-    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    /// buf.extend_from_slice(&[1, 2, 3, 4])?;
     ///
     /// assert!(buf.is_compatible_with::<u32>());
     /// assert!(!buf.is_compatible_with::<u64>());
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     pub fn is_compatible_with<T>(&self) -> bool
@@ -226,10 +227,11 @@ impl Buf {
     /// use musli_zerocopy::OwnedBuf;
     ///
     /// let mut buf = OwnedBuf::with_alignment::<u32>();
-    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    /// buf.extend_from_slice(&[1, 2, 3, 4])?;
     ///
     /// assert!(buf.ensure_compatible_with::<u32>().is_ok());
     /// assert!(buf.ensure_compatible_with::<u64>().is_err());
+    /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
     pub fn ensure_compatible_with<T>(&self) -> Result<(), Error>
@@ -348,8 +350,8 @@ impl Buf {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let first = buf.store_unsized("first");
-    /// let second = buf.store_unsized("second");
+    /// let first = buf.store_unsized("first")?;
+    /// let second = buf.store_unsized("second")?;
     ///
     /// let buf = buf.as_ref();
     ///
@@ -380,8 +382,8 @@ impl Buf {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// buf.store(&1u32);
-    /// buf.store(&2u32);
+    /// buf.store(&1u32)?;
+    /// buf.store(&2u32)?;
     ///
     /// let buf = buf.as_ref();
     ///
@@ -411,8 +413,8 @@ impl Buf {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// buf.store(&1u32);
-    /// buf.store(&2u32);
+    /// buf.store(&1u32)?;
+    /// buf.store(&2u32)?;
     ///
     /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
     /// unsafe {
@@ -443,9 +445,9 @@ impl Buf {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// buf.store(&42u8);
-    /// buf.store(&[1u8, 0, 0, 0]);
-    /// buf.store(&[2u8, 0, 0, 0]);
+    /// buf.store(&42u8)?;
+    /// buf.store(&[1u8, 0, 0, 0])?;
+    /// buf.store(&[2u8, 0, 0, 0])?;
     ///
     /// assert_eq!(buf.load_at_unaligned::<u32>(1)?, 1u32.to_le());
     /// assert_eq!(buf.load_at_unaligned::<u32>(5)?, 2u32.to_le());
@@ -473,8 +475,8 @@ impl Buf {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let first = buf.store_unsized("first");
-    /// let second = buf.store_unsized("second");
+    /// let first = buf.store_unsized("first")?;
+    /// let second = buf.store_unsized("second")?;
     ///
     /// // SAFETY: We're not manipulating data in a way which leaves uninitialized regions.
     /// let buf = unsafe { buf.as_mut_buf() };
@@ -587,7 +589,7 @@ impl Buf {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let custom = buf.store(&Custom { field: 42, field2: 85 });
+    /// let custom = buf.store(&Custom { field: 42, field2: 85 })?;
     ///
     /// let mut v = buf.validate_struct::<Custom>()?;
     ///
@@ -1050,10 +1052,24 @@ impl ToOwned for Buf {
 
     #[inline]
     fn to_owned(&self) -> Self::Owned {
-        let mut buf =
+        let result =
             unsafe { OwnedBuf::with_capacity_and_custom_alignment(self.len(), self.alignment()) };
 
-        buf.extend_from_slice(&self.data);
+        let mut buf = match result {
+            Ok(buf) => buf,
+            Err(_) => {
+                let layout =
+                    unsafe { Layout::from_size_align_unchecked(self.len(), self.alignment()) };
+
+                alloc::alloc::handle_alloc_error(layout);
+            }
+        };
+
+        if buf.extend_from_slice(&self.data).is_err() {
+            let layout = unsafe { Layout::from_size_align_unchecked(self.len(), self.alignment()) };
+            alloc::alloc::handle_alloc_error(layout);
+        }
+
         buf
     }
 }

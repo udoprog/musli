@@ -36,20 +36,20 @@ fn criterion_benchmark(c: &mut Criterion) {
 
         let mut buf = OwnedBuf::new();
 
-        let maybe_uninit = buf.store_uninit::<DataMusli>();
+        let maybe_uninit = buf.store_uninit::<DataMusli>().unwrap();
 
         let mut vec = Vec::new();
 
         for _ in 0..vec_size {
             let str = format!("some_long_string{}", some_long_str);
-            vec.push(buf.store_slice(str.as_bytes()));
+            vec.push(buf.store_slice(str.as_bytes()).unwrap());
         }
 
         let person = DataMusli {
-            slice: buf.store_slice(&vec),
+            slice: buf.store_slice(&vec).unwrap(),
         };
 
-        buf.load_uninit_mut(maybe_uninit).write(&person);
+        buf.load_uninit_mut(maybe_uninit).unwrap().write(&person);
 
         b.iter(|| {
             let mut len = 0;

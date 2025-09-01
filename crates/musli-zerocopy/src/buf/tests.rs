@@ -32,7 +32,7 @@ fn allocate_array_needing_padding() -> Result<()> {
 
     let mut buf = OwnedBuf::new();
 
-    let array = buf.store_uninit::<[Element; 10]>();
+    let array = buf.store_uninit::<[Element; 10]>()?;
 
     let values = array::from_fn(|index| Element {
         first: index as u8,
@@ -49,7 +49,7 @@ fn allocate_array_needing_padding() -> Result<()> {
         ],
     });
 
-    buf.load_uninit_mut(array).write(&values);
+    buf.load_uninit_mut(array)?.write(&values);
     let array = array.assume_init();
 
     assert_eq!(buf.load(array)?, &values);
@@ -71,7 +71,7 @@ fn allocate_array_not_needing_padding() -> Result<()> {
 
     let mut buf = OwnedBuf::new();
 
-    let array = buf.store_uninit::<[Element; 10]>();
+    let array = buf.store_uninit::<[Element; 10]>()?;
 
     let values = array::from_fn(|index| Element {
         first: index as u32,
@@ -79,7 +79,7 @@ fn allocate_array_not_needing_padding() -> Result<()> {
         third: 0x05060708u32,
     });
 
-    buf.load_uninit_mut(array).write(&values);
+    buf.load_uninit_mut(array)?.write(&values);
     let array = array.assume_init();
 
     assert_eq!(buf.load(array)?, &values);
@@ -95,20 +95,20 @@ fn test_unaligned_write() -> Result<()> {
         string: Ref<str>,
     }
 
-    let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128);
-    buf.extend_from_slice(&[1]);
+    let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128)?;
+    buf.extend_from_slice(&[1])?;
 
-    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 
-    let string = buf.store_unsized("Hello World!");
+    let string = buf.store_unsized("Hello World!")?;
 
-    buf.load_uninit_mut(reference).write(&Custom { string });
+    buf.load_uninit_mut(reference)?.write(&Custom { string });
 
     let reference = reference.assume_init();
 
     assert_eq!(reference.offset(), 4);
 
-    buf.align_in_place();
+    buf.align_in_place()?;
 
     let custom = buf.load(reference)?;
     assert_eq!(buf.load(custom.string)?, "Hello World!");
@@ -147,18 +147,18 @@ fn inner_padding() -> Result<()> {
     let inner2 = Inner2 { field: 20 };
     let custom = Custom { inner, inner2 };
 
-    let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128);
-    buf.extend_from_slice(&[1]);
+    let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128)?;
+    buf.extend_from_slice(&[1])?;
 
-    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 
-    buf.load_uninit_mut(reference).write(&custom);
+    buf.load_uninit_mut(reference)?.write(&custom);
 
     let reference = reference.assume_init();
 
     assert_eq!(reference.offset(), 16);
 
-    buf.align_in_place();
+    buf.align_in_place()?;
 
     let custom = buf.load(reference)?;
     assert_eq!(&custom.inner, &inner);

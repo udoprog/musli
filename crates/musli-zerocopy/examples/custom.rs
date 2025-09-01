@@ -12,13 +12,13 @@ struct Custom {
 fn main() -> Result<()> {
     let mut buf = OwnedBuf::new();
 
-    let string = buf.store_unsized("string");
+    let string = buf.store_unsized("string")?;
 
-    let c1 = buf.store(&Custom { field: 1, string });
-    let c2 = buf.store(&Custom { field: 2, string });
+    let c1 = buf.store(&Custom { field: 1, string })?;
+    let c2 = buf.store(&Custom { field: 2, string })?;
 
     let map = phf::store_map(&mut buf, [(1, c1), (2, c2)])?;
-    buf.align_in_place();
+    buf.align_in_place()?;
     let map = buf.bind(map)?;
 
     let c1 = buf.load(*map.get(&1)?.context("Missing key 1")?)?;

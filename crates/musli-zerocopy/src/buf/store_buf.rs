@@ -1,5 +1,6 @@
 use core::slice::SliceIndex;
 
+use crate::buf::AllocError;
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 use crate::{Buf, ByteOrder, Error, Ref, Size};
 
@@ -46,13 +47,13 @@ pub trait StoreBuf: self::sealed::Sealed {
 
     /// Store an unsigned value.
     #[doc(hidden)]
-    fn store_unsized<T>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
+    fn store_unsized<T>(&mut self, value: &T) -> Result<Ref<T, Self::ByteOrder, Self::Size>, Error>
     where
         T: ?Sized + UnsizedZeroCopy;
 
     /// Store a [`ZeroCopy`] value.
     #[doc(hidden)]
-    fn store<T>(&mut self, value: &T) -> Ref<T, Self::ByteOrder, Self::Size>
+    fn store<T>(&mut self, value: &T) -> Result<Ref<T, Self::ByteOrder, Self::Size>, Error>
     where
         T: ZeroCopy;
 
@@ -70,20 +71,24 @@ pub trait StoreBuf: self::sealed::Sealed {
     ///
     /// For buffers which cannot be re-aligned, this will simply panic.
     #[doc(hidden)]
-    fn align_in_place(&mut self);
+    fn align_in_place(&mut self) -> Result<(), AllocError>;
 
     /// Construct an offset aligned for `T` into the current buffer which points
     /// to the next location that will be written.
     #[doc(hidden)]
-    fn next_offset<T>(&mut self) -> usize;
+    fn next_offset<T>(&mut self) -> Result<usize, AllocError>;
 
     /// Align by `align` and `reserve` additional space in the buffer or panic.
     #[doc(hidden)]
-    fn next_offset_with_and_reserve(&mut self, align: usize, reserve: usize);
+    fn next_offset_with_and_reserve(
+        &mut self,
+        align: usize,
+        reserve: usize,
+    ) -> Result<(), AllocError>;
 
     /// Fill the buffer with `len` repetitions of `byte`.
     #[doc(hidden)]
-    fn fill(&mut self, byte: u8, len: usize);
+    fn fill(&mut self, byte: u8, len: usize) -> Result<(), AllocError>;
 
     /// Get an immutable slice.
     #[doc(hidden)]

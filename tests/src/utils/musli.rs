@@ -218,7 +218,7 @@ pub mod musli_zerocopy {
     use musli_zerocopy::{Buf, Error, OwnedBuf, Ref, ZeroCopy};
 
     fn buffer() -> OwnedBuf<endian::Native, usize> {
-        OwnedBuf::with_capacity(4096).with_size()
+        OwnedBuf::with_capacity(4096).unwrap().with_size()
     }
 
     #[inline(always)]
@@ -227,8 +227,8 @@ pub mod musli_zerocopy {
         T: ZeroCopy,
     {
         buf.clear();
-        buf.request_align::<T>();
-        buf.align_in_place();
+        buf.request_align::<T>().unwrap();
+        buf.align_in_place().unwrap();
     }
 
     pub fn encode<'buf, T>(
@@ -238,9 +238,9 @@ pub mod musli_zerocopy {
     where
         T: ZeroCopy,
     {
-        // SAFETY: We know we've allocated space for `T` in the `reset`
-        // call, so this is safe.
-        unsafe { buf.store_unchecked(value) };
+        // SAFETY: We know we've allocated space for `T` in the `reset` call, so
+        // this is safe.
+        unsafe { buf.store_unchecked(value)? };
         Ok(&buf[..])
     }
 

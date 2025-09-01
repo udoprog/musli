@@ -37,7 +37,7 @@ pub enum BinarySearch {
 /// use musli_zerocopy::slice::{binary_search, BinarySearch};
 ///
 /// let mut buf = OwnedBuf::new();
-/// let slice = buf.store_slice(&[0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55]);
+/// let slice = buf.store_slice(&[0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55])?;
 ///
 /// assert_eq!(binary_search(&buf, slice, &13)?, BinarySearch::Found(9));
 /// assert_eq!(binary_search(&buf, slice, &4)?, BinarySearch::Missing(7));
@@ -81,7 +81,7 @@ where
 /// use musli_zerocopy::slice::{binary_search_by, BinarySearch};
 ///
 /// let mut buf = OwnedBuf::new();
-/// let slice = buf.store_slice(&[0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55]);
+/// let slice = buf.store_slice(&[0, 1, 1, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55])?;
 ///
 /// let s = 13;
 /// assert_eq!(binary_search_by(&buf, slice, |v| Ok(v.cmp(&s)))?, BinarySearch::Found(9));

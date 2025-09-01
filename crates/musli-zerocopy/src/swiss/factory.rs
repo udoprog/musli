@@ -60,8 +60,8 @@ const FIXED_SEED: u64 = 1234567890;
 /// let mut buf = OwnedBuf::new();
 ///
 /// let pairs = [
-///     (buf.store_unsized("first"), 1u32),
-///     (buf.store_unsized("second"), 2u32),
+///     (buf.store_unsized("first")?, 1u32),
+///     (buf.store_unsized("second")?, 2u32),
 /// ];
 ///
 /// let map = swiss::store_map(&mut buf, pairs)?;
@@ -156,9 +156,9 @@ where
 ///
 /// let mut buf = OwnedBuf::new();
 ///
-/// let first = buf.store_unsized("first");
-/// let second = buf.store_unsized("second");
-/// let third = buf.store_unsized("third");
+/// let first = buf.store_unsized("first")?;
+/// let second = buf.store_unsized("second")?;
+/// let third = buf.store_unsized("third")?;
 ///
 /// let set = swiss::store_set(&mut buf, [first, second])?;
 /// let set = buf.bind(set)?;
@@ -253,18 +253,18 @@ where
 
     debug_assert!(ctrl_align.is_power_of_two());
 
-    buf.next_offset_with_and_reserve(ctrl_align, ctrl_len);
+    buf.next_offset_with_and_reserve(ctrl_align, ctrl_len)?;
     let ctrl_ptr = buf.len();
 
     // All ones indicates that the table is empty, since the ctrl byte for empty
     // buckets is 1111_1111.
-    buf.fill(raw::EMPTY, ctrl_len + size_of::<raw::Group>());
+    buf.fill(raw::EMPTY, ctrl_len + size_of::<raw::Group>())?;
 
-    let base_ptr = buf.next_offset::<U>();
-    buf.fill(0, size_of::<T>().wrapping_mul(buckets));
+    let base_ptr = buf.next_offset::<U>()?;
+    buf.fill(0, size_of::<T>().wrapping_mul(buckets))?;
 
     let (bucket_mask, len) = {
-        buf.align_in_place();
+        buf.align_in_place()?;
         let mut table = Constructor::<U, _>::with_buf(buf, ctrl_ptr, base_ptr, buckets);
 
         for v in entries {

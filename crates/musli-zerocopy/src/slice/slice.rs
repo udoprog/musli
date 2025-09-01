@@ -154,7 +154,7 @@ where
     /// }
     ///
     /// let mut buf = OwnedBuf::new();
-    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    /// let slice = buf.store_slice(&[1, 2, 3, 4])?;
     ///
     /// generic(&buf, slice)?;
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -188,9 +188,9 @@ where
     /// }
     ///
     /// let mut buf = OwnedBuf::new();
-    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    /// let slice = buf.store_slice(&[1, 2, 3, 4])?;
     ///
-    /// buf.align_in_place();
+    /// buf.align_in_place()?;
     ///
     /// generic(&buf, slice)?;
     /// # Ok::<_, musli_zerocopy::Error>(())
@@ -229,7 +229,7 @@ where
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    /// let slice = buf.store_slice(&[1, 2, 3, 4])?;
     /// generic(&buf, slice)?;
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```

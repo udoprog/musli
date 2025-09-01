@@ -25,28 +25,28 @@ where
 fn main() -> Result<()> {
     let mut buf = OwnedBuf::new();
 
-    let header = buf.store_uninit::<Header>();
+    let header = buf.store_uninit::<Header>()?;
 
     // Byte-oriented data has no alignment, so we can re-use the string
     // allocation.
-    let name = buf.store_unsized("John Doe");
+    let name = buf.store_unsized("John Doe")?;
 
     let big = buf.store(&Data {
         name: name.to_endian(),
         age: Endian::new(35),
-    });
+    })?;
 
     let little = buf.store(&Data {
         name: name.to_endian(),
         age: Endian::new(35),
-    });
+    })?;
 
-    buf.load_uninit_mut(header).write(&Header {
+    buf.load_uninit_mut(header)?.write(&Header {
         big: big.to_endian(),
         little: little.to_endian(),
     });
 
-    buf.align_in_place();
+    buf.align_in_place()?;
 
     let header = buf.load_at::<Header>(0)?;
     let data = buf.load(endian::pick!("big" => header.big, "little" => header.little))?;

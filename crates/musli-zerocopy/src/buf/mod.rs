@@ -67,8 +67,8 @@
 //! }
 //!
 //! let mut buf1 = OwnedBuf::new();
-//! let slice = buf1.store_slice(&[1u8, 2, 3, 4]);
-//! let slice_ref: Ref<Ref<[u8]>> = buf1.store(&slice);
+//! let slice = buf1.store_slice(&[1u8, 2, 3, 4])?;
+//! let slice_ref: Ref<Ref<[u8]>> = buf1.store(&slice)?;
 //! assert_eq!(buf1.len(), 12);
 //!
 //! let slice = buf1.load(slice_ref)?;
@@ -76,9 +76,9 @@
 //! assert_eq!(buf1.load(*slice)?, &[1, 2, 3, 4]);
 //!
 //! let mut buf2 = OwnedBuf::new();
-//! let slice = buf2.store_slice(&[1u8, 2, 3, 4]);
+//! let slice = buf2.store_slice(&[1u8, 2, 3, 4])?;
 //! let slice = CompactSlice::new(slice.offset(), slice.len());
-//! let slice_ref: Ref<CompactSlice> = buf2.store(&slice);
+//! let slice_ref: Ref<CompactSlice> = buf2.store(&slice)?;
 //! assert_eq!(buf2.len(), 8);
 //!
 //! let slice = buf2.load(slice_ref)?;
@@ -119,6 +119,9 @@ mod owned_buf;
 pub use self::slice_mut::SliceMut;
 mod slice_mut;
 
+#[cfg(feature = "alloc")]
+use core::alloc::Layout;
+use core::fmt;
 use core::mem::size_of;
 use core::ptr::NonNull;
 
@@ -130,6 +133,78 @@ use crate::traits::ZeroCopy;
 /// The type used to calculate default alignment for [`OwnedBuf`].
 #[repr(transparent)]
 pub struct DefaultAlignment(usize);
+
+/// Error raised when allocation or space requirements in a fixed buffer fails.
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct AllocError {
+    kind: AllocErrorKind,
+}
+
+impl AllocError {
+    /// Construct a new allocation error due to insufficient capacity.
+    #[inline]
+    pub(crate) fn capacity(current: usize, needed: usize) -> Self {
+        Self {
+            kind: AllocErrorKind::Capacity { current, needed },
+        }
+    }
+
+    /// Construct a new allocation error due to an alignment requirement
+    /// not being met.
+    #[inline]
+    pub(crate) fn misaligned(addr: *const u8, align: usize) -> Self {
+        Self {
+            kind: AllocErrorKind::Alignment {
+                offset: addr.addr() % align,
+                align,
+            },
+        }
+    }
+
+    /// Construct a new allocation error due to an underlying allocation
+    /// failure.
+    #[inline]
+    #[allow(clippy::self_named_constructors)]
+    pub(crate) fn alloc_error(layout: Layout) -> Self {
+        Self {
+            kind: AllocErrorKind::AllocError { layout },
+        }
+    }
+}
+
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+enum AllocErrorKind {
+    Capacity { current: usize, needed: usize },
+    Alignment { offset: usize, align: usize },
+    AllocError { layout: Layout },
+}
+
+impl fmt::Display for AllocError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            AllocErrorKind::Capacity { current, needed } => write!(
+                f,
+                "Container has the capacity {current}, but {needed} bytes are needed",
+            ),
+            AllocErrorKind::Alignment { offset, align } => {
+                write!(f, "Container is not aligned to {align} by {offset} bytes",)
+            }
+            AllocErrorKind::AllocError { layout } => {
+                write!(
+                    f,
+                    "Failed to allocate {} bytes with alignment {}",
+                    layout.size(),
+                    layout.align()
+                )
+            }
+        }
+    }
+}
+
+impl core::error::Error for AllocError {}
 
 /// Return the max capacity of this vector. This depends on the requested
 /// alignment.
@@ -162,13 +237,13 @@ pub fn max_capacity_for_align(align: usize) -> usize {
 /// }
 ///
 /// let bytes = read("person.bin")?;
-/// let buf = buf::aligned_buf::<u128>(&bytes);
+/// let buf = buf::aligned_buf::<u128>(&bytes)?;
 ///
 /// let s = buf.load(Ref::<Person>::zero())?;
 /// # Ok::<_, anyhow::Error>(())
 /// ```
 #[cfg(feature = "alloc")]
-pub fn aligned_buf<T>(bytes: &[u8]) -> Cow<'_, Buf> {
+pub fn aligned_buf<T>(bytes: &[u8]) -> Result<Cow<'_, Buf>, AllocError> {
     Buf::new(bytes).to_aligned::<T>()
 }
 
@@ -196,13 +271,13 @@ pub fn aligned_buf<T>(bytes: &[u8]) -> Cow<'_, Buf> {
 /// }
 ///
 /// let bytes = read("person.bin")?;
-/// let buf = buf::aligned_buf_with(&bytes, 16);
+/// let buf = buf::aligned_buf_with(&bytes, 16)?;
 ///
 /// let s = buf.load(Ref::<Person>::zero())?;
 /// # Ok::<_, anyhow::Error>(())
 /// ```
 #[cfg(feature = "alloc")]
-pub fn aligned_buf_with(bytes: &[u8], align: usize) -> Cow<'_, Buf> {
+pub fn aligned_buf_with(bytes: &[u8], align: usize) -> Result<Cow<'_, Buf>, AllocError> {
     Buf::new(bytes).to_aligned_with(align)
 }
 

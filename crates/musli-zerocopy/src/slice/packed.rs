@@ -190,7 +190,7 @@ where
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let slice: Packed<[i32]> = Packed::from_ref(buf.store_slice(&[1, 2, 3, 4]));
+    /// let slice: Packed<[i32]> = Packed::from_ref(buf.store_slice(&[1, 2, 3, 4])?);
     ///
     /// let two = slice.get(2).expect("Missing element 2");
     /// assert_eq!(buf.load(two)?, &3);
@@ -221,9 +221,9 @@ where
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let slice: Packed<[i32]> = Packed::from_ref(buf.store_slice(&[1, 2, 3, 4]));
+    /// let slice: Packed<[i32]> = Packed::from_ref(buf.store_slice(&[1, 2, 3, 4])?);
     ///
-    /// buf.align_in_place();
+    /// buf.align_in_place()?;
     ///
     /// let (a, b) = slice.split_at(3);
     /// let (c, d) = slice.split_at(4);
@@ -263,7 +263,7 @@ where
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let slice: Packed<[i32]> = Packed::from_ref(buf.store_slice(&[1, 2, 3, 4]));
+    /// let slice: Packed<[i32]> = Packed::from_ref(buf.store_slice(&[1, 2, 3, 4])?);
     ///
     /// let two = slice.get_unchecked(2);
     /// assert_eq!(buf.load(two)?, &3);
