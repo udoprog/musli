@@ -281,10 +281,10 @@ it depends on are stored at subsequent offsets.
 
 ```rust
 use musli_zerocopy::OwnedBuf;
-use musli_zerocopy::mem::MaybeUninit;
+use musli_zerocopy::mem::PackedMaybeUninit;
 
 let mut buf = OwnedBuf::new();
-let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
+let reference: Ref<PackedMaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 
 let string = buf.store_unsized("Hello World!")?;
 

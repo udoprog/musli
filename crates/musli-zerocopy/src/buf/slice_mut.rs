@@ -1,6 +1,6 @@
 use core::borrow::Borrow;
 use core::marker::PhantomData;
-use core::mem::{self, ManuallyDrop, align_of, size_of, size_of_val};
+use core::mem::{ManuallyDrop, MaybeUninit, align_of, size_of, size_of_val};
 use core::ops::Deref;
 use core::ptr::NonNull;
 use core::slice::{self, SliceIndex};
@@ -11,7 +11,7 @@ use alloc::borrow::Cow;
 use crate::buf::{self, AllocError, Buf, DefaultAlignment, Padder, StoreBuf};
 use crate::endian::{ByteOrder, Native};
 use crate::error::{Error, ErrorKind};
-use crate::mem::MaybeUninit;
+use crate::mem::PackedMaybeUninit;
 use crate::pointer::{DefaultSize, Ref, Size};
 use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 
@@ -43,7 +43,7 @@ where
     O: Size,
 {
     /// Base data pointer.
-    data: NonNull<mem::MaybeUninit<u8>>,
+    data: NonNull<MaybeUninit<u8>>,
     /// The initialized length of the buffer.
     len: usize,
     /// The capacity of the buffer.
@@ -51,7 +51,7 @@ where
     /// The requested alignment.
     requested: usize,
     /// Sticky endianness and pointer size.
-    _marker: PhantomData<(&'a mut [mem::MaybeUninit<u8>], E, O)>,
+    _marker: PhantomData<(&'a mut [MaybeUninit<u8>], E, O)>,
 }
 
 impl<'a> SliceMut<'a> {
@@ -90,7 +90,7 @@ impl<'a> SliceMut<'a> {
     /// let number = buf.store(&42u32)?;
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn new_uninit(bytes: &'a mut [mem::MaybeUninit<u8>]) -> Self {
+    pub fn new_uninit(bytes: &'a mut [MaybeUninit<u8>]) -> Self {
         Self::with_alignment_uninit::<DefaultAlignment>(bytes)
     }
 
@@ -137,7 +137,7 @@ impl<'a> SliceMut<'a> {
     /// assert!(buf.is_empty());
     /// assert_eq!(buf.requested(), 8);
     /// ```
-    pub fn with_alignment_uninit<T>(bytes: &'a mut [mem::MaybeUninit<u8>]) -> Self {
+    pub fn with_alignment_uninit<T>(bytes: &'a mut [MaybeUninit<u8>]) -> Self {
         let align = align_of::<T>();
         let capacity = bytes.len();
 
@@ -332,13 +332,13 @@ where
 
     /// Get get a raw pointer to the current buffer.
     #[inline]
-    pub fn as_ptr(&self) -> *const mem::MaybeUninit<u8> {
+    pub fn as_ptr(&self) -> *const MaybeUninit<u8> {
         self.data.as_ptr() as *const _
     }
 
     /// Get get a raw mutable pointer to the current buffer.
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut mem::MaybeUninit<u8> {
+    pub fn as_mut_ptr(&mut self) -> *mut MaybeUninit<u8> {
         self.data.as_ptr()
     }
 
@@ -430,8 +430,9 @@ where
     /// [`next_offset<T>()`] before storing the value.
     ///
     /// > **Note:** this does not return [`std::mem::MaybeUninit`], instead we
-    /// > use an internal [`MaybeUninit`] which is similar but has different
-    /// > properties. See [its documentation][MaybeUninit] for more.
+    /// > use an internal [`PackedMaybeUninit`] which is similar but has
+    /// > different properties. See [its documentation][PackedMaybeUninit] for
+    /// > more.
     ///
     /// [`next_offset<T>()`]: Self::next_offset()
     /// [^non-zero]: Like with [`NonZero*`][core::num] types.
@@ -439,7 +440,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::mem::MaybeUninit;
+    /// use musli_zerocopy::mem::PackedMaybeUninit;
     /// use musli_zerocopy::{SliceMut, Ref, ZeroCopy};
     ///
     /// #[derive(ZeroCopy)]
@@ -448,7 +449,7 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
+    /// let reference: Ref<PackedMaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
     ///
     /// let string = buf.store_unsized("Hello World!")?;
     ///
@@ -459,7 +460,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn store_uninit<T>(&mut self) -> Result<Ref<MaybeUninit<T>, E, O>, Error>
+    pub fn store_uninit<T>(&mut self) -> Result<Ref<PackedMaybeUninit<T>, E, O>, Error>
     where
         T: ZeroCopy,
     {
@@ -514,7 +515,7 @@ where
     ///
     /// ```
     /// use musli_zerocopy::{SliceMut, Ref, ZeroCopy};
-    /// use musli_zerocopy::mem::MaybeUninit;
+    /// use musli_zerocopy::mem::PackedMaybeUninit;
     ///
     /// #[derive(ZeroCopy)]
     /// #[repr(C)]
@@ -522,7 +523,7 @@ where
     ///
     /// let mut buf = [0; 1024];
     /// let mut buf = SliceMut::new(&mut buf);
-    /// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
+    /// let reference: Ref<PackedMaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
     ///
     /// let string = buf.store_unsized("Hello World!")?;
     ///
@@ -535,8 +536,8 @@ where
     #[inline]
     pub fn load_uninit_mut<T, U, I>(
         &mut self,
-        reference: Ref<MaybeUninit<T>, U, I>,
-    ) -> Result<&mut MaybeUninit<T>, Error>
+        reference: Ref<PackedMaybeUninit<T>, U, I>,
+    ) -> Result<&mut PackedMaybeUninit<T>, Error>
     where
         T: ZeroCopy,
         U: ByteOrder,
@@ -553,7 +554,7 @@ where
 
         // SAFETY: `MaybeUninit<T>` has no representation requirements and is
         // unaligned.
-        Ok(unsafe { &mut *(self.data.as_ptr().add(at) as *mut MaybeUninit<T>) })
+        Ok(unsafe { &mut *(self.data.as_ptr().add(at) as *mut PackedMaybeUninit<T>) })
     }
 
     /// Insert a value with the given size.
