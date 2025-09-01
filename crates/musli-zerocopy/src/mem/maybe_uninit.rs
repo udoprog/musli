@@ -1,6 +1,6 @@
 use core::alloc::{Layout, LayoutError};
 use core::fmt;
-use core::mem::{ManuallyDrop, size_of};
+use core::mem::{self, ManuallyDrop, size_of};
 use core::ptr::NonNull;
 use core::slice;
 
@@ -98,9 +98,9 @@ impl<T> MaybeUninit<T> {
         T: ZeroCopy,
     {
         unsafe {
-            let ptr = NonNull::new_unchecked(self as *mut Self as *mut u8);
+            let ptr = NonNull::new_unchecked(self as *mut Self as *mut mem::MaybeUninit<u8>);
             buf::store_unaligned(ptr, value);
-            slice::from_raw_parts_mut(ptr.as_ptr(), size_of::<T>())
+            slice::from_raw_parts_mut(ptr.as_ptr().cast(), size_of::<T>())
         }
     }
 }

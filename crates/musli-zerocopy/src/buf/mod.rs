@@ -122,7 +122,7 @@ mod slice_mut;
 #[cfg(feature = "alloc")]
 use core::alloc::Layout;
 use core::fmt;
-use core::mem::size_of;
+use core::mem::{MaybeUninit, size_of};
 use core::ptr::NonNull;
 
 #[cfg(feature = "alloc")]
@@ -153,7 +153,7 @@ impl AllocError {
     /// Construct a new allocation error due to an alignment requirement
     /// not being met.
     #[inline]
-    pub(crate) fn misaligned(addr: *const u8, align: usize) -> Self {
+    pub(crate) fn misaligned<T>(addr: *const T, align: usize) -> Self {
         Self {
             kind: AllocErrorKind::Alignment {
                 offset: addr.addr() % align,
@@ -285,8 +285,8 @@ pub fn aligned_buf_with(bytes: &[u8], align: usize) -> Result<Cow<'_, Buf>, Allo
 ///
 /// Must be called with an alignment that is a power of two.
 #[inline]
-pub(crate) fn is_aligned_with(ptr: *const u8, align: usize) -> bool {
-    (ptr as usize) & (align - 1) == 0
+pub(crate) fn is_aligned_with<T>(ptr: *const T, align: usize) -> bool {
+    ptr.addr() & (align - 1) == 0
 }
 
 /// Calculate padding with the assumption that alignment is a power of two.
@@ -308,7 +308,7 @@ pub(crate) fn padding_to(len: usize, align: usize) -> usize {
 ///
 /// Also see the [type level safety documentation][#safety]
 #[inline]
-pub(crate) unsafe fn store_unaligned<T>(data: NonNull<u8>, value: *const T)
+pub(crate) unsafe fn store_unaligned<T>(data: NonNull<MaybeUninit<u8>>, value: *const T)
 where
     T: ZeroCopy,
 {

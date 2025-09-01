@@ -1,7 +1,7 @@
 use core::alloc::Layout;
 use core::borrow::Borrow;
 use core::marker::PhantomData;
-use core::mem::{ManuallyDrop, align_of, size_of, size_of_val};
+use core::mem::{self, ManuallyDrop, align_of, size_of, size_of_val};
 use core::ops::Deref;
 use core::ptr::NonNull;
 use core::slice::{self, SliceIndex};
@@ -45,7 +45,7 @@ where
     E: ByteOrder,
     O: Size,
 {
-    data: NonNull<u8>,
+    data: NonNull<mem::MaybeUninit<u8>>,
     /// The initialized length of the buffer.
     len: usize,
     /// The capacity of the buffer.
@@ -276,7 +276,7 @@ where
             }
 
             Ok(Self {
-                data: NonNull::new_unchecked(data),
+                data: NonNull::new_unchecked(data.cast()),
                 len: 0,
                 capacity,
                 requested: align,
@@ -411,14 +411,14 @@ where
 
     /// Get get a raw mutable pointer to the current buffer.
     #[inline]
-    pub(crate) fn as_mut_ptr(&mut self) -> *mut u8 {
+    pub(crate) fn as_mut_ptr(&mut self) -> *mut mem::MaybeUninit<u8> {
         self.data.as_ptr()
     }
 
     /// Get get a raw mutable pointer to the current buffer.
     #[inline]
     #[cfg(test)]
-    pub(crate) fn as_nonnull(&mut self) -> NonNull<u8> {
+    pub(crate) fn as_nonnull(&mut self) -> NonNull<mem::MaybeUninit<u8>> {
         self.data
     }
 
@@ -454,7 +454,8 @@ where
     /// ```
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
+        // SAFETY: We only expose the initialized part of the buffer.
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr().cast(), self.len()) }
     }
 
     /// Access the buffer mutably.
@@ -794,7 +795,8 @@ where
             self.next_offset_with_and_reserve(T::ALIGN, size)?;
             let offset = self.len;
             let ptr = NonNull::new_unchecked(self.data.as_ptr().add(offset));
-            ptr.as_ptr().copy_from_nonoverlapping(value.as_ptr(), size);
+            ptr.as_ptr()
+                .copy_from_nonoverlapping(value.as_ptr().cast(), size);
 
             if T::PADDED {
                 let mut padder = Padder::new(ptr);
@@ -1167,7 +1169,7 @@ where
                 return Err(AllocError::alloc_error(new_layout));
             }
 
-            self.data = NonNull::new_unchecked(ptr);
+            self.data = NonNull::new_unchecked(ptr.cast());
             self.capacity = new_layout.size();
             self.align = self.requested;
             Ok(())
@@ -1180,7 +1182,7 @@ where
         debug_assert_eq!(old_layout.align(), new_layout.align());
 
         unsafe {
-            let ptr = alloc::realloc(self.as_mut_ptr(), old_layout, new_layout.size());
+            let ptr = alloc::realloc(self.as_mut_ptr().cast(), old_layout, new_layout.size());
 
             if ptr.is_null() {
                 return Err(AllocError::alloc_error(new_layout));
@@ -1188,7 +1190,7 @@ where
 
             // NB: We may simply forget the old allocation, since `realloc` is
             // responsible for freeing it.
-            self.data = NonNull::new_unchecked(ptr);
+            self.data = NonNull::new_unchecked(ptr.cast());
             self.capacity = new_layout.size();
             Ok(())
         }
@@ -1205,10 +1207,10 @@ where
             }
 
             ptr.copy_from_nonoverlapping(self.as_ptr(), self.len);
-            alloc::dealloc(self.as_mut_ptr(), old_layout);
+            alloc::dealloc(self.as_mut_ptr().cast(), old_layout);
 
             // We've deallocated the old pointer.
-            self.data = NonNull::new_unchecked(ptr);
+            self.data = NonNull::new_unchecked(ptr.cast());
             self.capacity = new_layout.size();
             self.align = self.requested;
             Ok(())
@@ -1317,7 +1319,7 @@ where
             };
 
             new.as_mut_ptr()
-                .copy_from_nonoverlapping(self.as_ptr(), self.len);
+                .copy_from_nonoverlapping(self.as_ptr().cast(), self.len);
             // Set requested to the same as original.
             new.requested = self.requested;
             new.len = self.len;
@@ -1337,13 +1339,13 @@ where
                 // SAFETY: This is guaranteed to be valid per the construction
                 // of this type.
                 let layout = Layout::from_size_align_unchecked(self.capacity, self.align);
-                alloc::dealloc(self.data.as_ptr(), layout);
+                alloc::dealloc(self.data.as_ptr().cast(), layout);
             }
         }
     }
 }
 
-const unsafe fn dangling(align: usize) -> NonNull<u8> {
+const unsafe fn dangling(align: usize) -> NonNull<mem::MaybeUninit<u8>> {
     unsafe { NonNull::new_unchecked(invalid_mut(align)) }
 }
 

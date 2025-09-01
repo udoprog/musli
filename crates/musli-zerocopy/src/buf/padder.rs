@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of, size_of_val, transmute};
+use core::mem::{MaybeUninit, align_of, size_of, size_of_val, transmute};
 use core::ptr::NonNull;
 
 use crate::buf;
@@ -11,14 +11,14 @@ use crate::traits::ZeroCopy;
 /// and provides a builder-like API to doing so.
 #[must_use = "For the writer to have an effect on `OwnedBuf` you must call `Padder::remaining` / `Padder::remaining_unsized`"]
 pub struct Padder<'a, T: ?Sized> {
-    data: NonNull<u8>,
+    data: NonNull<MaybeUninit<u8>>,
     offset: usize,
     _marker: PhantomData<&'a mut T>,
 }
 
 impl<'a, T: ?Sized> Padder<'a, T> {
     #[inline]
-    pub(crate) fn new(data: NonNull<u8>) -> Self {
+    pub(crate) fn new(data: NonNull<MaybeUninit<u8>>) -> Self {
         Self {
             data,
             offset: 0,
