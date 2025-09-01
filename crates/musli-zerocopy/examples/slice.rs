@@ -3,11 +3,11 @@ use musli_zerocopy::{Error, OwnedBuf};
 fn main() -> Result<(), Error> {
     let mut buf = OwnedBuf::new();
 
-    let values = vec![buf.store_unsized("first"), buf.store_unsized("second")];
+    let values = [buf.store_unsized("first")?, buf.store_unsized("second")?];
 
-    let slice_ref = buf.store_slice(&values);
+    let slice_ref = buf.store_slice(&values)?;
 
-    buf.align_in_place();
+    buf.align_in_place()?;
 
     let slice = buf.load(slice_ref)?;
 

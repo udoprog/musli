@@ -34,7 +34,7 @@ use crate::pointer::{DefaultSize, Pointee, Size};
 /// use musli_zerocopy::{Ref, OwnedBuf};
 ///
 /// let mut buf = OwnedBuf::with_alignment::<u32>();
-/// buf.extend_from_slice(&[1, 2, 3, 4]);
+/// buf.extend_from_slice(&[1, 2, 3, 4])?;
 ///
 /// let buf = buf.as_ref();
 ///
@@ -355,6 +355,20 @@ where
     {
         T::check_layout(offset.as_usize(), metadata)?;
 
+        // SAFETY: We just checked that the layout of the type is valid.
+        unsafe { Self::try_with_metadata_unchecked(offset, metadata) }
+    }
+
+    /// Construct a reference doing only the layout conversion and checks,
+    /// trusting that the layout is valid.
+    #[inline(always)]
+    pub(crate) unsafe fn try_with_metadata_unchecked<U>(
+        offset: U,
+        metadata: T::Metadata,
+    ) -> Result<Self, CoerceError>
+    where
+        U: Size,
+    {
         Ok(Ref {
             offset: O::try_from(offset)?.swap_bytes::<E>(),
             metadata: T::try_from_metadata(metadata)?.swap_bytes::<E>(),
@@ -413,7 +427,7 @@ where
     /// use musli_zerocopy::OwnedBuf;
     ///
     /// let mut buf = OwnedBuf::new();
-    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    /// let slice = buf.store_slice(&[1, 2, 3, 4])?;
     ///
     /// let two = slice.get(2).expect("Missing element 2");
     /// assert_eq!(buf.load(two)?, &3);
@@ -448,7 +462,7 @@ where
     /// use musli_zerocopy::OwnedBuf;
     ///
     /// let mut buf = OwnedBuf::new();
-    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    /// let slice = buf.store_slice(&[1, 2, 3, 4])?;
     ///
     /// let two = slice.get_unchecked(2);
     /// assert_eq!(buf.load(two)?, &3);
@@ -474,9 +488,9 @@ where
     /// use musli_zerocopy::OwnedBuf;
     ///
     /// let mut buf = OwnedBuf::new();
-    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    /// let slice = buf.store_slice(&[1, 2, 3, 4])?;
     ///
-    /// buf.align_in_place();
+    /// buf.align_in_place()?;
     ///
     /// let (a, b) = slice.split_at(3);
     /// let (c, d) = slice.split_at(4);
@@ -517,11 +531,11 @@ where
     /// use musli_zerocopy::OwnedBuf;
     ///
     /// let mut buf = OwnedBuf::new();
-    /// buf.extend_from_slice(&[1, 2, 3, 4]);
+    /// buf.extend_from_slice(&[1, 2, 3, 4])?;
     ///
-    /// let slice = buf.store_slice(&[1, 2, 3, 4]);
+    /// let slice = buf.store_slice(&[1, 2, 3, 4])?;
     ///
-    /// buf.align_in_place();
+    /// buf.align_in_place()?;
     ///
     /// let mut out = Vec::new();
     ///
@@ -886,15 +900,15 @@ where
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let values = buf.store(&[1, 2, 3, 4]);
-    /// let slice = values.array_into_slice();
+    /// let values = buf.store(&[1, 2, 3, 4])?;
+    /// let slice = values.array_into_slice()?;
     ///
     /// assert_eq!(buf.load(slice)?, &[1, 2, 3, 4]);
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn array_into_slice(self) -> Ref<[T], E, O> {
-        Ref::with_metadata(self.offset, N)
+    pub fn array_into_slice(self) -> Result<Ref<[T], E, O>, CoerceError> {
+        Ref::try_with_metadata(self.offset, N)
     }
 }
 

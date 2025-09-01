@@ -188,7 +188,7 @@ mod tests {
 
         // Note: You're responsible for ensuring that the buffer has enough
         // capacity.
-        buf.reserve(size_of::<ZeroPadded>());
+        buf.reserve(size_of::<ZeroPadded>())?;
 
         // SAFETY: We do not pad beyond known fields and are making sure to
         // initialize all of the buffer.

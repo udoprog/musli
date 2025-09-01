@@ -4,6 +4,9 @@ use core::fmt;
 use core::ops::{Range, RangeFrom};
 use core::str::Utf8Error;
 
+#[cfg(feature = "alloc")]
+use crate::buf::AllocError;
+
 mod sealed {
     pub trait Sealed {}
     impl Sealed for () {}
@@ -211,6 +214,14 @@ impl fmt::Display for Error {
 
 impl core::error::Error for Error {}
 
+#[cfg(feature = "alloc")]
+impl From<AllocError> for Error {
+    #[inline]
+    fn from(error: AllocError) -> Self {
+        Self::new(ErrorKind::AllocError { error })
+    }
+}
+
 impl From<CoerceError> for Error {
     #[inline]
     fn from(error: CoerceError) -> Self {
@@ -222,6 +233,10 @@ impl From<CoerceError> for Error {
 #[cfg_attr(test, derive(PartialEq))]
 #[non_exhaustive]
 pub(crate) enum ErrorKind {
+    #[cfg(feature = "alloc")]
+    AllocError {
+        error: AllocError,
+    },
     Utf8Error {
         error: Utf8Error,
     },
@@ -286,6 +301,8 @@ pub(crate) enum ErrorKind {
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            #[cfg(feature = "alloc")]
+            ErrorKind::AllocError { error } => error.fmt(f),
             ErrorKind::Utf8Error { error } => error.fmt(f),
             ErrorKind::CoerceError { error } => error.fmt(f),
             ErrorKind::AlignmentRangeMismatch { addr, range, align } => {

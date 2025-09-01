@@ -32,11 +32,11 @@ use crate::traits::ZeroCopy;
 ///
 /// let mut buf = OwnedBuf::new();
 ///
-/// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+/// let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 ///
-/// let string = buf.store_unsized("Hello World!");
+/// let string = buf.store_unsized("Hello World!")?;
 ///
-/// buf.load_uninit_mut(reference).write(&Custom { string });
+/// buf.load_uninit_mut(reference)?.write(&Custom { string });
 ///
 /// let reference = reference.assume_init();
 ///

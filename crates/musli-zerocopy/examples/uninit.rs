@@ -8,16 +8,16 @@ fn main() -> Result<(), Error> {
         string: Ref<str>,
     }
 
-    let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128);
-    buf.extend_from_slice(&[1]);
+    let mut buf = OwnedBuf::with_capacity_and_alignment::<u8>(128)?;
+    buf.extend_from_slice(&[1])?;
 
-    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+    let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 
-    let string = buf.store_unsized("Hello World!");
+    let string = buf.store_unsized("Hello World!")?;
 
-    buf.load_uninit_mut(reference).write(&Custom { string });
+    buf.load_uninit_mut(reference)?.write(&Custom { string });
 
-    buf.align_in_place();
+    buf.align_in_place()?;
 
     let reference = reference.assume_init();
 

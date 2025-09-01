@@ -39,6 +39,7 @@ pub mod set;
 mod constructor;
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]
 pub use self::factory::*;
 #[cfg(feature = "alloc")]

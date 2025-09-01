@@ -29,8 +29,8 @@ use crate::phf::{Entry, MapRef, SetRef};
 ///
 /// let mut buf = OwnedBuf::new();
 ///
-/// let first = buf.store_unsized("first");
-/// let second = buf.store_unsized("second");
+/// let first = buf.store_unsized("first")?;
+/// let second = buf.store_unsized("second")?;
 ///
 /// let map = phf::store_map(&mut buf, [(first, 1u32), (second, 2u32)])?;
 /// let map = buf.bind(map)?;
@@ -96,9 +96,9 @@ where
 ///
 /// let mut buf = OwnedBuf::new();
 ///
-/// let first = buf.store_unsized("first");
-/// let second = buf.store_unsized("second");
-/// let third = buf.store_unsized("third");
+/// let first = buf.store_unsized("first")?;
+/// let second = buf.store_unsized("second")?;
+/// let third = buf.store_unsized("third")?;
 ///
 /// let set = phf::store_set(&mut buf, [first, second])?;
 /// let set = buf.bind(set)?;
@@ -158,16 +158,16 @@ where
     S: ?Sized + StoreBuf,
     F: Fn(&I::Item) -> &K,
 {
-    let entries = build_slice(buf, entries);
+    let entries = build_slice(buf, entries)?;
     let len = crate::phf::generator::displacements_len(entries.len());
-    let displacements = build_slice(buf, (0..len).map(|_| Entry::new(0, 0)));
+    let displacements = build_slice(buf, (0..len).map(|_| Entry::new(0, 0)))?;
 
     let len = buf.len();
 
-    let map = build_slice(buf, (0..entries.len()).map(|_| usize::MAX));
+    let map = build_slice(buf, (0..entries.len()).map(|_| usize::MAX))?;
 
     let hash_state = {
-        buf.align_in_place();
+        buf.align_in_place()?;
 
         // SAFETY: The internal structures are all padded to avoid uninitialized
         // data.
@@ -195,18 +195,22 @@ where
     Ok((hash_state.key, entries, displacements))
 }
 
-fn build_slice<S, I>(buf: &mut S, entries: I) -> Ref<[I::Item], S::ByteOrder, S::Size>
+fn build_slice<S, I>(
+    buf: &mut S,
+    entries: I,
+) -> Result<Ref<[I::Item], S::ByteOrder, S::Size>, Error>
 where
     S: ?Sized + StoreBuf,
     I: IntoIterator<Item: ZeroCopy, IntoIter: ExactSizeIterator>,
 {
-    let offset = buf.next_offset::<I::Item>();
+    let offset = buf.next_offset::<I::Item>()?;
     let iter = entries.into_iter();
     let len = iter.len();
 
     for value in iter {
-        buf.store(&value);
+        buf.store(&value)?;
     }
 
-    Ref::with_metadata(offset, len)
+    // SAFETY: Rust language requirements ensures that layouts are not violated.
+    Ok(unsafe { Ref::try_with_metadata_unchecked(offset, len)? })
 }

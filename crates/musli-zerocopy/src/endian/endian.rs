@@ -32,14 +32,13 @@ use crate::endian::{Big, ByteOrder, Little, Native};
 ///
 /// let mut buf = OwnedBuf::new();
 ///
-/// let name = buf.store_unsized("John");
-///
+/// let name = buf.store_unsized("John")?;
 /// let data = buf.store(&Struct {
 ///     name,
 ///     age: Endian::new(35),
-/// });
+/// })?;
 ///
-/// buf.align_in_place();
+/// buf.align_in_place()?;
 ///
 /// let data = buf.load(data)?;
 ///

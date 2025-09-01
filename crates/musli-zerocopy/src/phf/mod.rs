@@ -29,6 +29,7 @@ pub use self::set::{Set, SetRef};
 pub mod set;
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]
 pub use self::factory::*;
 #[cfg(feature = "alloc")]

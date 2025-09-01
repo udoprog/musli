@@ -9,7 +9,8 @@
 //! `&[u8]` <-> `&T` conversions.
 //!
 //! Reading a zero-copy structure has full `#[no_std]` support. Constructing
-//! ones currently requires the `alloc` feature to be enabled.
+//! ones require some kind of buffer to be provided through [`SliceMut`] or by
+//! constructing through [`OwnedBuf`] with the `alloc` feature to be enabled.
 //!
 //! ```
 //! # #[cfg(target_endian = "little")]
@@ -25,7 +26,7 @@
 //!     name: Ref<str>,
 //! }
 //!
-//! let buf = buf::aligned_buf::<Person>(include_bytes!("author.bin"));
+//! let buf = buf::aligned_buf::<Person>(include_bytes!("author.bin"))?;
 //! let person = Person::from_bytes(&buf[..])?;
 //!
 //! assert_eq!(person.age, 35);
@@ -114,8 +115,8 @@
 //! use musli_zerocopy::OwnedBuf;
 //!
 //! let mut buf = OwnedBuf::new();
-//! let string = buf.store_unsized("Hello World!");
-//! let reference = buf.store(&string);
+//! let string = buf.store_unsized("Hello World!")?;
+//! let reference = buf.store(&string)?;
 //!
 //! assert_eq!(reference.offset(), 12);
 //! # Ok::<_, musli_zerocopy::Error>(())
@@ -140,8 +141,8 @@
 //! use musli_zerocopy::{Ref, OwnedBuf};
 //!
 //! let mut buf = OwnedBuf::new();
-//! let slice: Ref<[u32]> = buf.store_slice(&[1, 2, 3, 4]);
-//! let reference = buf.store(&slice);
+//! let slice: Ref<[u32]> = buf.store_slice(&[1, 2, 3, 4])?;
+//! let reference = buf.store(&slice)?;
 //!
 //! assert_eq!(reference.offset(), 16);
 //! # Ok::<_, musli_zerocopy::Error>(())
@@ -177,8 +178,8 @@
 //!
 //! let mut buf = OwnedBuf::new();
 //!
-//! let string = buf.store_unsized("Hello World!");
-//! let custom = buf.store(&Custom { field: 42, string });
+//! let string = buf.store_unsized("Hello World!")?;
+//! let custom = buf.store(&Custom { field: 42, string })?;
 //!
 //! // The buffer stores both the unsized string and the Custom element.
 //! assert!(buf.len() >= 24);
@@ -304,11 +305,11 @@
 //! use musli_zerocopy::mem::MaybeUninit;
 //!
 //! let mut buf = OwnedBuf::new();
-//! let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>();
+//! let reference: Ref<MaybeUninit<Custom>> = buf.store_uninit::<Custom>()?;
 //!
-//! let string = buf.store_unsized("Hello World!");
+//! let string = buf.store_unsized("Hello World!")?;
 //!
-//! buf.load_uninit_mut(reference).write(&Custom { field: 42, string });
+//! buf.load_uninit_mut(reference)?.write(&Custom { field: 42, string });
 //!
 //! let reference = reference.assume_init();
 //! assert_eq!(reference.offset(), 0);
@@ -364,12 +365,12 @@
 //! let mut buf = OwnedBuf::new()
 //!     .with_byte_order::<endian::Little>();
 //!
-//! let first = buf.store(&Endian::le(42u16));
+//! let first = buf.store(&Endian::le(42u16))?;
 //! let portable = Archive {
-//!     string: buf.store_unsized("Hello World!"),
+//!     string: buf.store_unsized("Hello World!")?,
 //!     number: Endian::new(10),
 //! };
-//! let portable = buf.store(&portable);
+//! let portable = buf.store(&portable)?;
 //!
 //! assert_eq!(&buf[..], &[
 //!     42, 0, // 42u16
@@ -387,12 +388,12 @@
 //! let mut buf = OwnedBuf::new()
 //!     .with_byte_order::<endian::Big>();
 //!
-//! let first = buf.store(&Endian::be(42u16));
+//! let first = buf.store(&Endian::be(42u16))?;
 //! let portable = Archive {
-//!     string: buf.store_unsized("Hello World!"),
+//!     string: buf.store_unsized("Hello World!")?,
 //!     number: Endian::new(10),
 //! };
-//! let portable = buf.store(&portable);
+//! let portable = buf.store(&portable)?;
 //!
 //! assert_eq!(&buf[..], &[
 //!     0, 42, // 42u16
@@ -476,8 +477,9 @@
 //! use musli_zerocopy::OwnedBuf;
 //! use musli_zerocopy::buf::DefaultAlignment;
 //!
-//! let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)
+//! let mut buf = OwnedBuf::with_capacity_and_alignment::<DefaultAlignment>(0)?
 //!     .with_size::<usize>();
+//! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
 //!
 //! The [`Size`] you've specified during construction of an [`OwnedBuf`] will
@@ -495,14 +497,14 @@
 //!     unsize: Ref::<str, Native, usize>,
 //! }
 //!
-//! let mut buf = OwnedBuf::with_capacity(0)
+//! let mut buf = OwnedBuf::with_capacity(0)?
 //!     .with_size::<usize>();
 //!
-//! let reference = buf.store(&42u32);
-//! let slice = buf.store_slice(&[1, 2, 3, 4]);
-//! let unsize = buf.store_unsized("Hello World");
+//! let reference = buf.store(&42u32)?;
+//! let slice = buf.store_slice(&[1, 2, 3, 4])?;
+//! let unsize = buf.store_unsized("Hello World")?;
 //!
-//! buf.store(&Custom { reference, slice, unsize });
+//! buf.store(&Custom { reference, slice, unsize })?;
 //! # Ok::<_, musli_zerocopy::Error>(())
 //! ```
 //!
@@ -515,6 +517,7 @@
 //! [`max_align_t`]: https://en.cppreference.com/w/cpp/types/max_align_t.html
 //! [`OwnedBuf::with_size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_size
 //! [`OwnedBuf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html
+//! [`OwnedBuf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html
 //! [`phf` crate]: https://docs.rs/phf
 //! [`phf`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/phf/index.html
 //! [`Ref`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
@@ -522,6 +525,7 @@
 //! [`Ref<T, E, O>`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/struct.Ref.html
 //! [`requested()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.OwnedBuf.html#method.requested
 //! [`Size`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/pointer/trait.Size.html
+//! [`SliceMut`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.SliceMut.html
 //! [`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
 //! [`trie`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trie/index.html
 //! [`with_byte_order::<E>()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_byte_order
@@ -543,6 +547,7 @@ extern crate alloc;
 extern crate std;
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]
 pub use self::buf::OwnedBuf;
 #[doc(inline)]
@@ -612,8 +617,8 @@ pub use musli_zerocopy_macros::Visit;
 /// struct Custom { field: u32 }
 ///
 /// let mut buf = OwnedBuf::new();
-/// let ptr = buf.store(&Custom { field: 10 });
-/// buf.align_in_place();
+/// let ptr = buf.store(&Custom { field: 10 })?;
+/// buf.align_in_place()?;
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 10 });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
@@ -686,15 +691,15 @@ pub use musli_zerocopy_macros::Visit;
 /// let mut buf = OwnedBuf::with_alignment::<Flags>();
 ///
 /// buf.clear();
-/// let ptr = buf.store(&Flags::First);
+/// let ptr = buf.store(&Flags::First)?;
 /// assert_eq!(buf.load(ptr)?, &Flags::First);
 ///
 /// buf.clear();
-/// let ptr = buf.store(&Flags::Second(42));
+/// let ptr = buf.store(&Flags::Second(42))?;
 /// assert_eq!(buf.load(ptr)?, &Flags::Second(42));
 ///
 /// buf.clear();
-/// let ptr = buf.store(&Flags::Third { first: 42, second: 84 });
+/// let ptr = buf.store(&Flags::Third { first: 42, second: 84 })?;
 /// assert_eq!(buf.load(ptr)?, &Flags::Third { first: 42, second: 84 });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```

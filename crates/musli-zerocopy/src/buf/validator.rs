@@ -69,7 +69,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// let custom = buf.store(&Custom { field: 42, field2: 85 });
+    /// let custom = buf.store(&Custom { field: 42, field2: 85 })?;
     ///
     /// let mut v = buf.validate_struct::<Custom>()?;
     ///
@@ -165,7 +165,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// buf.store(&Packed { field: 42, field2: NonZeroU64::new(84).unwrap() });
+    /// buf.store(&Packed { field: 42, field2: NonZeroU64::new(84).unwrap() })?;
     ///
     /// let mut v = buf.validate_struct::<Packed>()?;
     ///
@@ -215,7 +215,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     ///
     /// let mut buf = OwnedBuf::new();
     ///
-    /// buf.store(&Packed { field: 42, field2: NonZeroU64::new(84).unwrap() });
+    /// buf.store(&Packed { field: 42, field2: NonZeroU64::new(84).unwrap() })?;
     ///
     /// let mut v = buf.validate_struct::<Packed>()?;
     ///

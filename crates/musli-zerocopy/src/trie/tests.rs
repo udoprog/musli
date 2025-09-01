@@ -12,17 +12,17 @@ fn regular_trie() -> Result<(), Error> {
 
     let mut trie = Builder::new();
 
-    let key = buf.store_unsized("work");
+    let key = buf.store_unsized("work")?;
     trie.insert(&buf, key, 1)?;
-    let key = buf.store_unsized("worker");
+    let key = buf.store_unsized("worker")?;
     trie.insert(&buf, key, 2)?;
-    let key = buf.store_unsized("workers");
+    let key = buf.store_unsized("workers")?;
     trie.insert(&buf, key, 3)?;
-    let key = buf.store_unsized("working");
+    let key = buf.store_unsized("working")?;
     trie.insert(&buf, key, 4)?;
-    let key = buf.store_unsized("working");
+    let key = buf.store_unsized("working")?;
     trie.insert(&buf, key, 5)?;
-    let key = buf.store_unsized("working man");
+    let key = buf.store_unsized("working man")?;
     trie.insert(&buf, key, 6)?;
 
     let trie = trie.build(&mut buf)?;
@@ -39,17 +39,17 @@ fn disorederly_trie() -> Result<(), Error> {
 
     let mut trie = Builder::new();
 
-    let key = buf.store_unsized("working");
+    let key = buf.store_unsized("working")?;
     trie.insert(&buf, key, 4)?;
-    let key = buf.store_unsized("working man");
+    let key = buf.store_unsized("working man")?;
     trie.insert(&buf, key, 6)?;
-    let key = buf.store_unsized("work");
+    let key = buf.store_unsized("work")?;
     trie.insert(&buf, key, 1)?;
-    let key = buf.store_unsized("worker");
+    let key = buf.store_unsized("worker")?;
     trie.insert(&buf, key, 2)?;
-    let key = buf.store_unsized("workers");
+    let key = buf.store_unsized("workers")?;
     trie.insert(&buf, key, 3)?;
-    let key = buf.store_unsized("working");
+    let key = buf.store_unsized("working")?;
     trie.insert(&buf, key, 5)?;
 
     let trie = trie.build(&mut buf)?;
@@ -63,8 +63,8 @@ fn disorederly_trie() -> Result<(), Error> {
 #[test]
 fn trie_problem() -> Result<(), Error> {
     let mut buf = OwnedBuf::new();
-    let a = buf.store_unsized("食べなかった");
-    let b = buf.store_unsized("食べない");
+    let a = buf.store_unsized("食べなかった")?;
+    let b = buf.store_unsized("食べない")?;
 
     let mut trie = Builder::new();
 
@@ -83,14 +83,14 @@ fn trie_prefix() -> Result<(), Error> {
     let mut buf = OwnedBuf::new();
 
     let values = [
-        (buf.store_unsized("work"), 1),
-        (buf.store_unsized("worker"), 2),
-        (buf.store_unsized("workers"), 3),
-        (buf.store_unsized("working"), 4),
-        (buf.store_unsized("working"), 5),
-        (buf.store_unsized("working man"), 6),
-        (buf.store_unsized("run"), 7),
-        (buf.store_unsized("running"), 8),
+        (buf.store_unsized("work")?, 1),
+        (buf.store_unsized("worker")?, 2),
+        (buf.store_unsized("workers")?, 3),
+        (buf.store_unsized("working")?, 4),
+        (buf.store_unsized("working")?, 5),
+        (buf.store_unsized("working man")?, 6),
+        (buf.store_unsized("run")?, 7),
+        (buf.store_unsized("running")?, 8),
     ];
 
     let trie = store(&mut buf, values)?;
@@ -131,14 +131,14 @@ fn entries() -> Result<()> {
     let mut buf = OwnedBuf::new();
 
     let values = [
-        (buf.store_unsized("work"), 1),
-        (buf.store_unsized("worker"), 2),
-        (buf.store_unsized("workers"), 3),
-        (buf.store_unsized("working"), 4),
-        (buf.store_unsized("working"), 5),
-        (buf.store_unsized("working man"), 6),
-        (buf.store_unsized("run"), 7),
-        (buf.store_unsized("running"), 8),
+        (buf.store_unsized("work")?, 1),
+        (buf.store_unsized("worker")?, 2),
+        (buf.store_unsized("workers")?, 3),
+        (buf.store_unsized("working")?, 4),
+        (buf.store_unsized("working")?, 5),
+        (buf.store_unsized("working man")?, 6),
+        (buf.store_unsized("run")?, 7),
+        (buf.store_unsized("running")?, 8),
     ];
 
     let trie = store(&mut buf, values)?;

@@ -61,9 +61,7 @@ mod sealed {
 /// use musli_zerocopy::OwnedBuf;
 ///
 /// let mut buf = OwnedBuf::with_alignment::<u8>();
-///
-/// let bytes = buf.store_unsized(&b"Hello World!"[..]);
-/// let buf = buf.as_ref();
+/// let bytes = buf.store_unsized(&b"Hello World!"[..])?;
 /// assert_eq!(buf.load(bytes)?, b"Hello World!");
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
@@ -196,9 +194,9 @@ pub unsafe trait ZeroSized {}
 /// }
 ///
 /// let zero = u32::to_ne_bytes(0);
-/// let zero = buf::aligned_buf::<u32>(&zero);
+/// let zero = buf::aligned_buf::<u32>(&zero)?;
 /// let one = u32::to_ne_bytes(1);
-/// let one = buf::aligned_buf::<u32>(&one);
+/// let one = buf::aligned_buf::<u32>(&one)?;
 ///
 /// let st = zero.load(Ref::<Struct>::zero())?;
 /// assert_eq!(st.field.0, 0);
@@ -352,7 +350,7 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// let original = weapon.to_bytes();
 ///
 /// // Make a copy that we can play around with.
-/// let mut bytes = buf::aligned_buf::<Weapon>(original).into_owned();
+/// let mut bytes = buf::aligned_buf::<Weapon>(original)?.into_owned();
 ///
 /// assert_eq!(weapon.damage, 42);
 /// assert_eq!(&weapon, Weapon::from_bytes(&bytes[..])?);
@@ -409,8 +407,8 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// struct Custom { field: u32, #[zero_copy(ignore)] ignore: () }
 ///
 /// let mut buf = OwnedBuf::new();
-/// let ptr = buf.store(&Custom { field: 42, ignore: () });
-/// buf.align_in_place();
+/// let ptr = buf.store(&Custom { field: 42, ignore: () })?;
+/// buf.align_in_place()?;
 /// assert_eq!(buf.load(ptr)?, &Custom { field: 42, ignore: () });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
@@ -539,7 +537,7 @@ where
     /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
     /// let mut buf = OwnedBuf::new();
-    /// buf.extend_from_slice(&1u32.to_ne_bytes());
+    /// buf.extend_from_slice(&1u32.to_ne_bytes())?;
     ///
     /// let bytes: &[u8] = &buf[..];
     /// assert_eq!(*u32::from_bytes(&bytes)?, 1);
@@ -568,7 +566,7 @@ where
     /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
     ///
     /// let mut buf = OwnedBuf::new();
-    /// buf.extend_from_slice(&1u32.to_ne_bytes());
+    /// buf.extend_from_slice(&1u32.to_ne_bytes())?;
     ///
     /// // SAFETY: Writing a u32 does not leave any uninitialized space.
     /// unsafe {
@@ -805,9 +803,9 @@ macro_rules! impl_number {
         #[doc = concat!("let one: ", stringify!($ty), " = 1;")]
         ///
         #[doc = concat!("let zero = ", stringify!($ty), "::to_ne_bytes(0);")]
-        #[doc = concat!("let zero = buf::aligned_buf::<", stringify!($ty), ">(&zero);")]
+        #[doc = concat!("let zero = buf::aligned_buf::<", stringify!($ty), ">(&zero)?;")]
         #[doc = concat!("let one = ", stringify!($ty), "::to_ne_bytes(1);")]
-        #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one);")]
+        #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one)?;")]
         ///
         /// let st = zero.load(Ref::<Struct>::zero())?;
         /// assert_eq!(st.field, 0);
@@ -1009,9 +1007,9 @@ macro_rules! impl_nonzero_number {
         /// }
         ///
         #[doc = concat!("let zero = ", stringify!($inner), "::to_ne_bytes(0);")]
-        #[doc = concat!("let zero = buf::aligned_buf::<", stringify!($ty), ">(&zero);")]
+        #[doc = concat!("let zero = buf::aligned_buf::<", stringify!($ty), ">(&zero)?;")]
         #[doc = concat!("let one = ", stringify!($inner), "::to_ne_bytes(1);")]
-        #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one);")]
+        #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one)?;")]
         ///
         /// // Non-zero buffer works as expected.
         /// let st = one.load(Ref::<Struct>::zero())?;
@@ -1086,9 +1084,9 @@ macro_rules! impl_nonzero_number {
         /// }
         ///
         #[doc = concat!("let zero = ", stringify!($inner), "::to_ne_bytes(0);")]
-        #[doc = concat!("let zero = buf::aligned_buf::<", stringify!($ty), ">(&zero);")]
+        #[doc = concat!("let zero = buf::aligned_buf::<", stringify!($ty), ">(&zero)?;")]
         #[doc = concat!("let one = ", stringify!($inner), "::to_ne_bytes(1);")]
-        #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one);")]
+        #[doc = concat!("let one = buf::aligned_buf::<", stringify!($ty), ">(&one)?;")]
         ///
         /// let st = zero.load(Ref::<Struct>::zero())?;
         /// assert_eq!(st.field, None);
@@ -1171,8 +1169,8 @@ macro_rules! impl_zst {
         ///
         /// let mut buf = OwnedBuf::new();
         /// let values = [Struct::default(); 100];
-        /// let slice = buf.store_unsized(&values[..]);
-        /// buf.align_in_place();
+        /// let slice = buf.store_unsized(&values[..])?;
+        /// buf.align_in_place()?;
         /// assert_eq!(buf.len(), 0);
         ///
         /// let slice = buf.load(slice)?;
@@ -1237,8 +1235,8 @@ impl_zst!({T}, PhantomData<T>, PhantomData, {PhantomData<u32>, std::marker::Phan
 ///
 /// let mut buf = OwnedBuf::with_alignment::<u128>();
 /// let values = [Struct::<u128>::default(); 100];
-/// let slice = buf.store_unsized(&values[..]);
-/// buf.align_in_place();
+/// let slice = buf.store_unsized(&values[..])?;
+/// buf.align_in_place()?;
 /// assert_eq!(buf.len(), 0);
 ///
 /// let slice = buf.load(slice)?;

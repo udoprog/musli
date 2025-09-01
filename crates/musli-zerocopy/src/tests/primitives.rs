@@ -29,8 +29,8 @@ fn test_ref_to_slice() -> Result<()> {
 
     let mut buf = OwnedBuf::new();
 
-    let index = buf.store_slice(&[1, 2, 3, 4]);
-    let index = buf.store(&index);
+    let index = buf.store_slice(&[1, 2, 3, 4])?;
+    let index = buf.store(&index)?;
 
     let to_slice1 = RefToSlice {
         index,
@@ -42,10 +42,10 @@ fn test_ref_to_slice() -> Result<()> {
         extra: InnerEnum::None,
     };
 
-    let to_slice1_ref = buf.store(&to_slice1);
-    let to_slice2_ref = buf.store(&to_slice2);
+    let to_slice1_ref = buf.store(&to_slice1)?;
+    let to_slice2_ref = buf.store(&to_slice2)?;
 
-    buf.align_in_place();
+    buf.align_in_place()?;
 
     assert_eq!(buf.load(to_slice1_ref)?, &to_slice1);
     assert_eq!(buf.load(to_slice2_ref)?, &to_slice2);
@@ -165,8 +165,8 @@ fn weird_alignment() -> Result<()> {
     };
 
     let mut buf = OwnedBuf::with_alignment::<WeirdAlignment>();
-    let w = buf.store(&weird);
-    buf.align_in_place();
+    let w = buf.store(&weird)?;
+    buf.align_in_place()?;
 
     assert_eq!(buf.len(), size_of::<WeirdAlignment>());
     assert_eq!(buf.load(w)?, &weird);
@@ -232,15 +232,15 @@ fn enum_boundaries() -> Result<()> {
             assert_eq!($name::AfterMin as $repr, $min + 1);
 
             let mut buf = OwnedBuf::with_alignment::<$name>();
-            let v1 = buf.store(&$name::Variant1);
-            let v2 = buf.store(&$name::Variant2);
-            let v3 = buf.store(&$name::Variant3);
-            let max = buf.store(&$name::Max);
-            let min = buf.store(&$name::Min);
-            let after_min = buf.store(&$name::AfterMin);
-            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX - 1)).offset());
+            let v1 = buf.store(&$name::Variant1)?;
+            let v2 = buf.store(&$name::Variant2)?;
+            let v3 = buf.store(&$name::Variant3)?;
+            let max = buf.store(&$name::Max)?;
+            let min = buf.store(&$name::Min)?;
+            let after_min = buf.store(&$name::AfterMin)?;
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX - 1))?.offset());
 
-            buf.align_in_place();
+            buf.align_in_place()?;
 
             assert_eq!(buf.load(v1)?, &$name::Variant1);
             assert_eq!(buf.load(v2)?, &$name::Variant2);
@@ -308,12 +308,12 @@ fn test_signed_wraparound() -> Result<()> {
             assert_eq!($name::One as $repr, 1);
 
             let mut buf = OwnedBuf::with_alignment::<$name>();
-            let minus_one = buf.store(&$name::MinusOne);
-            let zero = buf.store(&$name::Zero);
-            let one = buf.store(&$name::One);
-            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX)).offset());
+            let minus_one = buf.store(&$name::MinusOne)?;
+            let zero = buf.store(&$name::Zero)?;
+            let one = buf.store(&$name::One)?;
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX))?.offset());
 
-            buf.align_in_place();
+            buf.align_in_place()?;
 
             assert_eq!(buf.load(minus_one)?, &$name::MinusOne);
             assert_eq!(buf.load(zero)?, &$name::Zero);
@@ -353,12 +353,12 @@ fn test_neg0() -> Result<()> {
             assert_eq!($name::One as $repr, 1);
 
             let mut buf = OwnedBuf::with_alignment::<$name>();
-            let minus_one = buf.store(&$name::MinusOne);
-            let neg0 = buf.store(&$name::Neg0);
-            let one = buf.store(&$name::One);
-            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX)).offset());
+            let minus_one = buf.store(&$name::MinusOne)?;
+            let neg0 = buf.store(&$name::Neg0)?;
+            let one = buf.store(&$name::One)?;
+            let v4 = Ref::<$name>::new(buf.store(&(<$num>::MAX))?.offset());
 
-            buf.align_in_place();
+            buf.align_in_place()?;
 
             assert_eq!(buf.load(minus_one)?, &$name::MinusOne);
             assert_eq!(buf.load(neg0)?, &$name::Neg0);
@@ -431,12 +431,12 @@ fn test_enum_with_fields() -> Result<()> {
     let variant = buf.store(&Types::Variant {
         field: 10,
         field2: 20,
-    });
-    let variant2 = buf.store(&Types::Variant2(40));
-    let variant3 = buf.store(&Types::Variant3);
-    let empty = buf.store(&Types::Empty { empty: PhantomData });
+    })?;
+    let variant2 = buf.store(&Types::Variant2(40))?;
+    let variant3 = buf.store(&Types::Variant3)?;
+    let empty = buf.store(&Types::Empty { empty: PhantomData })?;
 
-    buf.align_in_place();
+    buf.align_in_place()?;
 
     assert_eq!(
         buf.load(variant)?,
@@ -472,9 +472,9 @@ fn validate_packed() -> Result<()> {
     buf.store(&Packed {
         field: 42,
         field2: NonZeroU64::new(84).unwrap(),
-    });
+    })?;
 
-    buf.align_in_place();
+    buf.align_in_place()?;
 
     let mut v = buf.validate_struct::<Packed>()?;
 
@@ -504,8 +504,8 @@ mod primitive_slices {
                 struct Custom $(<$param>)* { field: Ref<[$ty]> }
 
                 let mut buf = OwnedBuf::new();
-                let slice: Ref<[$ty]> = buf.store_slice(&$example);
-                buf.align_in_place();
+                let slice: Ref<[$ty]> = buf.store_slice(&$example)?;
+                buf.align_in_place()?;
                 assert_eq!(buf.load(slice)?, &$example);
                 Ok(())
             }
@@ -539,8 +539,8 @@ mod nonzero_slices {
                 struct Custom { field: Ref<[$ty]> }
 
                 let mut buf = OwnedBuf::new();
-                let slice: Ref<[$ty]> = buf.store_slice(&$example).cast::<[$ty]>();
-                buf.align_in_place();
+                let slice: Ref<[$ty]> = buf.store_slice(&$example)?.cast::<[$ty]>();
+                buf.align_in_place()?;
                 let example: &[$ty] = unsafe { core::mem::transmute(&$example[..]) };
                 assert_eq!(buf.load(slice)?, example);
                 Ok(())
@@ -561,8 +561,8 @@ mod nonzero_slices {
                 struct Custom { field: Ref<[$ty]> }
 
                 let mut buf = OwnedBuf::new();
-                let slice: Ref<[$ty]> = buf.store_slice(&$example).cast::<[$ty]>();
-                buf.align_in_place();
+                let slice: Ref<[$ty]> = buf.store_slice(&$example)?.cast::<[$ty]>();
+                buf.align_in_place()?;
                 assert!(buf.load(slice).is_err());
                 Ok(())
             }
@@ -696,13 +696,13 @@ fn padded_enum() -> Result<()> {
             assert_eq!(size_of::<Enum>(), slice.len());
 
             buf.clear();
-            let r = buf.store(&$variant);
+            let r = buf.store(&$variant)?;
             assert_eq!(buf.as_slice(), slice);
             assert_eq!(buf.load(r)?, &$variant);
 
             buf.clear();
             let packed = PackedStruct(0x1020u16.to_be(), $variant);
-            let r = buf.store(&packed);
+            let r = buf.store(&packed)?;
             assert_eq!(&buf.as_slice()[0..2], &[16, 32]);
             assert_eq!(&buf.as_slice()[2..], slice);
             assert_eq!(
