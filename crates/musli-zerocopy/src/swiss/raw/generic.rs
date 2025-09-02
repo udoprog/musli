@@ -75,7 +75,7 @@ impl Group {
     #[inline]
     #[allow(clippy::cast_ptr_alignment)] // unaligned load
     pub(crate) unsafe fn load(ptr: *const u8) -> Self {
-        Group(ptr::read_unaligned(ptr.cast()))
+        Group(unsafe { ptr::read_unaligned(ptr.cast()) })
     }
 
     /// Loads a group of bytes starting at the given address, which must be
@@ -85,7 +85,7 @@ impl Group {
     pub(crate) unsafe fn load_aligned(ptr: *const u8) -> Self {
         // FIXME: use align_offset once it stabilizes
         debug_assert_eq!(ptr as usize & (mem::align_of::<Self>() - 1), 0);
-        Group(ptr::read(ptr.cast()))
+        Group(unsafe { ptr::read(ptr.cast()) })
     }
 
     /// Returns a `BitMask` indicating all bytes in the group which *may*

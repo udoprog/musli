@@ -126,7 +126,7 @@ fn test_bit_pattern() -> Result<(), Error> {
                 metadata: $size,
             }
 
-            let mut invalid_ref = RawRef {
+            let invalid_ref = RawRef {
                 offset: <$size>::MAX,
                 metadata: <$order as ByteOrder>::$swap(<$size>::MAX / 2),
             };
@@ -195,7 +195,7 @@ fn test_bit_pattern() -> Result<(), Error> {
                 stringify!($order),
             );
 
-            let mut valid_ref = RawRef {
+            let valid_ref = RawRef {
                 offset: <$order as ByteOrder>::$swap(
                     <$size>::MAX - size_of::<SizedValue>() as $size,
                 ),

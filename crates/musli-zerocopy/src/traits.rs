@@ -347,7 +347,7 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 ///     damage: 42u32,
 /// };
 ///
-/// let original = weapon.to_bytes();
+/// let original = weapon.to_bytes_padded();
 ///
 /// // Make a copy that we can play around with.
 /// let mut bytes = buf::aligned_buf::<Weapon>(original)?.into_owned();
@@ -355,16 +355,17 @@ unsafe impl<T: ?Sized> ZeroSized for PhantomData<T> {}
 /// assert_eq!(weapon.damage, 42);
 /// assert_eq!(&weapon, Weapon::from_bytes(&bytes[..])?);
 ///
-/// # #[cfg(target_endian = "little")]
-/// assert_eq!(&bytes[..], &[1, 0, 0, 0, 42, 0, 0, 0]);
+/// assert_eq!(&bytes[0..1], [1]);
+/// assert_eq!(&bytes[4..8], 42u32.to_ne_bytes());
 ///
 /// // SAFETY: Modifying a field of a u32 does not leave any uninitialized space.
 /// unsafe {
-///     Weapon::from_bytes_mut(bytes.as_mut_slice())?.damage += 10;
+///     let weapon = Weapon::from_bytes_mut_padded(bytes.as_mut_slice())?;
+///     weapon.damage += 10;
 /// }
 ///
-/// # #[cfg(target_endian = "little")]
-/// assert_eq!(&bytes[..], &[1, 0, 0, 0, 52, 0, 0, 0]);
+/// assert_eq!(&bytes[0..1], [1]);
+/// assert_eq!(&bytes[4..8], 52u32.to_ne_bytes());
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 ///
@@ -471,7 +472,49 @@ where
         }
     }
 
-    /// Convert a reference to a `ZeroCopy` type into bytes.
+    /// Convert a mutable reference to a `ZeroCopy` type into bytes.
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [`initialize_padding()`]: Self::initialize_padding
+    /// [type level documentation]: Self
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    ///
+    /// #[derive(ZeroCopy, Debug, PartialEq)]
+    /// #[repr(C)]
+    /// struct Weapon {
+    ///     id: u8,
+    ///     damage: u32,
+    /// }
+    ///
+    /// let mut weapon = Weapon {
+    ///     id: 1,
+    ///     damage: 42,
+    /// };
+    ///
+    /// let bytes = weapon.to_bytes_padded();
+    /// assert_eq!(&bytes[0..1], [1]);
+    /// assert_eq!(&bytes[4..8], 42u32.to_ne_bytes());
+    /// ```
+    #[track_caller]
+    #[inline]
+    fn to_bytes(&self) -> &[u8] {
+        const {
+            assert!(
+                !Self::PADDED,
+                "ZeroCopy::to_bytes_unpadded can only be used on unpadded types"
+            );
+        }
+
+        unsafe { self.to_bytes_unchecked() }
+    }
+
+    /// Convert a reference to a `ZeroCopy` type into bytes assuming it might be
+    /// [`Self::PADDED`].
     ///
     /// This requires mutable access to `self`, since it must call
     /// [`initialize_padding()`] to ensure that the returned buffer is fully
@@ -492,13 +535,10 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    fn to_bytes(&mut self) -> &[u8] {
+    fn to_bytes_padded(&mut self) -> &[u8] {
         self.initialize_padding();
 
-        unsafe {
-            let ptr = (self as *mut Self).cast::<u8>();
-            slice::from_raw_parts(ptr, size_of::<Self>())
-        }
+        unsafe { self.to_bytes_unchecked() }
     }
 
     /// Convert a `ZeroCopy` type into bytes.
@@ -516,6 +556,118 @@ where
         unsafe {
             let ptr = (self as *const Self).cast::<u8>();
             slice::from_raw_parts(ptr, size_of::<Self>())
+        }
+    }
+
+    /// Convert a mutable reference to a `ZeroCopy` type into mutable bytes
+    /// requring `!Self::PADDED`.
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [type level documentation]: Self
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Packed {
+    ///     a: u32,
+    ///     b: u32,
+    /// }
+    ///
+    /// let mut value = Packed { a: 1, b: 42 };
+    /// value.initialize_padding();
+    ///
+    /// let bytes = value.to_bytes_mut();
+    ///
+    /// assert_eq!(&bytes[0..4], 1u32.to_ne_bytes());
+    /// assert_eq!(&bytes[4..8], 42u32.to_ne_bytes());
+    ///
+    /// let value = Packed::from_bytes_mut(&mut *bytes)?;
+    /// value.a = 2;
+    /// value.initialize_padding();
+    ///
+    /// assert_eq!(&bytes[0..4], 2u32.to_ne_bytes());
+    /// assert_eq!(&bytes[4..8], 42u32.to_ne_bytes());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[track_caller]
+    #[inline]
+    fn to_bytes_mut(&mut self) -> &mut [u8] {
+        const {
+            assert!(
+                !Self::PADDED,
+                "ZeroCopy::to_bytes_unpadded can only be used on unpadded types"
+            );
+        }
+
+        unsafe { self.to_bytes_mut_unchecked() }
+    }
+
+    /// Convert a mutable reference to a `ZeroCopy` type into mutable bytes
+    /// assuming it might be [`Self::PADDED`].
+    ///
+    /// This will call [`initialize_padding()`] to ensure that the returned bit
+    /// pattern is initialized.
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [`initialize_padding()`]: Self::initialize_padding
+    /// [type level documentation]: Self
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
+    ///
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Weapon {
+    ///     id: u8,
+    ///     damage: u32,
+    /// }
+    ///
+    /// let mut value = Weapon { id: 1, damage: 42 };
+    /// value.initialize_padding();
+    ///
+    /// let bytes = value.to_bytes_mut_padded();
+    ///
+    /// assert_eq!(&bytes[0..1], [1]);
+    /// assert_eq!(&bytes[4..8], 42u32.to_ne_bytes());
+    ///
+    /// // SAFETY: After writing to the id field, we initialize padding again to
+    /// // ensure we can safely access the used buffer again.
+    /// unsafe {
+    ///     let value = Weapon::from_bytes_mut_padded(&mut *bytes)?;
+    ///     value.id = 2;
+    ///     value.initialize_padding();
+    /// }
+    ///
+    /// assert_eq!(&bytes[0..1], [2]);
+    /// assert_eq!(&bytes[4..8], 42u32.to_ne_bytes());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[inline]
+    fn to_bytes_mut_padded(&mut self) -> &mut [u8] {
+        self.initialize_padding();
+
+        unsafe { self.to_bytes_mut_unchecked() }
+    }
+
+    /// Convert a `ZeroCopy` type into mutable bytes.
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [`initialize_padding()`]: Self::initialize_padding
+    /// [type level documentation]: Self
+    #[inline]
+    unsafe fn to_bytes_mut_unchecked(&mut self) -> &mut [u8] {
+        unsafe {
+            let ptr = (self as *mut Self).cast::<u8>();
+            slice::from_raw_parts_mut(ptr, size_of::<Self>())
         }
     }
 
@@ -560,6 +712,49 @@ where
     /// to inhabit `&mut Self`. Anything else will cause an [`Error`] detailing
     /// why the conversion failed.
     ///
+    /// See [`Buf::new_mut`] for more information.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_zerocopy::{OwnedBuf, ZeroCopy};
+    ///
+    /// let mut buf = OwnedBuf::new();
+    /// buf.extend_from_slice(&1u32.to_ne_bytes())?;
+    ///
+    /// *u32::from_bytes_mut(buf.as_mut_slice())? += 10;
+    ///
+    /// assert_eq!(*u32::from_bytes(&buf[..])?, 11);
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[track_caller]
+    #[inline]
+    fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Self, Error> {
+        const {
+            assert!(
+                !Self::PADDED,
+                "ZeroCopy::from_bytes_mut can only be used on unpadded types"
+            );
+        }
+
+        unsafe { Buf::new_mut(bytes).load_at_mut::<Self>(0) }
+    }
+
+    /// Load bytes into a mutable reference of `Self` assuming it is
+    /// [`Self::PADDED`].
+    ///
+    /// See the [type level documentation] for examples.
+    ///
+    /// [type level documentation]: Self
+    ///
+    /// # Errors
+    ///
+    /// This will ensure that `bytes` is aligned, appropriately sized, and valid
+    /// to inhabit `&mut Self`. Anything else will cause an [`Error`] detailing
+    /// why the conversion failed.
+    ///
+    /// See [`Buf::new_mut`] for more information.
+    ///
     /// # Examples
     ///
     /// ```
@@ -577,18 +772,41 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     ///
-    /// # Safety
+    /// Use with a padded type:
     ///
-    /// Since this allows the underlying buffer to be mutated, depending on how
-    /// the buffer is used it might result in undefined bit-patterns like
-    /// padding bytes being written to it. The caller must ensure this is not
-    /// done with the structures being written by for example calling
-    /// [`ZeroCopy::initialize_padding()`] after the contents of the buffer is
-    /// modified.
+    /// ```
+    /// use musli_zerocopy::ZeroCopy;
     ///
-    /// See [`Buf::new_mut`] for more information.
+    /// #[derive(ZeroCopy)]
+    /// #[repr(C)]
+    /// struct Weapon {
+    ///     id: u8,
+    ///     damage: u32,
+    /// }
+    ///
+    /// let mut value = Weapon { id: 1, damage: 42 };
+    /// value.initialize_padding();
+    ///
+    /// let bytes = value.to_bytes_mut_padded();
+    ///
+    /// assert_eq!(&bytes[0..1], [1]);
+    /// assert_eq!(&bytes[4..8], 42u32.to_ne_bytes());
+    ///
+    /// // SAFETY: After writing to the id field, we initialize padding again to
+    /// // ensure we can safely access the used buffer again.
+    /// unsafe {
+    ///     let value = Weapon::from_bytes_mut_padded(&mut *bytes)?;
+    ///     value.id = 2;
+    ///     value.initialize_padding();
+    /// }
+    ///
+    /// assert_eq!(&bytes[0..1], [2]);
+    /// assert_eq!(&bytes[4..8], 42u32.to_ne_bytes());
+    /// # Ok::<_, musli_zerocopy::Error>(())
+    /// ```
+    #[track_caller]
     #[inline]
-    unsafe fn from_bytes_mut(bytes: &mut [u8]) -> Result<&mut Self, Error> {
+    unsafe fn from_bytes_mut_padded(bytes: &mut [u8]) -> Result<&mut Self, Error> {
         unsafe { Buf::new_mut(bytes).load_at_mut::<Self>(0) }
     }
 
