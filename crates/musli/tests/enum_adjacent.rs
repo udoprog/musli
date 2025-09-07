@@ -223,3 +223,62 @@ fn named_with_skip() {
         json = r#"{"type":"Struct","content":{"string":"Hello World","number":42}}"#,
     };
 }
+
+/// See https://github.com/udoprog/musli/issues/320
+#[test]
+fn issue_320() {
+    #[derive(Debug, PartialEq, Decode, Encode)]
+    #[musli(Text, name_all = "snake_case", tag = "type")]
+    enum Criteria {
+        Greeting,
+        #[musli(Text, name(type = str))]
+        IsHungry(#[musli(Text, name = "0")] u8),
+        #[musli(Text, name(type = str))]
+        IsTest(#[musli(Text, name = "0")] u8, #[musli(Text, name = "1")] u8),
+    }
+
+    #[derive(Debug, PartialEq, Decode, Encode)]
+    struct MyRecord {
+        crit: Criteria,
+        text: Vec<String>,
+    }
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        MyRecord {
+            crit: Criteria::Greeting,
+            text: vec!["I am VERY hungry".to_string()],
+        },
+        json = r#"{"crit":{"type":"greeting"},"text":["I am VERY hungry"]}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Criteria::IsHungry(5),
+        json = r#"{"type":"is_hungry","0":5}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        MyRecord {
+            crit: Criteria::IsHungry(5),
+            text: vec!["I am VERY hungry".to_string()],
+        },
+        json = r#"{"crit":{"type":"is_hungry","0":5},"text":["I am VERY hungry"]}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        Criteria::IsTest(3, 2),
+        json = r#"{"type":"is_test","0":3,"1":2}"#
+    };
+
+    musli::macros::assert_roundtrip_eq! {
+        descriptive,
+        MyRecord {
+            crit: Criteria::IsTest(3, 2),
+            text: vec!["I am hungry".to_string()],
+        },
+        json = r#"{"crit":{"type":"is_test","0":3,"1":2},"text":["I am hungry"]}"#
+    };
+}

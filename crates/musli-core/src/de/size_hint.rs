@@ -88,7 +88,7 @@ impl fmt::Display for SizeHint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
             SizeHintKind::Any => write!(f, "unknown length"),
-            SizeHintKind::Exact(length) => write!(f, "{length} items"),
+            SizeHintKind::Exact(length) => write!(f, "size {length}"),
         }
     }
 }
