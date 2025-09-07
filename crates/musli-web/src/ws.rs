@@ -672,9 +672,9 @@ where
     ///
     /// Note that the written message is buffered, and will be sent when
     /// [`Server::run`] is called.
-    pub fn broadcast<'de, T>(self: Pin<&mut Self>, message: T) -> Result<(), Error>
+    pub fn broadcast<T>(self: Pin<&mut Self>, message: T) -> Result<(), Error>
     where
-        T: Broadcast<'de>,
+        T: Broadcast,
     {
         let this = unsafe { Pin::get_unchecked_mut(self) };
 

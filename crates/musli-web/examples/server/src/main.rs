@@ -76,7 +76,11 @@ async fn handler(ws: WebSocketUpgrade, State(sender): State<Sender<Broadcast>>) 
 
                     let result = match message {
                         Broadcast::Tick { tick } => {
-                            server.as_mut().broadcast(api::TickEvent { message: "tick", tick })
+                            (|| {
+                                server.as_mut().broadcast(api::TickEvent { message: "tick", tick })?;
+                                server.as_mut().broadcast(api::OwnedTickEvent { message: String::from("tock"), tick })?;
+                                Ok::<_, anyhow::Error>(())
+                            })()
                         },
                     };
 

@@ -19,7 +19,7 @@
 //!     pub struct HelloRequest<'de> {
 //!         pub message: &'de str,
 //!     }
-//!    
+//!
 //!     #[derive(Encode, Decode)]
 //!     pub struct HelloResponse<'de> {
 //!         pub message: &'de str,

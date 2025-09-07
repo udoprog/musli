@@ -17,6 +17,12 @@ pub struct TickEvent<'de> {
     pub tick: u32,
 }
 
+#[derive(Encode)]
+pub struct OwnedTickEvent {
+    pub message: String,
+    pub tick: u32,
+}
+
 api::define! {
     endpoint Hello {
         request<'de> = HelloRequest<'de>;
@@ -24,6 +30,7 @@ api::define! {
     }
 
     broadcast Tick {
-        body<'de> = TickEvent<'de>;
+        event<'de> = TickEvent<'de>;
+        event = OwnedTickEvent;
     }
 }
