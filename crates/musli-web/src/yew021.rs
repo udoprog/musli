@@ -34,12 +34,12 @@
 //!     }
 //!
 //!     api::define! {
-//!         endpoint Hello {
+//!         pub endpoint Hello {
 //!             request<'de> = HelloRequest<'de>;
 //!             response<'de> = HelloResponse<'de>;
 //!         }
 //!
-//!         broadcast Tick {
+//!         pub broadcast Tick {
 //!             event<'de> = TickEvent<'de>;
 //!         }
 //!     }
@@ -133,7 +133,7 @@
 //!             Msg::Tick(Ok(packet)) => {
 //!                 tracing::debug!("Got tick");
 //!
-//!                 if let Ok(tick) = packet.decode_broadcast() {
+//!                 if let Ok(tick) = packet.decode_event() {
 //!                     self.tick = tick.tick;
 //!                 }
 //!

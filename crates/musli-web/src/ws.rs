@@ -83,7 +83,7 @@ use rand::rngs::SmallRng;
 use tokio::time::{Duration, Instant, Sleep};
 
 use crate::Buf;
-use crate::api::{Broadcast, Listener, RequestHeader, ResponseHeader};
+use crate::api::{Broadcast, Event, RequestHeader, ResponseHeader};
 use crate::buf::InvalidFrame;
 
 const MAX_CAPACITY: usize = 1048576;
@@ -674,13 +674,13 @@ where
     /// [`Server::run`] is called.
     pub fn broadcast<T>(self: Pin<&mut Self>, message: T) -> Result<(), Error>
     where
-        T: Broadcast,
+        T: Event,
     {
         let this = unsafe { Pin::get_unchecked_mut(self) };
 
         this.buf.write(ResponseHeader {
             serial: 0,
-            broadcast: Some(<T::Endpoint as Listener>::KIND),
+            broadcast: Some(<T::Broadcast as Broadcast>::KIND),
             error: None,
         })?;
 

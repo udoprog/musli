@@ -26,7 +26,7 @@
 //!     }
 //!
 //!     api::define! {
-//!         endpoint Hello {
+//!         pub endpoint Hello {
 //!             request<'de> = HelloRequest<'de>;
 //!             response<'de> = HelloResponse<'de>;
 //!         }

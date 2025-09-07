@@ -31,7 +31,7 @@ use musli::storage;
 
 use slab::Slab;
 
-use crate::api;
+use crate::api::{self, Event};
 
 const MAX_CAPACITY: usize = 1048576;
 
@@ -845,7 +845,7 @@ where
     ///     }
     ///
     ///     api::define! {
-    ///         endpoint Hello {
+    ///         pub endpoint Hello {
     ///             request<'de> = HelloRequest<'de>;
     ///             response<'de> = HelloResponse<'de>;
     ///         }
@@ -946,7 +946,7 @@ where
     ///     }
     ///
     ///     api::define! {
-    ///         endpoint Hello {
+    ///         pub endpoint Hello {
     ///             request<'de> = HelloRequest<'de>;
     ///             response<'de> = HelloResponse<'de>;
     ///         }
@@ -1485,16 +1485,37 @@ where
     ///
     /// You can check if the packet is empty using [`Packet::is_empty`].
     pub fn decode(&self) -> Result<T::Response<'_>> {
+        self.decode_any()
+    }
+
+    /// Decode any contents of a packet.
+    ///
+    /// This can be called multiple times if there are multiple payloads in
+    /// sequence of the response.
+    ///
+    /// You can check if the packet is empty using [`Packet::is_empty`].
+    pub fn decode_any<'de, R>(&'de self) -> Result<R>
+    where
+        R: Decode<'de, Binary, Global>,
+    {
         self.raw.decode()
     }
 }
 
 impl<T> Packet<T>
 where
-    T: api::Listener,
+    T: api::Broadcast,
 {
-    /// Decode a typed broadcast.
-    pub fn decode_broadcast(&self) -> Result<T::Broadcast<'_>> {
+    /// Decode the primary event related to a broadcast.
+    pub fn decode_event<'de>(&'de self) -> Result<T::Event<'de>> {
+        self.decode_event_any()
+    }
+
+    /// Decode any event related to a broadcast.
+    pub fn decode_event_any<'de, E>(&'de self) -> Result<E>
+    where
+        E: Event<Broadcast = T> + Decode<'de, Binary, Global>,
+    {
         self.raw.decode()
     }
 }
@@ -1541,7 +1562,7 @@ where
     ///     }
     ///
     ///     api::define! {
-    ///         endpoint Hello {
+    ///         pub endpoint Hello {
     ///             request<'de> = HelloRequest<'de>;
     ///             response<'de> = HelloResponse<'de>;
     ///         }
@@ -1636,7 +1657,7 @@ where
     ///     }
     ///
     ///     api::define! {
-    ///         broadcast Tick {
+    ///         pub broadcast Tick {
     ///             event<'de> = TickEvent<'de>;
     ///         }
     ///     }
@@ -1676,7 +1697,7 @@ where
     ///                 false
     ///             }
     ///             Msg::Tick(Ok(packet)) => {
-    ///                 if let Ok(tick) = packet.decode_broadcast() {
+    ///                 if let Ok(tick) = packet.decode_event() {
     ///                     self.tick = tick.tick;
     ///                 }
     ///
@@ -1697,7 +1718,7 @@ where
     /// ```
     pub fn on_broadcast<T>(&self, callback: impl Callback<Result<Packet<T>>>) -> Listener
     where
-        T: api::Listener,
+        T: api::Broadcast,
     {
         self.on_raw_broadcast::<T>(move |result| match result {
             Ok(packet) => callback.call(Ok(Packet::new(packet))),
@@ -1728,7 +1749,7 @@ where
     ///     }
     ///
     ///     api::define! {
-    ///         broadcast Tick {
+    ///         pub broadcast Tick {
     ///             event<'de> = TickEvent<'de>;
     ///         }
     ///     }
@@ -1790,7 +1811,7 @@ where
     /// ```
     pub fn on_raw_broadcast<T>(&self, callback: impl Callback<Result<RawPacket>>) -> Listener
     where
-        T: api::Listener,
+        T: api::Broadcast,
     {
         let Some(shared) = self.shared.upgrade() else {
             return Listener::empty_with_kind(T::KIND);

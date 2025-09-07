@@ -117,7 +117,7 @@ impl Component for App {
             Msg::Tick(Ok(packet)) => {
                 tracing::debug!("Got tick");
 
-                if let Ok(tick) = packet.decode_broadcast() {
+                if let Ok(tick) = packet.decode_event() {
                     self.tick = tick.tick;
                     self.messages.push(tick.message.to_owned());
                 }

@@ -17,7 +17,6 @@ use axum::extract::State;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::any;
-use musli_web::api::Endpoint;
 use musli_web::{axum08, ws};
 use tokio::sync::broadcast::Sender;
 use tokio::time::{self, Duration};

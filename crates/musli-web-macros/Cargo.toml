@@ -1,0 +1,29 @@
+[package]
+name = "musli-web-macros"
+version = "0.0.145"
+authors = ["John-John Tedro <udoprog@tedro.se>"]
+edition = "2024"
+rust-version = "1.85"
+description = """
+Macros for Müsli web.
+"""
+documentation = "https://docs.rs/musli"
+readme = "README.md"
+homepage = "https://github.com/udoprog/musli"
+repository = "https://github.com/udoprog/musli"
+license = "MIT OR Apache-2.0"
+keywords = ["no_std", "serialization", "zerocopy"]
+categories = ["encoding", "no-std", "no-std::no-alloc"]
+
+[lib]
+proc-macro = true
+path = "src/lib.rs"
+
+[dependencies]
+proc-macro2 = "1.0.79"
+quote = { version = "1.0.35", default-features = false }
+syn = { version = "2.0.55", features = ["full", "extra-traits"] }
+
+[dev-dependencies]
+musli = { path = "../musli", version = "0.0.145" }
+musli-web = { path = "../musli-web", version = "0.0.145", features = ["api"] }
