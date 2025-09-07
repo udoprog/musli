@@ -65,7 +65,7 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///         }
 ///
 ///         broadcast Tick {
-///             body<'de> = TickEvent<'de>;
+///             event<'de> = TickEvent<'de>;
 ///         }
 ///     }
 /// }

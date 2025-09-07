@@ -28,18 +28,25 @@ macro_rules! __define {
     };
 
     (@inner broadcast $listener:ident {
-        body<$body_lt:lifetime> = $body:ty;
+        event <$first_event_lt:lifetime> = $first_event:ty;
+        $(event $(<$event_lt:lifetime>)? = $event:ty;)*
     }) => {
         pub enum $listener {}
 
         impl $crate::api::Listener for $listener {
             const KIND: &'static str = stringify!($listener);
-            type Broadcast<$body_lt> = $body;
+            type Broadcast<$first_event_lt> = $first_event;
         }
 
-        impl<$body_lt>  $crate::api::Broadcast<$body_lt> for $body {
+        impl <$first_event_lt> $crate::api::Broadcast for $first_event {
             type Endpoint = $listener;
         }
+
+        $(
+            impl $(<$event_lt>)* $crate::api::Broadcast for $event {
+                type Endpoint = $listener;
+            }
+        )*
     }
 }
 
@@ -87,6 +94,12 @@ macro_rules! __define {
 ///     pub tick: u32,
 /// }
 ///
+/// #[derive(Encode, Decode)]
+/// pub struct OwnedTickEvent {
+///     pub message: String,
+///     pub tick: u32,
+/// }
+///
 /// api::define! {
 ///     endpoint Hello {
 ///         request<'de> = HelloRequest<'de>;
@@ -94,7 +107,8 @@ macro_rules! __define {
 ///     }
 ///
 ///     broadcast Tick {
-///         body<'de> = TickEvent<'de>;
+///         event<'de> = TickEvent<'de>;
+///         event = OwnedTickEvent;
 ///     }
 /// }
 /// ```
@@ -120,7 +134,7 @@ where
     const KIND: &'static str;
 
     /// The response type related to the endpoint.
-    type Broadcast<'de>: Broadcast<'de, Endpoint = Self>;
+    type Broadcast<'de>: Broadcast<Endpoint = Self> + Decode<'de, Binary, Global>;
 }
 
 /// A marker indicating a request type.
@@ -133,12 +147,12 @@ where
 }
 
 /// A broadcast type marker.
-pub trait Broadcast<'de>
+pub trait Broadcast
 where
-    Self: Encode<Binary> + Decode<'de, Binary, Global>,
+    Self: Encode<Binary>,
 {
     /// The endpoint related to the broadcast.
-    type Endpoint: Listener<Broadcast<'de> = Self>;
+    type Endpoint: Listener;
 }
 
 /// A request header.

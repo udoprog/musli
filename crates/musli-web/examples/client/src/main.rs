@@ -34,6 +34,7 @@ struct App {
     text: String,
     tick: u32,
     responses: Vec<String>,
+    messages: Vec<String>,
 }
 
 impl Component for App {
@@ -64,6 +65,7 @@ impl Component for App {
             text: String::new(),
             tick: 0,
             responses: Vec::new(),
+            messages: Vec::new(),
         }
     }
 
@@ -117,6 +119,7 @@ impl Component for App {
 
                 if let Ok(tick) = packet.decode_broadcast() {
                     self.tick = tick.tick;
+                    self.messages.push(tick.message.to_owned());
                 }
 
                 true
@@ -144,14 +147,15 @@ impl Component for App {
 
         html! {
             <div class="container">
-                <div>
+                <div key="input">
                     <input key="input" type="text" {oninput} {onkeydown} value={self.text.clone()} />
                     <button {onclick}>{"Send Message"}</button>
                 </div>
 
-                <div>{format!("State: {:?}", self.state)}</div>
-                {for self.responses.iter().enumerate().map(|(index, response)| html!(<div>{format!("Response #{index}: {response}")}</div>))}
-                <div>{format!("Global tick: {}", self.tick)}</div>
+                <div key="state">{format!("State: {:?}", self.state)}</div>
+                {for self.responses.iter().enumerate().map(|(index, response)| html!(<div key={format!("response-{index}")}>{format!("Response #{index}: {response}")}</div>))}
+                <div key="tick">{format!("Global tick: {}", self.tick)}</div>
+                {for self.messages.iter().enumerate().map(|(index, message)| html!(<div key={format!("message-{index}")}>{format!("Message #{index}: {message}")}</div>))}
             </div>
         }
     }

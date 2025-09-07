@@ -1637,7 +1637,7 @@ where
     ///
     ///     api::define! {
     ///         broadcast Tick {
-    ///             body<'de> = TickEvent<'de>;
+    ///             event<'de> = TickEvent<'de>;
     ///         }
     ///     }
     /// }
@@ -1729,7 +1729,7 @@ where
     ///
     ///     api::define! {
     ///         broadcast Tick {
-    ///             body<'de> = TickEvent<'de>;
+    ///             event<'de> = TickEvent<'de>;
     ///         }
     ///     }
     /// }
