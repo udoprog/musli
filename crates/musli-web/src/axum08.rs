@@ -34,7 +34,6 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 /// use tokio::sync::broadcast::Sender;
 /// use tokio::time::{self, Duration};
 ///
-/// use musli_web::api::Endpoint;
 /// use musli_web::axum08;
 /// use musli_web::ws;
 ///
@@ -59,12 +58,12 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///     }
 ///
 ///     api::define! {
-///         endpoint Hello {
+///         pub endpoint Hello {
 ///             request<'de> = HelloRequest<'de>;
 ///             response<'de> = HelloResponse<'de>;
 ///         }
 ///
-///         broadcast Tick {
+///         pub broadcast Tick {
 ///             event<'de> = TickEvent<'de>;
 ///         }
 ///     }

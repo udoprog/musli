@@ -24,12 +24,13 @@ pub struct OwnedTickEvent {
 }
 
 api::define! {
-    endpoint Hello {
+    /// The hello endpoint.
+    pub endpoint Hello {
         request<'de> = HelloRequest<'de>;
         response<'de> = HelloResponse<'de>;
     }
 
-    broadcast Tick {
+    pub broadcast Tick {
         event<'de> = TickEvent<'de>;
         event = OwnedTickEvent;
     }
