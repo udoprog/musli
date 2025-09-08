@@ -2,73 +2,109 @@ use std::cell::RefCell;
 
 use proc_macro2::{Span, TokenStream};
 use quote::ToTokens;
-use syn::{
-    Generics, Ident, Lifetime, LitStr, Path, Token, Type,
-    parse::{Parse, ParseStream, Parser},
-};
+use syn::parse::{ParseStream, Parser};
+use syn::spanned::Spanned;
+use syn::{Attribute, Generics, Ident, Lifetime, LitStr, Path, Token, Type};
 
 pub(super) fn cx(base: &Path) -> Context<'_> {
     let errors = Vec::new();
 
+    macro_rules! path {
+        ($first:ident $(:: $remaining:ident)*) => {
+            TraitPath {
+                base,
+                segments: vec![
+                    Ident::new(stringify!($first), Span::call_site()),
+                    $(Ident::new(stringify!($remaining), Span::call_site()),)*
+                ],
+            }
+        }
+    }
+
     Context {
         t: Tokens {
-            endpoint: TraitPath {
-                base,
-                segments: vec![
-                    Ident::new("api", Span::call_site()),
-                    Ident::new("Endpoint", Span::call_site()),
-                ],
-            },
-            broadcast: TraitPath {
-                base,
-                segments: vec![
-                    Ident::new("api", Span::call_site()),
-                    Ident::new("Broadcast", Span::call_site()),
-                ],
-            },
-            request: TraitPath {
-                base,
-                segments: vec![
-                    Ident::new("api", Span::call_site()),
-                    Ident::new("Request", Span::call_site()),
-                ],
-            },
-            event: TraitPath {
-                base,
-                segments: vec![
-                    Ident::new("api", Span::call_site()),
-                    Ident::new("Event", Span::call_site()),
-                ],
-            },
+            api: path!(api),
             brace: syn::token::Brace::default(),
             const_: <Token![const]>::default(),
+            eq: <Token![=]>::default(),
             fn_: <Token![fn]>::default(),
-            for_: <Token![for]>::default(),
             impl_: <Token![impl]>::default(),
             paren: syn::token::Paren::default(),
             type_: <Token![type]>::default(),
+            pub_: <Token![pub]>::default(),
         },
         errors: RefCell::new(errors),
     }
 }
 
 struct AssocType {
-    attrs: Vec<syn::Attribute>,
+    attrs: Vec<Attribute>,
+    type_: Token![type],
+    what: Ident,
     generics: Generics,
     eq: Token![=],
     ty: Type,
     semi: Token![;],
 }
 
-impl Parse for AssocType {
+impl AssocType {
     #[inline]
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(AssocType {
-            attrs: input.call(syn::Attribute::parse_outer)?,
+    fn parse(
+        attrs: Vec<Attribute>,
+        type_: Token![type],
+        what: Ident,
+        input: ParseStream,
+    ) -> syn::Result<Self> {
+        Ok(Self {
+            attrs,
+            type_,
+            what,
             generics: input.parse::<Generics>()?,
-            eq: input.parse::<Token![=]>()?,
+            eq: input.parse()?,
             ty: input.parse::<Type>()?,
-            semi: input.parse::<Token![;]>()?,
+            semi: input.parse()?,
+        })
+    }
+
+    #[inline]
+    fn span(&self) -> Span {
+        let end = self.ty.span();
+        self.what.span().join(end).unwrap_or(end)
+    }
+}
+
+struct ImplType {
+    attrs: Vec<Attribute>,
+    impl_: Token![impl],
+    generics: Generics,
+    what: Ident,
+    for_: Token![for],
+    ty: Type,
+    semi: Token![;],
+}
+
+impl ImplType {
+    #[inline]
+    fn parse(
+        attrs: Vec<Attribute>,
+        impl_: Token![impl],
+        mut generics: Generics,
+        what: Ident,
+        input: ParseStream,
+    ) -> syn::Result<Self> {
+        let for_ = input.parse()?;
+        let ty = input.parse::<Type>()?;
+        generics.where_clause = input.parse()?;
+        let semi = input.parse()?;
+
+        Ok(Self {
+            attrs,
+            impl_,
+            generics,
+            what,
+            for_,
+            ty,
+            semi,
         })
     }
 }
@@ -80,14 +116,100 @@ struct ParsedAttrs {
 
 struct Endpoint {
     parsed_attrs: ParsedAttrs,
-    attrs: Vec<syn::Attribute>,
-    vis: syn::Visibility,
+    attrs: Vec<Attribute>,
+    impl_: Token![impl],
+    generics: Generics,
+    what: Ident,
+    for_: Token![for],
     name: Ident,
-    requests: Vec<AssocType>,
+    brace: syn::token::Brace,
+    requests: Vec<ImplType>,
     res: AssocType,
 }
 
 impl Endpoint {
+    fn parse(
+        cx: &Context,
+        parsed_attrs: ParsedAttrs,
+        attrs: Vec<Attribute>,
+        impl_: Token![impl],
+        mut generics: Generics,
+        what: Ident,
+        input: ParseStream,
+    ) -> syn::Result<Self> {
+        let for_ = input.parse()?;
+        let name = input.parse::<Ident>()?;
+        generics.where_clause = input.parse()?;
+
+        let content;
+        let brace = syn::braced!(content in input);
+
+        let mut requests = Vec::new();
+        let mut response = None::<AssocType>;
+
+        while !content.is_empty() {
+            let attrs = content.call(Attribute::parse_outer)?;
+
+            if let Some(impl_) = content.parse::<Option<Token![impl]>>()? {
+                let generics = content.parse::<Generics>()?;
+                let what = content.parse::<Ident>()?;
+
+                if what == "Request" {
+                    requests.push(ImplType::parse(attrs, impl_, generics, what, &content)?);
+                    continue;
+                }
+
+                return Err(syn::Error::new(
+                    what.span(),
+                    "Unsupported impl type, expected `Request`",
+                ));
+            }
+
+            if let Some(type_) = content.parse::<Option<Token![type]>>()? {
+                let what = content.parse::<Ident>()?;
+
+                if what == "Response" {
+                    if let Some(response) = response.take() {
+                        cx.errors.borrow_mut().push(syn::Error::new(
+                            response.span(),
+                            "Expected at most one `response`",
+                        ));
+                    }
+
+                    response = Some(AssocType::parse(attrs, type_, what, &content)?);
+                    continue;
+                }
+
+                return Err(syn::Error::new(
+                    what.span(),
+                    "Unsupported associated type, expected `Response`",
+                ));
+            }
+
+            return Err(syn::Error::new(content.span(), "Expected `impl` or `type`"));
+        }
+
+        let Some(res) = response.take() else {
+            return Err(syn::Error::new(
+                name.span(),
+                "Expected at least one `Request`",
+            ));
+        };
+
+        Ok(Endpoint {
+            parsed_attrs,
+            attrs,
+            impl_,
+            generics,
+            what,
+            for_,
+            name,
+            brace,
+            requests,
+            res,
+        })
+    }
+
     fn implement(self, cx: &Context, t: &mut TokenStream) {
         let kind = match self.parsed_attrs.kind {
             Some(kind) => kind,
@@ -99,24 +221,30 @@ impl Endpoint {
                 attr.to_tokens(t);
             }
 
-            self.vis.to_tokens(t);
+            cx.t.pub_.to_tokens(t);
             <Token![enum]>::default().to_tokens(t);
             self.name.to_tokens(t);
-            cx.t.brace.surround(t, |_| {});
+            self.brace.surround(t, |_| {});
 
             cx.t.impl_.to_tokens(t);
             self.name.to_tokens(t);
             cx.t.brace.surround(t, |t| {
-                self.vis.to_tokens(t);
+                cx.t.pub_.to_tokens(t);
                 cx.define_const("KIND", &kind, t);
             });
         }
 
+        let (impl_generics, type_generics, where_clause) = self.generics.split_for_impl();
+
         {
-            cx.t.impl_.to_tokens(t);
-            cx.t.endpoint.to_tokens(t);
-            cx.t.for_.to_tokens(t);
+            self.impl_.to_tokens(t);
+            impl_generics.to_tokens(t);
+            cx.t.api.to_tokens(t);
+            Ident::new("Endpoint", self.what.span()).to_tokens(t);
+            self.for_.to_tokens(t);
             self.name.to_tokens(t);
+            type_generics.to_tokens(t);
+            where_clause.to_tokens(t);
 
             cx.t.brace.surround(t, |t| {
                 cx.define_const("KIND", &kind, t);
@@ -125,8 +253,8 @@ impl Endpoint {
                     attr.to_tokens(t);
                 }
 
-                cx.t.type_.to_tokens(t);
-                syn::Ident::new("Response", Span::call_site()).to_tokens(t);
+                self.res.type_.to_tokens(t);
+                self.res.what.to_tokens(t);
                 self.res.generics.to_tokens(t);
                 self.res.eq.to_tokens(t);
                 self.res.ty.to_tokens(t);
@@ -141,16 +269,20 @@ impl Endpoint {
                 attr.to_tokens(t);
             }
 
-            cx.t.impl_.to_tokens(t);
-            req.generics.to_tokens(t);
-            cx.t.request.to_tokens(t);
-            cx.t.for_.to_tokens(t);
+            let (impl_generics, _, where_clause) = req.generics.split_for_impl();
+
+            req.impl_.to_tokens(t);
+            impl_generics.to_tokens(t);
+            cx.t.api.to_tokens(t);
+            req.what.to_tokens(t);
+            req.for_.to_tokens(t);
             req.ty.to_tokens(t);
+            where_clause.to_tokens(t);
 
             cx.t.brace.surround(t, |t| {
                 cx.t.type_.to_tokens(t);
-                syn::Ident::new("Endpoint", Span::call_site()).to_tokens(t);
-                req.eq.to_tokens(t);
+                Ident::new("Endpoint", Span::call_site()).to_tokens(t);
+                cx.t.eq.to_tokens(t);
                 self.name.to_tokens(t);
                 req.semi.to_tokens(t);
 
@@ -162,14 +294,82 @@ impl Endpoint {
 
 struct Broadcast {
     parsed_attrs: ParsedAttrs,
-    attrs: Vec<syn::Attribute>,
-    vis: syn::Visibility,
+    attrs: Vec<Attribute>,
+    impl_: Token![impl],
+    generics: Generics,
+    what: Ident,
+    for_: Token![for],
     name: Ident,
-    first: AssocType,
-    events: Vec<AssocType>,
+    brace: syn::token::Brace,
+    first: ImplType,
+    remaining: Vec<ImplType>,
 }
 
 impl Broadcast {
+    fn parse(
+        _cx: &Context,
+        parsed_attrs: ParsedAttrs,
+        attrs: Vec<Attribute>,
+        impl_: Token![impl],
+        generics: Generics,
+        what: Ident,
+        input: ParseStream,
+    ) -> syn::Result<Self> {
+        let for_ = input.parse()?;
+        let name = input.parse::<Ident>()?;
+
+        let content;
+        let brace = syn::braced!(content in input);
+
+        let mut first = None;
+        let mut remaining = Vec::new();
+
+        while !content.is_empty() {
+            let attrs = content.call(Attribute::parse_outer)?;
+
+            if let Some(impl_) = content.parse::<Option<Token![impl]>>()? {
+                let generics = content.parse::<Generics>()?;
+                let what = content.parse::<Ident>()?;
+
+                if what == "Event" {
+                    let impl_type = ImplType::parse(attrs, impl_, generics, what, &content)?;
+
+                    if first.is_none() {
+                        first = Some(impl_type);
+                    } else {
+                        remaining.push(impl_type);
+                    }
+
+                    continue;
+                }
+
+                return Err(syn::Error::new(what.span(), "Expected `Event`"));
+            }
+
+            return Err(syn::Error::new(content.span(), "Expected `impl`"));
+        }
+
+        let Some(first) = first.take() else {
+            return Err(syn::Error::new(
+                name.span(),
+                "Expected at least one `event`",
+            ));
+        };
+
+        Ok(Self {
+            parsed_attrs,
+            attrs,
+            impl_,
+            generics,
+            what,
+            for_,
+            name,
+            brace,
+            first,
+            remaining,
+        })
+    }
+
     fn implement(self, cx: &Context, t: &mut TokenStream) {
         let kind = match self.parsed_attrs.kind {
             Some(kind) => kind,
@@ -181,32 +381,38 @@ impl Broadcast {
                 attr.to_tokens(t);
             }
 
-            self.vis.to_tokens(t);
+            cx.t.pub_.to_tokens(t);
             <Token![enum]>::default().to_tokens(t);
             self.name.to_tokens(t);
-            cx.t.brace.surround(t, |_| {});
+            self.brace.surround(t, |_| {});
 
             cx.t.impl_.to_tokens(t);
             self.name.to_tokens(t);
             cx.t.brace.surround(t, |t| {
-                self.vis.to_tokens(t);
+                cx.t.pub_.to_tokens(t);
                 cx.define_const("KIND", &kind, t);
             });
         }
 
+        let (impl_generics, type_generics, where_clause) = self.generics.split_for_impl();
+
         {
-            cx.t.impl_.to_tokens(t);
-            cx.t.broadcast.to_tokens(t);
-            cx.t.for_.to_tokens(t);
+            self.impl_.to_tokens(t);
+            impl_generics.to_tokens(t);
+            cx.t.api.to_tokens(t);
+            Ident::new("Broadcast", self.what.span()).to_tokens(t);
+            self.for_.to_tokens(t);
             self.name.to_tokens(t);
+            type_generics.to_tokens(t);
+            where_clause.to_tokens(t);
 
             cx.t.brace.surround(t, |t| {
                 cx.define_const("KIND", &kind, t);
 
                 cx.t.type_.to_tokens(t);
-                syn::Ident::new("Event", Span::call_site()).to_tokens(t);
+                Ident::new("Event", Span::call_site()).to_tokens(t);
                 self.first.generics.to_tokens(t);
-                <Token![=]>::default().to_tokens(t);
+                cx.t.eq.to_tokens(t);
                 self.first.ty.to_tokens(t);
                 <Token![;]>::default().to_tokens(t);
 
@@ -214,22 +420,25 @@ impl Broadcast {
             });
         }
 
-        for ev in [&self.first].into_iter().chain(&self.events) {
+        for ev in [&self.first].into_iter().chain(&self.remaining) {
             for attr in &ev.attrs {
                 attr.to_tokens(t);
             }
 
-            cx.t.impl_.to_tokens(t);
-            ev.generics.to_tokens(t);
-            cx.t.event.to_tokens(t);
+            let (impl_generics, _, where_clause) = ev.generics.split_for_impl();
 
-            cx.t.for_.to_tokens(t);
+            ev.impl_.to_tokens(t);
+            impl_generics.to_tokens(t);
+            cx.t.api.to_tokens(t);
+            Ident::new("Event", ev.what.span()).to_tokens(t);
+            ev.for_.to_tokens(t);
             ev.ty.to_tokens(t);
+            where_clause.to_tokens(t);
 
             cx.t.brace.surround(t, |t| {
                 cx.t.type_.to_tokens(t);
-                syn::Ident::new("Broadcast", Span::call_site()).to_tokens(t);
-                <Token![=]>::default().to_tokens(t);
+                Ident::new("Broadcast", Span::call_site()).to_tokens(t);
+                cx.t.eq.to_tokens(t);
                 self.name.to_tokens(t);
                 <Token![;]>::default().to_tokens(t);
 
@@ -248,7 +457,7 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
             let mut attrs = Vec::new();
             let mut parsed_attrs = ParsedAttrs::default();
 
-            for attr in input.call(syn::Attribute::parse_outer)? {
+            for attr in input.call(Attribute::parse_outer)? {
                 if !attr.path().is_ident("musli") {
                     attrs.push(attr);
                     continue;
@@ -271,101 +480,39 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
                 }
             }
 
-            let vis = input.parse::<syn::Visibility>()?;
+            let impl_ = input.parse::<Token![impl]>()?;
+            let generics = input.parse::<Generics>()?;
             let what = input.parse::<Ident>()?;
 
-            if what == "endpoint" {
-                let name = input.parse::<Ident>()?;
-
-                let content;
-                syn::braced!(content in input);
-
-                let mut requests = Vec::new();
-                let mut response = None;
-
-                while !content.is_empty() {
-                    let ty = content.parse::<Ident>()?;
-
-                    if ty == "request" {
-                        requests.push(content.parse()?);
-                        continue;
-                    }
-
-                    if ty == "response" {
-                        response = Some(content.parse()?);
-                        continue;
-                    }
-
-                    return Err(syn::Error::new(
-                        ty.span(),
-                        "Expected `request` or `response`",
-                    ));
-                }
-
-                let Some(response) = response.take() else {
-                    return Err(syn::Error::new(
-                        name.span(),
-                        "Expected at least one `request`",
-                    ));
-                };
-
-                endpoints.push(Endpoint {
+            if what == "Endpoint" {
+                endpoints.push(Endpoint::parse(
+                    cx,
                     parsed_attrs,
                     attrs,
-                    vis,
-                    name,
-                    requests,
-                    res: response,
-                });
+                    impl_,
+                    generics,
+                    what,
+                    input,
+                )?);
                 continue;
             }
 
-            if what == "broadcast" {
-                let name = input.parse::<Ident>()?;
-
-                let content;
-                syn::braced!(content in input);
-
-                let mut first = None;
-                let mut events = Vec::new();
-
-                while !content.is_empty() {
-                    let ty = content.parse::<Ident>()?;
-
-                    if ty == "event" {
-                        if first.is_none() {
-                            first = Some(content.parse()?);
-                        } else {
-                            events.push(content.parse()?);
-                        }
-
-                        continue;
-                    }
-
-                    return Err(syn::Error::new(ty.span(), "Expected `event`"));
-                }
-
-                let Some(first) = first.take() else {
-                    return Err(syn::Error::new(
-                        name.span(),
-                        "Expected at least one `event`",
-                    ));
-                };
-
-                broadcasts.push(Broadcast {
+            if what == "Broadcast" {
+                broadcasts.push(Broadcast::parse(
+                    cx,
                     parsed_attrs,
                     attrs,
-                    vis,
-                    name,
-                    first,
-                    events,
-                });
+                    impl_,
+                    generics,
+                    what,
+                    input,
+                )?);
                 continue;
             }
 
             return Err(syn::Error::new(
                 what.span(),
-                "Expected `endpoint` or `broadcast`",
+                "Expected `Endpoint` or `Broadcast`",
             ));
         }
 
@@ -392,17 +539,15 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
 }
 
 struct Tokens<'a> {
-    endpoint: TraitPath<'a>,
-    broadcast: TraitPath<'a>,
-    request: TraitPath<'a>,
-    event: TraitPath<'a>,
+    api: TraitPath<'a>,
     brace: syn::token::Brace,
     const_: Token![const],
+    eq: Token![=],
     fn_: Token![fn],
-    for_: Token![for],
     impl_: Token![impl],
     paren: syn::token::Paren,
     type_: Token![type],
+    pub_: Token![pub],
 }
 
 pub(super) struct Context<'a> {
@@ -431,19 +576,19 @@ impl Context<'_> {
 
     fn do_not_implement(&self, name: &str, t: &mut TokenStream) {
         self.t.fn_.to_tokens(t);
-        syn::Ident::new(name, Span::call_site()).to_tokens(t);
+        Ident::new(name, Span::call_site()).to_tokens(t);
         self.t.paren.surround(t, |_| {});
         self.t.brace.surround(t, |_| {});
     }
 
-    fn define_const(&self, name: &str, value: impl ToTokens, t: &mut TokenStream) {
+    fn define_const(&self, name: &str, value: &dyn ToTokens, t: &mut TokenStream) {
         self.t.const_.to_tokens(t);
         <Ident>::new(name, Span::call_site()).to_tokens(t);
         <Token![:]>::default().to_tokens(t);
         <Token![&]>::default().to_tokens(t);
         Lifetime::new("'static", Span::call_site()).to_tokens(t);
         Ident::new("str", Span::call_site()).to_tokens(t);
-        <Token![=]>::default().to_tokens(t);
+        self.t.eq.to_tokens(t);
         value.to_tokens(t);
         <Token![;]>::default().to_tokens(t);
     }
@@ -464,5 +609,7 @@ impl<'a> TraitPath<'a> {
             colon_colon.to_tokens(tokens);
             segment.to_tokens(tokens);
         }
+
+        colon_colon.to_tokens(tokens);
     }
 }

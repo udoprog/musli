@@ -44,17 +44,17 @@ mod define;
 /// These roughly follow the structure of:
 ///
 /// ```text
-/// endpoint <name> {
+/// impl Endpoint for <name> {
 ///     <definition>
 /// }
 ///
-/// broadcast <name> {
+/// impl Broadcast for <name> {
 ///     <definition>
 /// }
 /// ```
 ///
-/// An `endpoint` can define requests and responses. The first response defined is
-/// required and is the default response that certain APIs will expected the
+/// An `endpoint` can define requests and responses. The first response defined
+/// is required and is the default response that certain APIs will expected the
 /// endpoint to return. Any number of requests can be specified, this is allows
 /// for different "sender types" to be defined, but their over the wire format
 /// has to be the same.
@@ -63,9 +63,10 @@ mod define;
 /// types sets as response types must implemente [`musli::Decode`].
 ///
 /// ```text
-/// endpoint Hello {
-///     request<'de> = HelloRequest<'de>;
-///     response<'de> = HelloResponse<'de>;
+/// (#[musli(..)])?
+/// impl Endpoint for Hello (where <bounds>)? {
+///     impl<'de> Request for HelloRequest<'de> (where <bounds>)?;
+///     type Response<'de> = HelloResponse<'de> (where <bounds>)?;
 /// }
 /// ```
 ///
@@ -76,9 +77,10 @@ mod define;
 /// same.
 ///
 /// ```text
-/// broadcast Tick {
-///     event<'de> = TickEvent<'de>;
-///     event = OwnedTickEvent;
+/// (#[musli(..)])?
+/// impl Broadcast for Tick (where <bounds>)? {
+///     impl<'de> Event TickEvent<'de> (where <bounds>)?;
+///     impl Event for OwnedTickEvent (where <bounds>)?;
 /// }
 /// ```
 ///
@@ -91,9 +93,9 @@ mod define;
 ///
 /// ```text
 /// #[musli(kind = "tock")]
-/// broadcast Tick {
-///     event<'de> = TickEvent<'de>;
-///     event = OwnedTickEvent;
+/// impl Broadcast for Tick {
+///     impl<'de> Event for TickEvent<'de>;
+///     impl Event for OwnedTickEvent;
 /// }
 /// ```
 ///
@@ -128,15 +130,15 @@ mod define;
 /// }
 ///
 /// api::define! {
-///     pub endpoint Hello {
-///         request<'de> = HelloRequest<'de>;
-///         response<'de> = HelloResponse<'de>;
+///     impl Endpoint for Hello {
+///         impl<'de> Request for HelloRequest<'de>;
+///         type Response<'de> = HelloResponse<'de>;
 ///     }
 ///
 ///     #[musli(kind = "tock")]
-///     pub broadcast Tick {
-///         event<'de> = TickEvent<'de>;
-///         event = OwnedTickEvent;
+///     impl Broadcast for Tick {
+///         impl<'de> Event for TickEvent<'de>;
+///         impl Event for OwnedTickEvent;
 ///     }
 /// }
 /// ```

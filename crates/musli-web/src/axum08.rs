@@ -58,13 +58,13 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///     }
 ///
 ///     api::define! {
-///         pub endpoint Hello {
-///             request<'de> = HelloRequest<'de>;
-///             response<'de> = HelloResponse<'de>;
+///         impl Endpoint for Hello {
+///             impl<'de> Request for HelloRequest<'de>;
+///             type Response<'de> = HelloResponse<'de>;
 ///         }
 ///
-///         pub broadcast Tick {
-///             event<'de> = TickEvent<'de>;
+///         impl Broadcast for Tick {
+///             impl<'de> Event for TickEvent<'de>;
 ///         }
 ///     }
 /// }

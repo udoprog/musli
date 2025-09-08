@@ -1,3 +1,4 @@
+use musli::mode::Binary;
 use musli::{Decode, Encode};
 use musli_web::api;
 
@@ -18,20 +19,23 @@ pub struct TickEvent<'de> {
 }
 
 #[derive(Encode)]
-pub struct OwnedTickEvent {
-    pub message: String,
+pub struct OwnedTickEvent<S>
+where
+    S: AsRef<str>,
+{
+    pub message: S,
     pub tick: u32,
 }
 
 api::define! {
     /// The hello endpoint.
-    pub endpoint Hello {
-        request<'de> = HelloRequest<'de>;
-        response<'de> = HelloResponse<'de>;
+    impl Endpoint for Hello {
+        impl<'de> Request for HelloRequest<'de>;
+        type Response<'de> = HelloResponse<'de>;
     }
 
-    pub broadcast Tick {
-        event<'de> = TickEvent<'de>;
-        event = OwnedTickEvent;
+    impl Broadcast for Tick {
+        impl<'de> Event for TickEvent<'de>;
+        impl<S> Event for OwnedTickEvent<S> where S: AsRef<str> + Encode<Binary>;
     }
 }
