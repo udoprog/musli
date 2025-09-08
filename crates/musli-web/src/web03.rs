@@ -26,9 +26,9 @@
 //!     }
 //!
 //!     api::define! {
-//!         pub endpoint Hello {
-//!             request<'de> = HelloRequest<'de>;
-//!             response<'de> = HelloResponse<'de>;
+//!         impl Endpoint for Hello {
+//!             impl<'de> Request for HelloRequest<'de>;
+//!             type Response<'de> = HelloResponse<'de>;
 //!         }
 //!     }
 //! }
