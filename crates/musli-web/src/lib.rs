@@ -96,3 +96,8 @@ pub mod yew021;
 #[cfg(feature = "ws")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "ws")))]
 pub mod ws;
+
+#[doc(hidden)]
+pub mod __macros {
+    pub use core::fmt;
+}

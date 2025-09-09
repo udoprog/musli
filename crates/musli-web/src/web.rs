@@ -31,7 +31,7 @@ use musli::storage;
 
 use slab::Slab;
 
-use crate::api::{self, Event};
+use crate::api::{self, Event, MessageId};
 
 const MAX_CAPACITY: usize = 1048576;
 
@@ -46,7 +46,7 @@ pub struct EmptyCallback;
 /// Slab of state listeners.
 type StateListeners = Slab<Rc<dyn Callback<State>>>;
 /// Slab of broadcast listeners.
-type Broadcasts = HashMap<&'static str, Slab<Rc<dyn Callback<Result<RawPacket>>>>>;
+type Broadcasts = HashMap<MessageId, Slab<Rc<dyn Callback<Result<RawPacket>>>>>;
 /// Queue of recycled buffers.
 type Buffers = VecDeque<Box<BufData>>;
 /// Pending requests.
@@ -465,7 +465,7 @@ where
 
         let header = api::RequestHeader {
             serial,
-            kind: <T::Endpoint as api::Endpoint>::KIND,
+            id: <T::Endpoint as api::Endpoint>::ID.get(),
         };
 
         let out = &mut *self.output.borrow_mut();
@@ -475,7 +475,7 @@ where
 
         tracing::debug!(
             header.serial,
-            header.kind,
+            ?header.id,
             len = out.len(),
             "Sending request"
         );
@@ -507,70 +507,67 @@ where
 
         let header: api::ResponseHeader<'_> = storage::decode(&mut reader)?;
 
-        match header.broadcast {
-            Some(kind) => {
-                tracing::debug!(kind, "Got broadcast");
+        if let Some(broadcast) = MessageId::new(header.broadcast) {
+            tracing::debug!(?header.broadcast, "Got broadcast");
 
-                let Some(kind) = self.prepare_broadcast(kind) else {
-                    return Ok(());
+            if !self.prepare_broadcast(broadcast) {
+                return Ok(());
+            };
+
+            if !header.error.is_empty() {
+                while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
+                    if let Some(callback) = callback.upgrade() {
+                        callback.call(Err(Error::msg(header.error)));
+                    }
+                }
+            } else {
+                let at = buf.len().saturating_sub(reader.remaining());
+
+                let packet = RawPacket {
+                    buf: buf.clone(),
+                    at: Cell::new(at),
+                    id: broadcast,
                 };
 
-                if let Some(error) = header.error {
-                    while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
-                        if let Some(callback) = callback.upgrade() {
-                            callback.call(Err(Error::msg(error)));
-                        }
-                    }
-                } else {
-                    let at = buf.len().saturating_sub(reader.remaining());
-
-                    let packet = RawPacket {
-                        buf: buf.clone(),
-                        at: Cell::new(at),
-                        kind,
-                    };
-
-                    while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
-                        if let Some(callback) = callback.upgrade() {
-                            callback.call(Ok(packet.clone()));
-                        }
+                while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
+                    if let Some(callback) = callback.upgrade() {
+                        callback.call(Ok(packet.clone()));
                     }
                 }
             }
-            None => {
-                tracing::debug!(header.serial, "Got response");
+        } else {
+            tracing::debug!(header.serial, "Got response");
 
-                let p = {
-                    let mut requests = self.g.requests.borrow_mut();
+            let p = {
+                let mut requests = self.g.requests.borrow_mut();
 
-                    let Some(p) = requests.remove(&header.serial) else {
-                        tracing::debug!(header.serial, "Missing request");
-                        return Ok(());
-                    };
-
-                    p
+                let Some(p) = requests.remove(&header.serial) else {
+                    tracing::debug!(header.serial, "Missing request");
+                    return Ok(());
                 };
 
-                if let Some(error) = header.error {
-                    p.callback.call(Err(Error::msg(error)));
-                } else {
-                    let at = buf.len().saturating_sub(reader.remaining());
+                p
+            };
 
-                    let packet = RawPacket {
-                        buf,
-                        at: Cell::new(at),
-                        kind: p.kind,
-                    };
+            if !header.error.is_empty() {
+                p.callback.call(Err(Error::msg(header.error)));
+            } else {
+                let at = buf.len().saturating_sub(reader.remaining());
 
-                    p.callback.call(Ok(packet));
-                }
+                let packet = RawPacket {
+                    id: p.kind,
+                    buf,
+                    at: Cell::new(at),
+                };
+
+                p.callback.call(Ok(packet));
             }
         }
 
         Ok(())
     }
 
-    fn prepare_broadcast(self: &Rc<Self>, kind: &str) -> Option<&'static str> {
+    fn prepare_broadcast(self: &Rc<Self>, kind: MessageId) -> bool {
         // Note: We need to defer this, since the outcome of calling
         // the broadcast callback might be that the broadcast
         // listener is modified, which could require mutable access
@@ -578,17 +575,16 @@ where
         let mut defer = self.defer_broadcasts.borrow_mut();
 
         let broadcasts = self.g.broadcasts.borrow();
-        let (&kind, broadcasts) = broadcasts.get_key_value(kind)?;
+
+        let Some(broadcasts) = broadcasts.get(&kind) else {
+            return false;
+        };
 
         for (_, callback) in broadcasts.iter() {
             defer.push_back(Rc::downgrade(callback));
         }
 
-        if defer.is_empty() {
-            return None;
-        }
-
-        Some(kind)
+        !defer.is_empty()
     }
 
     pub(crate) fn set_open(&self) {
@@ -1060,8 +1056,8 @@ where
         shared.serial.set(serial.wrapping_add(1));
 
         let pending = Pending {
+            kind: <B::Endpoint as api::Endpoint>::ID,
             serial,
-            kind: <B::Endpoint as api::Endpoint>::KIND,
             callback: self.callback,
         };
 
@@ -1145,7 +1141,7 @@ impl Drop for Request {
 ///
 /// [`clear()`]: Self::clear
 pub struct Listener {
-    kind: &'static str,
+    kind: Option<MessageId>,
     index: usize,
     g: Weak<Generic>,
 }
@@ -1155,7 +1151,7 @@ impl Listener {
     #[inline]
     pub const fn new() -> Self {
         Self {
-            kind: "",
+            kind: None,
             index: 0,
             g: Weak::new(),
         }
@@ -1163,9 +1159,9 @@ impl Listener {
 
     /// Build up an empty listener with the specified kind.
     #[inline]
-    pub(crate) const fn empty_with_kind(kind: &'static str) -> Self {
+    pub(crate) const fn empty_with_kind(kind: MessageId) -> Self {
         Self {
-            kind,
+            kind: Some(kind),
             index: 0,
             g: Weak::new(),
         }
@@ -1185,8 +1181,11 @@ impl Listener {
             };
 
             self.g = Weak::new();
-            let kind = mem::take(&mut self.kind);
             let index = mem::take(&mut self.index);
+
+            let Some(kind) = self.kind.take() else {
+                return;
+            };
 
             let mut broadcasts = g.broadcasts.borrow_mut();
 
@@ -1385,9 +1384,9 @@ impl Drop for BufRc {
 /// A raw packet of data.
 #[derive(Clone)]
 pub struct RawPacket {
+    id: MessageId,
     buf: BufRc,
     at: Cell<usize>,
-    kind: &'static str,
 }
 
 impl RawPacket {
@@ -1426,12 +1425,13 @@ impl RawPacket {
         self.at.get() >= self.buf.len()
     }
 
-    /// The kind of the packet this is a response to as specified by
-    /// [`Endpoint::KIND`].
+    /// The id of the packet this is a response to as specified by
+    /// [`Endpoint::ID`] or [`Broadcast::ID`].
     ///
-    /// [`Endpoint::KIND`]: crate::api::Endpoint::KIND
-    pub fn kind(&self) -> &str {
-        self.kind
+    /// [`Endpoint::ID`]: crate::api::Endpoint::ID
+    /// [`Broadcast::ID`]: crate::api::Broadcast::ID
+    pub fn id(&self) -> MessageId {
+        self.id
     }
 }
 
@@ -1459,7 +1459,7 @@ impl<T> Packet<T> {
     /// Convert a packet into a raw packet.
     ///
     /// To determine which endpoint or broadcast it belongs to the
-    /// [`RawPacket::kind`] method can be used.
+    /// [`RawPacket::id`] method can be used.
     pub fn into_raw(self) -> RawPacket {
         self.raw
     }
@@ -1469,12 +1469,13 @@ impl<T> Packet<T> {
         self.raw.is_empty()
     }
 
-    /// The kind of the packet this is a response to as specified by
-    /// [`Endpoint::KIND`].
+    /// The id of the packet this is a response to as specified by
+    /// [`Endpoint::ID`] or [`Broadcast::ID`].
     ///
-    /// [`Endpoint::KIND`]: crate::api::Endpoint::KIND
-    pub fn kind(&self) -> &str {
-        self.raw.kind()
+    /// [`Endpoint::ID`]: crate::api::Endpoint::ID
+    /// [`Broadcast::ID`]: crate::api::Broadcast::ID
+    pub fn id(&self) -> MessageId {
+        self.raw.id()
     }
 }
 
@@ -1824,17 +1825,17 @@ where
         T: api::Broadcast,
     {
         let Some(shared) = self.shared.upgrade() else {
-            return Listener::empty_with_kind(T::KIND);
+            return Listener::empty_with_kind(T::ID);
         };
 
         let index = {
             let mut broadcasts = shared.g.broadcasts.borrow_mut();
-            let slots = broadcasts.entry(T::KIND).or_default();
+            let slots = broadcasts.entry(T::ID).or_default();
             slots.insert(Rc::new(callback))
         };
 
         Listener {
-            kind: T::KIND,
+            kind: Some(T::ID),
             index,
             g: Rc::downgrade(&shared.g),
         }
@@ -1952,8 +1953,8 @@ struct Pending<C>
 where
     C: ?Sized,
 {
+    kind: MessageId,
     serial: u32,
-    kind: &'static str,
     callback: C,
 }
 

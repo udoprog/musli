@@ -34,6 +34,7 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 /// use tokio::sync::broadcast::Sender;
 /// use tokio::time::{self, Duration};
 ///
+/// use musli_web::api::MessageId;
 /// use musli_web::axum08;
 /// use musli_web::ws;
 ///
@@ -81,18 +82,19 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 /// struct MyHandler;
 ///
 /// impl ws::Handler for MyHandler {
+///     type Id = api::Request;
 ///     type Response = Option<()>;
 ///
 ///     async fn handle(
 ///         &mut self,
-///         kind: &str,
+///         id: Self::Id,
 ///         incoming: &mut ws::Incoming<'_>,
 ///         outgoing: &mut ws::Outgoing<'_>,
 ///     ) -> Self::Response {
-///         tracing::info!("Handling: {kind}");
+///         tracing::info!("Handling: {id:?}");
 ///
-///         match kind {
-///             api::Hello::KIND => {
+///         match id {
+///             api::Request::Hello => {
 ///                 let request = incoming.read::<api::HelloRequest<'_>>()?;
 ///
 ///                 outgoing.write(api::HelloResponse {
@@ -100,9 +102,6 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///                 });
 ///
 ///                 Some(())
-///             }
-///             _ => {
-///                 None
 ///             }
 ///         }
 ///     }
