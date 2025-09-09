@@ -1,10 +1,11 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
 
 use proc_macro2::{Span, TokenStream};
-use quote::ToTokens;
+use quote::{ToTokens, quote};
 use syn::parse::{ParseStream, Parser};
 use syn::spanned::Spanned;
-use syn::{Attribute, Generics, Ident, Lifetime, LitStr, Path, Token, Type, Visibility};
+use syn::{Attribute, Generics, Ident, LitInt, Path, Token, Type, Visibility};
 
 pub(super) fn cx(base: &Path) -> Context<'_> {
     let errors = Vec::new();
@@ -24,13 +25,17 @@ pub(super) fn cx(base: &Path) -> Context<'_> {
     Context {
         t: Tokens {
             api: path!(api),
+            message_id: path!(api::MessageId),
+            fmt: path!(__macros::fmt),
             brace: syn::token::Brace::default(),
+            colon_colon: <Token![::]>::default(),
             const_: <Token![const]>::default(),
             enum_: <Token![enum]>::default(),
             eq: <Token![=]>::default(),
             fn_: <Token![fn]>::default(),
             impl_: <Token![impl]>::default(),
             paren: syn::token::Paren::default(),
+            semi: <Token![;]>::default(),
             type_: <Token![type]>::default(),
         },
         errors: RefCell::new(errors),
@@ -111,22 +116,22 @@ impl ImplType {
 
 #[derive(Default)]
 struct ParsedAttrs {
-    kind: Option<LitStr>,
+    id: Option<(u16, Span)>,
 }
 
 impl ParsedAttrs {
     fn deny(self, cx: &Context<'_>) {
-        if let Some(kind) = &self.kind {
+        if let Some((_, span)) = &self.id {
             cx.errors.borrow_mut().push(syn::Error::new(
-                kind.span(),
+                *span,
                 "The `#[musli(kind)]` attribute cannot be specified here",
             ));
         }
     }
 }
 
-struct TypeDecl {
-    kind: LitStr,
+struct TypeDeclBuilder {
+    id: Option<(u16, Span)>,
     attrs: Vec<Attribute>,
     #[allow(dead_code)]
     vis: Visibility,
@@ -137,7 +142,7 @@ struct TypeDecl {
     semi: Token![;],
 }
 
-impl TypeDecl {
+impl TypeDeclBuilder {
     fn parse(
         parsed_attrs: ParsedAttrs,
         attrs: Vec<Attribute>,
@@ -149,10 +154,7 @@ impl TypeDecl {
         let semi = input.parse::<Token![;]>()?;
 
         Ok(Self {
-            kind: match parsed_attrs.kind {
-                Some(kind) => kind,
-                None => LitStr::new(&name.to_string(), name.span()),
-            },
+            id: parsed_attrs.id,
             attrs,
             vis,
             type_,
@@ -160,13 +162,25 @@ impl TypeDecl {
             semi,
         })
     }
+}
 
-    fn kind(&self) -> &LitStr {
-        &self.kind
-    }
+struct TypeDecl {
+    id: (u16, Span),
+    attrs: Vec<Attribute>,
+    #[allow(dead_code)]
+    vis: Visibility,
+    #[allow(dead_code)]
+    type_: Token![type],
+    name: Ident,
+    #[allow(dead_code)]
+    semi: Token![;],
+    endpoint: bool,
+    broadcast: bool,
+}
 
+impl TypeDecl {
     fn implement(&self, cx: &Context, t: &mut TokenStream) {
-        let kind = self.kind();
+        let (id, _) = self.id;
 
         for attr in &self.attrs {
             attr.to_tokens(t);
@@ -181,7 +195,7 @@ impl TypeDecl {
         self.name.to_tokens(t);
         cx.t.brace.surround(t, |t| {
             self.vis.to_tokens(t);
-            cx.define_const("KIND", &kind, t);
+            cx.define_id("ID", id, t);
         });
     }
 }
@@ -282,8 +296,8 @@ impl Endpoint {
         })
     }
 
-    fn implement(&self, cx: &Context, types: &[TypeDecl], t: &mut TokenStream) {
-        let Some(ty) = types.iter().find(|ty| ty.name == self.name) else {
+    fn implement(&self, cx: &Context, types: &mut [TypeDecl], t: &mut TokenStream) {
+        let Some(ty) = types.iter_mut().find(|ty| ty.name == self.name) else {
             cx.errors.borrow_mut().push(syn::Error::new(
                 self.name.span(),
                 format_args!(
@@ -293,6 +307,10 @@ impl Endpoint {
             ));
             return;
         };
+
+        ty.endpoint = true;
+
+        let (id, _) = ty.id;
 
         let (impl_generics, type_generics, where_clause) = self.generics.split_for_impl();
 
@@ -304,6 +322,7 @@ impl Endpoint {
             self.impl_.to_tokens(t);
             impl_generics.to_tokens(t);
             cx.t.api.to_tokens(t);
+            cx.t.colon_colon.to_tokens(t);
             Ident::new("Endpoint", self.what.span()).to_tokens(t);
             self.for_.to_tokens(t);
             self.name.to_tokens(t);
@@ -311,7 +330,7 @@ impl Endpoint {
             where_clause.to_tokens(t);
 
             self.brace.surround(t, |t| {
-                cx.define_const("KIND", ty.kind(), t);
+                cx.define_id("ID", id, t);
 
                 for attr in &self.res.attrs {
                     attr.to_tokens(t);
@@ -338,6 +357,7 @@ impl Endpoint {
             req.impl_.to_tokens(t);
             impl_generics.to_tokens(t);
             cx.t.api.to_tokens(t);
+            cx.t.colon_colon.to_tokens(t);
             req.what.to_tokens(t);
             req.for_.to_tokens(t);
             req.ty.to_tokens(t);
@@ -434,8 +454,8 @@ impl Broadcast {
         })
     }
 
-    fn implement(&self, cx: &Context, types: &[TypeDecl], t: &mut TokenStream) {
-        let Some(ty) = types.iter().find(|ty| ty.name == self.name) else {
+    fn implement(&self, cx: &Context, types: &mut [TypeDecl], t: &mut TokenStream) {
+        let Some(ty) = types.iter_mut().find(|ty| ty.name == self.name) else {
             cx.errors.borrow_mut().push(syn::Error::new(
                 self.name.span(),
                 format_args!(
@@ -445,6 +465,10 @@ impl Broadcast {
             ));
             return;
         };
+
+        ty.broadcast = true;
+
+        let (id, _) = ty.id;
 
         let (impl_generics, type_generics, where_clause) = self.generics.split_for_impl();
 
@@ -456,6 +480,7 @@ impl Broadcast {
             self.impl_.to_tokens(t);
             impl_generics.to_tokens(t);
             cx.t.api.to_tokens(t);
+            cx.t.colon_colon.to_tokens(t);
             Ident::new("Broadcast", self.what.span()).to_tokens(t);
             self.for_.to_tokens(t);
             self.name.to_tokens(t);
@@ -463,14 +488,14 @@ impl Broadcast {
             where_clause.to_tokens(t);
 
             self.brace.surround(t, |t| {
-                cx.define_const("KIND", ty.kind(), t);
+                cx.define_id("ID", id, t);
 
                 cx.t.type_.to_tokens(t);
                 Ident::new("Event", Span::call_site()).to_tokens(t);
                 self.first.generics.to_tokens(t);
                 cx.t.eq.to_tokens(t);
                 self.first.ty.to_tokens(t);
-                <Token![;]>::default().to_tokens(t);
+                cx.t.semi.to_tokens(t);
 
                 cx.do_not_implement("__do_not_implement_broadcast", t);
             });
@@ -486,6 +511,7 @@ impl Broadcast {
             ev.impl_.to_tokens(t);
             impl_generics.to_tokens(t);
             cx.t.api.to_tokens(t);
+            cx.t.colon_colon.to_tokens(t);
             Ident::new("Event", ev.what.span()).to_tokens(t);
             ev.for_.to_tokens(t);
             ev.ty.to_tokens(t);
@@ -496,7 +522,7 @@ impl Broadcast {
                 Ident::new("Broadcast", Span::call_site()).to_tokens(t);
                 cx.t.eq.to_tokens(t);
                 self.name.to_tokens(t);
-                <Token![;]>::default().to_tokens(t);
+                cx.t.semi.to_tokens(t);
 
                 cx.do_not_implement("__do_not_implement_event", t);
             });
@@ -505,7 +531,7 @@ impl Broadcast {
 }
 
 pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
-    let mut types = Vec::new();
+    let mut builders = Vec::new();
     let mut endpoints = Vec::new();
     let mut broadcasts = Vec::new();
 
@@ -521,15 +547,20 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
                 }
 
                 let result = attr.parse_args_with(|input: ParseStream| {
-                    let kind = input.parse::<Ident>()?;
+                    let key = input.parse::<Ident>()?;
 
-                    if kind == "kind" {
+                    if key == "id" {
                         input.parse::<Token![=]>()?;
-                        parsed_attrs.kind = Some(input.parse::<LitStr>()?);
+                        let lit = input.parse::<LitInt>()?;
+                        let id = lit.base10_parse()?;
+                        parsed_attrs.id = Some((id, lit.span()));
                         return Ok(());
                     }
 
-                    Err(syn::Error::new(kind.span(), "Expected `kind` as attribute"))
+                    Err(syn::Error::new(
+                        key.span(),
+                        "Unsupported attribute, expected `id`",
+                    ))
                 });
 
                 if let Err(error) = result {
@@ -540,7 +571,13 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
             let vis = input.parse::<Visibility>()?;
 
             if let Some(type_) = input.parse::<Option<Token![type]>>()? {
-                types.push(TypeDecl::parse(parsed_attrs, attrs, vis, type_, input)?);
+                builders.push(TypeDeclBuilder::parse(
+                    parsed_attrs,
+                    attrs,
+                    vis,
+                    type_,
+                    input,
+                )?);
                 continue;
             };
 
@@ -601,6 +638,39 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
         cx.errors.borrow_mut().push(error);
     }
 
+    let mut alloc = KindAlloc::new();
+
+    for ty in &builders {
+        if let Some((id, span)) = ty.id {
+            if !alloc.used.insert(id) {
+                cx.errors.borrow_mut().push(syn::Error::new(
+                    span,
+                    format_args!("Message id `{id}` has already been used"),
+                ));
+            }
+        }
+    }
+
+    let mut types = Vec::with_capacity(builders.len());
+
+    for ty in builders {
+        let id = match ty.id {
+            Some((id, span)) => (id, span),
+            None => (alloc.allocate(), ty.name.span()),
+        };
+
+        types.push(TypeDecl {
+            id,
+            attrs: ty.attrs,
+            vis: ty.vis,
+            type_: ty.type_,
+            name: ty.name,
+            semi: ty.semi,
+            endpoint: false,
+            broadcast: false,
+        });
+    }
+
     let mut tokens = TokenStream::new();
 
     for ty in &types {
@@ -608,25 +678,121 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
     }
 
     for endpoint in endpoints {
-        endpoint.implement(cx, &types, &mut tokens);
+        endpoint.implement(cx, &mut types, &mut tokens);
     }
 
     for broadcast in broadcasts {
-        broadcast.implement(cx, &types, &mut tokens);
+        broadcast.implement(cx, &mut types, &mut tokens);
     }
+
+    let message_id = &cx.t.message_id;
+    let fmt = &cx.t.fmt;
+    let api = &cx.t.api;
+
+    let idents = types.iter().map(|ty| &ty.name).collect::<Vec<_>>();
+
+    let requests = types
+        .iter()
+        .filter(|ty| ty.endpoint)
+        .map(|ty| &ty.name)
+        .collect::<Vec<_>>();
+
+    let request_values = types
+        .iter()
+        .filter(|ty| ty.endpoint)
+        .map(|ty| ty.id.0)
+        .collect::<Vec<_>>();
+
+    if requests.is_empty() {
+        tokens.extend(quote! {
+            /// Enum of request types used in this protocol.
+            pub enum Request {}
+
+            impl #api::Id for Request {
+                #[inline]
+                fn from_raw(_id: u16) -> Option<Self> {
+                    None
+                }
+            }
+
+            impl #fmt::Debug for Request {
+                fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
+                    match *self {}
+                }
+            }
+        });
+    } else {
+        tokens.extend(quote! {
+            /// Enum of request types used in this protocol.
+            #[repr(u16)]
+            pub enum Request {
+                #(#requests = #request_values,)*
+            }
+
+            impl #api::Id for Request {
+                #[inline]
+                fn from_raw(id: u16) -> Option<Self> {
+                    match id {
+                        #(#request_values => Some(Self::#requests),)*
+                        _ => None,
+                    }
+                }
+            }
+
+            impl #fmt::Debug for Request {
+                fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
+                    match *self {
+                        #(Self::#requests => f.write_str(stringify!(#requests)),)*
+                    }
+                }
+            }
+        });
+    }
+
+    tokens.extend(quote! {
+        /// Debug a message id.
+        ///
+        /// This coerced the debug message into a type which implements
+        /// `fmt::Debug` that can be used for to visualize the name of the
+        /// message being received from a message identifier.
+        pub fn debug_id(id: #message_id) -> impl #fmt::Debug {
+            enum Debug {
+                Known(&'static str),
+                Unknown(#message_id),
+            }
+
+            impl #fmt::Debug for Debug {
+                fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
+                    match *self {
+                        Debug::Known(name) => f.write_str(name),
+                        Debug::Unknown(id) => f.debug_tuple("Unknown").field(&id.get()).finish(),
+                    }
+                }
+            }
+
+            match id {
+                #(#idents::ID => Debug::Known(stringify!(#idents)),)*
+                id => Debug::Unknown(id),
+            }
+        }
+    });
 
     tokens
 }
 
 struct Tokens<'a> {
     api: TraitPath<'a>,
+    message_id: TraitPath<'a>,
+    fmt: TraitPath<'a>,
     brace: syn::token::Brace,
+    colon_colon: Token![::],
     const_: Token![const],
     enum_: Token![enum],
     eq: Token![=],
     fn_: Token![fn],
     impl_: Token![impl],
     paren: syn::token::Paren,
+    semi: Token![;],
     type_: Token![type],
 }
 
@@ -661,16 +827,15 @@ impl Context<'_> {
         self.t.brace.surround(t, |_| {});
     }
 
-    fn define_const(&self, name: &str, value: &dyn ToTokens, t: &mut TokenStream) {
+    fn define_id(&self, name: &str, value: u16, t: &mut TokenStream) {
         self.t.const_.to_tokens(t);
-        <Ident>::new(name, Span::call_site()).to_tokens(t);
+        Ident::new(name, Span::call_site()).to_tokens(t);
         <Token![:]>::default().to_tokens(t);
-        <Token![&]>::default().to_tokens(t);
-        Lifetime::new("'static", Span::call_site()).to_tokens(t);
-        Ident::new("str", Span::call_site()).to_tokens(t);
+        self.t.message_id.to_tokens(t);
         self.t.eq.to_tokens(t);
-        value.to_tokens(t);
-        <Token![;]>::default().to_tokens(t);
+        let message_id = &self.t.message_id;
+        t.extend(quote!(unsafe { #message_id::new_unchecked(#value) }));
+        self.t.semi.to_tokens(t);
     }
 }
 
@@ -679,7 +844,8 @@ struct TraitPath<'a> {
     segments: Vec<Ident>,
 }
 
-impl<'a> TraitPath<'a> {
+impl ToTokens for TraitPath<'_> {
+    #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let colon_colon = <Token![::]>::default();
 
@@ -689,7 +855,30 @@ impl<'a> TraitPath<'a> {
             colon_colon.to_tokens(tokens);
             segment.to_tokens(tokens);
         }
+    }
+}
 
-        colon_colon.to_tokens(tokens);
+struct KindAlloc {
+    used: HashSet<u16>,
+    next: u16,
+}
+
+impl KindAlloc {
+    fn new() -> Self {
+        Self {
+            used: HashSet::new(),
+            next: 1,
+        }
+    }
+
+    fn allocate(&mut self) -> u16 {
+        while self.used.contains(&self.next) {
+            self.next = self.next.saturating_add(1);
+        }
+
+        let id = self.next;
+        self.used.insert(id);
+        self.next = self.next.saturating_add(1);
+        id
     }
 }

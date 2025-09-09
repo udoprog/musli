@@ -1,5 +1,8 @@
 //! Shared traits for defining API types.
 
+use core::fmt;
+use core::num::NonZeroU16;
+
 use musli::alloc::Global;
 use musli::mode::Binary;
 use musli::{Decode, Encode};
@@ -7,12 +10,68 @@ use musli::{Decode, Encode};
 #[doc(inline)]
 pub use musli_web_macros::define;
 
+/// A trait for constructing identifiers.
+pub trait Id
+where
+    Self: 'static + fmt::Debug,
+{
+    /// Construct an identifier from a raw `u16`.
+    #[doc(hidden)]
+    fn from_raw(id: u16) -> Option<Self>
+    where
+        Self: Sized;
+}
+
+/// The identifier of a message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
+#[repr(transparent)]
+#[musli(transparent)]
+pub struct MessageId(NonZeroU16);
+
+impl fmt::Display for MessageId {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl MessageId {
+    /// Try to construct a message id.
+    #[doc(hidden)]
+    #[inline]
+    pub const fn new(id: u16) -> Option<Self> {
+        let Some(value) = NonZeroU16::new(id) else {
+            return None;
+        };
+
+        Some(Self(value))
+    }
+
+    /// Get a raw message identifier.
+    #[doc(hidden)]
+    #[inline]
+    pub const fn get(&self) -> u16 {
+        self.0.get()
+    }
+
+    /// Construct a new message ID.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` is zero.
+    #[doc(hidden)]
+    #[inline]
+    pub const unsafe fn new_unchecked(id: u16) -> Self {
+        Self(unsafe { NonZeroU16::new_unchecked(id) })
+    }
+}
+
 pub trait Endpoint
 where
     Self: 'static,
 {
     /// The kind of the endpoint.
-    const KIND: &'static str;
+    const ID: MessageId;
 
     /// The primary response type related to the endpoint.
     type Response<'de>: Decode<'de, Binary, Global>;
@@ -29,7 +88,7 @@ where
     Self: 'static,
 {
     /// The kind of the broadcast.
-    const KIND: &'static str;
+    const ID: MessageId;
 
     /// The primary event related to the broadcast.
     type Event<'de>: Event<Broadcast = Self> + Decode<'de, Binary, Global>;
@@ -69,24 +128,23 @@ where
 /// A request header.
 #[derive(Debug, Clone, Copy, Encode, Decode)]
 #[doc(hidden)]
-pub struct RequestHeader<'a> {
+#[musli(packed)]
+pub struct RequestHeader {
     /// The serial of the request.
     pub serial: u32,
     /// The kind of the request.
-    pub kind: &'a str,
+    pub id: u16,
 }
 
 /// The header of a response.
 #[derive(Debug, Clone, Encode, Decode)]
 #[doc(hidden)]
+#[musli(packed)]
 pub struct ResponseHeader<'de> {
     /// The serial request this is a response to.
     pub serial: u32,
-    /// This is a broadcast over the specified topic. If this is set, then
-    /// serial is `0`.
-    #[musli(default, skip_encoding_if = Option::is_none)]
-    pub broadcast: Option<&'de str>,
+    /// This is a broadcast over the specified topic. If this is non-empty the serial is 0.
+    pub broadcast: u16,
     /// An error message in the response.
-    #[musli(default, skip_encoding_if = Option::is_none)]
-    pub error: Option<&'de str>,
+    pub error: &'de str,
 }

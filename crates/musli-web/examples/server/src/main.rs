@@ -29,18 +29,19 @@ enum Broadcast {
 struct MyHandler;
 
 impl ws::Handler for MyHandler {
+    type Id = api::Request;
     type Response = bool;
 
     async fn handle(
         &mut self,
-        kind: &str,
+        id: api::Request,
         incoming: &mut ws::Incoming<'_>,
         outgoing: &mut ws::Outgoing<'_>,
     ) -> Self::Response {
-        tracing::info!("Handling: {kind}");
+        tracing::info!("Handling: {id:?}");
 
-        match kind {
-            api::Hello::KIND => {
+        match id {
+            api::Request::Hello => {
                 let Some(request) = incoming.read::<api::HelloRequest<'_>>() else {
                     return false;
                 };
@@ -55,7 +56,6 @@ impl ws::Handler for MyHandler {
 
                 true
             }
-            _ => false,
         }
     }
 }

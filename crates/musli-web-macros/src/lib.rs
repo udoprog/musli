@@ -37,8 +37,22 @@ mod define;
 /// represented by an uninhabitable type-level marker declared through a `type`
 /// declaration.
 ///
+/// On top of the API types, this macro also generates a `debug_id` function
+/// with the following signature:
+///
+/// ```rust
+/// use musli_web::api::MessageId;
+///
+/// fn debug_id(id: MessageId) -> impl core::fmt::Debug {
+///     # "fake"
+/// }
+/// ```
+///
+/// This method can be used to debug a message id, unknown message ids will be
+/// identified with an `Unknown(<number>)` debug printing.
+///
 /// Each type-level marker will implement either [`api::Endpoint`] or
-/// [`api::Broadcast`]. And they will have an associated constant named `KIND`
+/// [`api::Broadcast`]. And they will have an associated constant named `ID`
 /// which matches the kind that are assocaited with them.
 ///
 /// These roughly follow the structure of:
@@ -55,11 +69,11 @@ mod define;
 /// }
 /// ```
 ///
-/// An `endpoint` can define requests and responses. The first response defined
-/// is required and is the default response that certain APIs will expected the
-/// endpoint to return. Any number of requests can be specified, this is allows
-/// for different "sender types" to be defined, but their over the wire format
-/// has to be the same.
+/// Implementing an `Endpoint` can define requests and responses. The first
+/// response defined is required and is the default response that certain APIs
+/// will expected the endpoint to return. Any number of requests can be
+/// specified, this is allows for different "sender types" to be defined, but
+/// their over the wire format has to be the same.
 ///
 /// Types specified as request types have to implement [`musli::Encode`] and
 /// types sets as response types must implemente [`musli::Decode`].
@@ -74,11 +88,11 @@ mod define;
 /// }
 /// ```
 ///
-/// A `broadcast` can define events, which are messages sent from the server to
-/// the client. At least one event type is required, which will be used as the
-/// default. Any number of events can be specified which allows for different
-/// "sender types" to be defined, but their over the wire format has to be the
-/// same.
+/// Implementing a `Broadcast` can define events, which are messages sent from
+/// the server to the client. At least one event type is required, which will be
+/// used as the default. Any number of events can be specified which allows for
+/// different "sender types" to be defined, but their over the wire format has
+/// to be the same.
 ///
 /// ```text
 /// (#[musli(..)])?
@@ -145,7 +159,7 @@ mod define;
 ///         type Response<'de> = HelloResponse<'de>;
 ///     }
 ///
-///     #[musli(kind = "tock")]
+///     #[musli(id = 100)]
 ///     pub type Tick;
 ///
 ///     impl Broadcast for Tick {
@@ -153,6 +167,9 @@ mod define;
 ///         impl Event for OwnedTickEvent;
 ///     }
 /// }
+///
+/// assert_eq!(format!("{:?}", debug_id(Hello::ID)), "Hello");
+/// assert_eq!(format!("{:?}", debug_id(Tick::ID)), "Tick");
 /// ```
 ///
 /// [`api::Broadcast`]: <https://docs.rs/musli-web/latest/musli_web/api/trait.Broadcast.html>

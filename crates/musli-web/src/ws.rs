@@ -11,49 +11,74 @@
 //! that implements [`fmt::Display`]:
 //!
 //! ```
-//! use musli::{Decode, Encode};
+//! use musli_web::api::MessageId;
 //! use musli_web::ws;
 //!
-//! #[derive(Decode)]
-//! struct Request<'de> {
-//!     message: &'de str,
+//! mod api {
+//!     use musli::{Decode, Encode};
+//!     use musli_web::api;
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct HelloRequest<'de> {
+//!         pub message: &'de str,
+//!     }
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct HelloResponse<'de> {
+//!         pub message: &'de str,
+//!     }
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct TickEvent<'de> {
+//!         pub message: &'de str,
+//!         pub tick: u32,
+//!     }
+//!
+//!     api::define! {
+//!         pub type Hello;
+//!
+//!         impl Endpoint for Hello {
+//!             impl<'de> Request for HelloRequest<'de>;
+//!             type Response<'de> = HelloResponse<'de>;
+//!         }
+//!
+//!         pub type Tick;
+//!
+//!         impl Broadcast for Tick {
+//!             impl<'de> Event for TickEvent<'de>;
+//!         }
+//!     }
 //! }
 //!
-//! #[derive(Encode)]
-//! struct Response<'de> {
-//!     message: &'de str,
+//! #[derive(Debug, Clone)]
+//! enum Broadcast {
+//!     Tick { tick: u32 },
 //! }
 //!
 //! struct MyHandler;
 //!
 //! impl ws::Handler for MyHandler {
-//!     type Response = Result<bool, &'static str>;
+//!     type Id = api::Request;
+//!     type Response = Option<()>;
 //!
 //!     async fn handle(
 //!         &mut self,
-//!         kind: &str,
+//!         id: Self::Id,
 //!         incoming: &mut ws::Incoming<'_>,
 //!         outgoing: &mut ws::Outgoing<'_>,
 //!     ) -> Self::Response {
-//!         tracing::info!("Handling: {kind}");
+//!         tracing::info!("Handling: {id:?}");
 //!
-//!         match kind {
-//!             "request" => {
-//!                 let Some(request) = incoming.read::<Request<'_>>() else {
-//!                     return Ok(false);
-//!                 };
+//!         match id {
+//!             api::Request::Hello => {
+//!                 let request = incoming.read::<api::HelloRequest<'_>>()?;
 //!
-//!                 if !request.message.contains("hello") {
-//!                     return Err("Rude message");
-//!                 }
-//!
-//!                 outgoing.write(Response {
+//!                 outgoing.write(api::HelloResponse {
 //!                     message: request.message,
 //!                 });
 //!
-//!                 Ok(true)
+//!                 Some(())
 //!             }
-//!             _ => Ok(false),
 //!         }
 //!     }
 //! }
@@ -83,7 +108,7 @@ use rand::rngs::SmallRng;
 use tokio::time::{Duration, Instant, Sleep};
 
 use crate::Buf;
-use crate::api::{Broadcast, Event, RequestHeader, ResponseHeader};
+use crate::api::{Broadcast, Event, Id, RequestHeader, ResponseHeader};
 use crate::buf::InvalidFrame;
 
 const MAX_CAPACITY: usize = 1048576;
@@ -349,13 +374,15 @@ where
 ///
 /// [`server()`]: crate::axum08::server
 pub trait Handler {
+    /// The type of message id used.
+    type Id: Id;
     /// The response type returned by the handler.
     type Response: IntoResponse;
 
     /// Handle a request.
     fn handle<'this>(
         &'this mut self,
-        kind: &'this str,
+        id: Self::Id,
         incoming: &'this mut Incoming<'_>,
         outgoing: &'this mut Outgoing<'_>,
     ) -> impl Future<Output = Self::Response> + Send + 'this;
@@ -545,7 +572,7 @@ where
     async fn handle_message(&mut self, bytes: Bytes) -> Result<(), Error> {
         let mut reader = SliceReader::new(&bytes);
 
-        let header = match storage::decode(&mut reader) {
+        let header: RequestHeader = match storage::decode(&mut reader) {
             Ok(header) => header,
             Err(error) => {
                 tracing::debug!(?error, "Invalid request header");
@@ -557,7 +584,12 @@ where
         };
 
         let err = 'err: {
-            let res = match self.handle_request(reader, header).await {
+            let Some(id) = <H::Id as Id>::from_raw(header.id) else {
+                self.format_err("Unsupported message id 0")?;
+                break 'err true;
+            };
+
+            let res = match self.handle_request(reader, header.serial, id).await {
                 Ok(res) => res,
                 Err(err) => {
                     self.format_err(err)?;
@@ -574,7 +606,7 @@ where
             };
 
             if !res.handled {
-                self.format_err(format_args!("No support for request `{}`", header.kind))?;
+                self.format_err(format_args!("No support for request `{}`", header.id))?;
                 break 'err true;
             }
 
@@ -587,8 +619,8 @@ where
 
             self.buf.write(ResponseHeader {
                 serial: header.serial,
-                broadcast: None,
-                error: Some(self.error.as_str()),
+                broadcast: 0,
+                error: self.error.as_str(),
             })?;
         }
 
@@ -680,8 +712,8 @@ where
 
         this.buf.write(ResponseHeader {
             serial: 0,
-            broadcast: Some(<T::Broadcast as Broadcast>::KIND),
-            error: None,
+            broadcast: <T::Broadcast as Broadcast>::ID.get(),
+            error: "",
         })?;
 
         this.buf.write(message)?;
@@ -692,14 +724,15 @@ where
     async fn handle_request(
         &mut self,
         reader: SliceReader<'_>,
-        header: RequestHeader<'_>,
+        serial: u32,
+        id: H::Id,
     ) -> Result<H::Response, storage::Error> {
-        tracing::debug!(?header, "Got request");
+        tracing::debug!(serial, ?id, "Got request");
 
         self.buf.write(ResponseHeader {
-            serial: header.serial,
-            broadcast: None,
-            error: None,
+            serial,
+            broadcast: 0,
+            error: "",
         })?;
 
         let mut incoming = Incoming {
@@ -712,10 +745,7 @@ where
             buf: &mut self.buf,
         };
 
-        let response = self
-            .handler
-            .handle(header.kind, &mut incoming, &mut outgoing)
-            .await;
+        let response = self.handler.handle(id, &mut incoming, &mut outgoing).await;
 
         if let Some(error) = incoming.error.take() {
             return Err(error);
