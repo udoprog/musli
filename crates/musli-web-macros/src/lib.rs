@@ -34,8 +34,8 @@ mod define;
 /// # Macro usage
 ///
 /// The macro defines a set of endpoints and broadcasts, each of which is
-/// represented by an uninhabitable enum intended to be used as a type-level
-/// marker.
+/// represented by an uninhabitable type-level marker declared through a `type`
+/// declaration.
 ///
 /// Each type-level marker will implement either [`api::Endpoint`] or
 /// [`api::Broadcast`]. And they will have an associated constant named `KIND`
@@ -44,6 +44,8 @@ mod define;
 /// These roughly follow the structure of:
 ///
 /// ```text
+/// pub type <name>;
+///
 /// impl Endpoint for <name> {
 ///     <definition>
 /// }
@@ -64,6 +66,8 @@ mod define;
 ///
 /// ```text
 /// (#[musli(..)])?
+/// pub type Hello;
+///
 /// impl Endpoint for Hello (where <bounds>)? {
 ///     impl<'de> Request for HelloRequest<'de> (where <bounds>)?;
 ///     type Response<'de> = HelloResponse<'de> (where <bounds>)?;
@@ -78,6 +82,8 @@ mod define;
 ///
 /// ```text
 /// (#[musli(..)])?
+/// pub type Tick;
+///
 /// impl Broadcast for Tick (where <bounds>)? {
 ///     impl<'de> Event TickEvent<'de> (where <bounds>)?;
 ///     impl Event for OwnedTickEvent (where <bounds>)?;
@@ -93,6 +99,8 @@ mod define;
 ///
 /// ```text
 /// #[musli(kind = "tock")]
+/// pub type Tick;
+///
 /// impl Broadcast for Tick {
 ///     impl<'de> Event for TickEvent<'de>;
 ///     impl Event for OwnedTickEvent;
@@ -130,12 +138,16 @@ mod define;
 /// }
 ///
 /// api::define! {
+///     pub type Hello;
+///
 ///     impl Endpoint for Hello {
 ///         impl<'de> Request for HelloRequest<'de>;
 ///         type Response<'de> = HelloResponse<'de>;
 ///     }
 ///
 ///     #[musli(kind = "tock")]
+///     pub type Tick;
+///
 ///     impl Broadcast for Tick {
 ///         impl<'de> Event for TickEvent<'de>;
 ///         impl Event for OwnedTickEvent;

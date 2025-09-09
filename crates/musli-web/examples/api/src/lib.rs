@@ -29,6 +29,11 @@ where
 
 api::define! {
     /// The hello endpoint.
+    pub type Hello;
+
+    /// The tick broadcast.
+    pub type Tick;
+
     impl Endpoint for Hello {
         impl<'de> Request for HelloRequest<'de>;
         type Response<'de> = HelloResponse<'de>;
