@@ -26,6 +26,8 @@
 //!     }
 //!
 //!     api::define! {
+//!         pub type Hello;
+//!
 //!         impl Endpoint for Hello {
 //!             impl<'de> Request for HelloRequest<'de>;
 //!             type Response<'de> = HelloResponse<'de>;

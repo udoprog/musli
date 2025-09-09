@@ -34,10 +34,14 @@
 //!     }
 //!
 //!     api::define! {
+//!         pub type Hello;
+//!
 //!         impl Endpoint for Hello {
 //!             impl<'de> Request for HelloRequest<'de>;
 //!             type Response<'de> = HelloResponse<'de>;
 //!         }
+//!
+//!         pub type Tick;
 //!
 //!         impl Broadcast for Tick {
 //!             impl<'de> Event for TickEvent<'de>;
