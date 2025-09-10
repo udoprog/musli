@@ -35,7 +35,13 @@ impl fmt::Display for MessageId {
     }
 }
 
+/// Start of special identifiers.
+const START: u16 = i16::MAX as u16;
+
 impl MessageId {
+    /// The message id for [`ErrorMessage`].
+    pub const ERROR_MESSAGE: Self = unsafe { Self::new_unchecked(START) };
+
     /// Try to construct a message id.
     #[doc(hidden)]
     #[inline]
@@ -140,11 +146,21 @@ pub struct RequestHeader {
 #[derive(Debug, Clone, Encode, Decode)]
 #[doc(hidden)]
 #[musli(packed)]
-pub struct ResponseHeader<'de> {
+pub struct ResponseHeader {
     /// The serial request this is a response to.
     pub serial: u32,
-    /// This is a broadcast over the specified topic. If this is non-empty the serial is 0.
+    /// This is a broadcast over the specified type. If this is non-empty the
+    /// serial is 0.
     pub broadcast: u16,
-    /// An error message in the response.
-    pub error: &'de str,
+    /// If non-zero, the response contains an error of the given type.
+    pub error: u16,
+}
+
+/// An error response.
+#[derive(Debug, Clone, Encode, Decode)]
+#[doc(hidden)]
+#[musli(packed)]
+pub struct ErrorMessage<'de> {
+    /// The error message.
+    pub message: &'de str,
 }

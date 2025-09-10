@@ -108,7 +108,7 @@ use rand::rngs::SmallRng;
 use tokio::time::{Duration, Instant, Sleep};
 
 use crate::Buf;
-use crate::api::{Broadcast, Event, Id, RequestHeader, ResponseHeader};
+use crate::api::{Broadcast, ErrorMessage, Event, Id, MessageId, RequestHeader, ResponseHeader};
 use crate::buf::InvalidFrame;
 
 const MAX_CAPACITY: usize = 1048576;
@@ -620,7 +620,11 @@ where
             self.buf.write(ResponseHeader {
                 serial: header.serial,
                 broadcast: 0,
-                error: self.error.as_str(),
+                error: MessageId::ERROR_MESSAGE.get(),
+            })?;
+
+            self.buf.write(ErrorMessage {
+                message: &self.error,
             })?;
         }
 
@@ -713,7 +717,7 @@ where
         this.buf.write(ResponseHeader {
             serial: 0,
             broadcast: <T::Broadcast as Broadcast>::ID.get(),
-            error: "",
+            error: 0,
         })?;
 
         this.buf.write(message)?;
@@ -732,7 +736,7 @@ where
         self.buf.write(ResponseHeader {
             serial,
             broadcast: 0,
-            error: "",
+            error: 0,
         })?;
 
         let mut incoming = Incoming {

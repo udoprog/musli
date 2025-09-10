@@ -29,12 +29,9 @@ pub(super) fn cx(base: &Path) -> Context<'_> {
             fmt: path!(__macros::fmt),
             brace: syn::token::Brace::default(),
             colon_colon: <Token![::]>::default(),
-            const_: <Token![const]>::default(),
             enum_: <Token![enum]>::default(),
             eq: <Token![=]>::default(),
-            fn_: <Token![fn]>::default(),
             impl_: <Token![impl]>::default(),
-            paren: syn::token::Paren::default(),
             semi: <Token![;]>::default(),
             type_: <Token![type]>::default(),
         },
@@ -180,8 +177,6 @@ struct TypeDecl {
 
 impl TypeDecl {
     fn implement(&self, cx: &Context, t: &mut TokenStream) {
-        let (id, _) = self.id;
-
         for attr in &self.attrs {
             attr.to_tokens(t);
         }
@@ -195,7 +190,7 @@ impl TypeDecl {
         self.name.to_tokens(t);
         cx.t.brace.surround(t, |t| {
             self.vis.to_tokens(t);
-            cx.define_id("ID", id, t);
+            cx.define_id("ID", self.id, t);
         });
     }
 }
@@ -310,8 +305,6 @@ impl Endpoint {
 
         ty.endpoint = true;
 
-        let (id, _) = ty.id;
-
         let (impl_generics, type_generics, where_clause) = self.generics.split_for_impl();
 
         {
@@ -330,7 +323,7 @@ impl Endpoint {
             where_clause.to_tokens(t);
 
             self.brace.surround(t, |t| {
-                cx.define_id("ID", id, t);
+                cx.define_id("ID", ty.id, t);
 
                 for attr in &self.res.attrs {
                     attr.to_tokens(t);
@@ -468,8 +461,6 @@ impl Broadcast {
 
         ty.broadcast = true;
 
-        let (id, _) = ty.id;
-
         let (impl_generics, type_generics, where_clause) = self.generics.split_for_impl();
 
         {
@@ -488,7 +479,7 @@ impl Broadcast {
             where_clause.to_tokens(t);
 
             self.brace.surround(t, |t| {
-                cx.define_id("ID", id, t);
+                cx.define_id("ID", ty.id, t);
 
                 cx.t.type_.to_tokens(t);
                 Ident::new("Event", Span::call_site()).to_tokens(t);
@@ -786,12 +777,9 @@ struct Tokens<'a> {
     fmt: TraitPath<'a>,
     brace: syn::token::Brace,
     colon_colon: Token![::],
-    const_: Token![const],
     enum_: Token![enum],
     eq: Token![=],
-    fn_: Token![fn],
     impl_: Token![impl],
-    paren: syn::token::Paren,
     semi: Token![;],
     type_: Token![type],
 }
@@ -821,21 +809,26 @@ impl Context<'_> {
     }
 
     fn do_not_implement(&self, name: &str, t: &mut TokenStream) {
-        self.t.fn_.to_tokens(t);
-        Ident::new(name, Span::call_site()).to_tokens(t);
-        self.t.paren.surround(t, |_| {});
-        self.t.brace.surround(t, |_| {});
+        let name = Ident::new(name, Span::call_site());
+        t.extend(quote!(fn #name() {}));
     }
 
-    fn define_id(&self, name: &str, value: u16, t: &mut TokenStream) {
-        self.t.const_.to_tokens(t);
-        Ident::new(name, Span::call_site()).to_tokens(t);
-        <Token![:]>::default().to_tokens(t);
-        self.t.message_id.to_tokens(t);
-        self.t.eq.to_tokens(t);
+    fn define_id(&self, name: &str, (value, span): (u16, Span), t: &mut TokenStream) {
+        if value == 0 || value >= i16::MAX as u16 {
+            self.errors.borrow_mut().push(syn::Error::new(
+                span,
+                format_args!("Message id `{value}` not in range 1-{}", i16::MAX as u16),
+            ));
+
+            return;
+        }
+
+        let name = Ident::new(name, Span::call_site());
         let message_id = &self.t.message_id;
-        t.extend(quote!(unsafe { #message_id::new_unchecked(#value) }));
-        self.t.semi.to_tokens(t);
+
+        t.extend(quote! {
+            const #name: #message_id = unsafe { #message_id::new_unchecked(#value) };
+        });
     }
 }
 

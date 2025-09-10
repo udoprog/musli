@@ -505,7 +505,7 @@ where
         let buf = BufRc::new(buf);
         let mut reader = SliceReader::new(&buf);
 
-        let header: api::ResponseHeader<'_> = storage::decode(&mut reader)?;
+        let header: api::ResponseHeader = storage::decode(&mut reader)?;
 
         if let Some(broadcast) = MessageId::new(header.broadcast) {
             tracing::debug!(?header.broadcast, "Got broadcast");
@@ -514,25 +514,35 @@ where
                 return Ok(());
             };
 
-            if !header.error.is_empty() {
-                while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
-                    if let Some(callback) = callback.upgrade() {
-                        callback.call(Err(Error::msg(header.error)));
+            if let Some(id) = MessageId::new(header.error) {
+                let error = if id == MessageId::ERROR_MESSAGE {
+                    storage::decode(&mut reader)?
+                } else {
+                    api::ErrorMessage {
+                        message: "Unknown error",
                     }
-                }
-            } else {
-                let at = buf.len().saturating_sub(reader.remaining());
-
-                let packet = RawPacket {
-                    buf: buf.clone(),
-                    at: Cell::new(at),
-                    id: broadcast,
                 };
 
                 while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
                     if let Some(callback) = callback.upgrade() {
-                        callback.call(Ok(packet.clone()));
+                        callback.call(Err(Error::msg(error.message)));
                     }
+                }
+
+                return Ok(());
+            }
+
+            let at = buf.len().saturating_sub(reader.remaining());
+
+            let packet = RawPacket {
+                buf: buf.clone(),
+                at: Cell::new(at),
+                id: broadcast,
+            };
+
+            while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
+                if let Some(callback) = callback.upgrade() {
+                    callback.call(Ok(packet.clone()));
                 }
             }
         } else {
@@ -549,19 +559,28 @@ where
                 p
             };
 
-            if !header.error.is_empty() {
-                p.callback.call(Err(Error::msg(header.error)));
-            } else {
-                let at = buf.len().saturating_sub(reader.remaining());
-
-                let packet = RawPacket {
-                    id: p.kind,
-                    buf,
-                    at: Cell::new(at),
+            if let Some(id) = MessageId::new(header.error) {
+                let error = if id == MessageId::ERROR_MESSAGE {
+                    storage::decode(&mut reader)?
+                } else {
+                    api::ErrorMessage {
+                        message: "Unknown error",
+                    }
                 };
 
-                p.callback.call(Ok(packet));
+                p.callback.call(Err(Error::msg(error.message)));
+                return Ok(());
             }
+
+            let at = buf.len().saturating_sub(reader.remaining());
+
+            let packet = RawPacket {
+                id: p.kind,
+                buf,
+                at: Cell::new(at),
+            };
+
+            p.callback.call(Ok(packet));
         }
 
         Ok(())
