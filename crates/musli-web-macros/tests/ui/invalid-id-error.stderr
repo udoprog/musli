@@ -1,0 +1,11 @@
+error: Message id `0` not in range 1-32767
+ --> tests/ui/invalid-id-error.rs:2:18
+  |
+2 |     #[musli(id = 0)]
+  |                  ^
+
+error: Message id `32768` not in range 1-32767
+ --> tests/ui/invalid-id-error.rs:5:18
+  |
+5 |     #[musli(id = 32768)]
+  |                  ^^^^^

@@ -34,6 +34,7 @@ pub(super) fn cx(base: &Path) -> Context<'_> {
             impl_: <Token![impl]>::default(),
             semi: <Token![;]>::default(),
             type_: <Token![type]>::default(),
+            anon_de_lt: syn::Lifetime::new("'__de", Span::call_site()),
         },
         errors: RefCell::new(errors),
     }
@@ -88,6 +89,7 @@ struct ImplType {
 impl ImplType {
     #[inline]
     fn parse(
+        cx: &Context<'_>,
         attrs: Vec<Attribute>,
         impl_: Token![impl],
         mut generics: Generics,
@@ -98,6 +100,20 @@ impl ImplType {
         let ty = input.parse::<Type>()?;
         generics.where_clause = input.parse()?;
         let semi = input.parse()?;
+
+        let mut one = false;
+
+        for p in generics.params.iter() {
+            if matches!(p, syn::GenericParam::Lifetime(_)) && !one {
+                one = true;
+                continue;
+            }
+
+            cx.errors.borrow_mut().push(syn::Error::new(
+                p.span(),
+                "Only one lifetime parameter is supported for an `Event` impl",
+            ));
+        }
 
         Ok(Self {
             attrs,
@@ -237,7 +253,7 @@ impl Endpoint {
                 let what = content.parse::<Ident>()?;
 
                 if what == "Request" {
-                    requests.push(ImplType::parse(attrs, impl_, generics, what, &content)?);
+                    requests.push(ImplType::parse(cx, attrs, impl_, generics, what, &content)?);
                     continue;
                 }
 
@@ -410,7 +426,7 @@ impl Broadcast {
                 let what = content.parse::<Ident>()?;
 
                 if what == "Event" {
-                    let impl_type = ImplType::parse(attrs, impl_, generics, what, &content)?;
+                    let impl_type = ImplType::parse(cx, attrs, impl_, generics, what, &content)?;
 
                     if first.is_none() {
                         first = Some(impl_type);
@@ -481,14 +497,18 @@ impl Broadcast {
             self.brace.surround(t, |t| {
                 cx.define_id("ID", ty.id, t);
 
-                cx.t.type_.to_tokens(t);
-                Ident::new("Event", Span::call_site()).to_tokens(t);
-                self.first.generics.to_tokens(t);
-                cx.t.eq.to_tokens(t);
-                self.first.ty.to_tokens(t);
-                cx.t.semi.to_tokens(t);
+                let ty = &self.first.ty;
 
-                cx.do_not_implement("__do_not_implement_broadcast", t);
+                let lt = if let Some(lt) = self.first.generics.lifetimes().next() {
+                    &lt.lifetime
+                } else {
+                    &cx.t.anon_de_lt
+                };
+
+                t.extend(quote! {
+                    type Event<#lt> = #ty;
+                    fn __do_not_implement_broadcast() {}
+                });
             });
         }
 
@@ -782,6 +802,7 @@ struct Tokens<'a> {
     impl_: Token![impl],
     semi: Token![;],
     type_: Token![type],
+    anon_de_lt: syn::Lifetime,
 }
 
 pub(super) struct Context<'a> {
