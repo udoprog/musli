@@ -330,7 +330,7 @@ zerocopy = [
 ]
 
 [dependencies]
-musli = { path = "../crates/musli", version = "0.0.145", default-features = false, optional = true, features = [] }
+musli = { path = "../crates/musli", version = "0.0.146", default-features = false, optional = true, features = [] }
 musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.1.0", default-features = false, features = [], optional = true }
 tests-macros = { path = "../tests-macros" }
 

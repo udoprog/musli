@@ -1,6 +1,6 @@
 [package]
 name = "musli"
-version = "0.0.145"
+version = "0.0.146"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2024"
 rust-version = "1.85"
