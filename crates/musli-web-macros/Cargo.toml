@@ -1,6 +1,6 @@
 [package]
 name = "musli-web-macros"
-version = "0.0.145"
+version = "0.1.0"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2024"
 rust-version = "1.85"
@@ -26,4 +26,4 @@ syn = { version = "2.0.55", features = ["full", "extra-traits"] }
 
 [dev-dependencies]
 musli = { path = "../musli", version = "0.0.145" }
-musli-web = { path = "../musli-web", version = "0.0.145", features = ["api"] }
+musli-web = { path = "../musli-web", version = "0.1.0", features = ["api"] }
