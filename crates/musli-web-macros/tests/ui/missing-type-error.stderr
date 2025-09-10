@@ -1,0 +1,5 @@
+error: Expected corresponding `type` declaration for `Broadcast`
+ --> tests/ui/missing-type-error.rs:2:24
+  |
+2 |     impl Broadcast for Broadcast {
+  |                        ^^^^^^^^^

@@ -99,8 +99,7 @@ mod define;
 /// pub type Tick;
 ///
 /// impl Broadcast for Tick (where <bounds>)? {
-///     impl<'de> Event TickEvent<'de> (where <bounds>)?;
-///     impl Event for OwnedTickEvent (where <bounds>)?;
+///     impl Event (<'lt>)? for OwnedTickEvent (where <bounds>)?;
 /// }
 /// ```
 ///
@@ -116,8 +115,8 @@ mod define;
 /// pub type Tick;
 ///
 /// impl Broadcast for Tick {
-///     impl<'de> Event for TickEvent<'de>;
 ///     impl Event for OwnedTickEvent;
+///     impl<'de> Event for TickEvent<'de>;
 /// }
 /// ```
 ///
@@ -163,8 +162,8 @@ mod define;
 ///     pub type Tick;
 ///
 ///     impl Broadcast for Tick {
-///         impl<'de> Event for TickEvent<'de>;
 ///         impl Event for OwnedTickEvent;
+///         impl<'de> Event for TickEvent<'de>;
 ///     }
 /// }
 ///

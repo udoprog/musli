@@ -23,6 +23,7 @@ path = "src/lib.rs"
 proc-macro2 = "1.0.79"
 quote = { version = "1.0.35", default-features = false }
 syn = { version = "2.0.55", features = ["full", "extra-traits"] }
+trybuild = "1.0.110"
 
 [dev-dependencies]
 musli = { path = "../musli", version = "0.0.146" }
