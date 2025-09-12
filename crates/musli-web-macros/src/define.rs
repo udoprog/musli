@@ -89,7 +89,6 @@ struct ImplType {
 impl ImplType {
     #[inline]
     fn parse(
-        cx: &Context<'_>,
         attrs: Vec<Attribute>,
         impl_: Token![impl],
         mut generics: Generics,
@@ -100,20 +99,6 @@ impl ImplType {
         let ty = input.parse::<Type>()?;
         generics.where_clause = input.parse()?;
         let semi = input.parse()?;
-
-        let mut one = false;
-
-        for p in generics.params.iter() {
-            if matches!(p, syn::GenericParam::Lifetime(_)) && !one {
-                one = true;
-                continue;
-            }
-
-            cx.errors.borrow_mut().push(syn::Error::new(
-                p.span(),
-                "Only one lifetime parameter is supported for an `Event` impl",
-            ));
-        }
 
         Ok(Self {
             attrs,
@@ -253,7 +238,7 @@ impl Endpoint {
                 let what = content.parse::<Ident>()?;
 
                 if what == "Request" {
-                    requests.push(ImplType::parse(cx, attrs, impl_, generics, what, &content)?);
+                    requests.push(ImplType::parse(attrs, impl_, generics, what, &content)?);
                     continue;
                 }
 
@@ -426,7 +411,7 @@ impl Broadcast {
                 let what = content.parse::<Ident>()?;
 
                 if what == "Event" {
-                    let impl_type = ImplType::parse(cx, attrs, impl_, generics, what, &content)?;
+                    let impl_type = ImplType::parse(attrs, impl_, generics, what, &content)?;
 
                     if first.is_none() {
                         first = Some(impl_type);
@@ -479,6 +464,19 @@ impl Broadcast {
 
         let (impl_generics, type_generics, where_clause) = self.generics.split_for_impl();
 
+        let first_ty = &self.first.ty;
+
+        let (decode_lt, first_has_generics) = if let Some(lt) = self
+            .first
+            .generics
+            .lifetimes()
+            .find(|lt| lt.lifetime.ident == "de")
+        {
+            (&lt.lifetime, self.first.generics.params.len() > 1)
+        } else {
+            (&cx.t.anon_de_lt, !self.first.generics.params.is_empty())
+        };
+
         {
             for attr in &self.attrs {
                 attr.to_tokens(t);
@@ -497,18 +495,22 @@ impl Broadcast {
             self.brace.surround(t, |t| {
                 cx.define_id("ID", ty.id, t);
 
-                let ty = &self.first.ty;
-
-                let lt = if let Some(lt) = self.first.generics.lifetimes().next() {
-                    &lt.lifetime
-                } else {
-                    &cx.t.anon_de_lt
-                };
-
                 t.extend(quote! {
-                    type Event<#lt> = #ty;
                     fn __do_not_implement_broadcast() {}
                 });
+            });
+        }
+
+        if !first_has_generics {
+            let api = &cx.t.api;
+            let name = &self.name;
+
+            t.extend(quote! {
+                impl #impl_generics #api::BroadcastWithEvent for #name #type_generics #where_clause {
+                    type Event<#decode_lt> = #first_ty where Self: #decode_lt;
+
+                    fn __do_not_implement_broadcast_with_event() {}
+                }
             });
         }
 
