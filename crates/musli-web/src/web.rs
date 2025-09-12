@@ -1531,7 +1531,10 @@ where
     T: api::Broadcast,
 {
     /// Decode the primary event related to a broadcast.
-    pub fn decode_event<'de>(&'de self) -> Result<T::Event<'de>> {
+    pub fn decode_event<'de>(&'de self) -> Result<T::Event<'de>>
+    where
+        T: api::BroadcastWithEvent,
+    {
         self.decode_event_any()
     }
 
