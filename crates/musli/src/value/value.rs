@@ -3,9 +3,7 @@ use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::str;
 
-#[cfg(feature = "alloc")]
-use crate::alloc::GlobalAllocator;
-use crate::alloc::{AllocError, Box, String, Vec};
+use crate::alloc::{AllocError, Box, GlobalAllocator, String, Vec};
 use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 use crate::de::{
     EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
@@ -43,6 +41,27 @@ where
     Variant(Box<(Value<A>, Value<A>), A>),
     /// An optional value.
     Option(Option<Box<Value<A>, A>>),
+}
+
+impl<A> Clone for ValueKind<A>
+where
+    A: GlobalAllocator,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        match self {
+            ValueKind::Unit => ValueKind::Unit,
+            ValueKind::Bool(b) => ValueKind::Bool(*b),
+            ValueKind::Char(c) => ValueKind::Char(*c),
+            ValueKind::Number(n) => ValueKind::Number(*n),
+            ValueKind::Bytes(b) => ValueKind::Bytes(b.clone()),
+            ValueKind::String(s) => ValueKind::String(s.clone()),
+            ValueKind::Sequence(s) => ValueKind::Sequence(s.clone()),
+            ValueKind::Map(m) => ValueKind::Map(m.clone()),
+            ValueKind::Variant(v) => ValueKind::Variant(v.clone()),
+            ValueKind::Option(o) => ValueKind::Option(o.clone()),
+        }
+    }
 }
 
 /// This is a type-erased value which can be deserialized from any [Müsli]
@@ -1003,6 +1022,36 @@ where
     #[inline]
     fn from((): ()) -> Self {
         Value::new(ValueKind::Unit)
+    }
+}
+
+/// Default implementation for [`Value`] is the empty type.
+///
+/// # Examples
+///
+/// ```
+/// use musli::value::Value;
+/// use musli::alloc::Global;
+///
+/// let value = Value::<Global>::default();
+/// assert!(value.is_unit());
+/// let value2 = value.clone();
+/// assert_eq!(value, value2);
+///
+/// let value = Value::<Global>::try_from("hello world")?;
+/// let value2 = value.clone();
+/// assert_eq!(value, value2);
+/// # Ok::<_, musli::alloc::AllocError>(())
+/// ```
+impl<A> Clone for Value<A>
+where
+    A: GlobalAllocator,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            kind: self.kind.clone(),
+        }
     }
 }
 

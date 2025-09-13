@@ -9,9 +9,7 @@ use core::slice;
 use crate::de::{DecodeBytes, UnsizedVisitor};
 use crate::{Context, Decoder};
 
-#[cfg(feature = "alloc")]
-use super::GlobalAllocator;
-use super::{Alloc, AllocError, Allocator};
+use super::{Alloc, AllocError, Allocator, GlobalAllocator};
 
 /// A Müsli-allocated contiguous growable array type, written as `Vec<T>`, short
 /// for 'vector'.
@@ -438,6 +436,35 @@ where
     /// Access a reference to the raw underlying allocation.
     pub const fn raw(&self) -> &A::Alloc<T> {
         &self.buf
+    }
+}
+
+impl<T, A> Clone for Vec<T, A>
+where
+    T: Clone,
+    A: GlobalAllocator,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let mut this = Self {
+            buf: <A as GlobalAllocator>::clone_alloc(&self.buf),
+            len: 0,
+        };
+
+        let mut b = this.buf.as_mut_ptr();
+
+        for item in self.as_slice() {
+            // SAFETY: We know that the buffer is initialized up to `self.len`.
+            unsafe {
+                b.write(item.clone());
+                b = b.add(1);
+                // If cloning fails we don't want to drop interior items, so we
+                // keep track of length *after* cloning.
+                this.len += 1;
+            }
+        }
+
+        this
     }
 }
 
