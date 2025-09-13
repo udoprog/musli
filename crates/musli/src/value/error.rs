@@ -74,7 +74,7 @@ impl fmt::Display for ErrorMessage {
                 write!(f, "Value buffer expected map, but found {hint}")
             }
             ErrorMessage::ExpectedVariant(hint) => {
-                write!(f, "Value buffer expected struct, but found {hint}")
+                write!(f, "Value buffer expected variant, but found {hint}")
             }
         }
     }
