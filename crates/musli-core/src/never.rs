@@ -79,7 +79,7 @@ where
     type Mode = M;
     type TryClone = Self;
     type DecodeBuffer = Self;
-    type DecodePack = Self;
+    type DecodePack<'this> = Self;
     type DecodeSequence = Self;
     type DecodeMapEntries = Self;
     type DecodeSome = Self;
@@ -129,7 +129,7 @@ where
     }
 }
 
-impl<C, M> AsDecoder for Never<(C, M)>
+impl<'de, C, M> AsDecoder<'de> for Never<(C, M)>
 where
     C: Context,
     M: 'static,

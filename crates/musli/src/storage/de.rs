@@ -61,7 +61,10 @@ where
     type Allocator = C::Allocator;
     type Mode = M;
     type TryClone = StorageDecoder<OPT, PACK, R::TryClone, C, M>;
-    type DecodePack = StorageDecoder<OPT, true, R, C, M>;
+    type DecodePack<'this>
+        = StorageDecoder<OPT, true, R, C, M>
+    where
+        Self: 'this;
     type DecodeSome = Self;
     type DecodeSequence = LimitedStorageDecoder<OPT, PACK, R, C, M>;
     type DecodeMap = LimitedStorageDecoder<OPT, PACK, R, C, M>;
@@ -121,7 +124,7 @@ where
     #[inline]
     fn decode_pack<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
+        F: FnOnce(&mut Self::DecodePack<'_>) -> Result<O, Self::Error>,
     {
         let mut this = StorageDecoder::new(self.cx, self.reader);
         f(&mut this)

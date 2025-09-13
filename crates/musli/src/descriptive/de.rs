@@ -233,7 +233,10 @@ where
     type Mode = M;
     type TryClone = SelfDecoder<OPT, R::TryClone, C, M>;
     type DecodeBuffer = IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
-    type DecodePack = SelfDecoder<OPT, Limit<R>, C, M>;
+    type DecodePack<'this>
+        = SelfDecoder<OPT, Limit<R>, C, M>
+    where
+        Self: 'this;
     type DecodeSome = Self;
     type DecodeSequence = RemainingSelfDecoder<OPT, R, C, M>;
     type DecodeMap = RemainingSelfDecoder<OPT, R, C, M>;
@@ -281,7 +284,7 @@ where
     #[inline]
     fn decode_pack<F, O>(mut self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
+        F: FnOnce(&mut Self::DecodePack<'_>) -> Result<O, Self::Error>,
     {
         let pos = self.cx.mark();
         let len = self.decode_pack_length(&pos)?;

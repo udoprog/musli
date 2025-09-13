@@ -43,6 +43,7 @@ pub trait Decoder<'de>: Sized {
         >;
     /// Decoder returned by [`Decoder::decode_buffer`].
     type DecodeBuffer: AsDecoder<
+            'de,
             Cx = Self::Cx,
             Error = Self::Error,
             Allocator = Self::Allocator,
@@ -57,7 +58,7 @@ pub trait Decoder<'de>: Sized {
             Mode = Self::Mode,
         >;
     /// Decoder used by [`Decoder::decode_pack`].
-    type DecodePack: SequenceDecoder<
+    type DecodePack<'this>: SequenceDecoder<
             'de,
             Cx = Self::Cx,
             Error = Self::Error,
@@ -1334,7 +1335,7 @@ pub trait Decoder<'de>: Sized {
     #[inline]
     fn decode_pack<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
+        F: FnOnce(&mut Self::DecodePack<'_>) -> Result<O, Self::Error>,
     {
         Err(self.cx().message(expecting::unsupported_type(
             &expecting::Pack,

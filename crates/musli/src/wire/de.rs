@@ -264,7 +264,7 @@ where
     #[inline]
     fn decode_pack<F, O>(mut self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
+        F: FnOnce(&mut Self::DecodePack<'_>) -> Result<O, Self::Error>,
     {
         let mark = self.cx.mark();
         let len = self.decode_len(&mark)?;

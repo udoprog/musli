@@ -23,7 +23,7 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[doc(inline)]
 pub use self::value::{AsValueDecoder, IntoValueDecoder, Value};
-use self::value::{Number, ValueKind};
+use self::value::{Cow, Number, ValueKind};
 #[doc(inline)]
 pub use error::Error;
 
@@ -64,7 +64,7 @@ pub const OPTIONS: Options = crate::options::new().build();
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub fn encode(value: impl Encode<Binary>) -> Result<Value<Global>, Error> {
+pub fn encode(value: impl Encode<Binary>) -> Result<Value<'static, Global>, Error> {
     ENCODING.encode(value)
 }
 
@@ -97,7 +97,10 @@ pub fn encode(value: impl Encode<Binary>) -> Result<Value<Global>, Error> {
 /// assert_eq!(decoded, person);
 /// # Ok::<_, Box<dyn core::error::Error>>(())
 /// ```
-pub fn encode_with<C>(cx: C, value: impl Encode<Binary>) -> Result<Value<C::Allocator>, C::Error>
+pub fn encode_with<C>(
+    cx: C,
+    value: impl Encode<Binary>,
+) -> Result<Value<'static, C::Allocator>, C::Error>
 where
     C: Context,
 {
@@ -129,7 +132,7 @@ where
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub fn decode<'de, T>(value: &'de Value<impl Allocator>) -> Result<T, Error>
+pub fn decode<'a, 'de, T>(value: &'a Value<'de, impl Allocator>) -> Result<T, Error>
 where
     T: Decode<'de, Binary, Global>,
 {
@@ -164,7 +167,10 @@ where
 /// assert_eq!(decoded, person);
 /// # Ok::<_, Box<dyn core::error::Error>>(())
 /// ```
-pub fn decode_with<'de, C, T>(cx: C, value: &'de Value<impl Allocator>) -> Result<T, C::Error>
+pub fn decode_with<'a, 'de, C, T>(
+    cx: C,
+    value: &'a Value<'de, impl Allocator>,
+) -> Result<T, C::Error>
 where
     C: Context,
     T: Decode<'de, Binary, C::Allocator>,
@@ -325,7 +331,7 @@ where
         &self,
         cx: C,
         value: impl Encode<M>,
-    ) -> Result<Value<C::Allocator>, C::Error>
+    ) -> Result<Value<'static, C::Allocator>, C::Error>
     where
         C: Context,
     {
@@ -360,7 +366,7 @@ where
     /// ```
     #[cfg(feature = "alloc")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-    pub fn decode<'de, T>(&self, value: &'de Value<impl Allocator>) -> Result<T, Error>
+    pub fn decode<'a, 'de, T>(&self, value: &'a Value<'de, impl Allocator>) -> Result<T, Error>
     where
         T: Decode<'de, M, Global>,
     {
@@ -399,10 +405,10 @@ where
     /// assert_eq!(decoded, person);
     /// # Ok::<_, Box<dyn core::error::Error>>(())
     /// ```
-    pub fn decode_with<'de, C, T>(
+    pub fn decode_with<'a, 'de: 'a, C, T>(
         &self,
         cx: C,
-        value: &'de Value<impl Allocator>,
+        value: &'a Value<'de, impl Allocator>,
     ) -> Result<T, C::Error>
     where
         C: Context,

@@ -14,7 +14,7 @@ pub trait AsDecoder<'de> {
     type Mode: 'static;
     /// The decoder we reborrow as.
     type Decoder<'this>: Decoder<
-            'this,
+            'de,
             Cx = Self::Cx,
             Error = Self::Error,
             Allocator = Self::Allocator,

@@ -10,25 +10,25 @@ use crate::storage::en::StorageEncoder;
 use crate::writer::BufWriter;
 use crate::{Allocator, Context, Options};
 
-use super::{Number, Value, ValueKind};
+use super::{Cow, Number, Value, ValueKind};
 
 /// Insert a value into the given receiver.
-trait ValueOutput<A>
+trait ValueOutput<'de, A>
 where
     A: Allocator,
 {
     /// Write a value into the receiver.
-    fn write<C>(self, cx: C, value: ValueKind<A>) -> Result<(), C::Error>
+    fn write<C>(self, cx: C, value: ValueKind<'de, A>) -> Result<(), C::Error>
     where
         C: Context<Allocator = A>;
 }
 
-impl<A> ValueOutput<A> for &mut Value<A>
+impl<'de, A> ValueOutput<'de, A> for &mut Value<'de, A>
 where
     A: Allocator,
 {
     #[inline]
-    fn write<C>(self, _: C, value: ValueKind<A>) -> Result<(), C::Error>
+    fn write<C>(self, _: C, value: ValueKind<'de, A>) -> Result<(), C::Error>
     where
         C: Context<Allocator = A>,
     {
@@ -37,12 +37,12 @@ where
     }
 }
 
-impl<A> ValueOutput<A> for &mut Vec<Value<A>, A>
+impl<'de, A> ValueOutput<'de, A> for &mut Vec<Value<'de, A>, A>
 where
     A: Allocator,
 {
     #[inline]
-    fn write<C>(self, cx: C, value: ValueKind<A>) -> Result<(), C::Error>
+    fn write<C>(self, cx: C, value: ValueKind<'de, A>) -> Result<(), C::Error>
     where
         C: Context<Allocator = A>,
     {
@@ -55,13 +55,13 @@ pub struct SomeValueWriter<O> {
     output: O,
 }
 
-impl<O, A> ValueOutput<A> for SomeValueWriter<O>
+impl<'de, O, A> ValueOutput<'de, A> for SomeValueWriter<O>
 where
-    O: ValueOutput<A>,
+    O: ValueOutput<'de, A>,
     A: Allocator,
 {
     #[inline]
-    fn write<C>(self, cx: C, value: ValueKind<A>) -> Result<(), C::Error>
+    fn write<C>(self, cx: C, value: ValueKind<'de, A>) -> Result<(), C::Error>
     where
         C: Context<Allocator = A>,
     {
@@ -72,41 +72,43 @@ where
 }
 
 /// Encoder for a single value.
-pub struct ValueEncoder<const OPT: Options, O, C, M> {
+pub struct ValueEncoder<'de, const OPT: Options, O, C, M> {
     cx: C,
     output: O,
+    _value: PhantomData<&'de ()>,
     _marker: PhantomData<M>,
 }
 
-impl<const OPT: Options, O, C, M> ValueEncoder<OPT, O, C, M> {
+impl<'de, const OPT: Options, O, C, M> ValueEncoder<'de, OPT, O, C, M> {
     #[inline]
     pub(crate) fn new(cx: C, output: O) -> Self {
         Self {
             cx,
             output,
+            _value: PhantomData,
             _marker: PhantomData,
         }
     }
 }
 
 #[crate::trait_defaults(crate)]
-impl<const OPT: Options, O, C, M> Encoder for ValueEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> Encoder for ValueEncoder<'de, OPT, O, C, M>
 where
-    O: ValueOutput<C::Allocator>,
+    O: ValueOutput<'de, C::Allocator>,
     C: Context,
     M: 'static,
 {
     type Cx = C;
     type Error = C::Error;
     type Mode = M;
-    type EncodeSome = ValueEncoder<OPT, SomeValueWriter<O>, C, M>;
+    type EncodeSome = ValueEncoder<'de, OPT, SomeValueWriter<O>, C, M>;
     type EncodePack = PackValueEncoder<OPT, O, C, M>;
-    type EncodeSequence = SequenceValueEncoder<OPT, O, C, M>;
-    type EncodeMap = MapValueEncoder<OPT, O, C, M>;
-    type EncodeMapEntries = MapValueEncoder<OPT, O, C, M>;
-    type EncodeVariant = VariantValueEncoder<OPT, O, C, M>;
-    type EncodeSequenceVariant = VariantSequenceEncoder<OPT, O, C, M>;
-    type EncodeMapVariant = VariantStructEncoder<OPT, O, C, M>;
+    type EncodeSequence = SequenceValueEncoder<'de, OPT, O, C, M>;
+    type EncodeMap = MapValueEncoder<'de, OPT, O, C, M>;
+    type EncodeMapEntries = MapValueEncoder<'de, OPT, O, C, M>;
+    type EncodeVariant = VariantValueEncoder<'de, OPT, O, C, M>;
+    type EncodeSequenceVariant = VariantSequenceEncoder<'de, OPT, O, C, M>;
+    type EncodeMapVariant = VariantStructEncoder<'de, OPT, O, C, M>;
 
     #[inline]
     fn cx(&self) -> Self::Cx {
@@ -246,7 +248,8 @@ where
         let mut bytes =
             Vec::with_capacity_in(array.len(), self.cx.alloc()).map_err(self.cx.map())?;
         bytes.extend_from_slice(array).map_err(self.cx.map())?;
-        self.output.write(self.cx, ValueKind::Bytes(bytes))?;
+        self.output
+            .write(self.cx, ValueKind::Bytes(Cow::Owned(bytes)))?;
         Ok(())
     }
 
@@ -254,7 +257,8 @@ where
     fn encode_bytes(self, b: &[u8]) -> Result<(), Self::Error> {
         let mut bytes = Vec::with_capacity_in(b.len(), self.cx.alloc()).map_err(self.cx.map())?;
         bytes.extend_from_slice(b).map_err(self.cx.map())?;
-        self.output.write(self.cx, ValueKind::Bytes(bytes))?;
+        self.output
+            .write(self.cx, ValueKind::Bytes(Cow::Owned(bytes)))?;
         Ok(())
     }
 
@@ -269,7 +273,8 @@ where
             bytes.extend_from_slice(b.as_ref()).map_err(self.cx.map())?;
         }
 
-        self.output.write(self.cx, ValueKind::Bytes(bytes))?;
+        self.output
+            .write(self.cx, ValueKind::Bytes(Cow::Owned(bytes)))?;
         Ok(())
     }
 
@@ -277,7 +282,8 @@ where
     fn encode_string(self, s: &str) -> Result<(), Self::Error> {
         let mut string = String::new_in(self.cx.alloc());
         string.push_str(s).map_err(self.cx.map())?;
-        self.output.write(self.cx, ValueKind::String(string))?;
+        self.output
+            .write(self.cx, ValueKind::String(Cow::Owned(string)))?;
         Ok(())
     }
 
@@ -366,18 +372,18 @@ where
 }
 
 /// A sequence encoder.
-pub struct SequenceValueEncoder<const OPT: Options, O, C, M>
+pub struct SequenceValueEncoder<'de, const OPT: Options, O, C, M>
 where
     C: Context,
     M: 'static,
 {
     cx: C,
     output: O,
-    values: Vec<Value<C::Allocator>, C::Allocator>,
+    values: Vec<Value<'de, C::Allocator>, C::Allocator>,
     _marker: PhantomData<M>,
 }
 
-impl<const OPT: Options, O, C, M> SequenceValueEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> SequenceValueEncoder<'de, OPT, O, C, M>
 where
     C: Context,
     M: 'static,
@@ -395,9 +401,9 @@ where
     }
 }
 
-impl<const OPT: Options, O, C, M> SequenceEncoder for SequenceValueEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> SequenceEncoder for SequenceValueEncoder<'de, OPT, O, C, M>
 where
-    O: ValueOutput<C::Allocator>,
+    O: ValueOutput<'de, C::Allocator>,
     C: Context,
     M: 'static,
 {
@@ -405,7 +411,7 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
-        = ValueEncoder<OPT, &'this mut Vec<Value<C::Allocator>, C::Allocator>, C, M>
+        = ValueEncoder<'de, OPT, &'this mut Vec<Value<'de, C::Allocator>, C::Allocator>, C, M>
     where
         Self: 'this;
 
@@ -455,9 +461,9 @@ where
     }
 }
 
-impl<const OPT: Options, O, C, M> SequenceEncoder for PackValueEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> SequenceEncoder for PackValueEncoder<OPT, O, C, M>
 where
-    O: ValueOutput<C::Allocator>,
+    O: ValueOutput<'de, C::Allocator>,
     C: Context,
     M: 'static,
 {
@@ -482,24 +488,25 @@ where
     #[inline]
     fn finish_sequence(self) -> Result<(), Self::Error> {
         let buf = self.writer.into_inner();
-        self.output.write(self.cx, ValueKind::Bytes(buf))?;
+        self.output
+            .write(self.cx, ValueKind::Bytes(Cow::Owned(buf)))?;
         Ok(())
     }
 }
 
 /// A pairs encoder.
-pub struct MapValueEncoder<const OPT: Options, O, C, M>
+pub struct MapValueEncoder<'de, const OPT: Options, O, C, M>
 where
     C: Context,
     M: 'static,
 {
     cx: C,
     output: O,
-    values: Vec<(Value<C::Allocator>, Value<C::Allocator>), C::Allocator>,
+    values: Vec<(Value<'de, C::Allocator>, Value<'de, C::Allocator>), C::Allocator>,
     _marker: PhantomData<M>,
 }
 
-impl<const OPT: Options, O, C, M> MapValueEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> MapValueEncoder<'de, OPT, O, C, M>
 where
     C: Context,
     M: 'static,
@@ -517,9 +524,9 @@ where
     }
 }
 
-impl<const OPT: Options, O, C, M> MapEncoder for MapValueEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> MapEncoder for MapValueEncoder<'de, OPT, O, C, M>
 where
-    O: ValueOutput<C::Allocator>,
+    O: ValueOutput<'de, C::Allocator>,
     C: Context,
     M: 'static,
 {
@@ -527,7 +534,7 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeEntry<'this>
-        = PairValueEncoder<'this, OPT, C, M>
+        = PairValueEncoder<'this, 'de, OPT, C, M>
     where
         Self: 'this;
 
@@ -548,9 +555,9 @@ where
     }
 }
 
-impl<const OPT: Options, O, C, M> EntriesEncoder for MapValueEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> EntriesEncoder for MapValueEncoder<'de, OPT, O, C, M>
 where
-    O: ValueOutput<C::Allocator>,
+    O: ValueOutput<'de, C::Allocator>,
     C: Context,
     M: 'static,
 {
@@ -558,11 +565,11 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeEntryKey<'this>
-        = ValueEncoder<OPT, &'this mut Value<C::Allocator>, C, M>
+        = ValueEncoder<'de, OPT, &'this mut Value<'de, C::Allocator>, C, M>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = ValueEncoder<OPT, &'this mut Value<C::Allocator>, C, M>
+        = ValueEncoder<'de, OPT, &'this mut Value<'de, C::Allocator>, C, M>
     where
         Self: 'this;
 
@@ -601,18 +608,18 @@ where
 }
 
 /// A pairs encoder.
-pub struct PairValueEncoder<'a, const OPT: Options, C, M>
+pub struct PairValueEncoder<'a, 'de, const OPT: Options, C, M>
 where
     C: Context,
     M: 'static,
 {
     cx: C,
-    output: &'a mut Vec<(Value<C::Allocator>, Value<C::Allocator>), C::Allocator>,
-    pair: (Value<C::Allocator>, Value<C::Allocator>),
+    output: &'a mut Vec<(Value<'de, C::Allocator>, Value<'de, C::Allocator>), C::Allocator>,
+    pair: (Value<'de, C::Allocator>, Value<'de, C::Allocator>),
     _marker: PhantomData<M>,
 }
 
-impl<'a, const OPT: Options, C, M> PairValueEncoder<'a, OPT, C, M>
+impl<'a, 'de, const OPT: Options, C, M> PairValueEncoder<'a, 'de, OPT, C, M>
 where
     C: Context,
     M: 'static,
@@ -620,7 +627,7 @@ where
     #[inline]
     fn new(
         cx: C,
-        output: &'a mut Vec<(Value<C::Allocator>, Value<C::Allocator>), C::Allocator>,
+        output: &'a mut Vec<(Value<'de, C::Allocator>, Value<'de, C::Allocator>), C::Allocator>,
     ) -> Self {
         Self {
             cx,
@@ -631,7 +638,7 @@ where
     }
 }
 
-impl<const OPT: Options, C, M> EntryEncoder for PairValueEncoder<'_, OPT, C, M>
+impl<'de, const OPT: Options, C, M> EntryEncoder for PairValueEncoder<'_, 'de, OPT, C, M>
 where
     C: Context,
     M: 'static,
@@ -640,11 +647,11 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeKey<'this>
-        = ValueEncoder<OPT, &'this mut Value<C::Allocator>, C, M>
+        = ValueEncoder<'de, OPT, &'this mut Value<'de, C::Allocator>, C, M>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = ValueEncoder<OPT, &'this mut Value<C::Allocator>, C, M>
+        = ValueEncoder<'de, OPT, &'this mut Value<'de, C::Allocator>, C, M>
     where
         Self: 'this;
 
@@ -671,18 +678,18 @@ where
 }
 
 /// A pairs encoder.
-pub struct VariantValueEncoder<const OPT: Options, O, C, M>
+pub struct VariantValueEncoder<'de, const OPT: Options, O, C, M>
 where
     C: Context,
     M: 'static,
 {
     cx: C,
     output: O,
-    pair: (Value<C::Allocator>, Value<C::Allocator>),
+    pair: (Value<'de, C::Allocator>, Value<'de, C::Allocator>),
     _marker: PhantomData<M>,
 }
 
-impl<const OPT: Options, O, C, M> VariantValueEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> VariantValueEncoder<'de, OPT, O, C, M>
 where
     C: Context,
     M: 'static,
@@ -698,9 +705,9 @@ where
     }
 }
 
-impl<const OPT: Options, O, C, M> VariantEncoder for VariantValueEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> VariantEncoder for VariantValueEncoder<'de, OPT, O, C, M>
 where
-    O: ValueOutput<C::Allocator>,
+    O: ValueOutput<'de, C::Allocator>,
     C: Context,
     M: 'static,
 {
@@ -708,11 +715,11 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeTag<'this>
-        = ValueEncoder<OPT, &'this mut Value<C::Allocator>, C, M>
+        = ValueEncoder<'de, OPT, &'this mut Value<'de, C::Allocator>, C, M>
     where
         Self: 'this;
     type EncodeData<'this>
-        = ValueEncoder<OPT, &'this mut Value<C::Allocator>, C, M>
+        = ValueEncoder<'de, OPT, &'this mut Value<'de, C::Allocator>, C, M>
     where
         Self: 'this;
 
@@ -740,25 +747,30 @@ where
 }
 
 /// A variant sequence encoder.
-pub struct VariantSequenceEncoder<const OPT: Options, O, C, M>
+pub struct VariantSequenceEncoder<'de, const OPT: Options, O, C, M>
 where
     C: Context,
     M: 'static,
 {
     cx: C,
     output: O,
-    variant: Value<C::Allocator>,
-    values: Vec<Value<C::Allocator>, C::Allocator>,
+    variant: Value<'de, C::Allocator>,
+    values: Vec<Value<'de, C::Allocator>, C::Allocator>,
     _marker: PhantomData<M>,
 }
 
-impl<const OPT: Options, O, C, M> VariantSequenceEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> VariantSequenceEncoder<'de, OPT, O, C, M>
 where
     C: Context,
     M: 'static,
 {
     #[inline]
-    fn new(cx: C, output: O, variant: Value<C::Allocator>, len: usize) -> Result<Self, C::Error> {
+    fn new(
+        cx: C,
+        output: O,
+        variant: Value<'de, C::Allocator>,
+        len: usize,
+    ) -> Result<Self, C::Error> {
         let values = Vec::with_capacity_in(len, cx.alloc()).map_err(cx.map())?;
 
         Ok(Self {
@@ -771,9 +783,9 @@ where
     }
 }
 
-impl<const OPT: Options, O, C, M> SequenceEncoder for VariantSequenceEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> SequenceEncoder for VariantSequenceEncoder<'de, OPT, O, C, M>
 where
-    O: ValueOutput<C::Allocator>,
+    O: ValueOutput<'de, C::Allocator>,
     C: Context,
     M: 'static,
 {
@@ -781,7 +793,7 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
-        = ValueEncoder<OPT, &'this mut Vec<Value<C::Allocator>, C::Allocator>, C, M>
+        = ValueEncoder<'de, OPT, &'this mut Vec<Value<'de, C::Allocator>, C::Allocator>, C, M>
     where
         Self: 'this;
 
@@ -805,25 +817,30 @@ where
 }
 
 /// A variant struct encoder.
-pub struct VariantStructEncoder<const OPT: Options, O, C, M>
+pub struct VariantStructEncoder<'de, const OPT: Options, O, C, M>
 where
     C: Context,
     M: 'static,
 {
     cx: C,
     output: O,
-    variant: Value<C::Allocator>,
-    fields: Vec<(Value<C::Allocator>, Value<C::Allocator>), C::Allocator>,
+    variant: Value<'de, C::Allocator>,
+    fields: Vec<(Value<'de, C::Allocator>, Value<'de, C::Allocator>), C::Allocator>,
     _marker: PhantomData<M>,
 }
 
-impl<const OPT: Options, O, C, M> VariantStructEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> VariantStructEncoder<'de, OPT, O, C, M>
 where
     C: Context,
     M: 'static,
 {
     #[inline]
-    fn new(cx: C, output: O, variant: Value<C::Allocator>, len: usize) -> Result<Self, C::Error> {
+    fn new(
+        cx: C,
+        output: O,
+        variant: Value<'de, C::Allocator>,
+        len: usize,
+    ) -> Result<Self, C::Error> {
         let fields = Vec::with_capacity_in(len, cx.alloc()).map_err(cx.map())?;
 
         Ok(Self {
@@ -836,9 +853,9 @@ where
     }
 }
 
-impl<const OPT: Options, O, C, M> MapEncoder for VariantStructEncoder<OPT, O, C, M>
+impl<'de, const OPT: Options, O, C, M> MapEncoder for VariantStructEncoder<'de, OPT, O, C, M>
 where
-    O: ValueOutput<C::Allocator>,
+    O: ValueOutput<'de, C::Allocator>,
     C: Context,
     M: 'static,
 {
@@ -846,7 +863,7 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeEntry<'this>
-        = PairValueEncoder<'this, OPT, C, M>
+        = PairValueEncoder<'this, 'de, OPT, C, M>
     where
         Self: 'this;
 

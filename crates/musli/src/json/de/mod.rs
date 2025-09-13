@@ -118,7 +118,10 @@ where
     type Mode = M;
     type TryClone = JsonDecoder<P::TryClone, C, M>;
     type DecodeBuffer = IntoValueDecoder<BUFFER_OPTIONS, C, C::Allocator, M>;
-    type DecodePack = JsonSequenceDecoder<P, C, M>;
+    type DecodePack<'this>
+        = JsonSequenceDecoder<P, C, M>
+    where
+        Self: 'this;
     type DecodeSequence = JsonSequenceDecoder<P, C, M>;
     type DecodeMap = JsonObjectDecoder<P, C, M>;
     type DecodeMapEntries = JsonObjectDecoder<P, C, M>;
@@ -349,7 +352,7 @@ where
     #[inline]
     fn decode_pack<F, O>(self, f: F) -> Result<O, Self::Error>
     where
-        F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
+        F: FnOnce(&mut Self::DecodePack<'_>) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonSequenceDecoder::new(self.cx, None, self.parser)?;
         let output = f(&mut decoder)?;

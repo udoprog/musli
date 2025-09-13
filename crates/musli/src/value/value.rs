@@ -1,10 +1,13 @@
+use core::borrow::Borrow;
 use core::cmp::Ordering;
 use core::fmt::{self, Write};
 use core::marker::PhantomData;
+use core::ops::Deref;
 use core::str;
 
 #[cfg(feature = "alloc")]
 use crate::alloc::GlobalAllocator;
+use crate::alloc::ToOwned;
 use crate::alloc::{AllocError, Box, String, Vec};
 use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 use crate::de::{
@@ -17,8 +20,33 @@ use crate::{Allocator, Context, Options};
 use super::de::ValueDecoder;
 use super::type_hint::{NumberHint, TypeHint};
 
+pub(super) enum Cow<'de, T, A>
+where
+    T: ?Sized + ToOwned,
+    A: Allocator,
+{
+    Owned(T::Owned<A>),
+    Borrowed(&'de T),
+}
+
+impl<T, A> Deref for Cow<'_, T, A>
+where
+    T: ?Sized + ToOwned,
+    A: Allocator,
+{
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        match *self {
+            Cow::Owned(ref owned) => owned.borrow(),
+            Cow::Borrowed(borrowed) => borrowed,
+        }
+    }
+}
+
 /// The kind of a value.
-pub(crate) enum ValueKind<A>
+pub(crate) enum ValueKind<'de, A>
 where
     A: Allocator,
 {
@@ -31,18 +59,18 @@ where
     /// A number.
     Number(Number),
     /// An array.
-    Bytes(Vec<u8, A>),
+    Bytes(Cow<'de, [u8], A>),
     /// A string in a value.
-    String(String<A>),
+    String(Cow<'de, str, A>),
     /// A unit value.
-    Sequence(Vec<Value<A>, A>),
+    Sequence(Vec<Value<'de, A>, A>),
     /// A pair stored in the value.
-    Map(Vec<(Value<A>, Value<A>), A>),
+    Map(Vec<(Value<'de, A>, Value<'de, A>), A>),
     /// A variant pair. The first value identifies the variant, the second value
     /// contains the value of the variant.
-    Variant(Box<(Value<A>, Value<A>), A>),
+    Variant(Box<(Value<'de, A>, Value<'de, A>), A>),
     /// An optional value.
-    Option(Option<Box<Value<A>, A>>),
+    Option(Option<Box<Value<'de, A>, A>>),
 }
 
 /// This is a type-erased value which can be deserialized from any [Müsli]
@@ -87,20 +115,20 @@ where
 /// let value: Value<Global> = Value::new_map_in([(Value::from(1u32), Value::from(2u32))], alloc)?;
 /// # Ok::<_, musli::alloc::AllocError>(())
 /// ```
-pub struct Value<A>
+pub struct Value<'de, A>
 where
     A: Allocator,
 {
-    pub(super) kind: ValueKind<A>,
+    pub(super) kind: ValueKind<'de, A>,
 }
 
-impl<A> Value<A>
+impl<'de, A> Value<'de, A>
 where
     A: Allocator,
 {
     /// Construct a new value around a kind.
     #[inline]
-    pub(crate) const fn new(kind: ValueKind<A>) -> Self {
+    pub(crate) const fn new(kind: ValueKind<'de, A>) -> Self {
         Self { kind }
     }
 
@@ -142,7 +170,7 @@ where
     /// # Ok::<_, musli::alloc::AllocError>(())
     /// ```
     pub fn new_map_in(
-        iter: impl IntoIterator<Item = (Value<A>, Value<A>)>,
+        iter: impl IntoIterator<Item = (Value<'de, A>, Value<'de, A>)>,
         alloc: A,
     ) -> Result<Self, AllocError> {
         let mut entries = Vec::new_in(alloc);
@@ -174,7 +202,10 @@ where
     /// # Ok::<_, value::Error>(())
     /// ```
     #[inline]
-    pub fn into_decoder<const OPT: Options, C, M>(self, cx: C) -> IntoValueDecoder<OPT, C, A, M>
+    pub fn into_decoder<const OPT: Options, C, M>(
+        self,
+        cx: C,
+    ) -> IntoValueDecoder<'de, OPT, C, A, M>
     where
         C: Context,
     {
@@ -195,7 +226,10 @@ where
     /// # Ok::<_, value::Error>(())
     /// ```
     #[inline]
-    pub fn as_decoder<const OPT: Options, C, M>(&self, cx: C) -> AsValueDecoder<'_, OPT, C, A, M>
+    pub fn as_decoder<const OPT: Options, C, M>(
+        &self,
+        cx: C,
+    ) -> AsValueDecoder<'_, 'de, OPT, C, A, M>
     where
         C: Context,
     {
@@ -204,7 +238,10 @@ where
 
     /// Get a decoder associated with a value.
     #[inline]
-    pub(crate) fn decoder<const OPT: Options, C, M>(&self, cx: C) -> ValueDecoder<'_, OPT, C, A, M>
+    pub(crate) fn decoder<const OPT: Options, C, M>(
+        &self,
+        cx: C,
+    ) -> ValueDecoder<'_, 'de, OPT, C, A, M>
     where
         C: Context,
     {
@@ -240,7 +277,7 @@ where
 /// assert_eq!(format!("{value:?}"), "\"hello world\"");
 /// # Ok::<_, musli::alloc::AllocError>(())
 /// ```
-impl<A> fmt::Debug for Value<A>
+impl<A> fmt::Debug for Value<'_, A>
 where
     A: Allocator,
 {
@@ -278,7 +315,7 @@ where
     }
 }
 
-impl<A> PartialEq for Value<A>
+impl<A> PartialEq for Value<'_, A>
 where
     A: Allocator,
 {
@@ -289,8 +326,8 @@ where
             (ValueKind::Bool(lhs), ValueKind::Bool(rhs)) => lhs == rhs,
             (ValueKind::Char(lhs), ValueKind::Char(rhs)) => lhs == rhs,
             (ValueKind::Number(lhs), ValueKind::Number(rhs)) => lhs == rhs,
-            (ValueKind::Bytes(lhs), ValueKind::Bytes(rhs)) => lhs == rhs,
-            (ValueKind::String(lhs), ValueKind::String(rhs)) => lhs == rhs,
+            (ValueKind::Bytes(lhs), ValueKind::Bytes(rhs)) => **lhs == **rhs,
+            (ValueKind::String(lhs), ValueKind::String(rhs)) => **lhs == **rhs,
             (ValueKind::Sequence(lhs), ValueKind::Sequence(rhs)) => lhs == rhs,
             (ValueKind::Map(lhs), ValueKind::Map(rhs)) => lhs == rhs,
             (ValueKind::Variant(lhs), ValueKind::Variant(rhs)) => lhs == rhs,
@@ -300,7 +337,7 @@ where
     }
 }
 
-impl<A> PartialOrd for Value<A>
+impl<A> PartialOrd for Value<'_, A>
 where
     A: Allocator,
 {
@@ -446,7 +483,7 @@ impl<'de, C> Visitor<'de, C> for AnyVisitor
 where
     C: Context,
 {
-    type Ok = Value<C::Allocator>;
+    type Ok = Value<'de, C::Allocator>;
     type String = StringVisitor;
     type Bytes = BytesVisitor;
 
@@ -615,7 +652,7 @@ where
     }
 }
 
-impl<'de, M, A> Decode<'de, M, A> for Value<A>
+impl<'de, M, A> Decode<'de, M, A> for Value<'de, A>
 where
     A: Allocator,
 {
@@ -633,48 +670,58 @@ where
 struct BytesVisitor;
 
 #[crate::trait_defaults(crate)]
-impl<C> UnsizedVisitor<'_, C, [u8]> for BytesVisitor
+impl<'de, C> UnsizedVisitor<'de, C, [u8]> for BytesVisitor
 where
     C: Context,
 {
-    type Ok = Value<C::Allocator>;
+    type Ok = Value<'de, C::Allocator>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "bytes")
+    }
+
+    #[inline]
+    fn visit_borrowed(self, _: C, b: &'de [u8]) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::new(ValueKind::Bytes(Cow::Borrowed(b))))
     }
 
     #[inline]
     fn visit_ref(self, cx: C, b: &[u8]) -> Result<Self::Ok, Self::Error> {
         let mut bytes = Vec::with_capacity_in(b.len(), cx.alloc()).map_err(cx.map())?;
         bytes.extend_from_slice(b).map_err(cx.map())?;
-        Ok(Value::new(ValueKind::Bytes(bytes)))
+        Ok(Value::new(ValueKind::Bytes(Cow::Owned(bytes))))
     }
 }
 
 struct StringVisitor;
 
 #[crate::trait_defaults(crate)]
-impl<C> UnsizedVisitor<'_, C, str> for StringVisitor
+impl<'de, C> UnsizedVisitor<'de, C, str> for StringVisitor
 where
     C: Context,
 {
-    type Ok = Value<C::Allocator>;
+    type Ok = Value<'de, C::Allocator>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "bytes")
+        write!(f, "string")
+    }
+
+    #[inline]
+    fn visit_borrowed(self, _: C, b: &'de str) -> Result<Self::Ok, Self::Error> {
+        Ok(Value::new(ValueKind::String(Cow::Borrowed(b))))
     }
 
     #[inline]
     fn visit_ref(self, cx: C, s: &str) -> Result<Self::Ok, Self::Error> {
         let mut string = String::new_in(cx.alloc());
         string.push_str(s).map_err(cx.map())?;
-        Ok(Value::new(ValueKind::String(string)))
+        Ok(Value::new(ValueKind::String(Cow::Owned(string))))
     }
 }
 
-impl<M, C> Encode<M> for Value<C>
+impl<M, C> Encode<M> for Value<'_, C>
 where
     C: Allocator,
 {
@@ -730,18 +777,18 @@ where
 }
 
 /// Value's [`AsDecoder`] implementation.
-pub struct IntoValueDecoder<const OPT: Options, C, A, M>
+pub struct IntoValueDecoder<'de, const OPT: Options, C, A, M>
 where
     C: Context,
     A: Allocator,
     M: 'static,
 {
     cx: C,
-    value: Value<A>,
+    value: Value<'de, A>,
     _marker: PhantomData<M>,
 }
 
-impl<const OPT: Options, C, A, M> IntoValueDecoder<OPT, C, A, M>
+impl<'de, const OPT: Options, C, A, M> IntoValueDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
@@ -765,7 +812,7 @@ where
     /// let decoder = IntoValueDecoder::<OPTIONS, _, _, ()>::new(&cx, value);
     /// ```
     #[inline]
-    pub fn new(cx: C, value: Value<A>) -> Self {
+    pub fn new(cx: C, value: Value<'de, A>) -> Self {
         Self {
             cx,
             value,
@@ -774,7 +821,7 @@ where
     }
 }
 
-impl<const OPT: Options, C, A, M> AsDecoder for IntoValueDecoder<OPT, C, A, M>
+impl<'de, const OPT: Options, C, A, M> AsDecoder<'de> for IntoValueDecoder<'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
@@ -785,7 +832,7 @@ where
     type Allocator = C::Allocator;
     type Mode = M;
     type Decoder<'this>
-        = ValueDecoder<'this, OPT, C, A, M>
+        = ValueDecoder<'this, 'de, OPT, C, A, M>
     where
         Self: 'this;
 
@@ -796,18 +843,18 @@ where
 }
 
 /// Value's [`AsDecoder`] implementation.
-pub struct AsValueDecoder<'de, const OPT: Options, C, A, M>
+pub struct AsValueDecoder<'a, 'de, const OPT: Options, C, A, M>
 where
     C: Context,
     A: Allocator,
     M: 'static,
 {
     cx: C,
-    value: &'de Value<A>,
+    value: &'a Value<'de, A>,
     _marker: PhantomData<M>,
 }
 
-impl<'de, const OPT: Options, C, A, M> AsValueDecoder<'de, OPT, C, A, M>
+impl<'a, 'de, const OPT: Options, C, A, M> AsValueDecoder<'a, 'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
@@ -831,7 +878,7 @@ where
     /// let decoder = AsValueDecoder::<OPTIONS, _, _, ()>::new(&cx, &value);
     /// ```
     #[inline]
-    pub fn new(cx: C, value: &'de Value<A>) -> Self {
+    pub fn new(cx: C, value: &'a Value<'de, A>) -> Self {
         Self {
             cx,
             value,
@@ -840,7 +887,7 @@ where
     }
 }
 
-impl<const OPT: Options, C, A, M> AsDecoder for AsValueDecoder<'_, OPT, C, A, M>
+impl<'a, 'de, const OPT: Options, C, A, M> AsDecoder<'de> for AsValueDecoder<'a, 'de, OPT, C, A, M>
 where
     C: Context,
     A: Allocator,
@@ -851,7 +898,7 @@ where
     type Allocator = C::Allocator;
     type Mode = M;
     type Decoder<'this>
-        = ValueDecoder<'this, OPT, C, A, M>
+        = ValueDecoder<'a, 'de, OPT, C, A, M>
     where
         Self: 'this;
 
@@ -863,7 +910,7 @@ where
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<A> TryFrom<&str> for Value<A>
+impl<A> TryFrom<&str> for Value<'_, A>
 where
     A: GlobalAllocator,
 {
@@ -873,37 +920,37 @@ where
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut string = String::new_in(A::new());
         string.push_str(value)?;
-        Ok(Value::new(ValueKind::String(string)))
+        Ok(Value::new(ValueKind::String(Cow::Owned(string))))
     }
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<A> From<rust_alloc::string::String> for Value<A>
+impl<A> From<rust_alloc::string::String> for Value<'_, A>
 where
     A: GlobalAllocator,
 {
     #[inline]
     fn from(value: rust_alloc::string::String) -> Self {
-        Value::new(ValueKind::String(String::from(value)))
+        Value::new(ValueKind::String(Cow::Owned(String::from(value))))
     }
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<A> From<rust_alloc::vec::Vec<Value<A>>> for Value<A>
+impl<'de, A> From<rust_alloc::vec::Vec<Value<'de, A>>> for Value<'de, A>
 where
     A: GlobalAllocator,
 {
     #[inline]
-    fn from(value: rust_alloc::vec::Vec<Value<A>>) -> Self {
+    fn from(value: rust_alloc::vec::Vec<Value<'de, A>>) -> Self {
         Value::new(ValueKind::Sequence(Vec::from(value)))
     }
 }
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<A> TryFrom<&[u8]> for Value<A>
+impl<A> TryFrom<&[u8]> for Value<'_, A>
 where
     A: GlobalAllocator,
 {
@@ -913,7 +960,7 @@ where
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let mut string = Vec::new_in(A::new());
         string.extend_from_slice(value)?;
-        Ok(Value::new(ValueKind::Bytes(string)))
+        Ok(Value::new(ValueKind::Bytes(Cow::Owned(string))))
     }
 }
 
@@ -930,7 +977,7 @@ where
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<const N: usize, A> TryFrom<&[u8; N]> for Value<A>
+impl<const N: usize, A> TryFrom<&[u8; N]> for Value<'_, A>
 where
     A: GlobalAllocator,
 {
@@ -955,7 +1002,7 @@ where
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-impl<const N: usize, A> TryFrom<[u8; N]> for Value<A>
+impl<const N: usize, A> TryFrom<[u8; N]> for Value<'_, A>
 where
     A: GlobalAllocator,
 {
@@ -981,7 +1028,7 @@ where
 /// assert_eq!(unit, unit);
 /// assert_ne!(unit, number);
 /// ```
-impl<A> From<()> for Value<A>
+impl<A> From<()> for Value<'_, A>
 where
     A: Allocator,
 {
@@ -1014,7 +1061,7 @@ macro_rules! number_from {
             /// assert_eq!(value, value);
             /// assert_ne!(min, max);
             /// ```
-            impl<A> From<$ty> for Value<A>
+            impl<A> From<$ty> for Value<'_, A>
             where
                 A: Allocator,
             {
