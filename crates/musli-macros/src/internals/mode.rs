@@ -6,6 +6,8 @@ use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use syn::Token;
 
+use crate::internals::attr::Alloc;
+
 use super::ATTR;
 use super::Only;
 use super::attr::{FieldEncoding, ModeKind};
@@ -35,10 +37,18 @@ impl ToTokens for ModePath<'_> {
     }
 }
 
+/// Allocator parameter.
+#[derive(Clone)]
+pub enum AllocatorParam<'a> {
+    None,
+    Alloc(Alloc<'a>),
+    Ident(syn::Ident),
+}
+
 pub(crate) struct Trait<'a> {
     import: Import<'a>,
     mode: ModePath<'a>,
-    allocator_ident: Option<syn::Ident>,
+    allocator_param: AllocatorParam<'a>,
 }
 
 impl ToTokens for Trait<'_> {
@@ -49,9 +59,16 @@ impl ToTokens for Trait<'_> {
         <Token![<]>::default().to_tokens(tokens);
         self.mode.to_tokens(tokens);
 
-        if let Some(ident) = &self.allocator_ident {
-            <Token![,]>::default().to_tokens(tokens);
-            ident.to_tokens(tokens);
+        match &self.allocator_param {
+            AllocatorParam::None => {}
+            AllocatorParam::Alloc(alloc) => {
+                <Token![,]>::default().to_tokens(tokens);
+                alloc.to_tokens(tokens);
+            }
+            AllocatorParam::Ident(ident) => {
+                <Token![,]>::default().to_tokens(tokens);
+                ident.to_tokens(tokens);
+            }
         }
 
         <Token![>]>::default().to_tokens(tokens);
@@ -83,6 +100,7 @@ pub(crate) struct Mode<'a> {
     pub(crate) decode_bytes_t: Import<'a>,
     pub(crate) trace_decode_t: Import<'a>,
     pub(crate) decode_t: Import<'a>,
+    pub(crate) global: Import<'a>,
     pub(crate) only: Only,
 }
 
@@ -100,7 +118,7 @@ impl<'a> Mode<'a> {
             trait_t: Trait {
                 import: encode_t,
                 mode: self.mode_path,
-                allocator_ident: None,
+                allocator_param: AllocatorParam::None,
             },
             method: name,
         }
@@ -117,24 +135,24 @@ impl<'a> Mode<'a> {
             trait_t: Trait {
                 import: encode_t,
                 mode: self.mode_path,
-                allocator_ident: None,
+                allocator_param: AllocatorParam::None,
             },
             method: name,
         })
     }
 
     /// Get the fully expanded trait.
-    pub(crate) fn as_trait_t(&self, allocator_ident: &syn::Ident) -> Trait<'a> {
+    pub(crate) fn as_trait_t(&self, allocator_param: AllocatorParam<'a>) -> Trait<'a> {
         match self.only {
             Only::Encode => Trait {
                 import: self.encode_t,
                 mode: self.mode_path,
-                allocator_ident: None,
+                allocator_param: AllocatorParam::None,
             },
             Only::Decode => Trait {
                 import: self.decode_t,
                 mode: self.mode_path,
-                allocator_ident: Some(allocator_ident.clone()),
+                allocator_param,
             },
         }
     }
@@ -143,7 +161,7 @@ impl<'a> Mode<'a> {
     pub(crate) fn decode_t_decode(
         &self,
         encoding: FieldEncoding,
-        allocator_ident: &syn::Ident,
+        allocator_param: AllocatorParam<'a>,
     ) -> ImportedMethod<'a> {
         let (decode_t, name) = match encoding {
             FieldEncoding::Packed => (self.decode_packed_t, "decode_packed"),
@@ -156,7 +174,7 @@ impl<'a> Mode<'a> {
             trait_t: Trait {
                 import: decode_t,
                 mode: self.mode_path,
-                allocator_ident: Some(allocator_ident.clone()),
+                allocator_param,
             },
             method: name,
         }

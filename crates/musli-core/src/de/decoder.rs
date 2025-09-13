@@ -1,8 +1,9 @@
 use core::fmt;
 
+use crate::alloc::GlobalAllocator;
 use crate::expecting::{self, Expecting};
 use crate::hint::{MapHint, SequenceHint};
-use crate::{Allocator, Context};
+use crate::{Allocator, Context, WithAllocator};
 
 use super::{
     AsDecoder, Decode, DecodeSliceBuilder, DecodeUnsized, DecodeUnsizedBytes, EntriesDecoder,
@@ -105,6 +106,28 @@ pub trait Decoder<'de>: Sized {
     /// Access the context associated with the decoder.
     fn cx(&self) -> Self::Cx;
 
+    /// Wrap the decoder to behave identically, but use the specified
+    /// [`GlobalAllocator`].
+    #[inline]
+    fn with_global_allocator<U>(self) -> WithAllocator<Self, U>
+    where
+        Self: Sized,
+        U: GlobalAllocator,
+    {
+        WithAllocator::new(self, U::new())
+    }
+
+    /// Wrap the decoder to behave identically, but use the specified
+    /// [`Allocator`].
+    #[inline]
+    fn with_allocator<U>(self, allocator: U) -> WithAllocator<Self, U>
+    where
+        Self: Sized,
+        U: Allocator,
+    {
+        WithAllocator::new(self, allocator)
+    }
+
     /// Format the human-readable message that should occur if the decoder was
     /// expecting to decode some specific kind of value.
     ///
@@ -158,9 +181,10 @@ pub trait Decoder<'de>: Sized {
     /// This is intended to be a fast path when decoding a value when an
     /// encoding permits it.
     #[inline]
-    fn try_fast_decode<T>(self) -> Result<TryFastDecode<T, Self>, Self::Error>
+    fn try_fast_decode<T, A>(self) -> Result<TryFastDecode<T, Self>, Self::Error>
     where
-        T: Decode<'de, Self::Mode, Self::Allocator>,
+        T: Decode<'de, Self::Mode, A>,
+        A: Allocator,
     {
         Ok(TryFastDecode::Unsupported(self))
     }
@@ -173,7 +197,7 @@ pub trait Decoder<'de>: Sized {
     where
         T: Decode<'de, Self::Mode, Self::Allocator>,
     {
-        match self.try_fast_decode::<T>()? {
+        match self.try_fast_decode::<T, Self::Allocator>()? {
             TryFastDecode::Ok(value) => Ok(value),
             TryFastDecode::Unsupported(decoder) => T::decode(decoder),
         }
@@ -1590,10 +1614,11 @@ pub trait Decoder<'de>: Sized {
     /// }
     /// ```
     #[inline]
-    fn decode_map_hint<F, O>(self, _: impl MapHint, f: F) -> Result<O, Self::Error>
+    fn decode_map_hint<F, O>(self, hint: impl MapHint, f: F) -> Result<O, Self::Error>
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
+        _ = hint;
         self.decode_map(f)
     }
 

@@ -680,7 +680,10 @@ pub use self::en::{Encode, Encoder};
 pub use musli_core::__macros::musli_trait_defaults as trait_defaults;
 
 #[doc(hidden)]
-pub use musli_core::__priv;
+pub mod __priv {
+    pub use crate::alloc::Global;
+    pub use musli_core::__priv::*;
+}
 
 pub mod alloc;
 #[doc(inline)]

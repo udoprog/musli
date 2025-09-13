@@ -40,6 +40,10 @@ pub use self::en::{Encode, Encoder};
 pub mod hint;
 pub mod mode;
 
+mod with_allocator;
+#[doc(inline)]
+pub use with_allocator::WithAllocator;
+
 #[doc(hidden)]
 pub use musli_macros as __macros;
 

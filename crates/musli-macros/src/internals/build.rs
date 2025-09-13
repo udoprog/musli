@@ -10,6 +10,7 @@ use crate::expander::{
     self, Data, EnumData, Expander, FieldData, Name, NameMethod, StructData, StructKind,
     UnsizedMethod, VariantData,
 };
+use crate::internals::mode::AllocatorParam;
 
 use super::attr::{DefaultOrCustom, EnumTagging, FieldEncoding, ModeKind, MusliBound, Packing};
 use super::mode::ImportedMethod;
@@ -315,6 +316,7 @@ pub(crate) struct Variant<'a> {
 pub(crate) struct Field<'a> {
     pub(crate) span: Span,
     pub(crate) index: usize,
+    pub(crate) allocator_param: AllocatorParam<'a>,
     pub(crate) encode_path: (Span, DefaultOrCustom<'a>),
     pub(crate) decode_path: (Span, DefaultOrCustom<'a>),
     pub(crate) size_hint_path: Option<(Span, DefaultOrCustom<'a>)>,
@@ -379,7 +381,10 @@ pub(crate) fn setup<'a>(
         return Err(());
     }
 
-    let decode_t_decode = mode.decode_t_decode(FieldEncoding::Default, &p.allocator_ident);
+    let decode_t_decode = mode.decode_t_decode(
+        FieldEncoding::Default,
+        AllocatorParam::Ident(p.allocator_ident.clone()),
+    );
     let encode_t_encode = mode.encode_t_encode(FieldEncoding::Default);
 
     let bounds = e.type_attr.bounds(&mode);
@@ -606,10 +611,15 @@ fn setup_field<'a>(
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
     allocator_ident: &syn::Ident,
 ) -> Field<'a> {
+    let allocator_param = match data.attr.alloc(mode) {
+        None => AllocatorParam::Ident(allocator_ident.clone()),
+        Some(alloc) => AllocatorParam::Alloc(alloc),
+    };
+
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
     let decode_path = data
         .attr
-        .decode_path_expanded(mode, data.span, allocator_ident);
+        .decode_path_expanded(mode, data.span, allocator_param.clone());
     let size_hint_path = data.attr.size_hint_path_expanded(mode, data.span);
 
     let (name, name_span) = expander::expand_name(data, mode, name_all, data.ident);
@@ -700,6 +710,7 @@ fn setup_field<'a>(
     Field {
         span: data.span,
         index: data.index,
+        allocator_param,
         encode_path,
         decode_path,
         size_hint_path,

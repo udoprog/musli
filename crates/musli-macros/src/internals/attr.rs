@@ -12,6 +12,8 @@ use syn::parse::ParseStream;
 use syn::spanned::Spanned;
 
 use crate::expander::{Name, NameMethod};
+use crate::internals::mode::AllocatorParam;
+use crate::internals::tokens::Import;
 
 use super::ATTR;
 use super::build;
@@ -773,6 +775,14 @@ pub(crate) enum FieldEncoding {
     Default,
 }
 
+/// The value of the `#[musli(global = ..)]` attribute.
+pub(crate) enum FieldGlobal {
+    /// The default global allocator.
+    Default,
+    /// The path to a custom global allocator.
+    Custom(syn::Path),
+}
+
 layer! {
     Field, FieldNew, FieldLayer {
         /// Module to use when decoding.
@@ -791,18 +801,20 @@ layer! {
         skip: (),
         /// Field encoding to use.
         encoding: FieldEncoding,
+        /// The `#[musli(global = ..)]`.
+        global: FieldGlobal,
     }
 }
 
 impl Field {
     /// Expand encode of the given field.
     pub(crate) fn encode_path_expanded<'a>(
-        &self,
+        &'a self,
         mode: &Mode<'a>,
         span: Span,
     ) -> (Span, DefaultOrCustom<'a>) {
         if let Some(&(span, ref encode_path)) = self.encode_path(mode) {
-            (span, DefaultOrCustom::Custom(encode_path.clone()))
+            (span, DefaultOrCustom::Custom(encode_path))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
             let encode_path = mode.encode_t_encode(field_encoding);
@@ -827,18 +839,26 @@ impl Field {
 
     /// Expand decode of the given field.
     pub(crate) fn decode_path_expanded<'a>(
-        &self,
+        &'a self,
         mode: &Mode<'a>,
         span: Span,
-        allocator_ident: &syn::Ident,
+        allocator_param: AllocatorParam<'a>,
     ) -> (Span, DefaultOrCustom<'a>) {
         if let Some(&(span, ref decode_path)) = self.decode_path(mode) {
-            (span, DefaultOrCustom::Custom(decode_path.clone()))
+            (span, DefaultOrCustom::Custom(decode_path))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
-            let decode_path = mode.decode_t_decode(field_encoding, allocator_ident);
+            let decode_path = mode.decode_t_decode(field_encoding, allocator_param);
             (span, DefaultOrCustom::Default(decode_path))
         }
+    }
+
+    /// Get a custom global allocator to use for the field.
+    pub(crate) fn alloc<'a>(&'a self, mode: &Mode<'a>) -> Option<Alloc<'a>> {
+        self.global(mode).map(|(_, g)| match g {
+            FieldGlobal::Default => Alloc::Import(mode.global),
+            FieldGlobal::Custom(path) => Alloc::Path(path),
+        })
     }
 }
 
@@ -974,6 +994,17 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 
             if let Some(m) = parse_path_mode(&meta) {
                 mode = Some(m);
+                return Ok(());
+            }
+
+            if meta.path.is_ident("global") {
+                let global = if meta.input.parse::<Option<Token![=]>>()?.is_some() {
+                    FieldGlobal::Custom(meta.input.parse()?)
+                } else {
+                    FieldGlobal::Default
+                };
+
+                new.global.push((meta.input.span(), global));
                 return Ok(());
             }
 
@@ -1154,7 +1185,23 @@ pub(crate) enum DefaultOrCustom<'a> {
     /// A default method call from [`Tokens`][super::Tokens].
     Default(ImportedMethod<'a>),
     /// A custom specified path.
-    Custom(syn::Path),
+    Custom(&'a syn::Path),
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum Alloc<'a> {
+    Import(Import<'a>),
+    Path(&'a syn::Path),
+}
+
+impl ToTokens for Alloc<'_> {
+    #[inline]
+    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+        match self {
+            Self::Import(imp) => imp.to_tokens(tokens),
+            Self::Path(path) => path.to_tokens(tokens),
+        }
+    }
 }
 
 impl DefaultOrCustom<'_> {

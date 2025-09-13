@@ -36,6 +36,43 @@ being generated documented below.
 
 <br>
 
+## Borrowing from input data
+
+In order to borrow from input data, the first lifetime specified can be used
+when decoding. This lifetime will exactly correspond to the lifetime in the
+[`Decode`] trait.
+
+```rust
+use musli::Decode;
+
+#[derive(Decode)]
+struct Person<'de> {
+    name: &'de str,
+}
+```
+
+<br>
+
+## Using a custom allocator
+
+Some data types need to be allocated, and in order to support this in a no-alloc
+environment decode types can specify a generic argument that has to be named
+`A`. This will then be used to "capture" the allocator provided through the
+[`Decode`] trait.
+
+```rust
+use musli::Decode;
+use musli::alloc::{Vec, String};
+
+#[derive(Decode)]
+#[musli(decode_bound = {A})]
+struct Person<A> {
+    name: Vec<String<A>, A>,
+}
+```
+
+<br>
+
 ## Meta attributes
 
 Certain attributes affect which other attributes apply to a given context. These
@@ -1399,6 +1436,28 @@ use musli::{Encode, Decode};
 struct Collection {
     #[musli(trace)]
     values: HashMap<String, u32>,
+}
+```
+
+<br>
+
+#### `#[musli(global [= <path>])]`
+
+This field attribute indicates that the encapsulated value uses the specified
+[`GlobalAllocator`]. Or [`Global`] if no allocator is specified.
+
+This trait must be specified when a different allocator than the one provided
+through the [`Decode`] trait is used.
+
+```rust
+use musli::{Decode, Allocator};
+use musli::value::Value;
+use musli::alloc::Global;
+
+#[derive(Decode)]
+struct Struct {
+    #[musli(global)]
+    value: Value<Global>,
 }
 ```
 

@@ -20,6 +20,7 @@ impl<'a> Expansion<'a> {
             decode_bytes_t: tokens.decode_bytes_t,
             trace_decode_t: tokens.trace_decode_t,
             decode_t: tokens.decode_t,
+            global: tokens.global,
             only,
         }
     }

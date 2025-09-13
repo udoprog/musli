@@ -27,7 +27,6 @@ pub(crate) fn packed(e: &Build<'_>, st: &Body<'_>) -> syn::Expr {
     match st.packing {
         (_, Packing::Packed) if base && st.all_fields.len() == st.unskipped_fields().count() => {
             let packed_field = syn::Ident::new(packed_field, Span::call_site());
-            let trait_t = e.mode.as_trait_t(&e.p.allocator_ident);
 
             let mut offsets = Vec::with_capacity(st.all_fields.len().saturating_sub(1));
             let mut sizes = Vec::with_capacity(st.all_fields.len());
@@ -51,6 +50,7 @@ pub(crate) fn packed(e: &Build<'_>, st: &Body<'_>) -> syn::Expr {
             }
 
             for f in &st.all_fields {
+                let trait_t = e.mode.as_trait_t(f.allocator_param.clone());
                 let ty = &f.ty;
                 sizes.push(quote!(#size_of::<#ty>()));
                 packed.push(quote!(<#ty as #trait_t>::#packed_field));

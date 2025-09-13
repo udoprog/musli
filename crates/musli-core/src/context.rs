@@ -4,7 +4,8 @@ use core::error::Error;
 use core::fmt;
 use core::str;
 
-use crate::Allocator;
+use crate::alloc::GlobalAllocator;
+use crate::{Allocator, WithAllocator};
 
 /// Provides ergonomic access to the serialization context.
 ///
@@ -71,6 +72,28 @@ pub trait Context: Copy {
 
     /// Access the underlying allocator.
     fn alloc(self) -> Self::Allocator;
+
+    /// Wrap the context to behave identically, but using the specified
+    /// [`GlobalAllocator`].
+    #[inline]
+    fn with_global_allocator<U>(self) -> WithAllocator<Self, U>
+    where
+        Self: Sized,
+        U: GlobalAllocator,
+    {
+        WithAllocator::new(self, U::new())
+    }
+
+    /// Wrap the context to behave identically, but using the specified
+    /// [`Allocator`].
+    #[inline]
+    fn with_allocator<U>(self, allocator: U) -> WithAllocator<Self, U>
+    where
+        Self: Sized,
+        U: Allocator,
+    {
+        WithAllocator::new(self, allocator)
+    }
 
     /// Generate a map function which maps an error using the `custom` function.
     #[inline]
