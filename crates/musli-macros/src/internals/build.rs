@@ -23,6 +23,13 @@ pub(crate) struct Parameters {
     pub(crate) allocator_exists: bool,
 }
 
+impl Parameters {
+    /// Get extra idents from known parameters.
+    pub(crate) fn extra_idents(&self) -> Option<&syn::Ident> {
+        self.allocator_exists.then_some(&self.allocator_ident)
+    }
+}
+
 pub(crate) struct Build<'a> {
     pub(crate) mode: Mode<'a>,
     pub(crate) input: &'a syn::DeriveInput,
@@ -806,7 +813,10 @@ fn determine_name_method(ty: &syn::Type) -> (NameMethod, Option<NameAll>) {
 }
 
 /// Extract existing ident bounds which are present, so that the default type bounds can be excluded on this basis.
-pub(crate) fn existing_bounds(bounds: &[(Span, MusliBound)]) -> HashSet<&syn::Ident> {
+pub(crate) fn existing_bounds<'a>(
+    bounds: &'a [(Span, MusliBound)],
+    extra_idents: Option<&'a syn::Ident>,
+) -> HashSet<&'a syn::Ident> {
     let mut idents = HashSet::new();
 
     for (_, bound) in bounds {
@@ -815,6 +825,10 @@ pub(crate) fn existing_bounds(bounds: &[(Span, MusliBound)]) -> HashSet<&syn::Id
         };
 
         idents.insert(ident);
+    }
+
+    if let Some(extra_ident) = extra_idents {
+        idents.insert(extra_ident);
     }
 
     idents
