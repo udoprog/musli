@@ -58,6 +58,7 @@ mod decode_unsized_bytes;
 mod decoder;
 mod entries_decoder;
 mod entry_decoder;
+mod into_decoder;
 mod map_decoder;
 mod sequence_decoder;
 mod size_hint;
