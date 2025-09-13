@@ -96,11 +96,19 @@ where
     /// The kind of the broadcast.
     const ID: MessageId;
 
-    /// The primary event related to the broadcast.
-    type Event<'de>: Event<Broadcast = Self> + Decode<'de, Binary, Global>;
-
     #[doc(hidden)]
     fn __do_not_implement_broadcast();
+}
+
+/// Trait implemented for broadcasts which have a primary event.
+pub trait BroadcastWithEvent: Broadcast {
+    /// The event type related to the broadcast.
+    type Event<'de>: Event<Broadcast = Self> + Decode<'de, Binary, Global>
+    where
+        Self: 'de;
+
+    #[doc(hidden)]
+    fn __do_not_implement_broadcast_with_event();
 }
 
 /// A marker indicating a request type.
