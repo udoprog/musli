@@ -344,7 +344,7 @@ where
         T: ?Sized + Encode<Self::Mode>,
     {
         let size = hint.require(self.cx)?;
-        let mut variant = Value::new(ValueKind::Unit);
+        let mut variant = Value::new(ValueKind::Empty);
         ValueEncoder::<OPT, _, _, Self::Mode>::new(self.cx, &mut variant).encode(tag)?;
         VariantSequenceEncoder::new(self.cx, self.output, variant, size)
     }
@@ -359,7 +359,7 @@ where
         T: ?Sized + Encode<Self::Mode>,
     {
         let size = hint.require(self.cx)?;
-        let mut variant = Value::new(ValueKind::Unit);
+        let mut variant = Value::new(ValueKind::Empty);
         ValueEncoder::<OPT, _, _, Self::Mode>::new(self.cx, &mut variant).encode(tag)?;
         VariantStructEncoder::new(self.cx, self.output, variant, size)
     }
@@ -574,7 +574,7 @@ where
     #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, Self::Error> {
         self.values
-            .push((Value::new(ValueKind::Unit), Value::new(ValueKind::Unit)))
+            .push((Value::new(ValueKind::Empty), Value::new(ValueKind::Empty)))
             .map_err(self.cx.map())?;
 
         let Some((key, _)) = self.values.last_mut() else {
@@ -625,7 +625,7 @@ where
         Self {
             cx,
             output,
-            pair: (Value::new(ValueKind::Unit), Value::new(ValueKind::Unit)),
+            pair: (Value::new(ValueKind::Empty), Value::new(ValueKind::Empty)),
             _marker: PhantomData,
         }
     }
@@ -692,7 +692,7 @@ where
         Self {
             cx,
             output,
-            pair: (Value::new(ValueKind::Unit), Value::new(ValueKind::Unit)),
+            pair: (Value::new(ValueKind::Empty), Value::new(ValueKind::Empty)),
             _marker: PhantomData,
         }
     }

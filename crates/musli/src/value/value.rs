@@ -20,8 +20,8 @@ pub(crate) enum ValueKind<A>
 where
     A: Allocator,
 {
-    /// The default unit value.
-    Unit,
+    /// The default empty value.
+    Empty,
     /// A boolean value.
     Bool(bool),
     /// A character.
@@ -50,7 +50,7 @@ where
     #[inline]
     fn clone(&self) -> Self {
         match self {
-            ValueKind::Unit => ValueKind::Unit,
+            ValueKind::Empty => ValueKind::Empty,
             ValueKind::Bool(b) => ValueKind::Bool(*b),
             ValueKind::Char(c) => ValueKind::Char(*c),
             ValueKind::Number(n) => ValueKind::Number(*n),
@@ -132,10 +132,10 @@ where
     /// use musli::alloc::Global;
     ///
     /// let value = Value::<Global>::from(());
-    /// assert!(value.is_unit());
+    /// assert!(value.is_empty());
     /// ```
-    pub fn is_unit(&self) -> bool {
-        matches!(self.kind, ValueKind::Unit)
+    pub fn is_empty(&self) -> bool {
+        matches!(self.kind, ValueKind::Empty)
     }
 
     /// Construct a map out of entries in the given iterator.
@@ -248,7 +248,7 @@ where
     /// Get the type hint corresponding to the value.
     pub(crate) fn type_hint(&self) -> TypeHint {
         match &self.kind {
-            ValueKind::Unit => TypeHint::Unit,
+            ValueKind::Empty => TypeHint::Unit,
             ValueKind::Bool(..) => TypeHint::Bool,
             ValueKind::Char(..) => TypeHint::Char,
             ValueKind::Number(number) => TypeHint::Number(number.type_hint()),
@@ -281,7 +281,7 @@ where
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
-            ValueKind::Unit => write!(f, "()"),
+            ValueKind::Empty => write!(f, "()"),
             ValueKind::Bool(value) => value.fmt(f),
             ValueKind::Char(value) => value.fmt(f),
             ValueKind::Number(value) => value.fmt(f),
@@ -319,7 +319,7 @@ where
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (&self.kind, &other.kind) {
-            (ValueKind::Unit, ValueKind::Unit) => true,
+            (ValueKind::Empty, ValueKind::Empty) => true,
             (ValueKind::Bool(lhs), ValueKind::Bool(rhs)) => lhs == rhs,
             (ValueKind::Char(lhs), ValueKind::Char(rhs)) => lhs == rhs,
             (ValueKind::Number(lhs), ValueKind::Number(rhs)) => lhs == rhs,
@@ -341,7 +341,7 @@ where
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (&self.kind, &other.kind) {
-            (ValueKind::Unit, ValueKind::Unit) => Some(Ordering::Equal),
+            (ValueKind::Empty, ValueKind::Empty) => Some(Ordering::Equal),
             (ValueKind::Bool(lhs), ValueKind::Bool(rhs)) => lhs.partial_cmp(rhs),
             (ValueKind::Char(lhs), ValueKind::Char(rhs)) => lhs.partial_cmp(rhs),
             (ValueKind::Number(lhs), ValueKind::Number(rhs)) => lhs.partial_cmp(rhs),
@@ -491,7 +491,7 @@ where
 
     #[inline]
     fn visit_empty(self, _: C) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Unit))
+        Ok(Value::new(ValueKind::Empty))
     }
 
     #[inline]
@@ -721,7 +721,7 @@ where
         E: Encoder<Mode = M>,
     {
         match &self.kind {
-            ValueKind::Unit => encoder.encode_empty(),
+            ValueKind::Empty => encoder.encode_empty(),
             ValueKind::Bool(b) => encoder.encode_bool(*b),
             ValueKind::Char(c) => encoder.encode_char(*c),
             ValueKind::Number(n) => encoder.encode(n),
@@ -1021,7 +1021,7 @@ where
 {
     #[inline]
     fn from((): ()) -> Self {
-        Value::new(ValueKind::Unit)
+        Value::new(ValueKind::Empty)
     }
 }
 
@@ -1034,7 +1034,7 @@ where
 /// use musli::alloc::Global;
 ///
 /// let value = Value::<Global>::default();
-/// assert!(value.is_unit());
+/// assert!(value.is_empty());
 /// let value2 = value.clone();
 /// assert_eq!(value, value2);
 ///
@@ -1064,7 +1064,7 @@ where
 /// use musli::alloc::Global;
 ///
 /// let value = Value::<Global>::default();
-/// assert!(value.is_unit());
+/// assert!(value.is_empty());
 /// ```
 impl<A> Default for Value<A>
 where
@@ -1072,7 +1072,7 @@ where
 {
     #[inline]
     fn default() -> Self {
-        Self::new(ValueKind::Unit)
+        Self::new(ValueKind::Empty)
     }
 }
 
