@@ -104,6 +104,21 @@ where
         Self { kind }
     }
 
+    /// Check if the value is a unit.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::Value;
+    /// use musli::alloc::Global;
+    ///
+    /// let value = Value::<Global>::from(());
+    /// assert!(value.is_unit());
+    /// ```
+    pub fn is_unit(&self) -> bool {
+        matches!(self.kind, ValueKind::Unit)
+    }
+
     /// Construct a map out of entries in the given iterator.
     ///
     /// Note that "maps" in musli can contain duplicate keys, and unless two
@@ -988,6 +1003,27 @@ where
     #[inline]
     fn from((): ()) -> Self {
         Value::new(ValueKind::Unit)
+    }
+}
+
+/// Default implementation for [`Value`] is the empty type.
+///
+/// # Examples
+///
+/// ```
+/// use musli::value::Value;
+/// use musli::alloc::Global;
+///
+/// let value = Value::<Global>::default();
+/// assert!(value.is_unit());
+/// ```
+impl<A> Default for Value<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn default() -> Self {
+        Self::new(ValueKind::Unit)
     }
 }
 
