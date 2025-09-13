@@ -22,6 +22,9 @@ where
     #[doc(hidden)]
     fn new() -> Self;
 
+    /// Clone an allocation.
+    fn clone_alloc<T>(alloc: &Self::Alloc<T>) -> Self::Alloc<T>;
+
     /// Construct an allocation from the given raw parts assuming they are
     /// allocated using the [`Global`] allocator.
     ///

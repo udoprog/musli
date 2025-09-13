@@ -60,6 +60,29 @@ unsafe impl GlobalAllocator for Global {
     }
 
     #[inline]
+    fn clone_alloc<T>(alloc: &Self::Alloc<T>) -> Self::Alloc<T> {
+        if alloc.size == 0 {
+            return GlobalAlloc::DANGLING;
+        }
+
+        unsafe {
+            // SAFETY: The layout assumption has already been checked.
+            let layout =
+                Layout::from_size_align_unchecked(alloc.size * size_of::<T>(), align_of::<T>());
+            let data = alloc::alloc(layout);
+
+            if data.is_null() {
+                alloc::handle_alloc_error(layout);
+            }
+
+            GlobalAlloc {
+                data: NonNull::new_unchecked(data).cast(),
+                size: alloc.size,
+            }
+        }
+    }
+
+    #[inline]
     fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T> {
         GlobalAlloc {
             data: ptr,

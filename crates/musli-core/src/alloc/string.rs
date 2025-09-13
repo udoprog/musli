@@ -11,9 +11,7 @@ use rust_alloc::borrow::Cow;
 use crate::de::UnsizedVisitor;
 use crate::{Context, Decode, Decoder, Encode, Encoder};
 
-#[cfg(feature = "alloc")]
-use super::GlobalAllocator;
-use super::{AllocError, Allocator, Vec};
+use super::{AllocError, Allocator, GlobalAllocator, Vec};
 
 /// Collect a string into a string buffer.
 #[inline]
@@ -470,6 +468,18 @@ where
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+impl<A> Clone for String<A>
+where
+    A: GlobalAllocator,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            vec: self.vec.clone(),
+        }
     }
 }
 
