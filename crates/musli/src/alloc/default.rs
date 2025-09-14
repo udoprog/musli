@@ -71,8 +71,17 @@ unsafe impl<const BUF: usize> GlobalAllocator for &DefaultAllocator<'_, BUF> {
     #[inline]
     fn __do_not_implement() {}
 
+    #[inline]
     fn new() -> Self {
         &const { DefaultAllocator::new(Global::new()) }
+    }
+
+    #[inline]
+    fn clone_alloc<T>(alloc: &Self::Alloc<T>) -> Self::Alloc<T> {
+        DefaultAlloc {
+            inner: <Global as GlobalAllocator>::clone_alloc(&alloc.inner),
+            _marker: PhantomData,
+        }
     }
 
     #[inline]

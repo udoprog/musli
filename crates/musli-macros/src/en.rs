@@ -78,7 +78,7 @@ pub(crate) fn expand_encode_entry(b: &Build<'_>) -> Result<TokenStream> {
             .extend(b.bounds.iter().flat_map(|(_, v)| v.as_predicate()).cloned());
     }
 
-    let existing_bounds = build::existing_bounds(b.bounds);
+    let existing_bounds = build::existing_bounds(b.bounds, b.p.extra_idents());
 
     for t in b.input.generics.type_params() {
         if existing_bounds.contains(&t.ident) {

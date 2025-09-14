@@ -284,9 +284,9 @@ where
     #[cfg(feature = "alloc")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
     pub fn encode(&self, value: impl Encode<M>) -> Result<Value<Global>, Error> {
-        let mut output = Value::new(ValueKind::Unit);
+        let mut output = Value::new(ValueKind::Empty);
         let cx = crate::context::new().with_error();
-        ValueEncoder::<OPT, _, _, M>::new(&cx, &mut output).encode(value)?;
+        ValueEncoder::<OPT, _, _, M>::new(&cx, 0, &mut output).encode(value)?;
         Ok(output)
     }
 
@@ -329,8 +329,8 @@ where
     where
         C: Context,
     {
-        let mut output = Value::new(ValueKind::Unit);
-        ValueEncoder::<OPT, _, _, M>::new(cx, &mut output).encode(value)?;
+        let mut output = Value::new(ValueKind::Empty);
+        ValueEncoder::<OPT, _, _, M>::new(cx, 0, &mut output).encode(value)?;
         Ok(output)
     }
 

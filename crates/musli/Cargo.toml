@@ -1,6 +1,6 @@
 [package]
 name = "musli"
-version = "0.0.146"
+version = "0.0.148"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2024"
 rust-version = "1.85"
@@ -38,7 +38,7 @@ serde = ["dep:serde"]
 test = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde"]
 
 [dependencies]
-musli-core = { version = "0.1.0", path = "../musli-core", default-features = false }
+musli-core = { version = "0.1.2", path = "../musli-core", default-features = false }
 
 simdutf8 = { version = "0.1.4", optional = true, default-features = false }
 itoa = { version = "1.0.10", optional = true }

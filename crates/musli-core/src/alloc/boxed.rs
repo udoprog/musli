@@ -4,7 +4,7 @@ use core::hash::{Hash, Hasher};
 use core::mem::needs_drop;
 use core::ops::{Deref, DerefMut};
 
-use super::{Alloc, AllocError, Allocator};
+use super::{Alloc, AllocError, Allocator, GlobalAllocator};
 
 /// A Müsli-allocated pointer type that uniquely owns a heap allocation of type
 /// `T`.
@@ -60,6 +60,24 @@ where
         Ok(Self {
             buf: alloc.alloc(value)?,
         })
+    }
+}
+
+impl<T, A> Clone for Box<T, A>
+where
+    T: Clone,
+    A: GlobalAllocator,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        let mut buf = <A as GlobalAllocator>::clone_alloc(&self.buf);
+
+        // SAFETY: Layout assumptions are correct when a buffer is cloned.
+        unsafe {
+            buf.as_mut_ptr().write(self.as_ref().clone());
+        }
+
+        Self { buf }
     }
 }
 

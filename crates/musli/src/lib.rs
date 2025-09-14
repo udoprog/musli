@@ -38,7 +38,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! musli = { version = "0.0.146", features = ["storage"] }
+//! musli = { version = "0.0.148", features = ["storage"] }
 //! ```
 //!
 //! <br>
@@ -684,7 +684,7 @@ pub use musli_core::__priv;
 
 pub mod alloc;
 #[doc(inline)]
-pub use self::alloc::Allocator;
+pub use self::alloc::{Allocator, GlobalAllocator};
 
 pub mod descriptive;
 pub mod json;

@@ -14,7 +14,7 @@ crate::macros::implement_error! {
 pub(crate) enum ErrorMessage {
     ArrayOutOfBounds,
     ExpectedPackValue,
-    ExpectedUnit(TypeHint),
+    ExpectedEmpty(TypeHint),
     ExpectedBool(TypeHint),
     ExpectedChar(TypeHint),
     ExpectedNumber(NumberHint, TypeHint),
@@ -39,8 +39,8 @@ impl fmt::Display for ErrorMessage {
                 )
             }
             ErrorMessage::ExpectedPackValue => write!(f, "Value buffer expected pack value"),
-            ErrorMessage::ExpectedUnit(hint) => {
-                write!(f, "Value buffer expected unit, but found {hint}")
+            ErrorMessage::ExpectedEmpty(hint) => {
+                write!(f, "Value buffer expected empty, but found {hint}")
             }
             ErrorMessage::ExpectedBool(hint) => {
                 write!(f, "Value buffer expected boolean, but found {hint}")
@@ -74,7 +74,7 @@ impl fmt::Display for ErrorMessage {
                 write!(f, "Value buffer expected map, but found {hint}")
             }
             ErrorMessage::ExpectedVariant(hint) => {
-                write!(f, "Value buffer expected struct, but found {hint}")
+                write!(f, "Value buffer expected variant, but found {hint}")
             }
         }
     }

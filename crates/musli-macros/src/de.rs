@@ -106,7 +106,7 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
         );
     }
 
-    let existing_bounds = build::existing_bounds(b.decode_bounds);
+    let existing_bounds = build::existing_bounds(b.decode_bounds, b.p.extra_idents());
 
     for t in b.input.generics.type_params() {
         if existing_bounds.contains(&t.ident) {

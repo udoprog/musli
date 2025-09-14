@@ -145,7 +145,7 @@ where
 
     #[inline]
     fn decode_empty(self) -> Result<(), Self::Error> {
-        ensure!(self, hint, ExpectedUnit(hint), ValueKind::Unit => Ok(()))
+        ensure!(self, hint, ExpectedEmpty(hint), ValueKind::Empty => Ok(()))
     }
 
     #[inline]
@@ -326,7 +326,7 @@ where
         V: Visitor<'de, Self::Cx, Error = Self::Error, Allocator = Self::Allocator>,
     {
         match &self.value.kind {
-            ValueKind::Unit => visitor.visit_empty(self.cx),
+            ValueKind::Empty => visitor.visit_empty(self.cx),
             ValueKind::Bool(value) => visitor.visit_bool(self.cx, *value),
             ValueKind::Char(value) => visitor.visit_char(self.cx, *value),
             ValueKind::Number(number) => match number {

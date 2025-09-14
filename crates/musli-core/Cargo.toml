@@ -1,6 +1,6 @@
 [package]
 name = "musli-core"
-version = "0.1.0"
+version = "0.1.2"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2024"
 rust-version = "1.85"
@@ -29,7 +29,7 @@ alloc = []
 verbose = ["musli-macros/verbose"]
 
 [dependencies]
-musli-macros = { version = "0.1.0", path = "../musli-macros", default-features = false }
+musli-macros = { version = "0.1.1", path = "../musli-macros", default-features = false }
 
 # Note that musli-macros is tightly coupled with the version of musli-core used.
 # Never add this as a dependency directly. This section cannot be enabled and
@@ -38,7 +38,7 @@ musli-macros = { version = "0.1.0", path = "../musli-macros", default-features =
 #
 # See https://github.com/serde-rs/serde/blob/master/serde/Cargo.toml
 [target.'cfg(any())'.dependencies]
-musli-macros = { version = "=0.1.0", path = "../musli-macros" }
+musli-macros = { version = "=0.1.1", path = "../musli-macros" }
 
 [dev-dependencies]
-musli = { version = "=0.0.146", path = "../musli", features = ["json"] }
+musli = { version = "=0.0.148", path = "../musli", features = ["json"] }
