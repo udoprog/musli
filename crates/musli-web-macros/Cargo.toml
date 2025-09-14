@@ -26,5 +26,5 @@ syn = { version = "2.0.55", features = ["full", "extra-traits"] }
 trybuild = "1.0.110"
 
 [dev-dependencies]
-musli = { path = "../musli", version = "0.0.148" }
+musli = { path = "../musli", version = "0.0.149" }
 musli-web = { path = "../musli-web", version = "0.1.1", features = ["api"] }
