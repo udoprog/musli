@@ -7,7 +7,7 @@ use crate::de::SizeHint;
 #[non_exhaustive]
 pub(crate) enum TypeHint {
     /// A unit type or an empty value.
-    Unit,
+    Empty,
     /// A boolean type.
     Bool,
     /// A character type.
@@ -31,14 +31,14 @@ pub(crate) enum TypeHint {
 impl fmt::Display for TypeHint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TypeHint::Unit => write!(f, "unit"),
+            TypeHint::Empty => write!(f, "empty"),
             TypeHint::Bool => write!(f, "bool"),
             TypeHint::Char => write!(f, "char"),
             TypeHint::Number(number) => number.fmt(f),
-            TypeHint::Bytes(size) => write!(f, "bytes with {size}"),
-            TypeHint::String(size) => write!(f, "string with {size}"),
-            TypeHint::Sequence(size) => write!(f, "sequence with {size}"),
-            TypeHint::Map(size) => write!(f, "map with {size}"),
+            TypeHint::Bytes(size) => write!(f, "bytes with length {size}"),
+            TypeHint::String(size) => write!(f, "string with length {size}"),
+            TypeHint::Sequence(size) => write!(f, "sequence with length {size}"),
+            TypeHint::Map(size) => write!(f, "map with length {size}"),
             TypeHint::Variant => write!(f, "variant"),
             TypeHint::Option => write!(f, "option"),
         }

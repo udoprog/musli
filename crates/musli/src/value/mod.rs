@@ -30,11 +30,12 @@ pub use error::Error;
 use crate::alloc::Allocator;
 #[cfg(feature = "alloc")]
 use crate::alloc::Global;
-use crate::mode::Binary;
+use crate::mode::{Binary, Text};
 use crate::value::en::ValueEncoder;
 use crate::{Context, Decode, Decoder, Encode, Encoder, Options};
 
-const ENCODING: Encoding = Encoding::new();
+const ENCODING_BINARY: Encoding<OPTIONS, Binary> = Encoding::new();
+const ENCODING_TEXT: Encoding<OPTIONS, Text> = Encoding::new().with_mode();
 
 /// The default options used in the value encoding and decoding.
 pub const OPTIONS: Options = crate::options::new().build();
@@ -64,8 +65,38 @@ pub const OPTIONS: Options = crate::options::new().build();
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[inline]
 pub fn encode(value: impl Encode<Binary>) -> Result<Value<Global>, Error> {
-    ENCODING.encode(value)
+    ENCODING_BINARY.encode(value)
+}
+
+/// Encode something that implements [`Encode`] into a [`Value`] in the
+/// [`Text`] mode.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Encode, Decode};
+/// use musli::value;
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person<'de> {
+///     name: &'de str,
+///     age: u32,
+/// }
+///
+/// let person = Person { name: "Alice", age: 30 };
+/// let value = value::encode_text(&person)?;
+///
+/// let decoded: Person<'_> = value::decode_text(&value)?;
+/// assert_eq!(decoded, person);
+/// # Ok::<_, value::Error>(())
+/// ```
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[inline]
+pub fn encode_text(value: impl Encode<Text>) -> Result<Value<Global>, Error> {
+    ENCODING_TEXT.encode(value)
 }
 
 /// Encode something that implements [`Encode`] into a [`Value`] using a custom
@@ -80,7 +111,6 @@ pub fn encode(value: impl Encode<Binary>) -> Result<Value<Global>, Error> {
 /// use musli::{Encode, Decode};
 /// use musli::context;
 /// use musli::value;
-/// use musli::mode::Binary;
 ///
 /// #[derive(Debug, PartialEq, Encode, Decode)]
 /// struct Person<'de> {
@@ -97,11 +127,48 @@ pub fn encode(value: impl Encode<Binary>) -> Result<Value<Global>, Error> {
 /// assert_eq!(decoded, person);
 /// # Ok::<_, Box<dyn core::error::Error>>(())
 /// ```
+#[inline]
 pub fn encode_with<C>(cx: C, value: impl Encode<Binary>) -> Result<Value<C::Allocator>, C::Error>
 where
     C: Context,
 {
-    ENCODING.encode_with(cx, value)
+    ENCODING_BINARY.encode_with(cx, value)
+}
+
+/// Encode something that implements [`Encode`] into a [`Value`] using a custom
+/// [`Context`] `C` in the [`Text`] mode.
+///
+/// A custom context allows [`Value`] encoding to be performed without an
+/// allocator.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Encode, Decode};
+/// use musli::context;
+/// use musli::value;
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person<'de> {
+///     name: &'de str,
+///     age: u32,
+/// }
+///
+/// let person = Person { name: "Alice", age: 30 };
+///
+/// let cx = context::new();
+/// let value = value::encode_text_with(&cx, &person)?;
+///
+/// let decoded: Person<'_> = value::decode_text(&value)?;
+/// assert_eq!(decoded, person);
+/// # Ok::<_, Box<dyn core::error::Error>>(())
+/// ```
+#[inline]
+pub fn encode_text_with<C>(cx: C, value: impl Encode<Text>) -> Result<Value<C::Allocator>, C::Error>
+where
+    C: Context,
+{
+    ENCODING_TEXT.encode_with(cx, value)
 }
 
 /// Decode a [`Value`] into a type which implements [`Decode`] in the [`Binary`]
@@ -112,7 +179,6 @@ where
 /// ```
 /// use musli::{Encode, Decode};
 /// use musli::value;
-/// use musli::mode::Binary;
 ///
 /// #[derive(Debug, PartialEq, Encode, Decode)]
 /// struct Person<'de> {
@@ -129,11 +195,44 @@ where
 /// ```
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[inline]
 pub fn decode<'de, T>(value: &'de Value<impl Allocator>) -> Result<T, Error>
 where
     T: Decode<'de, Binary, Global>,
 {
-    ENCODING.decode(value)
+    ENCODING_BINARY.decode(value)
+}
+
+/// Decode a [`Value`] into a type which implements [`Decode`] in the [`Text`]
+/// mode.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Encode, Decode};
+/// use musli::value;
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person<'de> {
+///     name: &'de str,
+///     age: u32,
+/// }
+///
+/// let person = Person { name: "Alice", age: 30 };
+/// let encoded = value::encode_text(&person)?;
+///
+/// let decoded: Person<'_> = value::decode_text(&encoded)?;
+/// assert_eq!(decoded, person);
+/// # Ok::<_, value::Error>(())
+/// ```
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[inline]
+pub fn decode_text<'de, T>(value: &'de Value<impl Allocator>) -> Result<T, Error>
+where
+    T: Decode<'de, Text, Global>,
+{
+    ENCODING_TEXT.decode(value)
 }
 
 /// Decode a [`Value`] into a type which implements [`Decode`] using a custom
@@ -148,7 +247,6 @@ where
 /// use musli::{Encode, Decode};
 /// use musli::context;
 /// use musli::value;
-/// use musli::mode::Binary;
 ///
 /// #[derive(Debug, PartialEq, Encode, Decode)]
 /// struct Person<'de> {
@@ -164,12 +262,49 @@ where
 /// assert_eq!(decoded, person);
 /// # Ok::<_, Box<dyn core::error::Error>>(())
 /// ```
+#[inline]
 pub fn decode_with<'de, C, T>(cx: C, value: &'de Value<impl Allocator>) -> Result<T, C::Error>
 where
     C: Context,
     T: Decode<'de, Binary, C::Allocator>,
 {
-    ENCODING.decode_with(cx, value)
+    ENCODING_BINARY.decode_with(cx, value)
+}
+
+/// Decode a [`Value`] into a type which implements [`Decode`] using a custom
+/// [`Context`] `C` in the [`Text`] mode.
+///
+/// A custom context allows [`Value`] decoding to be performed without an
+/// allocator.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Encode, Decode};
+/// use musli::context;
+/// use musli::value;
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person<'de> {
+///     name: &'de str,
+///     age: u32,
+/// }
+///
+/// let person = Person { name: "Alice", age: 30 };
+/// let value = value::encode_text(&person)?;
+///
+/// let cx = context::new();
+/// let decoded: Person<'_> = value::decode_text_with(&cx, &value)?;
+/// assert_eq!(decoded, person);
+/// # Ok::<_, Box<dyn core::error::Error>>(())
+/// ```
+#[inline]
+pub fn decode_text_with<'de, C, T>(cx: C, value: &'de Value<impl Allocator>) -> Result<T, C::Error>
+where
+    C: Context,
+    T: Decode<'de, Text, C::Allocator>,
+{
+    ENCODING_TEXT.decode_with(cx, value)
 }
 
 /// Setting up encoding with parameters.
@@ -264,7 +399,6 @@ where
     /// ```
     /// use musli::{Encode, Decode};
     /// use musli::value;
-    /// use musli::mode::Binary;
     ///
     /// const ENCODING: value::Encoding = value::Encoding::new();
     ///
@@ -302,7 +436,6 @@ where
     /// use musli::{Encode, Decode};
     /// use musli::context;
     /// use musli::value;
-    /// use musli::mode::Binary;
     ///
     /// const ENCODING: value::Encoding = value::Encoding::new();
     ///
@@ -341,7 +474,6 @@ where
     /// ```
     /// use musli::{Encode, Decode};
     /// use musli::value;
-    /// use musli::mode::Binary;
     ///
     /// const ENCODING: value::Encoding = value::Encoding::new();
     ///
@@ -380,7 +512,6 @@ where
     /// use musli::{Encode, Decode};
     /// use musli::context;
     /// use musli::value;
-    /// use musli::mode::Binary;
     ///
     /// const ENCODING: value::Encoding = value::Encoding::new();
     ///

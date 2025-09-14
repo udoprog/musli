@@ -335,7 +335,7 @@ where
     /// Get the type hint corresponding to the value.
     pub(crate) fn type_hint(&self) -> TypeHint {
         match &self.kind {
-            ValueKind::Empty => TypeHint::Unit,
+            ValueKind::Empty => TypeHint::Empty,
             ValueKind::Bool(..) => TypeHint::Bool,
             ValueKind::Char(..) => TypeHint::Char,
             ValueKind::Number(number) => TypeHint::Number(number.type_hint()),
