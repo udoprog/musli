@@ -15,55 +15,6 @@ use crate::{Allocator, Context, Options};
 use super::de::ValueDecoder;
 use super::type_hint::{NumberHint, TypeHint};
 
-/// The kind of a value.
-pub(crate) enum ValueKind<A>
-where
-    A: Allocator,
-{
-    /// The default empty value.
-    Empty,
-    /// A boolean value.
-    Bool(bool),
-    /// A character.
-    Char(char),
-    /// A number.
-    Number(Number),
-    /// An array.
-    Bytes(Vec<u8, A>),
-    /// A string in a value.
-    String(String<A>),
-    /// A unit value.
-    Sequence(Vec<Value<A>, A>),
-    /// A pair stored in the value.
-    Map(Vec<(Value<A>, Value<A>), A>),
-    /// A variant pair. The first value identifies the variant, the second value
-    /// contains the value of the variant.
-    Variant(Box<(Value<A>, Value<A>), A>),
-    /// An optional value.
-    Option(Option<Box<Value<A>, A>>),
-}
-
-impl<A> Clone for ValueKind<A>
-where
-    A: GlobalAllocator,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        match self {
-            ValueKind::Empty => ValueKind::Empty,
-            ValueKind::Bool(b) => ValueKind::Bool(*b),
-            ValueKind::Char(c) => ValueKind::Char(*c),
-            ValueKind::Number(n) => ValueKind::Number(*n),
-            ValueKind::Bytes(b) => ValueKind::Bytes(b.clone()),
-            ValueKind::String(s) => ValueKind::String(s.clone()),
-            ValueKind::Sequence(s) => ValueKind::Sequence(s.clone()),
-            ValueKind::Map(m) => ValueKind::Map(m.clone()),
-            ValueKind::Variant(v) => ValueKind::Variant(v.clone()),
-            ValueKind::Option(o) => ValueKind::Option(o.clone()),
-        }
-    }
-}
-
 /// This is a type-erased value which can be deserialized from any [Müsli]
 /// supported type.
 ///
@@ -113,6 +64,43 @@ where
     pub(super) kind: ValueKind<A>,
 }
 
+macro_rules! number {
+    ($ty:ty, $variant:ident, $constructor:ident, $test:ident, $example:expr) => {
+        #[doc = concat!(" Construct a `", stringify!($ty), "` value.")]
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::value::Value;
+        /// use musli::alloc::Global;
+        ///
+        #[doc = concat!(" let value = Value::<Global>::", stringify!($constructor), "(", $example, ");")]
+        #[doc = concat!(" assert!(value.", stringify!($test), "());")]
+        ///
+        /// let value2 = Value::from(());
+        /// assert_ne!(value, value2);
+        /// ```
+        pub const fn $constructor(value: $ty) -> Self {
+            Self::new(ValueKind::Number(Number::$variant(value)))
+        }
+
+        #[doc = concat!(" Check if the value is a `", stringify!($ty), "`.")]
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::value::Value;
+        /// use musli::alloc::Global;
+        ///
+        #[doc = concat!(" let value = Value::<Global>::", stringify!($constructor), "(", $example, ");")]
+        #[doc = concat!(" assert!(value.", stringify!($test), "());")]
+        /// ```
+        pub fn $test(&self) -> bool {
+            matches!(self.kind, ValueKind::Number(Number::$variant(_)))
+        }
+    }
+}
+
 impl<A> Value<A>
 where
     A: Allocator,
@@ -121,6 +109,24 @@ where
     #[inline]
     pub(crate) const fn new(kind: ValueKind<A>) -> Self {
         Self { kind }
+    }
+
+    /// Construct an empty value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::Value;
+    /// use musli::alloc::Global;
+    ///
+    /// let value = Value::<Global>::empty();
+    /// assert!(value.is_empty());
+    ///
+    /// let value2 = Value::from(());
+    /// assert_eq!(value, value2);
+    /// ```
+    pub const fn empty() -> Self {
+        Self::new(ValueKind::Empty)
     }
 
     /// Check if the value is a unit.
@@ -137,6 +143,87 @@ where
     pub fn is_empty(&self) -> bool {
         matches!(self.kind, ValueKind::Empty)
     }
+
+    /// Construct a boolean value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::Value;
+    /// use musli::alloc::Global;
+    ///
+    /// let value = Value::<Global>::bool(true);
+    /// assert!(value.is_bool());
+    ///
+    /// let value2 = Value::from(true);
+    /// assert_eq!(value, value2);
+    /// ```
+    pub const fn bool(value: bool) -> Self {
+        Self::new(ValueKind::Bool(value))
+    }
+
+    /// Check if the value is a boolean.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::Value;
+    /// use musli::alloc::Global;
+    ///
+    /// let value = Value::<Global>::bool(true);
+    /// assert!(value.is_bool());
+    /// ```
+    pub fn is_bool(&self) -> bool {
+        matches!(self.kind, ValueKind::Bool(_))
+    }
+
+    /// Construct a character value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::Value;
+    /// use musli::alloc::Global;
+    ///
+    /// let value = Value::<Global>::char('a');
+    /// assert!(value.is_char());
+    ///
+    /// let value2 = Value::from('a');
+    /// assert_eq!(value, value2);
+    /// ```
+    pub const fn char(value: char) -> Self {
+        Self::new(ValueKind::Char(value))
+    }
+
+    /// Check if the value is a character.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::Value;
+    /// use musli::alloc::Global;
+    ///
+    /// let value = Value::<Global>::char('a');
+    /// assert!(value.is_char());
+    /// ```
+    pub fn is_char(&self) -> bool {
+        matches!(self.kind, ValueKind::Char(_))
+    }
+
+    number!(u8, U8, u8, is_u8, "42");
+    number!(u16, U16, u16, is_u16, "42");
+    number!(u32, U32, u32, is_u32, "42");
+    number!(u64, U64, u64, is_u64, "42");
+    number!(u128, U128, u128, is_u128, "42");
+    number!(i8, I8, i8, is_i8, "42");
+    number!(i16, I16, i16, is_i16, "42");
+    number!(i32, I32, i32, is_i32, "42");
+    number!(i64, I64, i64, is_i64, "42");
+    number!(i128, I128, i128, is_i128, "42");
+    number!(usize, Usize, usize, is_usize, "42");
+    number!(isize, Isize, isize, is_isize, "42");
+    number!(f32, F32, f32, is_f32, "3.14");
+    number!(f64, F64, f64, is_f64, "3.14");
 
     /// Construct a map out of entries in the given iterator.
     ///
@@ -356,11 +443,60 @@ where
     }
 }
 
+/// The kind of a value.
+pub(crate) enum ValueKind<A>
+where
+    A: Allocator,
+{
+    /// The default empty value.
+    Empty,
+    /// A boolean value.
+    Bool(bool),
+    /// A character.
+    Char(char),
+    /// A number.
+    Number(Number),
+    /// An array.
+    Bytes(Vec<u8, A>),
+    /// A string in a value.
+    String(String<A>),
+    /// A unit value.
+    Sequence(Vec<Value<A>, A>),
+    /// A pair stored in the value.
+    Map(Vec<(Value<A>, Value<A>), A>),
+    /// A variant pair. The first value identifies the variant, the second value
+    /// contains the value of the variant.
+    Variant(Box<(Value<A>, Value<A>), A>),
+    /// An optional value.
+    Option(Option<Box<Value<A>, A>>),
+}
+
+impl<A> Clone for ValueKind<A>
+where
+    A: GlobalAllocator,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        match self {
+            ValueKind::Empty => ValueKind::Empty,
+            ValueKind::Bool(b) => ValueKind::Bool(*b),
+            ValueKind::Char(c) => ValueKind::Char(*c),
+            ValueKind::Number(n) => ValueKind::Number(*n),
+            ValueKind::Bytes(b) => ValueKind::Bytes(b.clone()),
+            ValueKind::String(s) => ValueKind::String(s.clone()),
+            ValueKind::Sequence(s) => ValueKind::Sequence(s.clone()),
+            ValueKind::Map(m) => ValueKind::Map(m.clone()),
+            ValueKind::Variant(v) => ValueKind::Variant(v.clone()),
+            ValueKind::Option(o) => ValueKind::Option(o.clone()),
+        }
+    }
+}
+
 /// A dynamic number value.
 ///
 /// This can represent any of the primitive number types in Rust.
 /// Used internally by the Value enum to store numeric data.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
 #[non_exhaustive]
 pub(crate) enum Number {
     /// `u8`
@@ -393,30 +529,27 @@ pub(crate) enum Number {
     F64(f64),
 }
 
-macro_rules! from {
-    ($ty:ty, $variant:ident) => {
-        impl From<$ty> for Number {
-            fn from(value: $ty) -> Self {
-                Self::$variant(value)
-            }
+impl fmt::Debug for Number {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Number::U8(n) => n.fmt(f),
+            Number::U16(n) => n.fmt(f),
+            Number::U32(n) => n.fmt(f),
+            Number::U64(n) => n.fmt(f),
+            Number::U128(n) => n.fmt(f),
+            Number::I8(n) => n.fmt(f),
+            Number::I16(n) => n.fmt(f),
+            Number::I32(n) => n.fmt(f),
+            Number::I64(n) => n.fmt(f),
+            Number::I128(n) => n.fmt(f),
+            Number::Usize(n) => n.fmt(f),
+            Number::Isize(n) => n.fmt(f),
+            Number::F32(n) => n.fmt(f),
+            Number::F64(n) => n.fmt(f),
         }
-    };
+    }
 }
-
-from!(u8, U8);
-from!(u16, U16);
-from!(u32, U32);
-from!(u64, U64);
-from!(u128, U128);
-from!(i8, I8);
-from!(i16, I16);
-from!(i32, I32);
-from!(i64, I64);
-from!(i128, I128);
-from!(usize, Usize);
-from!(isize, Isize);
-from!(f32, F32);
-from!(f64, F64);
 
 impl<M> Encode<M> for Number {
     type Encode = Self;
@@ -1076,8 +1209,50 @@ where
     }
 }
 
+/// Convert from a boolean value.
+///
+/// # Examples
+///
+/// ```
+/// use musli::value::Value;
+/// use musli::alloc::Global;
+///
+/// let value = Value::<Global>::from(true);
+/// assert!(value.is_bool());
+/// ```
+impl<A> From<bool> for Value<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn from(value: bool) -> Self {
+        Value::new(ValueKind::Bool(value))
+    }
+}
+
+/// Convert from a character.
+///
+/// # Examples
+///
+/// ```
+/// use musli::value::Value;
+/// use musli::alloc::Global;
+///
+/// let value = Value::<Global>::from('a');
+/// assert!(value.is_char());
+/// ```
+impl<A> From<char> for Value<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn from(value: char) -> Self {
+        Value::new(ValueKind::Char(value))
+    }
+}
+
 macro_rules! number_from {
-    ($($ty:ty => $variant:ident, $example:expr, $min:expr, $max:expr),* $(,)?) => {
+    ($($ty:ty => $variant:ident, $example:expr, $min:expr, $max:expr, $test:ident),* $(,)?) => {
         $(
             /// Convert from a primitive number.
             ///
@@ -1087,14 +1262,17 @@ macro_rules! number_from {
             /// use musli::value::Value;
             /// use musli::alloc::Global;
             ///
-            #[doc = concat!("let value: ", stringify!($ty), " = ", stringify!($example), ";")]
-            /// let value: Value<Global> = Value::from(value);
+            #[doc = concat!(" let value: ", stringify!($ty), " = ", stringify!($example), ";")]
+            /// let value = Value::<Global>::from(value);
+            #[doc = concat!(" assert!(value.", stringify!($test), "());")]
             ///
-            #[doc = concat!("let value: ", stringify!($ty), " = ", stringify!($min), ";")]
-            /// let min: Value<Global> = Value::from(value);
+            #[doc = concat!(" let value: ", stringify!($ty), " = ", stringify!($min), ";")]
+            /// let min = Value::<Global>::from(value);
+            #[doc = concat!(" assert!(min.", stringify!($test), "());")]
             ///
-            #[doc = concat!("let value: ", stringify!($ty), " = ", stringify!($max), ";")]
-            /// let max: Value<Global> = Value::from(value);
+            #[doc = concat!(" let value: ", stringify!($ty), " = ", stringify!($max), ";")]
+            /// let max = Value::<Global>::from(value);
+            #[doc = concat!(" assert!(max.", stringify!($test), "());")]
             ///
             /// assert_eq!(value, value);
             /// assert_ne!(min, max);
@@ -1113,20 +1291,20 @@ macro_rules! number_from {
 }
 
 number_from! {
-    i8 => I8, 42, i8::MAX, i8::MIN,
-    i16 => I16, 42, i16::MAX, i16::MIN,
-    i32 => I32, 42, i32::MAX, i32::MIN,
-    i64 => I64, 42, i64::MAX, i64::MIN,
-    i128 => I128, 42, i128::MAX, i128::MIN,
-    isize => Isize, 42, isize::MAX, isize::MIN,
-    u8 => U8, 42, u8::MAX, u8::MIN,
-    u16 => U16, 42, u16::MAX, u16::MIN,
-    u32 => U32, 42, u32::MAX, u32::MIN,
-    u64 => U64, 42, u64::MAX, u64::MIN,
-    u128 => U128, 42, u128::MAX, u128::MIN,
-    usize => Usize, 42, usize::MAX, usize::MIN,
-    f32 => F32, 42.42, 0.42, 100000.42,
-    f64 => F64, 42.42, 0.42, 100000.42,
+    i8 => I8, 42, i8::MAX, i8::MIN, is_i8,
+    i16 => I16, 42, i16::MAX, i16::MIN, is_i16,
+    i32 => I32, 42, i32::MAX, i32::MIN, is_i32,
+    i64 => I64, 42, i64::MAX, i64::MIN, is_i64,
+    i128 => I128, 42, i128::MAX, i128::MIN, is_i128,
+    isize => Isize, 42, isize::MAX, isize::MIN, is_isize,
+    u8 => U8, 42, u8::MAX, u8::MIN, is_u8,
+    u16 => U16, 42, u16::MAX, u16::MIN, is_u16,
+    u32 => U32, 42, u32::MAX, u32::MIN, is_u32,
+    u64 => U64, 42, u64::MAX, u64::MIN, is_u64,
+    u128 => U128, 42, u128::MAX, u128::MIN, is_u128,
+    usize => Usize, 42, usize::MAX, usize::MIN, is_usize,
+    f32 => F32, 42.42, 0.42, 100000.42, is_f32,
+    f64 => F64, 42.42, 0.42, 100000.42, is_f64,
 }
 
 #[repr(transparent)]
