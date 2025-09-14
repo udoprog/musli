@@ -22,7 +22,6 @@ pub(crate) enum ErrorMessage {
     ExpectedBytes(TypeHint),
     ExpectedString(TypeHint),
     ExpectedStringAsNumber,
-    ExpectedOption(TypeHint),
     ExpectedSequence(TypeHint),
     ExpectedPack(TypeHint),
     ExpectedMap(TypeHint),
@@ -60,9 +59,6 @@ impl fmt::Display for ErrorMessage {
             }
             ErrorMessage::ExpectedStringAsNumber => {
                 write!(f, "Value buffer expected string containing number")
-            }
-            ErrorMessage::ExpectedOption(hint) => {
-                write!(f, "Value buffer expected option, but found {hint}")
             }
             ErrorMessage::ExpectedSequence(hint) => {
                 write!(f, "Value buffer expected sequence, but found {hint}")

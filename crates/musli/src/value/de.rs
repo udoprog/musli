@@ -257,9 +257,11 @@ where
 
     #[inline]
     fn decode_option(self) -> Result<Option<Self::DecodeSome>, Self::Error> {
-        ensure!(self, hint, ExpectedOption(hint), ValueKind::Option(option) => {
-            Ok(option.as_ref().map(|some| ValueDecoder::new(self.cx, some)))
-        })
+        match &self.value.kind {
+            ValueKind::Empty => Ok(None),
+            ValueKind::Option(o) => Ok(o.as_ref().map(|v| ValueDecoder::new(self.cx, v))),
+            _ => Ok(Some(ValueDecoder::new(self.cx, self.value))),
+        }
     }
 
     #[inline]
