@@ -15,6 +15,8 @@ pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<Token
     let ident = &input.ident;
     let mut generate_in = None;
 
+    let attr = type_attrs(cx, &input.attrs)?;
+
     let out = match &input.data {
         syn::Data::Struct(st) => {
             let fields = build_fields(cx, &st.fields, &rng, &generate)?;
@@ -108,6 +110,10 @@ pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<Token
     let where_clause = input.generics.make_where_clause();
 
     for t in types {
+        if attr.ignore_bound.iter().any(|i| i == &t) {
+            continue;
+        }
+
         where_clause
             .predicates
             .push(syn::parse_quote!(#t: #generate));
@@ -135,7 +141,7 @@ fn build_fields(
     let mut out = Vec::new();
 
     for (n, field) in fields.iter().enumerate() {
-        let attr = parse_attr(cx, &field.attrs)?;
+        let attr = field_attrs(cx, &field.attrs)?;
 
         let member = match &field.ident {
             Some(ident) => syn::Member::Named(ident.clone()),
@@ -153,10 +159,10 @@ fn build_fields(
 
         let ty = &field.ty;
 
-        let generate = if let Some(range) = attr.range {
-            quote!(<#ty as #generate>::generate_range(#rng, #range))
-        } else {
-            quote!(<#ty as #generate>::generate(#rng))
+        let generate = match (attr.with, attr.range) {
+            (Some(with), _) => quote!(#with(#rng)),
+            (_, Some(range)) => quote!(<#ty as #generate>::generate_range(#rng, #range)),
+            (_, None) => quote!(<#ty as #generate>::generate(#rng)),
         };
 
         out.push(syn::FieldValue {
@@ -171,12 +177,48 @@ fn build_fields(
 }
 
 #[derive(Default)]
-struct Attr {
-    range: Option<syn::Expr>,
+struct TypeAttrs {
+    ignore_bound: Vec<syn::Ident>,
 }
 
-fn parse_attr(cx: &mut Ctxt, attrs: &[syn::Attribute]) -> Result<Attr, ()> {
-    let mut attr = Attr::default();
+fn type_attrs(cx: &mut Ctxt, attrs: &[syn::Attribute]) -> Result<TypeAttrs, ()> {
+    let mut attr = TypeAttrs::default();
+
+    for a in attrs {
+        if !a.path().is_ident("generate") {
+            continue;
+        }
+
+        let result = a.parse_nested_meta(|meta| {
+            if meta.path.is_ident("ignore_bound") {
+                meta.input.parse::<Token![=]>()?;
+                attr.ignore_bound.push(meta.input.parse()?);
+                return Ok(());
+            }
+
+            Err(syn::Error::new_spanned(meta.path, "Unsupported attribute"))
+        });
+
+        if let Err(error) = result {
+            cx.errors.push(error);
+        }
+    }
+
+    if !cx.errors.is_empty() {
+        return Err(());
+    }
+
+    Ok(attr)
+}
+
+#[derive(Default)]
+struct FieldAttrs {
+    range: Option<syn::Expr>,
+    with: Option<syn::Path>,
+}
+
+fn field_attrs(cx: &mut Ctxt, attrs: &[syn::Attribute]) -> Result<FieldAttrs, ()> {
+    let mut attr = FieldAttrs::default();
 
     for a in attrs {
         if !a.path().is_ident("generate") {
@@ -187,10 +229,16 @@ fn parse_attr(cx: &mut Ctxt, attrs: &[syn::Attribute]) -> Result<Attr, ()> {
             if meta.path.is_ident("range") {
                 meta.input.parse::<Token![=]>()?;
                 attr.range = Some(meta.input.parse()?);
-                Ok(())
-            } else {
-                Err(syn::Error::new_spanned(meta.path, "Unsupported attribute"))
+                return Ok(());
             }
+
+            if meta.path.is_ident("with") {
+                meta.input.parse::<Token![=]>()?;
+                attr.with = Some(meta.input.parse()?);
+                return Ok(());
+            }
+
+            Err(syn::Error::new_spanned(meta.path, "Unsupported attribute"))
         });
 
         if let Err(error) = result {
