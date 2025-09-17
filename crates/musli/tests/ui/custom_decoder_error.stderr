@@ -1,4 +1,4 @@
-error: expected identifier
+error: #[musli(with = ..)] expected a path, found a string literal
  --> tests/ui/custom_decoder_error.rs:5:20
   |
 5 |     #[musli(with = "bytes")]

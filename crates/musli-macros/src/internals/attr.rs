@@ -8,6 +8,7 @@ use syn::Token;
 use syn::ext::IdentExt;
 use syn::meta::ParseNestedMeta;
 use syn::parse::Parse;
+use syn::parse::ParseBuffer;
 use syn::parse::ParseStream;
 use syn::spanned::Spanned;
 
@@ -689,7 +690,7 @@ pub(crate) fn variant_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> VariantAttr 
             if meta.path.is_ident("rename") {
                 return Err(syn::Error::new_spanned(
                     meta.path,
-                    "#[musli(rename = ..)] has been changed to #[musli(name = ..)]",
+                    format_args!("#[{ATTR}(rename = ..)] has been changed to #[{ATTR}(name = ..)]"),
                 ));
             }
 
@@ -874,6 +875,7 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
 
             if meta.path.is_ident("with") {
                 meta.input.parse::<Token![=]>()?;
+                reject_string_lit(meta.input, "with")?;
                 let mut path = meta.input.parse::<syn::Path>()?;
 
                 let (span, arguments) = match path.segments.last_mut() {
@@ -905,18 +907,28 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
-            if meta.path.is_ident("skip_encoding_if") {
+            if meta.path.is_ident("decode_with") {
                 meta.input.parse::<Token![=]>()?;
-                new.skip_encoding_if
-                    .push((meta.path.span(), meta.input.parse()?));
+                reject_string_lit(meta.input, "decode_with")?;
+                let path = meta.input.parse::<syn::Path>()?;
+                new.decode_path.push((meta.path.span(), path));
                 return Ok(());
             }
 
-            if meta.path.is_ident("rename") {
-                return Err(syn::Error::new_spanned(
-                    meta.path,
-                    "#[musli(rename = ..)] has been changed to #[musli(name = ..)]",
-                ));
+            if meta.path.is_ident("encode_with") {
+                meta.input.parse::<Token![=]>()?;
+                reject_string_lit(meta.input, "encode_with")?;
+                let path = meta.input.parse::<syn::Path>()?;
+                new.encode_path.push((meta.path.span(), path));
+                return Ok(());
+            }
+
+            if meta.path.is_ident("skip_encoding_if") {
+                meta.input.parse::<Token![=]>()?;
+                reject_string_lit(meta.input, "skip_encoding_if")?;
+                new.skip_encoding_if
+                    .push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
             }
 
             if meta.path.is_ident("name") {
@@ -977,6 +989,34 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 return Ok(());
             }
 
+            if meta.path.is_ident("rename") {
+                return Err(syn::Error::new_spanned(
+                    meta.path,
+                    format_args!("#[{ATTR}(rename = ..)] has been changed to #[{ATTR}(name = ..)]"),
+                ));
+            }
+
+            if meta.path.is_ident("skip_serializing_if") {
+                return Err(syn::Error::new_spanned(
+                    meta.path,
+                    format_args!("#[{ATTR}(skip_serializing_if = \"..\")] does not exist, you might be looking for #[{ATTR}(skip_encoding_if = <path>)]"),
+                ));
+            }
+
+            if meta.path.is_ident("deserialize_with") {
+                return Err(syn::Error::new_spanned(
+                    meta.path,
+                    format_args!("#[{ATTR}(deserialize_with = \"..\")] does not exist, you might be looking for #[{ATTR}(decode_with = <path>)]"),
+                ));
+            }
+
+            if meta.path.is_ident("serialize_with") {
+                return Err(syn::Error::new_spanned(
+                    meta.path,
+                    format_args!("#[{ATTR}(serialize_with = \"..\")] does not exist, you might be looking for #[{ATTR}(encode_with = <path>)]"),
+                ));
+            }
+
             Err(syn::Error::new_spanned(
                 meta.path,
                 format_args!("#[{ATTR}] Unsupported field attribute"),
@@ -1000,6 +1040,17 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
     }
 
     attr
+}
+
+fn reject_string_lit(input: &ParseBuffer<'_>, name: &str) -> syn::Result<()> {
+    if let Some(lit) = input.parse::<Option<syn::LitStr>>()? {
+        return Err(syn::Error::new_spanned(
+            lit,
+            format_args!("#[{ATTR}({name} = ..)] expected a path, found a string literal",),
+        ));
+    }
+
+    Ok(())
 }
 
 fn parse_mode(meta: &ParseNestedMeta<'_>) -> syn::Result<ModeIdent> {
@@ -1066,7 +1117,7 @@ impl TypeConfig {
             if let Some((s, _)) = this.value.replace((meta.path.span(), meta.input.parse()?)) {
                 return Err(syn::Error::new(
                     s,
-                    format_args!("#[musli({name} = ..)]: Duplicate value for attribute"),
+                    format_args!("#[{ATTR}({name} = ..)]: Duplicate value for attribute"),
                 ));
             }
 
@@ -1084,7 +1135,7 @@ impl TypeConfig {
                     if let Some((s, _)) = this.ty.replace((ty.span(), content.parse()?)) {
                         return Err(syn::Error::new(
                             s,
-                            format_args!("#[musli({name}(type = ..))]: Duplicate attribute"),
+                            format_args!("#[{ATTR}({name}(type = ..))]: Duplicate attribute"),
                         ));
                     }
 
@@ -1100,7 +1151,7 @@ impl TypeConfig {
                         return Err(syn::Error::new(
                             s,
                             format_args!(
-                                "#[musli({name}(value = ..))]: Duplicate value for attribute"
+                                "#[{ATTR}({name}(value = ..))]: Duplicate value for attribute)"
                             ),
                         ));
                     }
@@ -1114,7 +1165,7 @@ impl TypeConfig {
                     if let Some((s, _)) = this.method.replace((id.span(), content.parse()?)) {
                         return Err(syn::Error::new(
                             s,
-                            format_args!("#[musli({name}(method = ..))]: Duplicate attribute"),
+                            format_args!("#[{ATTR}({name}(method = ..))]: Duplicate attribute"),
                         ));
                     }
 
@@ -1127,7 +1178,9 @@ impl TypeConfig {
                     if let Some((s, _)) = this.format_with.replace((id.span(), content.parse()?)) {
                         return Err(syn::Error::new(
                             s,
-                            format_args!("#[musli({name}(format_with = ..))]: Duplicate attribute"),
+                            format_args!(
+                                "#[{ATTR}({name}(format_with = ..))]: Duplicate attribute"
+                            ),
                         ));
                     }
 
@@ -1136,7 +1189,7 @@ impl TypeConfig {
 
                 return Err(syn::Error::new_spanned(
                     &id,
-                    format_args!("#[musli({name}({id} = ..))]: Unsupported attribute"),
+                    format_args!("#[{ATTR}({name}({id} = ..))]: Unsupported attribute"),
                 ));
             };
 
