@@ -112,7 +112,24 @@ impl rand::RngCore for Rng {
     }
 }
 
-pub trait Generate: Sized {
+pub trait Generate
+where
+    Self: Sized,
+{
+    /// Generate a random value with the default rng.
+    fn random() -> Self {
+        let mut rng = crate::rng();
+        Self::generate(&mut rng)
+    }
+
+    /// Generate a random value with the default rng.
+    fn random_all() -> Vec<Self> {
+        let mut rng = crate::rng();
+        let mut out = Vec::new();
+        Self::generate_in(&mut rng, |value| out.push(value));
+        out
+    }
+
     /// Generate a value of the given type.
     fn generate<R>(rng: &mut R) -> Self
     where
@@ -133,6 +150,23 @@ pub trait Generate: Sized {
         F: FnMut(Self),
     {
         out(Self::generate(rng));
+    }
+}
+
+impl<T> Generate for Option<T>
+where
+    T: Generate,
+{
+    #[inline]
+    fn generate<R>(rng: &mut R) -> Self
+    where
+        R: rand::Rng,
+    {
+        if rng.random() {
+            Some(T::generate(rng))
+        } else {
+            None
+        }
     }
 }
 

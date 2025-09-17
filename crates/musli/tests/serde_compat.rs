@@ -201,7 +201,6 @@ tester!(descriptive, Binary);
 tester!(json, Text);
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
-#[generate(crate)]
 enum Enum {
     Empty,
     Tuple(u32, u32),
@@ -209,7 +208,6 @@ enum Enum {
 }
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
-#[generate(crate)]
 struct Struct {
     a: u32,
     b: u64,
@@ -217,7 +215,6 @@ struct Struct {
 }
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]
-#[generate(crate)]
 #[musli(Binary, bound = {T: Encode<Binary>}, decode_bound<'de, A> = {T: Decode<'de, Binary, A>})]
 #[musli(Text, bound = {T: Encode<Text>}, decode_bound<'de, A> = {T: Decode<'de, Text, A>})]
 struct StructWith<T> {
