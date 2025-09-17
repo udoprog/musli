@@ -1,0 +1,35 @@
+error: #[musli(skip_encoding_if = ..)] expected a path, found a string literal
+ --> tests/ui/reject_string_lit_error.rs:5:32
+  |
+5 |     #[musli(skip_encoding_if = "String::is_empty")]
+  |                                ^^^^^^^^^^^^^^^^^^
+
+error: #[musli(with = ..)] expected a path, found a string literal
+  --> tests/ui/reject_string_lit_error.rs:11:20
+   |
+11 |     #[musli(with = "encode_with")]
+   |                    ^^^^^^^^^^^^^
+
+error: #[musli(encode_with = ..)] expected a path, found a string literal
+  --> tests/ui/reject_string_lit_error.rs:17:27
+   |
+17 |     #[musli(encode_with = "encode_with")]
+   |                           ^^^^^^^^^^^^^
+
+error: #[musli(decode_with = ..)] expected a path, found a string literal
+  --> tests/ui/reject_string_lit_error.rs:23:27
+   |
+23 |     #[musli(decode_with = "decode_with")]
+   |                           ^^^^^^^^^^^^^
+
+error: #[musli(serialize_with = "..")] does not exist, you might be looking for #[musli(encode_with = <path>)]
+  --> tests/ui/reject_string_lit_error.rs:29:13
+   |
+29 |     #[musli(serialize_with = "serialize_with")]
+   |             ^^^^^^^^^^^^^^
+
+error: #[musli(deserialize_with = "..")] does not exist, you might be looking for #[musli(decode_with = <path>)]
+  --> tests/ui/reject_string_lit_error.rs:35:13
+   |
+35 |     #[musli(deserialize_with = "deserialize_with")]
+   |             ^^^^^^^^^^^^^^^^

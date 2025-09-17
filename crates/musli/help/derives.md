@@ -1242,6 +1242,126 @@ mod example {
 
 <br>
 
+#### `#[musli(encode_with = <path>)]`
+
+This specifies the path to a function to use instead of the fields default
+[`Encode`] implementations.
+
+<br>
+
+##### Basic example
+
+```rust
+mod example {
+    use musli::Encode;
+
+    #[derive(Encode)]
+    struct Container {
+        #[musli(encode_with = self::module::encode)]
+        field: Field,
+    }
+
+    struct Field {
+        /* internal */
+    }
+
+    mod module {
+        use musli::{Decoder, Encoder};
+
+        use super::Field;
+
+        pub fn encode<E>(field: &Field, encoder: E) -> Result<(), E::Error>
+        where
+            E: Encoder,
+        {
+            todo!()
+        }
+    }
+}
+```
+
+This can be very useful for types which have assymetric encoding options, like
+for containers which are capable of projecting their data during encoding:
+
+
+```rust
+mod example {
+    use musli::Encode;
+
+    struct Person {
+        name: String,
+    }
+
+    #[derive(Encode)]
+    struct Container<'de> {
+        #[musli(encode_with = self::module::encode)]
+        field: &'de [Person],
+    }
+
+    mod module {
+        use musli::{Decoder, Encoder};
+        use musli::en::SequenceEncoder;
+
+        use super::Person;
+
+        pub fn encode<E>(people: &[Person], encoder: E) -> Result<(), E::Error>
+        where
+            E: Encoder,
+        {
+            encoder.encode_sequence_fn(people.len(), |seq| {
+                for person in people {
+                    seq.push(&person.name)?;
+                }
+
+                Ok(())
+            })
+        }
+    }
+}
+```
+
+<br>
+
+#### `#[musli(decode_with = <path>)]`
+
+This specifies the path to a function to use instead of the fields default
+[`Decode`] implementations.
+
+<br>
+
+##### Basic example
+
+```rust
+mod example {
+    use musli::Decode;
+
+    #[derive(Decode)]
+    struct Container {
+        #[musli(decode_with = self::module::decode)]
+        field: Field,
+    }
+
+    struct Field {
+        /* internal */
+    }
+
+    mod module {
+        use musli::Decoder;
+
+        use super::Field;
+
+        pub fn decode<'de, D>(decoder: D) -> Result<Field, D::Error>
+        where
+            D: Decoder<'de>,
+        {
+            todo!()
+        }
+    }
+}
+```
+
+<br>
+
 ##### Generic implementation
 
 ```rust
@@ -1363,6 +1483,8 @@ struct Person {
     name: String,
     #[musli(skip_encoding_if = Option::is_none)]
     age: Option<u32>,
+    #[musli(skip_encoding_if = Vec::is_empty)]
+    numbers: Vec<u32>,
 }
 ```
 
