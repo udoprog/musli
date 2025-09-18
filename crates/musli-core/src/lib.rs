@@ -381,6 +381,17 @@ pub mod __priv {
 
         /// Missing variant field required to decode.
         #[inline]
+        pub fn tagged_enum_unsupported<C>(cx: C, type_name: &'static str) -> C::Error
+        where
+            C: Context,
+        {
+            cx.message(format_args!(
+                "Encoding format does not supported decoding type {type_name} as a tagged enum"
+            ))
+        }
+
+        /// Missing variant field required to decode.
+        #[inline]
         pub fn missing_variant_field<C>(
             cx: C,
             type_name: &'static str,

@@ -38,6 +38,36 @@ fn named() {
 }
 
 #[test]
+fn borrowed_variants() {
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    #[musli(name_all = "name", tag = "type", content = "content")]
+    pub enum Named<'de> {
+        #[musli(name_all = "name")]
+        Variant1 { string: &'de str, number: u32 },
+        #[musli(name = "variant2", name_all = "name")]
+        Variant2 { string: &'de str },
+    }
+
+    let value = Named::Variant1 {
+        string: "Hello",
+        number: 42,
+    };
+
+    let bytes = musli::storage::to_vec(&value).unwrap();
+    let decoded: Named<'_> = musli::storage::from_slice(&bytes).unwrap();
+
+    musli::macros::assert_roundtrip_borrowed_eq! {
+        full,
+        Named::Variant1 {
+            string: "Hello",
+            number: 42,
+        },
+    };
+
+    assert_eq!(value, decoded);
+}
+
+#[test]
 fn transparent() {
     #[derive(Debug, PartialEq, Encode, Decode)]
     pub struct Struct {

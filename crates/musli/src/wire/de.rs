@@ -140,7 +140,7 @@ where
 
     /// Decode the length of a prefix.
     #[inline]
-    fn decode_len(&mut self, start: &C::Mark) -> Result<usize, C::Error> {
+    fn decode_len(&mut self, start: &C::Mark, what: &'static str) -> Result<usize, C::Error> {
         let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
         match tag.kind() {
@@ -149,9 +149,10 @@ where
             } else {
                 crate::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
             }),
-            kind => Err(self
-                .cx
-                .message_at(start, format_args!("Expected prefix, but got {kind:?}"))),
+            kind => Err(self.cx.message_at(
+                start,
+                format_args!("Expected length prefix for {what}, but got {kind:?}"),
+            )),
         }
     }
 }
@@ -267,7 +268,7 @@ where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
     {
         let mark = self.cx.mark();
-        let len = self.decode_len(&mark)?;
+        let len = self.decode_len(&mark, "pack")?;
         let mut decoder = WireDecoder::new(self.cx, self.reader.limit(len));
         let output = f(&mut decoder)?;
         decoder.end()?;
@@ -277,7 +278,7 @@ where
     #[inline]
     fn decode_array<const N: usize>(mut self) -> Result<[u8; N], Self::Error> {
         let mark = self.cx.mark();
-        let len = self.decode_len(&mark)?;
+        let len = self.decode_len(&mark, "array")?;
 
         if len != N {
             return Err(self.cx.message_at(
@@ -298,7 +299,7 @@ where
         V: UnsizedVisitor<'de, C, [u8], Error = Self::Error, Allocator = Self::Allocator>,
     {
         let mark = self.cx.mark();
-        let len = self.decode_len(&mark)?;
+        let len = self.decode_len(&mark, "bytes")?;
         self.reader.read_bytes(self.cx, len, visitor)
     }
 

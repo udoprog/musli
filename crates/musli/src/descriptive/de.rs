@@ -164,7 +164,10 @@ where
 
         match tag.kind() {
             Kind::Bytes => self.decode_len(tag),
-            _ => Err(self.cx.message_at(start, "Expected prefix or pack")),
+            kind => Err(self.cx.message_at(
+                start,
+                format_args!("Expected bytes for pack but got {kind:?}"),
+            )),
         }
     }
 }
@@ -611,7 +614,7 @@ where
         let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
 
         if tag != VARIANT {
-            return Err(self.cx.message(Expected {
+            return Err(self.cx.message(ExpectedVariant {
                 expected: Kind::Mark,
                 actual: tag,
             }));
@@ -992,7 +995,18 @@ struct Expected {
 impl fmt::Display for Expected {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { expected, actual } = *self;
+        write!(f, "Expected {expected:?}, but was {actual:?}",)
+    }
+}
 
-        write!(f, "Expected {expected:?} but was {actual:?}",)
+struct ExpectedVariant {
+    expected: Kind,
+    actual: Tag,
+}
+
+impl fmt::Display for ExpectedVariant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { expected, actual } = *self;
+        write!(f, "Expected {expected:?} for variant, but was {actual:?}",)
     }
 }

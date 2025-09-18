@@ -471,7 +471,6 @@ fn decode_internal(
     } = *cx;
 
     let Tokens {
-        as_decoder_t,
         collect_string,
         context_t,
         decoder_t,
@@ -486,8 +485,6 @@ fn decode_internal(
 
     let type_name = en.name.value;
 
-    let buffer_decoder_var = b.cx.ident("buffer_decoder");
-    let buffer_var = b.cx.ident("buffer");
     let entry_var = b.cx.ident("entry");
     let field_name = b.cx.ident("field_name");
     let field_name_var = b.cx.ident("field_name");
@@ -500,6 +497,7 @@ fn decode_internal(
     let variant_decoder_var = b.cx.ident("variant_decoder");
     let variant_tag_var = b.cx.ident("variant_tag");
     let tag_static = b.cx.ident("TAG");
+    let mark_var = b.cx.ident("mark");
 
     let (decode_name, output_enum, name_type, output_arms, fallback) =
         decode_variant_name(cx, b, en, &variant_decoder_var, &variant_tag_var)?;
@@ -509,7 +507,7 @@ fn decode_internal(
     let arms = output_arms.iter().flat_map(|(v, pat, tag_value)| {
         let name = v.st.name.value;
 
-        let decode = decode_variant(cx, b, v, &buffer_decoder_var, &variant_tag_var).ok()?;
+        let decode = decode_variant(cx, b, v, decoder_var, &variant_tag_var).ok()?;
 
         let enter = cx.trace.then(|| {
             let formatted_tag = en.name.name_format(&tag_static);
@@ -531,7 +529,6 @@ fn decode_internal(
             #pat => {
                 #enter
 
-                let #buffer_decoder_var = #as_decoder_t::as_decoder(&#buffer_var)?;
                 let #output_var = #decode;
 
                 #leave
@@ -627,8 +624,12 @@ fn decode_internal(
         #outcome_enum
 
         #enter
-        let #buffer_var = #decoder_t::decode_buffer(#decoder_var)?;
-        let #struct_var = #as_decoder_t::as_decoder(&#buffer_var)?;
+
+        let #mark_var = #context_t::mark(#ctx_var);
+
+        let #option::Some(#struct_var) = #decoder_t::try_clone(&#decoder_var) else {
+            return #result::Err(#messages::tagged_enum_unsupported(#ctx_var, #type_name));
+        };
 
         let #variant_tag_var: #name_type = #decoder_t::decode_map(#struct_var, |#struct_var| {
             let #variant_decoder_var = loop {
@@ -650,6 +651,8 @@ fn decode_internal(
         };
 
         #leave
+
+        #context_t::restore(#ctx_var, &#mark_var);
         #result::Ok(#output_var)
     }};
 
