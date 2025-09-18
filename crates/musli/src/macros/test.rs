@@ -1,5 +1,37 @@
 //! Helper macros for use with Musli.
 
+use core::fmt;
+
+/// Helper used to format bytes for error messages.
+#[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
+#[repr(transparent)]
+pub struct FormatBytes([u8]);
+
+impl FormatBytes {
+    /// Construct a new `FormatBytes` wrapper.
+    pub fn new(bytes: &[u8]) -> &Self {
+        // SAFETY: This is safe as we are just wrapping a byte slice.
+        unsafe { &*(bytes as *const [u8] as *const FormatBytes) }
+    }
+}
+
+impl fmt::Display for FormatBytes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "b\"")?;
+
+        for chunk in self.0.utf8_chunks() {
+            f.write_str(chunk.valid())?;
+
+            for &b in chunk.invalid() {
+                write!(f, "\\x{b:02x}")?;
+            }
+        }
+
+        write!(f, "\" (0-{})", self.0.len())?;
+        Ok(())
+    }
+}
+
 macro_rules! test_include_if {
     (#[musli_value] => $($rest:tt)*) => { $($rest)* };
     (=> $($_:tt)*) => {};
@@ -20,30 +52,10 @@ macro_rules! test_fns {
             T: ::core::fmt::Debug + ::core::cmp::PartialEq,
             M: 'static,
         {
-            const WHAT: &str = $what;
-
-            let encoding = super::Encoding::new().with_mode::<M>();
-
             use ::core::any::type_name;
 
-            struct FormatBytes<'a>(&'a [u8]);
-
-            impl ::core::fmt::Display for FormatBytes<'_> {
-                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                    write!(f, "b\"")?;
-
-                    for b in self.0 {
-                        if b.is_ascii_graphic() {
-                            write!(f, "{}", *b as char)?;
-                        } else {
-                            write!(f, "\\x{b:02x}")?;
-                        }
-                    }
-
-                    write!(f, "\" (0-{})", self.0.len())?;
-                    Ok(())
-                }
-            }
+            let encoding = super::Encoding::new().with_mode::<M>();
+            let what = ::std::format!("{} ({})", $what, type_name::<M>());
 
             let cx = $crate::context::new().with_trace().with_type();
 
@@ -51,20 +63,20 @@ macro_rules! test_fns {
                 Ok(out) => out,
                 Err(..) => {
                     let error = cx.report();
-                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                    panic!("{what}: {}: failed to encode:\n{error}", type_name::<T>())
                 }
             };
 
             let decoded: T = match encoding.from_slice_with(&cx, out.as_slice()) {
                 Ok(decoded) => decoded,
                 Err(..) => {
-                    let out = FormatBytes(&out);
+                    let out = $crate::macros::FormatBytes::new(&out);
                     let error = cx.report();
-                    panic!("{WHAT}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<T>())
+                    panic!("{what}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<T>())
                 }
             };
 
-            assert_eq!(decoded, value, "{WHAT}: {}: roundtrip does not match\nValue: {value:?}", type_name::<T>());
+            assert_eq!(decoded, value, "{what}: {}: roundtrip does not match\nValue: {value:?}", type_name::<T>());
 
             $crate::macros::test_include_if! {
                 $($(#[$option])*)* =>
@@ -73,22 +85,22 @@ macro_rules! test_fns {
                 let value_decode: $crate::value::Value<_> = match encoding.from_slice_with(&cx, out.as_slice()) {
                     Ok(decoded) => decoded,
                     Err(..) => {
-                        let out = FormatBytes(&out);
+                        let out = $crate::macros::FormatBytes::new(&out);
                         let error = cx.report();
-                        panic!("{WHAT}: {}: failed to decode to value type:\nValue: {value:?}\nBytes:{out}\n{error}", type_name::<T>())
+                        panic!("{what}: {}: failed to decode to value type:\nValue: {value:?}\nBytes:{out}\n{error}", type_name::<T>())
                     }
                 };
 
                 let value_decoded: T = match value_encoding.decode_with(&cx, &value_decode) {
                     Ok(decoded) => decoded,
                     Err(..) => {
-                        let out = FormatBytes(&out);
+                        let out = $crate::macros::FormatBytes::new(&out);
                         let error = cx.report();
-                        panic!("{WHAT}: {}: failed to decode from value type:\nValue: {value:?}\nBytes: {out}\nBuffered value: {value_decode:?}\n{error}", type_name::<T>())
+                        panic!("{what}: {}: failed to decode from value type:\nValue: {value:?}\nBytes: {out}\nBuffered value: {value_decode:?}\n{error}", type_name::<T>())
                     }
                 };
 
-                assert_eq!(value_decoded, value, "{WHAT}: {}: musli-value roundtrip does not match\nValue: {value:?}", type_name::<T>());
+                assert_eq!(value_decoded, value, "{what}: {}: musli-value roundtrip does not match\nValue: {value:?}", type_name::<T>());
             }
 
             decoded
@@ -106,30 +118,11 @@ macro_rules! test_fns {
             U: ::core::fmt::Debug + ::core::cmp::PartialEq,
             M: 'static,
         {
-            const WHAT: &str = $what;
+            let what = ::std::format!("{} ({})", $what, type_name::<M>());
 
             let encoding = super::Encoding::new().with_mode::<M>();
 
             use ::core::any::type_name;
-
-            struct FormatBytes<'a>(&'a [u8]);
-
-            impl ::core::fmt::Display for FormatBytes<'_> {
-                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-                    write!(f, "b\"")?;
-
-                    for b in self.0 {
-                        if b.is_ascii_graphic() {
-                            write!(f, "{}", *b as char)?;
-                        } else {
-                            write!(f, "\\x{b:02x}")?;
-                        }
-                    }
-
-                    write!(f, "\" (0-{})", self.0.len())?;
-                    Ok(())
-                }
-            }
 
             let cx = $crate::context::new().with_trace().with_type();
 
@@ -139,24 +132,24 @@ macro_rules! test_fns {
                 Ok(()) => (),
                 Err(..) => {
                     let error = cx.report();
-                    panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                    panic!("{what}: {}: failed to encode:\n{error}", type_name::<T>())
                 }
             };
 
             let actual = match encoding.from_slice_with(&cx, &*out) {
                 Ok(decoded) => decoded,
                 Err(..) => {
-                    let out = FormatBytes(&*out);
+                    let out = $crate::macros::FormatBytes::new(&*out);
                     let error = cx.report();
-                    panic!("{WHAT}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<U>())
+                    panic!("{what}: {}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}", type_name::<U>())
                 }
             };
 
             assert_eq!(
                 actual,
                 *expected,
-                "{WHAT}: decoded value does not match expected\nBytes: {}",
-                FormatBytes(&*out),
+                "{what}: decoded value does not match expected\nBytes: {}",
+                $crate::macros::FormatBytes::new(&*out),
             );
 
             actual
@@ -171,7 +164,7 @@ macro_rules! test_fns {
             T: $crate::en::Encode<M>,
             M: 'static,
         {
-            const WHAT: &str = $what;
+            let what = ::std::format!("{} ({})", $what, type_name::<M>());
 
             let encoding = super::Encoding::new().with_mode::<M>();
 
@@ -184,7 +177,7 @@ macro_rules! test_fns {
                     Ok(out) => out,
                     Err(..) => {
                         let error = cx.report();
-                        panic!("{WHAT}: {}: failed to encode:\n{error}", type_name::<T>())
+                        panic!("{what}: {}: failed to encode:\n{error}", type_name::<T>())
                     }
                 }
             })
@@ -265,6 +258,95 @@ macro_rules! assert_roundtrip_eq {
 }
 
 pub use assert_roundtrip_eq;
+
+/// Assert that expression `$expr` can be roundtrip borrowed encoded using the
+/// encodings specified by `$support`.
+///
+/// This demands that encoding and subsequently decoding `$expr` through any
+/// formats results in a value that can be compared using [`PartialEq`] to
+/// `$expr`.
+///
+/// This can be used to test upgrade stable formats.
+///
+/// The `$support` parameter is one of:
+/// * `full` - All formats are tested.
+/// * `no_json` - All formats except JSON are tested.
+/// * `descriptive` - All fully self-descriptive formats are tested.
+/// * `json` - Only JSON is tested.
+/// * `upgrade_stable` - Only upgrade-stable formats are tested.
+///
+/// Extra tests can be specified using the `$extra` parameter:
+/// * `json = <expected>` - Assert that the JSON encoding of `$expr` matched
+///   exactly `$expected`.
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Decode, Encode};
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Version1 {
+///     name: String,
+/// }
+///
+/// #[derive(Debug, PartialEq, Encode, Decode)]
+/// struct Person<'de> {
+///     name: &'de str,
+///     #[musli(default)]
+///     age: Option<u32>,
+/// }
+///
+/// musli::macros::assert_roundtrip_borrowed_eq! {
+///     full,
+///     Person {
+///         name: "Aristotle",
+///         age: Some(61),
+///     }
+/// };
+/// ```
+#[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
+#[macro_export]
+macro_rules! assert_roundtrip_borrowed_eq {
+    ($support:ident, $name:ident $(::$variant:ident)? { $($body:tt)* } $(, $($extra:tt)*)?) => {{
+        macro_rules! inner {
+            ($framework:ident, $mode:ident) => {{
+                let what = ::std::format!("{}/{}/{}", stringify!($framework), stringify!($name $(::$variant)*), stringify!($mode));
+                let encoding = musli::$framework::Encoding::new().with_mode::<musli::mode::$mode>();
+
+                let value = $name $(::$variant)* { $($body)* };
+
+                let cx = $crate::context::new().with_trace().with_type();
+
+                let bytes = match encoding.to_vec_with(&cx, &value) {
+                    Ok(out) => out,
+                    Err(..) => {
+                        let error = cx.report();
+                        ::std::panic!("{what}: failed to encode:\n{error}")
+                    }
+                };
+
+                let decoded: $name<'_> = match encoding.from_slice_with(&cx, &bytes) {
+                    Ok(out) => out,
+                    Err(..) => {
+                        let out = $crate::macros::FormatBytes::new(&bytes);
+                        let error = cx.report();
+                        ::std::panic!("{what}: failed to decode:\nValue: {value:?}\nBytes: {out}\n{error}")
+                    }
+                };
+
+                assert_eq!(
+                    value,
+                    decoded,
+                    "{what}: roundtripped value does not match expected",
+                );
+            }}
+        }
+
+        $crate::macros::__test_matrix!($support, inner);
+    }};
+}
+
+pub use assert_roundtrip_borrowed_eq;
 
 /// Assert that expression `$expr` can decode to expression `$expected` using
 /// the encodings specified by `$support`.
@@ -403,6 +485,14 @@ macro_rules! __test_matrix {
         $call!(wire, Text);
         $call!(descriptive, Text);
         $call!(json, Text);
+    };
+
+    (storage, $call:path) => {
+        $call!(storage, Binary);
+    };
+
+    (wire, $call:path) => {
+        $call!(wire, Binary);
     };
 
     (binary_mode, $call:path) => {
