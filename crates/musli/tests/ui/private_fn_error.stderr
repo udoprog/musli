@@ -1,7 +1,7 @@
 error[E0603]: function `decode` is private
   --> tests/ui/private_fn_error.rs:5:26
    |
-5  |     #[musli(with = self::array)]
+ 5 |     #[musli(with = self::array)]
    |                          ^^^^^ private function
    |
 note: the function `decode` is defined here

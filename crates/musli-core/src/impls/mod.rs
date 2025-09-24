@@ -4,11 +4,13 @@ mod alloc;
 #[cfg(feature = "std")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
 mod net;
+#[cfg(all(any(unix, windows), all(feature = "std", feature = "alloc")))]
+mod platform_tag;
 mod range;
 mod tuples;
+#[cfg(all(any(unix, windows), all(feature = "std", feature = "alloc")))]
+use platform_tag::PlatformTag;
 
-#[cfg(feature = "std")]
-use core::any::TypeId;
 use core::ffi::CStr;
 use core::num::{
     NonZeroI8, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI128, NonZeroIsize, NonZeroU8,
@@ -21,84 +23,7 @@ use crate::de::{
     UnsizedVisitor, VariantDecoder,
 };
 use crate::en::{Encode, EncodeBytes, EncodePacked, Encoder, SequenceEncoder, VariantEncoder};
-#[cfg(feature = "std")]
-use crate::mode::Text;
 use crate::{Allocator, Context};
-
-/// Platform tag used by certain platform-specific implementations.
-#[cfg(feature = "std")]
-enum PlatformTag {
-    Unix,
-    Windows,
-}
-
-#[cfg(feature = "std")]
-impl<M> Encode<M> for PlatformTag
-where
-    M: 'static,
-{
-    type Encode = Self;
-
-    const IS_BITWISE_ENCODE: bool = false;
-
-    #[inline]
-    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
-    where
-        E: Encoder<Mode = M>,
-    {
-        if TypeId::of::<M>() == TypeId::of::<Text>() {
-            match self {
-                PlatformTag::Unix => encoder.encode("unix"),
-                PlatformTag::Windows => encoder.encode("windows"),
-            }
-        } else {
-            // For binary encoding, we use the tag as a single byte.
-            let tag = match self {
-                PlatformTag::Unix => 0,
-                PlatformTag::Windows => 1,
-            };
-
-            encoder.encode_u8(tag)
-        }
-    }
-
-    #[inline]
-    fn as_encode(&self) -> &Self::Encode {
-        self
-    }
-}
-
-#[cfg(feature = "std")]
-impl<'de, M, A> Decode<'de, M, A> for PlatformTag
-where
-    M: 'static,
-    A: Allocator,
-{
-    // Unit is always packed, since it is a ZST.
-    const IS_BITWISE_DECODE: bool = true;
-
-    #[inline]
-    fn decode<D>(decoder: D) -> Result<Self, D::Error>
-    where
-        D: Decoder<'de, Allocator = A>,
-    {
-        let cx = decoder.cx();
-
-        if TypeId::of::<M>() == TypeId::of::<Text>() {
-            decoder.decode_unsized(|value: &str| match value {
-                "unix" => Ok(PlatformTag::Unix),
-                "windows" => Ok(PlatformTag::Windows),
-                _ => Err(cx.message(format_args!("Unsupported platform tag `{value}`",))),
-            })
-        } else {
-            match decoder.decode_u8()? {
-                0 => Ok(PlatformTag::Unix),
-                1 => Ok(PlatformTag::Windows),
-                _ => Err(cx.message("Unsupported platform tag")),
-            }
-        }
-    }
-}
 
 impl<M> Encode<M> for () {
     type Encode = Self;
