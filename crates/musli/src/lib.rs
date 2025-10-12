@@ -547,8 +547,8 @@ pub use self::en::{Encode, Encoder};
 /// This is an attribute macro that must be used when implementing the following traits:
 ///
 /// * [`Decoder`]
-/// * [`de::Visitor`][crate::de::Visitor]
-/// * [`de::UnsizedVisitor`][crate::de::UnsizedVisitor]
+/// * [`Visitor`]
+/// * [`UnsizedVisitor`]
 /// * [`Encoder`]
 ///
 /// It is required to use because these traits might introduce new associated
@@ -676,6 +676,9 @@ pub use self::en::{Encode, Encoder};
 ///     }
 /// }
 /// ```
+///
+/// [`UnsizedVisitor`]: crate::de::UnsizedVisitor
+/// [`Visitor`]: crate::de::Visitor
 #[doc(inline)]
 pub use musli_core::__macros::musli_trait_defaults as trait_defaults;
 
