@@ -724,8 +724,6 @@ pub mod no_std;
 mod int;
 mod str;
 
-#[cfg(feature = "garde")]
-pub use musli_core::garde;
 
 use crate::alloc::Disabled;
 use crate::mode::Binary;

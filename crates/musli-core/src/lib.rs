@@ -21,7 +21,7 @@ mod impls;
 mod internal;
 mod never;
 /// Automatic impl of Encode for Valid and Unvalidated types, and Decode for Valid types.
-pub mod garde;
+mod garde022;
 pub mod alloc;
 #[doc(inline)]
 pub use self::alloc::Allocator;

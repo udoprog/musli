@@ -1,9 +1,9 @@
 
-#![cfg(feature = "garde")]
-#![cfg_attr(doc_cfg, doc(cfg(feature = "garde")))]
+#![cfg(feature = "garde022")]
+#![cfg_attr(doc_cfg, doc(cfg(feature = "garde022")))]
 
 use std::ops::Deref;
-use garde::{Unvalidated, Valid, Validate};
+use garde022::{Unvalidated, Valid, Validate};
 use crate::{Decode, Decoder, Encode, Encoder, Allocator, Context};
 
 impl<TValid, M> Encode<M> for Valid<TValid>

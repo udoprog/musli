@@ -27,11 +27,11 @@ default = ["std", "alloc"]
 std = []
 alloc = []
 verbose = ["musli-macros/verbose"]
-garde = ["dep:garde"]
+garde022 = ["dep:garde022"]
 
 [dependencies]
 musli-macros = { version = "0.1.4", path = "../musli-macros", default-features = false }
-garde = { version = "0.22.0", optional = true, default-features = false }
+garde022 = { version = "0.22", optional = true, default-features = false, package= "garde" }
 
 # Note that musli-macros is tightly coupled with the version of musli-core used.
 # Never add this as a dependency directly. This section cannot be enabled and
