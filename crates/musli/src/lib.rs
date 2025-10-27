@@ -724,7 +724,6 @@ pub mod no_std;
 mod int;
 mod str;
 
-
 use crate::alloc::Disabled;
 use crate::mode::Binary;
 
