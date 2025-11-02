@@ -299,8 +299,15 @@ where
     #[inline]
     pub fn clear(&mut self) {
         // SAFETY: We know that the buffer is initialized up to `len`.
-        unsafe { ptr::drop_in_place(slice::from_raw_parts_mut(self.buf.as_mut_ptr(), self.len)) }
-        self.len = 0;
+        //
+        // Set to zero in case dropping panics so we can't incidentally access
+        // uninitialized data in case the panic is caught.
+        unsafe {
+            let data = ptr::slice_from_raw_parts_mut(self.buf.as_mut_ptr(), self.len);
+
+            self.len = 0;
+            ptr::drop_in_place(data);
+        }
     }
 
     /// Get the initialized part of the buffer as a slice.

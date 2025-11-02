@@ -2,10 +2,15 @@ error[E0277]: `ContextError` must be implemented for `MyError`, or any error typ
   --> tests/ui/context_error_hint_error.rs:15:45
    |
 15 |     let _cx = context::new().with_capture::<MyError>();
-   |                              ------------   ^^^^^^^ the trait `ContextError<musli::alloc::Global>` is not implemented for `MyError`
+   |                              ------------   ^^^^^^^ unsatisfied trait bound
    |                              |
    |                              required by a bound introduced by this call
    |
+help: the trait `ContextError<musli::alloc::Global>` is not implemented for `MyError`
+  --> tests/ui/context_error_hint_error.rs:6:1
+   |
+ 6 | struct MyError;
+   | ^^^^^^^^^^^^^^
    = note: use `musli::context::ErrorMarker` to ignore errors
    = note: use `std::io::Error` and `std::string::String`, if the `std` or `alloc` features are enabled for `musli`
    = help: the following other types implement trait `ContextError<A>`:

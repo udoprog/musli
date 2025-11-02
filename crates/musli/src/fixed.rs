@@ -7,6 +7,7 @@ use core::fmt;
 use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
+use core::slice;
 
 use crate::Context;
 use crate::alloc::Vec;
@@ -198,7 +199,7 @@ impl<const N: usize> FixedBytes<N> {
 
         // SAFETY: We've asserted that `initialized` accounts for the number of
         // bytes that have been initialized.
-        unsafe { core::slice::from_raw_parts(self.data.as_ptr().cast(), self.init) }
+        unsafe { slice::from_raw_parts(self.data.as_ptr().cast(), self.init) }
     }
 
     /// Coerce into the mutable slice of initialized memory which is present.
@@ -223,7 +224,7 @@ impl<const N: usize> FixedBytes<N> {
 
         // SAFETY: We've asserted that `initialized` accounts for the number of
         // bytes that have been initialized.
-        unsafe { core::slice::from_raw_parts_mut(self.data.as_mut_ptr().cast(), self.init) }
+        unsafe { slice::from_raw_parts_mut(self.data.as_mut_ptr().cast(), self.init) }
     }
 
     /// Try and push a single byte.
