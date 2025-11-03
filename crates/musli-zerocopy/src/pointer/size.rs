@@ -56,6 +56,10 @@ where
     #[doc(hidden)]
     const N16: Self;
 
+    #[doc(hidden)]
+    /// Test for equality between two sizes.
+    fn eq(self, other: Self) -> bool;
+
     /// Try to perform a conversion from one `usize` type to another.
     #[inline(always)]
     fn try_from<U>(other: U) -> Result<Self, CoerceError>
@@ -72,6 +76,14 @@ where
     #[doc(hidden)]
     /// Perform checked multiplication over the type.
     fn checked_mul(self, other: Self) -> Option<Self>;
+
+    #[doc(hidden)]
+    /// Perform checked addition over the type.
+    fn checked_add(self, other: Self) -> Option<Self>;
+
+    #[doc(hidden)]
+    /// Perform checked subtraction over the type.
+    fn checked_sub(self, other: Self) -> Option<Self>;
 
     /// Construct this value from a usize.
     fn from_usize(value: usize) -> Self;
@@ -109,6 +121,11 @@ macro_rules! impl_size {
             const N16: Self = 16;
 
             #[inline(always)]
+            fn eq(self, other: Self) -> bool {
+                self == other
+            }
+
+            #[inline(always)]
             fn wrapping_mul(self, other: Self) -> Self {
                 self.wrapping_mul(other)
             }
@@ -116,6 +133,16 @@ macro_rules! impl_size {
             #[inline(always)]
             fn checked_mul(self, other: Self) -> Option<Self> {
                 self.checked_mul(other)
+            }
+
+            #[inline(always)]
+            fn checked_add(self, other: Self) -> Option<Self> {
+                self.checked_add(other)
+            }
+
+            #[inline(always)]
+            fn checked_sub(self, other: Self) -> Option<Self> {
+                self.checked_sub(other)
             }
 
             #[inline(always)]

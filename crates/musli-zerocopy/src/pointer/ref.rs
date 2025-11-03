@@ -552,8 +552,13 @@ where
     /// ```
     #[inline]
     pub fn iter(self) -> Iter<T, E, O> {
-        let start = self.offset.swap_bytes::<E>().as_usize();
-        let end = start + self.metadata.swap_bytes::<E>().as_usize() * size_of::<T>();
+        let start = self.offset.swap_bytes::<E>();
+        let end = self
+            .metadata
+            .swap_bytes::<E>()
+            .checked_mul(O::from_usize(size_of::<T>()))
+            .and_then(|v| v.checked_add(start))
+            .unwrap_or(start);
 
         Iter {
             start,
@@ -606,9 +611,9 @@ where
 ///
 /// See [`Ref::iter`].
 pub struct Iter<T, E, O> {
-    start: usize,
-    end: usize,
-    _marker: PhantomData<(T, E, O)>,
+    start: O,
+    end: O,
+    _marker: PhantomData<(T, E)>,
 }
 
 impl<T, E, O> Iterator for Iter<T, E, O>
@@ -621,13 +626,13 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.start == self.end {
+        if self.start.eq(self.end) {
             return None;
         }
 
         let start = self.start;
-        self.start += size_of::<T>();
-        Some(Ref::new(start))
+        self.start = self.start.checked_add(O::from_usize(size_of::<T>()))?;
+        Some(Ref::from_parts(start.swap_bytes::<E>(), ()))
     }
 }
 
@@ -639,12 +644,12 @@ where
 {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        if self.start == self.end {
+        if self.start.eq(self.end) {
             return None;
         }
 
-        self.end -= size_of::<T>();
-        Some(Ref::new(self.end))
+        self.end = self.end.checked_sub(O::from_usize(size_of::<T>()))?;
+        Some(Ref::from_parts(self.end.swap_bytes::<E>(), ()))
     }
 }
 

@@ -23,7 +23,7 @@ pub use self::size::{DefaultSize, Size};
 mod size;
 
 #[doc(inline)]
-pub use self::r#ref::Ref;
+pub use self::r#ref::{Iter, Ref};
 mod r#ref;
 
 #[doc(inline)]
