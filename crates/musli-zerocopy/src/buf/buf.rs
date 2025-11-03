@@ -610,12 +610,12 @@ impl Buf {
         Ok(Validator::from_slice(&self.data))
     }
 
-    pub(crate) unsafe fn get_range_from(
+    pub(crate) fn get_range_from(
         &self,
         start: usize,
         align: usize,
     ) -> Result<(NonNull<u8>, usize), Error> {
-        if self.data.len() < start {
+        let Some(len) = self.data.len().checked_sub(start) else {
             return Err(Error::new(ErrorKind::OutOfRangeFromBounds {
                 range: start..,
                 len: self.data.len(),
@@ -623,7 +623,6 @@ impl Buf {
         };
 
         let ptr = unsafe { NonNull::new_unchecked(self.data.as_ptr().add(start) as *mut _) };
-        let remaining = self.data.len() - start;
 
         if !buf::is_aligned_with(ptr.as_ptr(), align) {
             return Err(Error::new(ErrorKind::AlignmentRangeFromMismatch {
@@ -632,7 +631,7 @@ impl Buf {
             }));
         }
 
-        Ok((ptr, remaining))
+        Ok((ptr, len))
     }
 
     pub(crate) unsafe fn get_mut_range_from(
@@ -753,11 +752,11 @@ impl Buf {
     {
         let start = unsize.offset();
         let metadata = unsize.metadata();
+        let (buf, remaining) = self.get_range_from(start, T::ALIGN)?;
 
         // SAFETY: Alignment and size is checked just above when getting the
         // buffer slice.
         unsafe {
-            let (buf, remaining) = self.get_range_from(start, T::ALIGN)?;
             let metadata = T::validate_unsized::<E, O>(buf, remaining, metadata)?;
             Ok(&*T::with_metadata(buf, metadata))
         }

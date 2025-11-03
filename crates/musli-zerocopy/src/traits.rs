@@ -20,7 +20,7 @@ use core::array;
 use core::marker::PhantomData;
 use core::mem::{MaybeUninit, align_of, size_of, transmute};
 use core::num::Wrapping;
-use core::ptr::NonNull;
+use core::ptr::{self, NonNull};
 use core::slice;
 use core::str;
 
@@ -84,6 +84,11 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed + Pointee {
 
     /// Validate the buffer with the given capacity and return the decoded
     /// metadata.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that `data` point to a buffer that is at least
+    /// `len` long containing initialized data.
     unsafe fn validate_unsized<E, O>(
         data: NonNull<u8>,
         len: usize,
@@ -95,28 +100,22 @@ pub unsafe trait UnsizedZeroCopy: self::sealed::Sealed + Pointee {
 
     /// Construct a wide pointer from a pointer and its associated metadata.
     ///
-    /// # Safety
-    ///
-    /// The caller is responsible for ensuring that the pointer is valid. The
-    /// base pointer `ptr` has to point to a region of memory that is
-    /// initialized per `P::Metadata` requirements. Practically that means it's
-    /// passed a call to [`validate_unsized()`].
+    /// Note that calling this method is not unsafe, however using the resulting
+    /// pointer as an inhabitant of the given type without it being validated
+    /// first using [`validate_unsized()`] unsound.
     ///
     /// [`validate_unsized()`]: Self::validate_unsized
-    unsafe fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self;
+    fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self;
 
     /// Construct a wide mutable pointer from a pointer and its associated
     /// metadata.
     ///
-    /// # Safety
-    ///
-    /// The caller is responsible for ensuring that the pointer is valid. The
-    /// base pointer `ptr` has to point to a region of memory that is
-    /// initialized per `P::Metadata` requirements. Practically that means it's
-    /// passed a call to [`validate_unsized()`].
+    /// Note that calling this method is not unsafe, however using the resulting
+    /// pointer as an inhabitant of the given type without it being validated
+    /// first using [`validate_unsized()`] unsound.
     ///
     /// [`validate_unsized()`]: Self::validate_unsized
-    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self;
+    fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self;
 }
 
 /// This is a marker trait that must be implemented for a type in order to use
@@ -906,19 +905,15 @@ unsafe impl UnsizedZeroCopy for str {
     }
 
     #[inline]
-    unsafe fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self {
-        unsafe {
-            let slice = slice::from_raw_parts(data.as_ptr(), metadata);
-            str::from_utf8_unchecked(slice)
-        }
+    fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self {
+        let slice = ptr::slice_from_raw_parts(data.as_ptr(), metadata);
+        slice as *const Self
     }
 
     #[inline]
-    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self {
-        unsafe {
-            let slice = slice::from_raw_parts_mut(data.as_ptr(), metadata);
-            str::from_utf8_unchecked_mut(slice)
-        }
+    fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self {
+        let slice = ptr::slice_from_raw_parts_mut(data.as_ptr(), metadata);
+        slice as *mut Self
     }
 }
 
@@ -990,13 +985,13 @@ where
     }
 
     #[inline]
-    unsafe fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self {
-        unsafe { slice::from_raw_parts(data.cast().as_ptr(), metadata) }
+    fn with_metadata(data: NonNull<u8>, metadata: Self::Metadata) -> *const Self {
+        ptr::slice_from_raw_parts(data.cast().as_ptr(), metadata)
     }
 
     #[inline]
-    unsafe fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self {
-        unsafe { slice::from_raw_parts_mut(data.cast().as_ptr(), metadata) }
+    fn with_metadata_mut(data: NonNull<u8>, metadata: Self::Metadata) -> *mut Self {
+        ptr::slice_from_raw_parts_mut(data.cast().as_ptr(), metadata)
     }
 }
 
