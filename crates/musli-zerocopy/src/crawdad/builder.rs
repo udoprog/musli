@@ -53,10 +53,9 @@ impl Builder {
         self
     }
 
-    pub(super) fn build_from_keys<I, K>(self, keys: I) -> Result<Self, Error>
+    pub(super) fn build_from_keys<I>(self, keys: I) -> Result<Self, Error>
     where
-        I: IntoIterator<Item = K>,
-        K: AsRef<str>,
+        I: IntoIterator<Item: AsRef<str>>,
     {
         self.build_from_records(
             keys.into_iter()

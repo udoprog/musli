@@ -51,10 +51,9 @@ impl MpTrie {
     /// ```
     #[cfg(feature = "alloc")]
     #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-    pub fn from_keys<I, K>(keys: I) -> Result<Self, Error>
+    pub fn from_keys<I>(keys: I) -> Result<Self, Error>
     where
-        I: IntoIterator<Item = K>,
-        K: AsRef<str>,
+        I: IntoIterator<Item: AsRef<str>>,
     {
         Builder::new()
             .minimal_prefix()
