@@ -47,10 +47,11 @@ pub enum BinarySearch {
 /// assert!(match r { BinarySearch::Found(1..=4) => true, _ => false, });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn binary_search<S, Q>(buf: &Buf, slice: S, x: &Q) -> Result<BinarySearch, Error>
+pub fn binary_search<S, T, Q>(buf: &Buf, slice: S, x: &Q) -> Result<BinarySearch, Error>
 where
-    S: Slice<Item: ZeroCopy + Ord>,
-    Q: Visit<Target = S::Item>,
+    S: Slice<T>,
+    T: ZeroCopy + Ord,
+    Q: Visit<Target = T>,
 {
     binary_search_by(buf, slice, |value| x.visit(buf, |x| value.cmp(x)))
 }
@@ -94,10 +95,11 @@ where
 /// assert!(match r { BinarySearch::Found(1..=4) => true, _ => false, });
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub fn binary_search_by<S, F>(buf: &Buf, slice: S, mut f: F) -> Result<BinarySearch, Error>
+pub fn binary_search_by<S, T, F>(buf: &Buf, slice: S, mut f: F) -> Result<BinarySearch, Error>
 where
-    S: Slice<Item: ZeroCopy>,
-    F: FnMut(&S::Item) -> Result<Ordering, Error>,
+    S: Slice<T>,
+    T: ZeroCopy,
+    F: FnMut(&T) -> Result<Ordering, Error>,
 {
     // INVARIANTS:
     // - 0 <= left <= left + size = right <= slice.len()

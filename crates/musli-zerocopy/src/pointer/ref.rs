@@ -7,8 +7,8 @@ use core::mem::size_of;
 
 use crate::ZeroCopy;
 use crate::buf::{Padder, Validator};
-use crate::endian::{Big, ByteOrder, Little, Native};
-use crate::error::{CoerceError, Error};
+use crate::endian::{Big, ByteOrder, DefaultEndian, Little, Native};
+use crate::error::{CoerceError, CoerceErrorKind, Error};
 use crate::mem::PackedMaybeUninit;
 use crate::pointer::Coerce;
 use crate::pointer::{DefaultSize, Pointee, Size};
@@ -43,7 +43,7 @@ use crate::pointer::{DefaultSize, Pointee, Size};
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 #[repr(C)]
-pub struct Ref<T, E = Native, O = DefaultSize>
+pub struct Ref<T, E = DefaultEndian, O = DefaultSize>
 where
     T: ?Sized + Pointee,
     E: ByteOrder,
@@ -492,8 +492,8 @@ where
     ///
     /// buf.align_in_place()?;
     ///
-    /// let (a, b) = slice.split_at(3);
-    /// let (c, d) = slice.split_at(4);
+    /// let (a, b) = slice.split_at(3)?;
+    /// let (c, d) = slice.split_at(4)?;
     ///
     /// assert_eq!(buf.load(a)?, &[1, 2, 3]);
     /// assert_eq!(buf.load(b)?, &[4]);
@@ -502,13 +502,20 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn split_at(self, at: usize) -> (Self, Self) {
+    pub fn split_at(self, at: usize) -> Result<(Self, Self), CoerceError> {
         let offset = self.offset();
         let len = self.len();
-        assert!(at <= len, "Split point {at} is out of bounds 0..={len}");
-        let a = Self::with_metadata(offset, at);
-        let b = Self::with_metadata(offset + at * size_of::<T>(), len - at);
-        (a, b)
+
+        if at > len {
+            return Err(CoerceError::new(CoerceErrorKind::SplitAt { at, len }));
+        }
+
+        // SAFETY: Since we are splitting from a valid slice we know that they are valid.
+        unsafe {
+            let a = Self::try_with_metadata_unchecked(offset, at)?;
+            let b = Self::try_with_metadata_unchecked(offset + at * size_of::<T>(), len - at)?;
+            Ok((a, b))
+        }
     }
 
     /// Perform an fetch like `get` which panics with diagnostics in case the

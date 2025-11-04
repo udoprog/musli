@@ -2,8 +2,8 @@ use core::marker::PhantomData;
 use core::mem::size_of;
 
 use crate::buf::{Buf, Load};
-use crate::endian::{ByteOrder, Native};
-use crate::error::{CoerceError, Error};
+use crate::endian::{ByteOrder, DefaultEndian, Native};
+use crate::error::{CoerceError, CoerceErrorKind, Error};
 use crate::pointer::{Pointee, Ref, Size};
 use crate::slice::Slice;
 use crate::{DefaultSize, ZeroCopy};
@@ -18,10 +18,10 @@ use crate::{DefaultSize, ZeroCopy};
 /// use core::mem::{size_of, align_of};
 ///
 /// use musli_zerocopy::slice::Packed;
-/// use musli_zerocopy::{DefaultSize, Ref};
+/// use musli_zerocopy::{DefaultSize, DefaultEndian, Ref};
 ///
-/// assert_eq!(size_of::<Packed<[u32], u32, u8>>(), 5);
-/// assert_eq!(align_of::<Packed<[u32], u32, u8>>(), 1);
+/// assert_eq!(size_of::<Packed<[u32], DefaultEndian, u32, u8>>(), 5);
+/// assert_eq!(align_of::<Packed<[u32], DefaultEndian, u32, u8>>(), 1);
 ///
 /// assert_eq!(size_of::<Ref<[u32]>>(), size_of::<DefaultSize>() * 2);
 /// assert_eq!(align_of::<Ref<[u32]>>(), align_of::<DefaultSize>());
@@ -34,12 +34,12 @@ use crate::{DefaultSize, ZeroCopy};
 #[derive(ZeroCopy)]
 #[zero_copy(crate, bounds = {O: ZeroCopy, L: ZeroCopy})]
 #[repr(C, packed)]
-pub struct Packed<T, O = DefaultSize, L = DefaultSize, E = Native>
+pub struct Packed<T, E = DefaultEndian, O = DefaultSize, L = DefaultSize>
 where
     T: ?Sized,
+    E: ByteOrder,
     O: Size,
     L: Size,
-    E: ByteOrder,
 {
     offset: O,
     len: L,
@@ -47,24 +47,14 @@ where
     _marker: PhantomData<(E, T)>,
 }
 
-impl<T, O, L, E> Slice for Packed<[T], O, L, E>
+impl<T, E, O, L> Slice<T> for Packed<[T], E, O, L>
 where
     T: ZeroCopy,
     O: Size + TryFrom<usize>,
     L: Size + TryFrom<usize>,
     E: ByteOrder,
 {
-    type Item = T;
     type ItemRef = Ref<T, E, usize>;
-
-    #[inline]
-    fn from_ref<A, B>(slice: Ref<[T], A, B>) -> Self
-    where
-        A: ByteOrder,
-        B: Size,
-    {
-        Self::with_metadata(slice.offset(), slice.len())
-    }
 
     #[inline]
     fn try_from_ref<A, B>(slice: Ref<[T], A, B>) -> Result<Self, CoerceError>
@@ -73,11 +63,6 @@ where
         B: Size,
     {
         Self::try_with_metadata(slice.offset(), slice.len())
-    }
-
-    #[inline]
-    fn with_metadata(offset: usize, len: usize) -> Self {
-        Packed::from_raw_parts(offset, len)
     }
 
     #[inline]
@@ -91,7 +76,7 @@ where
     }
 
     #[inline]
-    fn split_at(self, at: usize) -> (Self, Self) {
+    fn split_at(self, at: usize) -> Result<(Self, Self), CoerceError> {
         Packed::split_at(self, at)
     }
 
@@ -116,7 +101,7 @@ where
     }
 }
 
-impl<T, O, L, E> Packed<[T], O, L, E>
+impl<T, E, O, L> Packed<[T], E, O, L>
 where
     T: ZeroCopy,
     O: Size,
@@ -158,12 +143,13 @@ where
     /// # Examples
     ///
     /// ```
+    /// use musli_zerocopy::DefaultEndian;
     /// use musli_zerocopy::slice::Packed;
     ///
-    /// let slice = Packed::<[u32], u32, u8>::try_from_raw_parts(42, 2)?;
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::try_from_raw_parts(42, 2)?;
     /// assert_eq!(slice.offset(), 42);
     ///
-    /// assert!(Packed::<[u32], u32, u8>::try_from_raw_parts(42, usize::MAX).is_err());
+    /// assert!(Packed::<[u32], DefaultEndian, u32, u8>::try_from_raw_parts(42, usize::MAX).is_err());
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
@@ -225,8 +211,8 @@ where
     ///
     /// buf.align_in_place()?;
     ///
-    /// let (a, b) = slice.split_at(3);
-    /// let (c, d) = slice.split_at(4);
+    /// let (a, b) = slice.split_at(3)?;
+    /// let (c, d) = slice.split_at(4)?;
     ///
     /// assert_eq!(buf.load(a)?, &[1, 2, 3]);
     /// assert_eq!(buf.load(b)?, &[4]);
@@ -235,13 +221,17 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn split_at(self, at: usize) -> (Self, Self) {
+    pub fn split_at(self, at: usize) -> Result<(Self, Self), CoerceError> {
         let offset = self.offset.swap_bytes::<E>().as_usize();
         let len = self.len.swap_bytes::<E>().as_usize();
-        assert!(at <= len, "Split point {at} is out of bounds 0..={len}");
-        let a = Self::from_raw_parts(offset, at);
-        let b = Self::from_raw_parts(offset + at * size_of::<T>(), len - at);
-        (a, b)
+
+        if at > len {
+            return Err(CoerceError::new(CoerceErrorKind::SplitAt { at, len }));
+        }
+
+        let a = Self::try_from_raw_parts(offset, at)?;
+        let b = Self::try_from_raw_parts(offset + at * size_of::<T>(), len - at)?;
+        Ok((a, b))
     }
 
     /// Get an unchecked reference directly out of the slice without validation.
@@ -283,9 +273,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// use musli_zerocopy::DefaultEndian;
     /// use musli_zerocopy::slice::Packed;
     ///
-    /// let slice = Packed::<[u32], u32, u8>::from_raw_parts(42, 2);
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::from_raw_parts(42, 2);
     /// assert_eq!(slice.offset(), 42);
     /// ```
     pub fn offset(self) -> usize {
@@ -297,9 +288,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// use musli_zerocopy::DefaultEndian;
     /// use musli_zerocopy::slice::Packed;
     ///
-    /// let slice = Packed::<[u32], u32, u8>::from_raw_parts(0, 2);
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::from_raw_parts(0, 2);
     /// assert_eq!(slice.len(), 2);
     /// ```
     #[inline]
@@ -312,12 +304,13 @@ where
     /// # Examples
     ///
     /// ```
+    /// use musli_zerocopy::DefaultEndian;
     /// use musli_zerocopy::slice::Packed;
     ///
-    /// let slice = Packed::<[u32], u32, u8>::from_raw_parts(0, 0);
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::from_raw_parts(0, 0);
     /// assert!(slice.is_empty());
     ///
-    /// let slice = Packed::<[u32], u32, u8>::from_raw_parts(0, 2);
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::from_raw_parts(0, 2);
     /// assert!(!slice.is_empty());
     /// ```
     #[inline]
@@ -326,7 +319,7 @@ where
     }
 }
 
-impl<T, O, L, E> Load for Packed<[T], O, L, E>
+impl<T, E, O, L> Load for Packed<[T], E, O, L>
 where
     T: ZeroCopy,
     O: Size,
@@ -350,7 +343,7 @@ where
     }
 }
 
-impl<T, O, L, E> Clone for Packed<[T], O, L, E>
+impl<T, E, O, L> Clone for Packed<[T], E, O, L>
 where
     O: Size,
     L: Size,
@@ -362,7 +355,7 @@ where
     }
 }
 
-impl<T, O, L, E> Copy for Packed<[T], O, L, E>
+impl<T, E, O, L> Copy for Packed<[T], E, O, L>
 where
     O: Size,
     L: Size,

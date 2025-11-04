@@ -12,7 +12,7 @@ use std::io;
 use alloc::alloc;
 
 use crate::buf::{self, AllocError, Buf, DefaultAlignment, Padder, StoreBuf};
-use crate::endian::{ByteOrder, Native};
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::error::{Error, ErrorKind};
 use crate::mem::PackedMaybeUninit;
 use crate::pointer::{DefaultSize, Ref, Size};
@@ -40,7 +40,7 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 /// assert!(buf.alignment() >= 128);
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub struct OwnedBuf<E = Native, O = DefaultSize>
+pub struct OwnedBuf<E = DefaultEndian, O = DefaultSize>
 where
     E: ByteOrder,
     O: Size,

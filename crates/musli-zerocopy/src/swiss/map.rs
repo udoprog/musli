@@ -18,7 +18,7 @@ use core::hash::{Hash, Hasher};
 use core::mem::size_of;
 
 use crate::buf::{Bindable, Buf, Visit};
-use crate::endian::{ByteOrder, Native};
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::error::{Error, ErrorKind};
 use crate::pointer::{DefaultSize, Ref, Size};
 use crate::sip::SipHasher13;
@@ -238,7 +238,7 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct MapRef<K, V, E = Native, O = DefaultSize>
+pub struct MapRef<K, V, E = DefaultEndian, O = DefaultSize>
 where
     K: ZeroCopy,
     V: ZeroCopy,
@@ -490,7 +490,7 @@ impl<'a, T> RawTable<'a, T> {
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub(crate) struct RawTableRef<T, E = Native, O = DefaultSize>
+pub(crate) struct RawTableRef<T, E = DefaultEndian, O = DefaultSize>
 where
     T: ZeroCopy,
     E: ByteOrder,

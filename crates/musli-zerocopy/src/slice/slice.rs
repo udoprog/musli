@@ -20,7 +20,7 @@ mod sealed {
     {
     }
 
-    impl<T, O, L, E> Sealed for Packed<[T], O, L, E>
+    impl<T, E, O, L> Sealed for Packed<[T], E, O, L>
     where
         O: Size,
         L: Size,
@@ -30,44 +30,14 @@ mod sealed {
 }
 
 /// A trait implemented by slice-like types.
-pub trait Slice
+pub trait Slice<T>
 where
-    Self: Copy + ZeroCopy + Load<Target = [Self::Item]> + self::sealed::Sealed,
+    Self: Copy + ZeroCopy + Load<Target = [T]> + self::sealed::Sealed,
 {
-    /// The item in an unsized slice, or the `T` in `[T]`.
-    type Item;
-
     /// A returned reference to an item in a slice.
-    type ItemRef: Load<Target = Self::Item>;
+    type ItemRef: Load<Target = T>;
 
-    /// Construct a slice from a [`Ref<[Self::Item]>`].
-    ///
-    /// # Panics
-    ///
-    /// This method panics if construction of the slice would overflow any of
-    /// its parameters.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::{Ref, ZeroCopy};
-    /// use musli_zerocopy::slice::Slice;
-    ///
-    /// fn generic<S>(r: Ref<[S::Item]>) -> S
-    /// where
-    ///     S: Slice,
-    ///     S::Item: ZeroCopy
-    /// {
-    ///     S::from_ref(r)
-    /// }
-    /// ```
-    fn from_ref<E, O>(slice: Ref<[Self::Item], E, O>) -> Self
-    where
-        Self::Item: ZeroCopy,
-        E: ByteOrder,
-        O: Size;
-
-    /// Try to construct a slice from a [`Ref<[Self::Item]>`].
+    /// Try to construct a slice from a [`Ref<[T]>`].
     ///
     /// # Errors
     ///
@@ -80,37 +50,19 @@ where
     /// use musli_zerocopy::{Error, Ref, ZeroCopy};
     /// use musli_zerocopy::slice::Slice;
     ///
-    /// fn generic<S>(r: Ref<[S::Item]>) -> Result<S, Error>
+    /// fn generic<S, T>(r: Ref<[T]>) -> Result<S, Error>
     /// where
-    ///     S: Slice<Item: ZeroCopy>
+    ///     S: Slice<T>,
+    ///     T: ZeroCopy,
     /// {
     ///     Ok(S::try_from_ref(r)?)
     /// }
     /// ```
-    fn try_from_ref<E, O>(slice: Ref<[Self::Item], E, O>) -> Result<Self, CoerceError>
+    fn try_from_ref<E, O>(slice: Ref<[T], E, O>) -> Result<Self, CoerceError>
     where
-        Self::Item: ZeroCopy,
+        T: ZeroCopy,
         E: ByteOrder,
         O: Size;
-
-    /// Construct a slice from its `offset` and `len`.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if construction of the slice would overflow any of
-    /// its parameters.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use musli_zerocopy::Ref;
-    /// use musli_zerocopy::slice::Slice;
-    ///
-    /// fn generic<S>() -> S where S: Slice {
-    ///     S::with_metadata(0usize, 10)
-    /// }
-    /// ```
-    fn with_metadata(offset: usize, len: usize) -> Self;
 
     /// Construct a slice from its `offset` and `len`.
     ///
@@ -122,11 +74,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// use musli_zerocopy::Ref;
+    /// use musli_zerocopy::{CoerceError, Ref};
     /// use musli_zerocopy::slice::Slice;
     ///
-    /// fn generic<S>() -> S where S: Slice {
-    ///     S::with_metadata(0usize, 10)
+    /// fn generic<S>() -> Result<S, CoerceError> where S: Slice<u8> {
+    ///     S::try_with_metadata(0usize, 10)
     /// }
     /// ```
     fn try_with_metadata(offset: usize, len: usize) -> Result<Self, CoerceError>;
@@ -144,7 +96,7 @@ where
     ///
     /// fn generic<S>(buf: &Buf, slice: S) -> Result<(), Error>
     /// where
-    ///     S: Slice<Item = i32>
+    ///     S: Slice<i32>
     /// {
     ///     let two = slice.get(2).expect("Missing element 2");
     ///     assert_eq!(buf.load(two)?, &3);
@@ -175,10 +127,10 @@ where
     ///
     /// fn generic<S>(buf: &Buf, slice: S) -> Result<(), Error>
     /// where
-    ///     S: Slice<Item = i32>
+    ///     S: Slice<i32>
     /// {
-    ///     let (a, b) = slice.split_at(3);
-    ///     let (c, d) = slice.split_at(4);
+    ///     let (a, b) = slice.split_at(3)?;
+    ///     let (c, d) = slice.split_at(4)?;
     ///
     ///     assert_eq!(buf.load(a)?, &[1, 2, 3]);
     ///     assert_eq!(buf.load(b)?, &[4]);
@@ -195,7 +147,7 @@ where
     /// generic(&buf, slice)?;
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    fn split_at(self, at: usize) -> (Self, Self);
+    fn split_at(self, at: usize) -> Result<(Self, Self), CoerceError>;
 
     /// Get an unchecked reference directly out of the slice without validation.
     ///
@@ -217,7 +169,7 @@ where
     /// // A method generic over a specific slice implementation.
     /// fn generic<S>(buf: &Buf, slice: S) -> Result<(), Error>
     /// where
-    ///     S: Slice<Item = i32>
+    ///     S: Slice<i32>
     /// {
     ///     let two = slice.get_unchecked(2);
     ///     assert_eq!(buf.load(two)?, &3);
@@ -244,7 +196,7 @@ where
     /// use musli_zerocopy::slice::Slice;
     ///
     /// // A method generic over a specific slice implementation.
-    /// fn generic<S>(slice: S) where S: Slice {
+    /// fn generic<S>(slice: S) where S: Slice<i32> {
     ///     assert_eq!(slice.offset(), 42);
     /// }
     ///
@@ -262,7 +214,7 @@ where
     /// use musli_zerocopy::slice::Slice;
     ///
     /// // A method generic over a specific slice implementation.
-    /// fn generic<S>(slice: S) where S: Slice {
+    /// fn generic<S>(slice: S) where S: Slice<i32> {
     ///     assert_eq!(slice.len(), 2);
     /// }
     ///
@@ -280,7 +232,7 @@ where
     /// use musli_zerocopy::slice::Slice;
     ///
     /// // A method generic over a specific slice implementation.
-    /// fn generic<S>(a: S, b: S) where S: Slice {
+    /// fn generic<S>(a: S, b: S) where S: Slice<u32> {
     ///     assert!(a.is_empty());
     ///     assert!(!b.is_empty());
     /// }
@@ -292,22 +244,11 @@ where
     fn is_empty(self) -> bool;
 }
 
-impl<T, A: ByteOrder, B: Size> Slice for Ref<[T], A, B>
+impl<T, A: ByteOrder, B: Size> Slice<T> for Ref<[T], A, B>
 where
     T: ZeroCopy,
 {
-    type Item = T;
     type ItemRef = Ref<T, A, B>;
-
-    #[inline]
-    fn from_ref<E, O>(slice: Ref<[T], E, O>) -> Self
-    where
-        T: ZeroCopy,
-        E: ByteOrder,
-        O: Size,
-    {
-        Ref::with_metadata(slice.offset(), slice.len())
-    }
 
     #[inline]
     fn try_from_ref<E, O>(slice: Ref<[T], E, O>) -> Result<Self, CoerceError>
@@ -317,11 +258,6 @@ where
         O: Size,
     {
         Ref::try_with_metadata(slice.offset(), slice.len())
-    }
-
-    #[inline]
-    fn with_metadata(offset: usize, len: usize) -> Self {
-        Ref::with_metadata(offset, len)
     }
 
     #[inline]
@@ -335,7 +271,7 @@ where
     }
 
     #[inline]
-    fn split_at(self, at: usize) -> (Self, Self) {
+    fn split_at(self, at: usize) -> Result<(Self, Self), CoerceError> {
         Ref::split_at(self, at)
     }
 
