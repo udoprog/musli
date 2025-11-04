@@ -134,6 +134,7 @@ impl core::error::Error for CoerceError {}
 #[cfg_attr(test, derive(PartialEq))]
 #[non_exhaustive]
 pub(crate) enum CoerceErrorKind {
+    SplitAt { at: usize, len: usize },
     SliceLengthOverflow { item: usize, len: usize },
     LengthOverflow { len: usize, size: usize },
     InvalidLayout { size: Option<usize>, align: usize },
@@ -145,6 +146,9 @@ pub(crate) enum CoerceErrorKind {
 impl fmt::Display for CoerceErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
+            Self::SplitAt { at, len } => {
+                write!(f, "Split point {at} is out of bounds 0..={len}")
+            }
             Self::SliceLengthOverflow { item, len } => {
                 write!(
                     f,

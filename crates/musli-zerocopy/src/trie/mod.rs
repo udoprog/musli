@@ -91,18 +91,18 @@ type StackEntry<'buf, T, E, F> = (LinksRef<T, E, F>, usize, &'buf [u8]);
 /// ```
 pub trait Flavor {
     /// The type representing a string in the trie.
-    type String<E>: Slice<Item = u8>
+    type String<E>: Slice<u8>
     where
         E: ByteOrder;
 
     /// The type representing a collection of values in the trie.
-    type Values<T, E>: Slice<Item = T>
+    type Values<T, E>: Slice<T>
     where
         T: ZeroCopy,
         E: ByteOrder;
 
     /// The type representing a collection of children in the trie.
-    type Children<T, E>: Slice<Item = T>
+    type Children<T, E>: Slice<T>
     where
         T: ZeroCopy,
         E: ByteOrder;

@@ -3,7 +3,7 @@ use core::mem::size_of;
 
 use crate::buf::{Buf, Load};
 use crate::endian::{ByteOrder, DefaultEndian, Native};
-use crate::error::{CoerceError, Error};
+use crate::error::{CoerceError, CoerceErrorKind, Error};
 use crate::pointer::{Pointee, Ref, Size};
 use crate::slice::Slice;
 use crate::{DefaultSize, ZeroCopy};
@@ -47,24 +47,14 @@ where
     _marker: PhantomData<(E, T)>,
 }
 
-impl<T, E, O, L> Slice for Packed<[T], E, O, L>
+impl<T, E, O, L> Slice<T> for Packed<[T], E, O, L>
 where
     T: ZeroCopy,
     O: Size + TryFrom<usize>,
     L: Size + TryFrom<usize>,
     E: ByteOrder,
 {
-    type Item = T;
     type ItemRef = Ref<T, E, usize>;
-
-    #[inline]
-    fn from_ref<A, B>(slice: Ref<[T], A, B>) -> Self
-    where
-        A: ByteOrder,
-        B: Size,
-    {
-        Self::with_metadata(slice.offset(), slice.len())
-    }
 
     #[inline]
     fn try_from_ref<A, B>(slice: Ref<[T], A, B>) -> Result<Self, CoerceError>
@@ -73,11 +63,6 @@ where
         B: Size,
     {
         Self::try_with_metadata(slice.offset(), slice.len())
-    }
-
-    #[inline]
-    fn with_metadata(offset: usize, len: usize) -> Self {
-        Packed::from_raw_parts(offset, len)
     }
 
     #[inline]
@@ -91,7 +76,7 @@ where
     }
 
     #[inline]
-    fn split_at(self, at: usize) -> (Self, Self) {
+    fn split_at(self, at: usize) -> Result<(Self, Self), CoerceError> {
         Packed::split_at(self, at)
     }
 
@@ -226,8 +211,8 @@ where
     ///
     /// buf.align_in_place()?;
     ///
-    /// let (a, b) = slice.split_at(3);
-    /// let (c, d) = slice.split_at(4);
+    /// let (a, b) = slice.split_at(3)?;
+    /// let (c, d) = slice.split_at(4)?;
     ///
     /// assert_eq!(buf.load(a)?, &[1, 2, 3]);
     /// assert_eq!(buf.load(b)?, &[4]);
@@ -236,13 +221,17 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
-    pub fn split_at(self, at: usize) -> (Self, Self) {
+    pub fn split_at(self, at: usize) -> Result<(Self, Self), CoerceError> {
         let offset = self.offset.swap_bytes::<E>().as_usize();
         let len = self.len.swap_bytes::<E>().as_usize();
-        assert!(at <= len, "Split point {at} is out of bounds 0..={len}");
-        let a = Self::from_raw_parts(offset, at);
-        let b = Self::from_raw_parts(offset + at * size_of::<T>(), len - at);
-        (a, b)
+
+        if at > len {
+            return Err(CoerceError::new(CoerceErrorKind::SplitAt { at, len }));
+        }
+
+        let a = Self::try_from_raw_parts(offset, at)?;
+        let b = Self::try_from_raw_parts(offset + at * size_of::<T>(), len - at)?;
+        Ok((a, b))
     }
 
     /// Get an unchecked reference directly out of the slice without validation.

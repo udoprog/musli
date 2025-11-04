@@ -176,7 +176,7 @@ where
 /// prefixed with its complete counterpart.
 fn prefix_string<S>(string: S, prefix_len: usize) -> Result<Ref<[u8], Native, usize>, CoerceError>
 where
-    S: Slice<Item = u8>,
+    S: Slice<u8>,
 {
     // NB: All of these operations have to be checked, since they are preformed
     // over untrusted data and we'd like to avoid a panic.

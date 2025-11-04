@@ -277,7 +277,7 @@ where
         (table.bucket_mask(), table.len())
     };
 
-    let ctrl = Ref::with_metadata(ctrl_ptr, ctrl_len);
-    let buckets = Ref::with_metadata(base_ptr, buckets);
+    let ctrl = Ref::try_with_metadata(ctrl_ptr, ctrl_len)?;
+    let buckets = Ref::try_with_metadata(base_ptr, buckets)?;
     Ok((key, ctrl, buckets, bucket_mask, len))
 }

@@ -208,7 +208,7 @@ where
                     // "work" => { "ing" => { values = [1, 2, 3] } }
                     // ```
                     if prefix != child.string.len() {
-                        let (prefix, suffix) = child.string.split_at(prefix);
+                        let (prefix, suffix) = child.string.split_at(prefix)?;
                         let new_node = Node::new(prefix);
                         let mut replaced = replace(child, new_node);
                         replaced.string = suffix;
@@ -216,7 +216,7 @@ where
                     }
 
                     current = &current[prefix..];
-                    string = string.split_at(prefix).1;
+                    string = string.split_at(prefix)?.1;
                     this = &mut child.links;
                 }
             }
