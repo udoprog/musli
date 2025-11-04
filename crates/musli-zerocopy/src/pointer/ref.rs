@@ -51,7 +51,7 @@ where
 {
     offset: O,
     metadata: T::Stored<O>,
-    _marker: PhantomData<(E, T)>,
+    _marker: PhantomData<E>,
 }
 
 unsafe impl<T, E, O> ZeroCopy for Ref<T, E, O>
