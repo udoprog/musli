@@ -1,6 +1,6 @@
 use core::slice;
 
-use crate::endian::Native;
+use crate::endian::{ByteOrder, Native};
 use crate::error::{CoerceError, CoerceErrorKind, ErrorKind};
 use crate::slice::{BinarySearch, Slice, binary_search_by};
 use crate::stack::Stack;
@@ -8,28 +8,30 @@ use crate::{Buf, Error, Ref, ZeroCopy};
 
 use super::{Flavor, LinksRef, StackEntry, prefix};
 
-pub(super) struct Walk<'a, 'buf, T, F, S>
+pub(super) struct Walk<'a, 'buf, T, E, F, S>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
-    S: Stack<StackEntry<'buf, T, F>>,
+    S: Stack<StackEntry<'buf, T, E, F>>,
 {
     // Buffer being walked.
     buf: &'buf Buf,
     // State of the current walker.
-    state: WalkState<'a, 'buf, T, F>,
+    state: WalkState<'a, 'buf, T, E, F>,
     // A stack which indicates the links who's children we should visit next,
     // and an index corresponding to the child to visit.
     stack: S,
 }
 
-impl<'a, 'buf, T, F, S> Walk<'a, 'buf, T, F, S>
+impl<'a, 'buf, T, E, F, S> Walk<'a, 'buf, T, E, F, S>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
-    S: Stack<StackEntry<'buf, T, F>>,
+    S: Stack<StackEntry<'buf, T, E, F>>,
 {
-    pub(super) fn find(buf: &'buf Buf, links: LinksRef<T, F>, prefix: &'a [u8]) -> Self {
+    pub(super) fn find(buf: &'buf Buf, links: LinksRef<T, E, F>, prefix: &'a [u8]) -> Self {
         Self {
             buf,
             state: WalkState::Find(links, prefix),
@@ -199,13 +201,14 @@ where
     Ref::try_with_metadata(real_start, real_end - real_start)
 }
 
-enum WalkState<'a, 'buf, T, F>
+enum WalkState<'a, 'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     // Initial state where we need to lookup the specified prefix in the trie.
-    Find(LinksRef<T, F>, &'a [u8]),
+    Find(LinksRef<T, E, F>, &'a [u8]),
     // Values are being yielded.
     Values(&'buf [u8], slice::Iter<'buf, T>),
     // Stack traversal.

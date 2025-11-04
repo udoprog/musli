@@ -25,7 +25,7 @@ use crate::slice::{BinarySearch, Slice, binary_search_by};
 use crate::stack::ArrayStack;
 use crate::{Buf, DefaultSize, Error, Ref, Size, ZeroCopy};
 
-type StackEntry<'buf, T, F> = (LinksRef<T, F>, usize, &'buf [u8]);
+type StackEntry<'buf, T, E, F> = (LinksRef<T, E, F>, usize, &'buf [u8]);
 
 /// The flavor of a trie. Allows for customization of implementation details to
 /// for example use a more compact representation than the one provided by
@@ -35,27 +35,31 @@ type StackEntry<'buf, T, F> = (LinksRef<T, F>, usize, &'buf [u8]);
 /// # Examples
 ///
 /// ```
-/// use musli_zerocopy::{trie, Error, OwnedBuf, ZeroCopy};
+/// use musli_zerocopy::{trie, DefaultEndian, Error, OwnedBuf, ZeroCopy, ByteOrder};
 /// use musli_zerocopy::slice::Packed;
 ///
 /// struct PackedTrie;
 ///
 /// impl trie::Flavor for PackedTrie {
 ///     // The maximum length of a string slice stored in the trie is `u8::MAX`.
-///     type String = Packed<[u8], u32, u8>;
+///     type String<E> = Packed<[u8], E, u32, u8>
+///     where
+///         E: ByteOrder;
 ///
 ///     // The max number of values stored in a single node is `u16::MAX`.
-///     type Values<T> = Packed<[T], u32, u16>
+///     type Values<T, E> = Packed<[T], E, u32, u16>
 ///     where
-///         T: ZeroCopy;
+///         T: ZeroCopy,
+///         E: ByteOrder;
 ///
 ///     // The maximum number of children for a single node is `u8::MAX`.
-///     type Children<T> = Packed<[T], u32, u8>
+///     type Children<T, E> = Packed<[T], E, u32, u8>
 ///     where
-///         T: ZeroCopy;
+///         T: ZeroCopy,
+///         E: ByteOrder;
 /// }
 ///
-/// fn populate<F>(buf: &mut OwnedBuf, mut trie: trie::Builder<u32, F>) -> Result<trie::TrieRef<u32, F>, Error>
+/// fn populate<F>(buf: &mut OwnedBuf, mut trie: trie::Builder<u32, F>) -> Result<trie::TrieRef<u32, DefaultEndian, F>, Error>
 /// where
 ///     F: trie::Flavor
 /// {
@@ -87,57 +91,68 @@ type StackEntry<'buf, T, F> = (LinksRef<T, F>, usize, &'buf [u8]);
 /// ```
 pub trait Flavor {
     /// The type representing a string in the trie.
-    type String: Slice<Item = u8>;
+    type String<E>: Slice<Item = u8>
+    where
+        E: ByteOrder;
 
     /// The type representing a collection of values in the trie.
-    type Values<T>: Slice<Item = T>
+    type Values<T, E>: Slice<Item = T>
     where
-        T: ZeroCopy;
+        T: ZeroCopy,
+        E: ByteOrder;
 
     /// The type representing a collection of children in the trie.
-    type Children<T>: Slice<Item = T>
+    type Children<T, E>: Slice<Item = T>
     where
-        T: ZeroCopy;
+        T: ZeroCopy,
+        E: ByteOrder;
 }
 
 /// Marker type indicating the default trie [`Flavor`] to use for a given
 /// [`ByteOrder`] and [`Size`].
-pub struct DefaultFlavor<E = DefaultEndian, O = DefaultSize>(PhantomData<(E, O)>)
+pub struct DefaultFlavor<O = DefaultSize>(PhantomData<O>)
 where
-    E: ByteOrder,
     O: Size;
 
-impl<E, O> Flavor for DefaultFlavor<E, O>
+impl<O> Flavor for DefaultFlavor<O>
 where
-    E: ByteOrder,
     O: Size,
 {
-    type String = Ref<[u8], E, O>;
-    type Values<T>
+    type String<E>
+        = Ref<[u8], E, O>
+    where
+        E: ByteOrder;
+
+    type Values<T, E>
         = Ref<[T], E, O>
     where
-        T: ZeroCopy;
-    type Children<T>
+        T: ZeroCopy,
+        E: ByteOrder;
+
+    type Children<T, E>
         = Ref<[T], E, O>
     where
-        T: ZeroCopy;
+        T: ZeroCopy,
+        E: ByteOrder;
 }
 
 /// A stored reference to a trie.
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-pub struct TrieRef<T, F = DefaultFlavor>
+pub struct TrieRef<T, E = DefaultEndian, F = DefaultFlavor>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    links: LinksRef<T, F>,
+    links: LinksRef<T, E, F>,
 }
 
-impl<T, F> TrieRef<T, F>
+impl<T, E, F> TrieRef<T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     /// Debug print the current trie.
@@ -164,7 +179,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[cfg(feature = "alloc")]
-    pub fn debug<'a, 'buf>(&'a self, buf: &'buf Buf) -> Debug<'a, 'buf, T, F>
+    pub fn debug<'a, 'buf>(&'a self, buf: &'buf Buf) -> Debug<'a, 'buf, T, E, F>
     where
         T: fmt::Debug,
     {
@@ -197,7 +212,7 @@ where
     pub fn debug_fixed<'a, 'buf, const N: usize>(
         &'a self,
         buf: &'buf Buf,
-    ) -> DebugFixed<'a, 'buf, N, T, F>
+    ) -> DebugFixed<'a, 'buf, N, T, E, F>
     where
         T: fmt::Debug,
     {
@@ -304,7 +319,7 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[cfg(feature = "alloc")]
-    pub fn values<'buf>(&self, buf: &'buf Buf) -> Values<'buf, T, F> {
+    pub fn values<'buf>(&self, buf: &'buf Buf) -> Values<'buf, T, E, F> {
         Values {
             iter: Walk::find(buf, self.links, &[]),
         }
@@ -346,7 +361,10 @@ where
     /// assert!(values.into_iter().copied().eq([1, 2, 3, 4, 5, 6, 7, 8]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn values_fixed<'buf, const N: usize>(&self, buf: &'buf Buf) -> ValuesFixed<'buf, N, T, F> {
+    pub fn values_fixed<'buf, const N: usize>(
+        &self,
+        buf: &'buf Buf,
+    ) -> ValuesFixed<'buf, N, T, E, F> {
         ValuesFixed {
             iter: Walk::find(buf, self.links, &[]),
         }
@@ -394,7 +412,11 @@ where
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[cfg(feature = "alloc")]
-    pub fn values_in<'a, 'buf, S>(&self, buf: &'buf Buf, prefix: &'a S) -> ValuesIn<'a, 'buf, T, F>
+    pub fn values_in<'a, 'buf, S>(
+        &self,
+        buf: &'buf Buf,
+        prefix: &'a S,
+    ) -> ValuesIn<'a, 'buf, T, E, F>
     where
         S: ?Sized + AsRef<[u8]>,
     {
@@ -448,7 +470,7 @@ where
         &self,
         buf: &'buf Buf,
         prefix: &'a S,
-    ) -> ValuesInFixed<'a, 'buf, N, T, F>
+    ) -> ValuesInFixed<'a, 'buf, N, T, E, F>
     where
         S: ?Sized + AsRef<[u8]>,
     {
@@ -520,7 +542,7 @@ where
     /// # Ok::<_, anyhow::Error>(())
     /// ```
     #[cfg(feature = "alloc")]
-    pub fn iter<'buf>(&self, buf: &'buf Buf) -> Iter<'buf, T, F> {
+    pub fn iter<'buf>(&self, buf: &'buf Buf) -> Iter<'buf, T, E, F> {
         Iter {
             iter: Walk::find(buf, self.links, &[]),
         }
@@ -589,7 +611,7 @@ where
     /// };
     /// # Ok::<_, anyhow::Error>(())
     /// ```
-    pub fn iter_fixed<'buf, const N: usize>(&self, buf: &'buf Buf) -> IterFixed<'buf, N, T, F> {
+    pub fn iter_fixed<'buf, const N: usize>(&self, buf: &'buf Buf) -> IterFixed<'buf, N, T, E, F> {
         IterFixed {
             iter: Walk::find(buf, self.links, &[]),
         }
@@ -674,7 +696,7 @@ where
     /// # Ok::<_, anyhow::Error>(())
     /// ```
     #[cfg(feature = "alloc")]
-    pub fn iter_in<'a, 'buf, S>(&self, buf: &'buf Buf, prefix: &'a S) -> IterIn<'a, 'buf, T, F>
+    pub fn iter_in<'a, 'buf, S>(&self, buf: &'buf Buf, prefix: &'a S) -> IterIn<'a, 'buf, T, E, F>
     where
         S: ?Sized + AsRef<[u8]>,
     {
@@ -766,7 +788,7 @@ where
         &self,
         buf: &'buf Buf,
         prefix: &'a S,
-    ) -> IterInFixed<'a, 'buf, N, T, F>
+    ) -> IterInFixed<'a, 'buf, N, T, E, F>
     where
         S: ?Sized + AsRef<[u8]>,
     {
@@ -780,18 +802,20 @@ where
 ///
 /// See [`TrieRef::values_in()`].
 #[cfg(feature = "alloc")]
-pub struct ValuesIn<'a, 'buf, T, F>
+pub struct ValuesIn<'a, 'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    iter: Walk<'a, 'buf, T, F, Vec<StackEntry<'buf, T, F>>>,
+    iter: Walk<'a, 'buf, T, E, F, Vec<StackEntry<'buf, T, E, F>>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'buf, T, F> Iterator for ValuesIn<'_, 'buf, T, F>
+impl<'buf, T, E, F> Iterator for ValuesIn<'_, 'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     type Item = Result<&'buf T, Error>;
@@ -811,17 +835,19 @@ where
 /// max iteration depth of `N`
 ///
 /// See [`TrieRef::values_in_fixed()`].
-pub struct ValuesInFixed<'a, 'buf, const N: usize, T, F>
+pub struct ValuesInFixed<'a, 'buf, const N: usize, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    iter: Walk<'a, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
+    iter: Walk<'a, 'buf, T, E, F, ArrayStack<StackEntry<'buf, T, E, F>, N>>,
 }
 
-impl<'buf, const N: usize, T, F> Iterator for ValuesInFixed<'_, 'buf, N, T, F>
+impl<'buf, const N: usize, T, E, F> Iterator for ValuesInFixed<'_, 'buf, N, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     type Item = Result<&'buf T, Error>;
@@ -841,18 +867,20 @@ where
 ///
 /// See [`TrieRef::values()`].
 #[cfg(feature = "alloc")]
-pub struct Values<'buf, T, F>
+pub struct Values<'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    iter: Walk<'static, 'buf, T, F, Vec<StackEntry<'buf, T, F>>>,
+    iter: Walk<'static, 'buf, T, E, F, Vec<StackEntry<'buf, T, E, F>>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'buf, T, F> Iterator for Values<'buf, T, F>
+impl<'buf, T, E, F> Iterator for Values<'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     type Item = Result<&'buf T, Error>;
@@ -872,17 +900,19 @@ where
 /// depth of `N`
 ///
 /// See [`TrieRef::values_fixed()`].
-pub struct ValuesFixed<'buf, const N: usize, T, F>
+pub struct ValuesFixed<'buf, const N: usize, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    iter: Walk<'static, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
+    iter: Walk<'static, 'buf, T, E, F, ArrayStack<StackEntry<'buf, T, E, F>, N>>,
 }
 
-impl<'buf, const N: usize, T, F> Iterator for ValuesFixed<'buf, N, T, F>
+impl<'buf, const N: usize, T, E, F> Iterator for ValuesFixed<'buf, N, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     type Item = Result<&'buf T, Error>;
@@ -902,18 +932,20 @@ where
 ///
 /// See [`TrieRef::iter()`].
 #[cfg(feature = "alloc")]
-pub struct Iter<'buf, T, F>
+pub struct Iter<'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    iter: Walk<'static, 'buf, T, F, Vec<StackEntry<'buf, T, F>>>,
+    iter: Walk<'static, 'buf, T, E, F, Vec<StackEntry<'buf, T, E, F>>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'buf, T, F> Iterator for Iter<'buf, T, F>
+impl<'buf, T, E, F> Iterator for Iter<'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     type Item = Result<(&'buf [u8], &'buf T), Error>;
@@ -928,17 +960,19 @@ where
 /// depth of `N`
 ///
 /// See [`TrieRef::iter_fixed()`].
-pub struct IterFixed<'buf, const N: usize, T, F>
+pub struct IterFixed<'buf, const N: usize, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    iter: Walk<'static, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
+    iter: Walk<'static, 'buf, T, E, F, ArrayStack<StackEntry<'buf, T, E, F>, N>>,
 }
 
-impl<'buf, const N: usize, T, F> Iterator for IterFixed<'buf, N, T, F>
+impl<'buf, const N: usize, T, E, F> Iterator for IterFixed<'buf, N, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     type Item = Result<(&'buf [u8], &'buf T), Error>;
@@ -953,18 +987,20 @@ where
 ///
 /// See [`TrieRef::iter_in()`].
 #[cfg(feature = "alloc")]
-pub struct IterIn<'a, 'buf, T, F>
+pub struct IterIn<'a, 'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    iter: Walk<'a, 'buf, T, F, Vec<StackEntry<'buf, T, F>>>,
+    iter: Walk<'a, 'buf, T, E, F, Vec<StackEntry<'buf, T, E, F>>>,
 }
 
 #[cfg(feature = "alloc")]
-impl<'buf, T, F> Iterator for IterIn<'_, 'buf, T, F>
+impl<'buf, T, E, F> Iterator for IterIn<'_, 'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     type Item = Result<(&'buf [u8], &'buf T), Error>;
@@ -979,17 +1015,19 @@ where
 /// fixed max iteration depth of `N`
 ///
 /// See [`TrieRef::iter_in_fixed()`].
-pub struct IterInFixed<'a, 'buf, const N: usize, T, F>
+pub struct IterInFixed<'a, 'buf, const N: usize, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    iter: Walk<'a, 'buf, T, F, ArrayStack<StackEntry<'buf, T, F>, N>>,
+    iter: Walk<'a, 'buf, T, E, F, ArrayStack<StackEntry<'buf, T, E, F>, N>>,
 }
 
-impl<'buf, const N: usize, T, F> Iterator for IterInFixed<'_, 'buf, N, T, F>
+impl<'buf, const N: usize, T, E, F> Iterator for IterInFixed<'_, 'buf, N, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     type Item = Result<(&'buf [u8], &'buf T), Error>;
@@ -1004,19 +1042,21 @@ where
 ///
 /// See [`TrieRef::debug()`].
 #[cfg(feature = "alloc")]
-pub struct Debug<'a, 'buf, T, F>
+pub struct Debug<'a, 'buf, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    trie: &'a TrieRef<T, F>,
+    trie: &'a TrieRef<T, E, F>,
     buf: &'buf Buf,
 }
 
 #[cfg(feature = "alloc")]
-impl<T, F> fmt::Debug for Debug<'_, '_, T, F>
+impl<T, E, F> fmt::Debug for Debug<'_, '_, T, E, F>
 where
     T: fmt::Debug + ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1034,18 +1074,20 @@ where
 /// Debug printing of a trie with a fixed iteration depth of `N`.
 ///
 /// See [`TrieRef::debug_fixed()`].
-pub struct DebugFixed<'a, 'buf, const N: usize, T, F>
+pub struct DebugFixed<'a, 'buf, const N: usize, T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    trie: &'a TrieRef<T, F>,
+    trie: &'a TrieRef<T, E, F>,
     buf: &'buf Buf,
 }
 
-impl<const N: usize, T, F> fmt::Debug for DebugFixed<'_, '_, N, T, F>
+impl<const N: usize, T, E, F> fmt::Debug for DebugFixed<'_, '_, N, T, E, F>
 where
     T: fmt::Debug + ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1060,12 +1102,13 @@ where
     }
 }
 
-impl<T, F> Clone for TrieRef<T, F>
+impl<T, E, F> Clone for TrieRef<T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
-    F::Values<T>: Clone,
-    F::Children<NodeRef<T, F>>: Clone,
+    F::Values<T, E>: Clone,
+    F::Children<NodeRef<T, E, F>, E>: Clone,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -1073,33 +1116,36 @@ where
     }
 }
 
-impl<T, F> Copy for TrieRef<T, F>
+impl<T, E, F> Copy for TrieRef<T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
-    F::Values<T>: Copy,
-    F::Children<NodeRef<T, F>>: Copy,
+    F::Values<T, E>: Copy,
+    F::Children<NodeRef<T, E, F>, E>: Copy,
 {
 }
 
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-struct LinksRef<T, F>
+struct LinksRef<T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    values: F::Values<T>,
-    children: F::Children<NodeRef<T, F>>,
+    values: F::Values<T, E>,
+    children: F::Children<NodeRef<T, E, F>, E>,
 }
 
-impl<T, F> Clone for LinksRef<T, F>
+impl<T, E, F> Clone for LinksRef<T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
-    F::Values<T>: Copy,
-    F::Children<NodeRef<T, F>>: Copy,
+    F::Values<T, E>: Copy,
+    F::Children<NodeRef<T, E, F>, E>: Copy,
 {
     #[inline]
     fn clone(&self) -> Self {
@@ -1107,25 +1153,27 @@ where
     }
 }
 
-impl<T, F> Copy for LinksRef<T, F>
+impl<T, E, F> Copy for LinksRef<T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
-    F::Values<T>: Copy,
-    F::Children<NodeRef<T, F>>: Copy,
+    F::Values<T, E>: Copy,
+    F::Children<NodeRef<T, E, F>, E>: Copy,
 {
 }
 
 #[derive(ZeroCopy)]
 #[zero_copy(crate)]
 #[repr(C)]
-struct NodeRef<T, F>
+struct NodeRef<T, E, F>
 where
     T: ZeroCopy,
+    E: ByteOrder,
     F: Flavor,
 {
-    string: F::String,
-    links: LinksRef<T, F>,
+    string: F::String<E>,
+    links: LinksRef<T, E, F>,
 }
 
 /// Calculate the common prefix between two strings.

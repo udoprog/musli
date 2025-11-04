@@ -158,12 +158,13 @@ where
     /// # Examples
     ///
     /// ```
+    /// use musli_zerocopy::DefaultEndian;
     /// use musli_zerocopy::slice::Packed;
     ///
-    /// let slice = Packed::<[u32], u32, u8>::try_from_raw_parts(42, 2)?;
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::try_from_raw_parts(42, 2)?;
     /// assert_eq!(slice.offset(), 42);
     ///
-    /// assert!(Packed::<[u32], u32, u8>::try_from_raw_parts(42, usize::MAX).is_err());
+    /// assert!(Packed::<[u32], DefaultEndian, u32, u8>::try_from_raw_parts(42, usize::MAX).is_err());
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
     #[inline]
@@ -283,9 +284,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// use musli_zerocopy::DefaultEndian;
     /// use musli_zerocopy::slice::Packed;
     ///
-    /// let slice = Packed::<[u32], u32, u8>::from_raw_parts(42, 2);
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::from_raw_parts(42, 2);
     /// assert_eq!(slice.offset(), 42);
     /// ```
     pub fn offset(self) -> usize {
@@ -297,9 +299,10 @@ where
     /// # Examples
     ///
     /// ```
+    /// use musli_zerocopy::DefaultEndian;
     /// use musli_zerocopy::slice::Packed;
     ///
-    /// let slice = Packed::<[u32], u32, u8>::from_raw_parts(0, 2);
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::from_raw_parts(0, 2);
     /// assert_eq!(slice.len(), 2);
     /// ```
     #[inline]
@@ -312,12 +315,13 @@ where
     /// # Examples
     ///
     /// ```
+    /// use musli_zerocopy::DefaultEndian;
     /// use musli_zerocopy::slice::Packed;
     ///
-    /// let slice = Packed::<[u32], u32, u8>::from_raw_parts(0, 0);
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::from_raw_parts(0, 0);
     /// assert!(slice.is_empty());
     ///
-    /// let slice = Packed::<[u32], u32, u8>::from_raw_parts(0, 2);
+    /// let slice = Packed::<[u32], DefaultEndian, u32, u8>::from_raw_parts(0, 2);
     /// assert!(!slice.is_empty());
     /// ```
     #[inline]

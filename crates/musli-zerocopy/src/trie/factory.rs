@@ -50,7 +50,7 @@ use super::{DefaultFlavor, Flavor, LinksRef, NodeRef, TrieRef, prefix};
 pub fn store<S, E, O, I, T>(
     buf: &mut OwnedBuf<E, O>,
     it: I,
-) -> Result<TrieRef<T, DefaultFlavor<E, O>>, Error>
+) -> Result<TrieRef<T, E, DefaultFlavor<O>>, Error>
 where
     I: IntoIterator<Item = (Ref<S, E, O>, T)>,
     T: ZeroCopy,
@@ -251,7 +251,7 @@ where
     /// assert_eq!(trie.get(&buf, "working")?, Some(&[4][..]));
     /// # Ok::<_, musli_zerocopy::Error>(())
     /// ```
-    pub fn build<E, O>(self, buf: &mut OwnedBuf<E, O>) -> Result<TrieRef<T, F>, Error>
+    pub fn build<E, O>(self, buf: &mut OwnedBuf<E, O>) -> Result<TrieRef<T, E, F>, Error>
     where
         T: ZeroCopy,
         E: ByteOrder,
@@ -285,7 +285,7 @@ impl<T> Links<T> {
         }
     }
 
-    fn into_ref<E, O, F>(self, buf: &mut OwnedBuf<E, O>) -> Result<LinksRef<T, F>, Error>
+    fn into_ref<E, O, F>(self, buf: &mut OwnedBuf<E, O>) -> Result<LinksRef<T, E, F>, Error>
     where
         T: ZeroCopy,
         E: ByteOrder,
@@ -320,7 +320,7 @@ impl<T> Node<T> {
         }
     }
 
-    fn into_ref<E, O, F>(self, buf: &mut OwnedBuf<E, O>) -> Result<NodeRef<T, F>, Error>
+    fn into_ref<E, O, F>(self, buf: &mut OwnedBuf<E, O>) -> Result<NodeRef<T, E, F>, Error>
     where
         T: ZeroCopy,
         E: ByteOrder,

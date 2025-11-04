@@ -581,7 +581,7 @@ pub use self::pointer::{DefaultSize, Ref, Size};
 pub mod pointer;
 
 #[doc(inline)]
-pub use self::endian::{ByteOrder, Endian};
+pub use self::endian::{ByteOrder, DefaultEndian, Endian};
 pub mod endian;
 
 mod lossy_str;
