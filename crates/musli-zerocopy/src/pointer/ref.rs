@@ -7,7 +7,7 @@ use core::mem::size_of;
 
 use crate::ZeroCopy;
 use crate::buf::{Padder, Validator};
-use crate::endian::{Big, ByteOrder, Little, Native};
+use crate::endian::{Big, ByteOrder, DefaultEndian, Little, Native};
 use crate::error::{CoerceError, Error};
 use crate::mem::PackedMaybeUninit;
 use crate::pointer::Coerce;
@@ -43,7 +43,7 @@ use crate::pointer::{DefaultSize, Pointee, Size};
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
 #[repr(C)]
-pub struct Ref<T, E = Native, O = DefaultSize>
+pub struct Ref<T, E = DefaultEndian, O = DefaultSize>
 where
     T: ?Sized + Pointee,
     E: ByteOrder,

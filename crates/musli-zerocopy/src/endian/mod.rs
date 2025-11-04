@@ -130,6 +130,9 @@ pub use __pick as pick;
 #[doc(inline)]
 pub use __matches as matches;
 
+/// Alias for the default endian, which is always [`Little`].
+pub type DefaultEndian = Little;
+
 #[doc(inline)]
 pub use self::endian::Endian;
 mod endian;

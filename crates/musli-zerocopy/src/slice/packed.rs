@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 use core::mem::size_of;
 
 use crate::buf::{Buf, Load};
-use crate::endian::{ByteOrder, Native};
+use crate::endian::{ByteOrder, DefaultEndian, Native};
 use crate::error::{CoerceError, Error};
 use crate::pointer::{Pointee, Ref, Size};
 use crate::slice::Slice;
@@ -18,10 +18,10 @@ use crate::{DefaultSize, ZeroCopy};
 /// use core::mem::{size_of, align_of};
 ///
 /// use musli_zerocopy::slice::Packed;
-/// use musli_zerocopy::{DefaultSize, Ref};
+/// use musli_zerocopy::{DefaultSize, DefaultEndian, Ref};
 ///
-/// assert_eq!(size_of::<Packed<[u32], u32, u8>>(), 5);
-/// assert_eq!(align_of::<Packed<[u32], u32, u8>>(), 1);
+/// assert_eq!(size_of::<Packed<[u32], DefaultEndian, u32, u8>>(), 5);
+/// assert_eq!(align_of::<Packed<[u32], DefaultEndian, u32, u8>>(), 1);
 ///
 /// assert_eq!(size_of::<Ref<[u32]>>(), size_of::<DefaultSize>() * 2);
 /// assert_eq!(align_of::<Ref<[u32]>>(), align_of::<DefaultSize>());
@@ -34,12 +34,12 @@ use crate::{DefaultSize, ZeroCopy};
 #[derive(ZeroCopy)]
 #[zero_copy(crate, bounds = {O: ZeroCopy, L: ZeroCopy})]
 #[repr(C, packed)]
-pub struct Packed<T, O = DefaultSize, L = DefaultSize, E = Native>
+pub struct Packed<T, E = DefaultEndian, O = DefaultSize, L = DefaultSize>
 where
     T: ?Sized,
+    E: ByteOrder,
     O: Size,
     L: Size,
-    E: ByteOrder,
 {
     offset: O,
     len: L,
@@ -47,7 +47,7 @@ where
     _marker: PhantomData<(E, T)>,
 }
 
-impl<T, O, L, E> Slice for Packed<[T], O, L, E>
+impl<T, E, O, L> Slice for Packed<[T], E, O, L>
 where
     T: ZeroCopy,
     O: Size + TryFrom<usize>,
@@ -116,7 +116,7 @@ where
     }
 }
 
-impl<T, O, L, E> Packed<[T], O, L, E>
+impl<T, E, O, L> Packed<[T], E, O, L>
 where
     T: ZeroCopy,
     O: Size,
@@ -326,7 +326,7 @@ where
     }
 }
 
-impl<T, O, L, E> Load for Packed<[T], O, L, E>
+impl<T, E, O, L> Load for Packed<[T], E, O, L>
 where
     T: ZeroCopy,
     O: Size,
@@ -350,7 +350,7 @@ where
     }
 }
 
-impl<T, O, L, E> Clone for Packed<[T], O, L, E>
+impl<T, E, O, L> Clone for Packed<[T], E, O, L>
 where
     O: Size,
     L: Size,
@@ -362,7 +362,7 @@ where
     }
 }
 
-impl<T, O, L, E> Copy for Packed<[T], O, L, E>
+impl<T, E, O, L> Copy for Packed<[T], E, O, L>
 where
     O: Size,
     L: Size,

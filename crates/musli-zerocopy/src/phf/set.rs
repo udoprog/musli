@@ -16,7 +16,7 @@ use core::borrow::Borrow;
 use core::hash::Hash;
 
 use crate::buf::{Bindable, Buf, Visit};
-use crate::endian::{ByteOrder, Native};
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::error::Error;
 use crate::phf::Entry;
 use crate::phf::hashing::HashKey;
@@ -146,7 +146,7 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct SetRef<T, E = Native, O = DefaultSize>
+pub struct SetRef<T, E = DefaultEndian, O = DefaultSize>
 where
     T: ZeroCopy,
     E: ByteOrder,

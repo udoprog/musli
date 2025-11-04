@@ -17,7 +17,7 @@ use core::hash::{Hash, Hasher};
 
 use crate::ZeroCopy;
 use crate::buf::{Bindable, Buf, Visit};
-use crate::endian::{ByteOrder, Native};
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::error::Error;
 use crate::pointer::{DefaultSize, Size};
 use crate::sip::SipHasher13;
@@ -146,7 +146,7 @@ where
 #[derive(Debug, ZeroCopy)]
 #[repr(C)]
 #[zero_copy(crate)]
-pub struct SetRef<T, E = Native, O = DefaultSize>
+pub struct SetRef<T, E = DefaultEndian, O = DefaultSize>
 where
     T: ZeroCopy,
     E: ByteOrder,

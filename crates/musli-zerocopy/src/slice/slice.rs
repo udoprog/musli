@@ -20,7 +20,7 @@ mod sealed {
     {
     }
 
-    impl<T, O, L, E> Sealed for Packed<[T], O, L, E>
+    impl<T, E, O, L> Sealed for Packed<[T], E, O, L>
     where
         O: Size,
         L: Size,

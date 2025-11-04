@@ -9,7 +9,7 @@ use core::slice::{self, SliceIndex};
 use alloc::borrow::Cow;
 
 use crate::buf::{self, AllocError, Buf, DefaultAlignment, Padder, StoreBuf};
-use crate::endian::{ByteOrder, Native};
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::error::{Error, ErrorKind};
 use crate::mem::PackedMaybeUninit;
 use crate::pointer::{DefaultSize, Ref, Size};
@@ -37,7 +37,7 @@ use crate::traits::{UnsizedZeroCopy, ZeroCopy};
 /// buf.store(&Custom { field: 10 })?;
 /// # Ok::<_, musli_zerocopy::Error>(())
 /// ```
-pub struct SliceMut<'a, E = Native, O = DefaultSize>
+pub struct SliceMut<'a, E = DefaultEndian, O = DefaultSize>
 where
     E: ByteOrder,
     O: Size,

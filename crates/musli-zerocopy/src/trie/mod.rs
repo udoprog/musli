@@ -19,11 +19,11 @@ use core::marker::PhantomData;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 
-use crate::endian::Native;
+use crate::endian::{ByteOrder, DefaultEndian};
 use crate::lossy_str::LossyStr;
 use crate::slice::{BinarySearch, Slice, binary_search_by};
 use crate::stack::ArrayStack;
-use crate::{Buf, ByteOrder, DefaultSize, Error, Ref, Size, ZeroCopy};
+use crate::{Buf, DefaultSize, Error, Ref, Size, ZeroCopy};
 
 type StackEntry<'buf, T, F> = (LinksRef<T, F>, usize, &'buf [u8]);
 
@@ -102,7 +102,7 @@ pub trait Flavor {
 
 /// Marker type indicating the default trie [`Flavor`] to use for a given
 /// [`ByteOrder`] and [`Size`].
-pub struct DefaultFlavor<E = Native, O = DefaultSize>(PhantomData<(E, O)>)
+pub struct DefaultFlavor<E = DefaultEndian, O = DefaultSize>(PhantomData<(E, O)>)
 where
     E: ByteOrder,
     O: Size;
