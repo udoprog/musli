@@ -199,6 +199,11 @@ impl Error {
         Self { kind }
     }
 
+    #[inline]
+    pub(crate) fn scale(what: &'static str, n: u32) -> Self {
+        Self::new(ErrorKind::ScaleError { what, n })
+    }
+
     #[inline(always)]
     #[doc(hidden)]
     pub fn __invalid_enum_discriminant<T>(discriminant: impl IntoRepr) -> Self {
@@ -300,6 +305,23 @@ pub(crate) enum ErrorKind {
     CapacityError,
     #[cfg(feature = "alloc")]
     FailedPhf,
+    #[cfg(feature = "alloc")]
+    MinimalPrefixEnable,
+    #[cfg(feature = "alloc")]
+    MinimalPrefixDisable,
+    #[cfg(feature = "alloc")]
+    EndMarkerInKeys,
+    #[cfg(feature = "alloc")]
+    EmptyRecords,
+    #[cfg(feature = "alloc")]
+    EmptyKey,
+    #[cfg(feature = "alloc")]
+    DuplicateKeys,
+    #[cfg(feature = "alloc")]
+    ScaleError {
+        what: &'static str,
+        n: u32,
+    },
 }
 
 impl fmt::Display for ErrorKind {
@@ -364,6 +386,34 @@ impl fmt::Display for ErrorKind {
             #[cfg(feature = "alloc")]
             ErrorKind::FailedPhf => {
                 write!(f, "Failed to construct perfect hash for map")
+            }
+            #[cfg(feature = "alloc")]
+            ErrorKind::MinimalPrefixEnable => {
+                write!(f, "Minimal prefix must be enabled")
+            }
+            #[cfg(feature = "alloc")]
+            ErrorKind::MinimalPrefixDisable => {
+                write!(f, "Minimal prefix must be disabled")
+            }
+            #[cfg(feature = "alloc")]
+            ErrorKind::EndMarkerInKeys => {
+                write!(f, "END_MARKER must not be contained in keys")
+            }
+            #[cfg(feature = "alloc")]
+            ErrorKind::EmptyRecords => {
+                write!(f, "Records must not be empty")
+            }
+            #[cfg(feature = "alloc")]
+            ErrorKind::EmptyKey => {
+                write!(f, "Records must not contain an empty key")
+            }
+            #[cfg(feature = "alloc")]
+            ErrorKind::DuplicateKeys => {
+                write!(f, "Records must not contain duplicated keys")
+            }
+            #[cfg(feature = "alloc")]
+            ErrorKind::ScaleError { what, n } => {
+                write!(f, "{what} must be no greater than {n}")
             }
         }
     }

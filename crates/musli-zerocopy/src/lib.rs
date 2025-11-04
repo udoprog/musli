@@ -47,6 +47,8 @@
 //!   SwissTable implementation.
 //! * [`trie`] is an implementation of a prefix-trie, which supports efficient
 //!   multi-value byte-prefixed lookups.
+//! * [`crawdad`] is a port of the crawdad crate, which supports efficient
+//!   char-prefixed lookups.
 //!
 //! Finally if you're interested in the performance of `musli-zerocopy` you
 //! should go to [`benchmarks`]. I will be extending this suite with more
@@ -528,6 +530,7 @@
 //! [`SliceMut`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/struct.SliceMut.html
 //! [`swiss`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/swiss/index.html
 //! [`trie`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trie/index.html
+//! [`crawdad`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/crawdad/index.html
 //! [`with_byte_order::<E>()`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/buf/struct.OwnedBuf.html#method.with_byte_order
 //! [`ZeroCopy`]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/trait.ZeroCopy.html
 //! [derive]: https://docs.rs/musli-zerocopy/latest/musli_zerocopy/derive.ZeroCopy.html
@@ -559,6 +562,8 @@ pub mod mem;
 pub mod slice;
 
 pub mod trie;
+
+pub mod crawdad;
 
 #[doc(inline)]
 pub use self::error::{CoerceError, Error};
