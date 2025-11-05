@@ -68,7 +68,7 @@ impl<const N: usize> FixedBytes<N> {
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         assert!(
-            capacity < N,
+            capacity <= N,
             "Requested capacity {capacity} is larger than {N}"
         );
         Self::new()
