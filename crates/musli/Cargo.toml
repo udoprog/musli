@@ -34,8 +34,9 @@ json = ["value", "dep:itoa", "dep:ryu"]
 parse-full = []
 value = []
 serde = ["dep:serde"]
+garde022 = ["musli-core/garde022"]
 
-test = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde"]
+test = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde", "garde022"]
 
 [dependencies]
 musli-core = { version = "0.1.4", path = "../musli-core", default-features = false }
