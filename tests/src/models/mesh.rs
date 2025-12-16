@@ -17,6 +17,7 @@ use crate::generate::Generate;
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 #[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
+#[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
 pub struct Mesh<V: AsRef<[Triangle]> = Vec<Triangle>> {
     pub triangles: V,
 }
