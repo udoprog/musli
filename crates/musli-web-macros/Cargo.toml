@@ -1,6 +1,6 @@
 [package]
 name = "musli-web-macros"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2024"
 rust-version = "1.85"
