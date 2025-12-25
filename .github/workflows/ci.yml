@@ -170,6 +170,7 @@ jobs:
         - json
         - api
         - yew021
+        - yew022
         - web03
         - ws
         - ws,axum08

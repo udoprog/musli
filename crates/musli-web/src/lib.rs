@@ -14,11 +14,12 @@
 //!   websocket clients using a well-defined API.
 //!
 //! Note that the organization of the modules include the version of the corresponding
-//! crate. Unstable versions are prefixed with `0`, such as [`yew021`].
+//! crate. Unstable versions are prefixed with `0`, such as [`yew022`].
 //!
 //! See the following modules for how to use:
 //! * [`axum08`] for [`axum`] `0.8.x` integration.
 //! * [`yew021`] for [`yew`] `0.21.x` integration.
+//! * [`yew022`] for [`yew`] `0.22.x` integration.
 //! * [`web03`] for [`web-sys`] `0.3.x` integration.
 //!
 //! <br>
@@ -92,6 +93,10 @@ pub mod web03;
 #[cfg(feature = "yew021")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "yew021")))]
 pub mod yew021;
+
+#[cfg(feature = "yew022")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "yew022")))]
+pub mod yew022;
 
 #[cfg(feature = "ws")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "ws")))]
