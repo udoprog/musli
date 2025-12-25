@@ -264,18 +264,18 @@ pub mod bson {
 
     use serde::{Deserialize, Serialize};
 
-    pub fn encode<T>(value: &T) -> Result<Vec<u8>, bson::ser::Error>
+    pub fn encode<T>(value: &T) -> Result<Vec<u8>, bson::error::Error>
     where
         T: Serialize,
     {
-        bson::to_vec(value)
+        bson::serialize_to_vec(value)
     }
 
-    pub fn decode<T>(buf: &[u8]) -> Result<T, bson::de::Error>
+    pub fn decode<T>(buf: &[u8]) -> Result<T, bson::error::Error>
     where
         for<'de> T: Deserialize<'de>,
     {
-        bson::from_slice(buf)
+        bson::deserialize_from_slice(buf)
     }
 }
 
