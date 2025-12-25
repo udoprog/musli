@@ -250,13 +250,15 @@ pub mod epserde {
     where
         T: Serialize,
     {
-        value.serialize(buf).map(|size| &buf[..size])
+        // SAFETY: wat?
+        unsafe { value.serialize(buf).map(|size| &buf[..size]) }
     }
 
     pub fn decode<T>(buf: &[u8]) -> Result<DeserType<'_, T>, epserde::deser::Error>
     where
         T: Deserialize,
     {
-        T::deserialize_eps(buf)
+        // SAFETY: wat?
+        unsafe { T::deserialize_eps(buf) }
     }
 }

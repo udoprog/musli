@@ -21,7 +21,7 @@ harness = false
 [features]
 default = ["std", "alloc"]
 std = ["musli?/std", "serde?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std", "epserde?/std", "bincode?/std", "epserde?/std"]
-alloc = ["serde?/alloc", "musli?/alloc", "musli-zerocopy?/alloc", "bincode?/alloc", "epserde?/alloc", "rkyv?/alloc"]
+alloc = ["serde?/alloc", "musli?/alloc", "musli-zerocopy?/alloc", "bincode?/alloc", "rkyv?/alloc"]
 verbose = ["musli?/verbose"]
 simdutf8 = ["musli?/simdutf8"]
 parse-full = ["musli?/parse-full"]
@@ -346,12 +346,12 @@ dlhn = { version = "0.1.6", default-features = false, optional = true }
 bitcode = { version = "0.6.0", default-features = false, optional = true, features = ["std"] }
 rkyv = { version = "0.8.10", default-features = false, optional = true, features = ["bytecheck"] }
 postcard = { version = "1.0.8",  default-features = false, optional = true }
-bson = { version = "2.14.0", default-features = false, optional = true }
+bson = { version = "3.1.0", default-features = false, optional = true, features = ["compat-3-0-0", "serde"] }
 zerocopy = { version = "0.8.13", default-features = false, optional = true, features = ["derive"] }
 miniserde = { version = "0.1.38", default-features = false, optional = true }
 speedy = { version = "0.8.7", optional = true }
-epserde = { version = "0.8.0", default-features = false, optional = true, features = ["derive"] }
-simd-json = { version = "0.15.1", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
+epserde = { version = "0.11.0", default-features = false, optional = true, features = ["derive"] }
+simd-json = { version = "0.17.0", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
 
 [dev-dependencies]
-criterion = { version = "0.6.0", features = ["html_reports"] }
+criterion = { version = "0.8.1", features = ["html_reports"] }
