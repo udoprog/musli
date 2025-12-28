@@ -195,8 +195,27 @@ pub struct Error {
     kind: ErrorKind,
 }
 
+impl Error {
+    /// Check if the error is caused by an empty packet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::{Error, RawPacket};
+    ///
+    /// let packet = RawPacket::empty();
+    /// let e = packet.decode::<u32>().unwrap_err();
+    ///
+    /// assert!(e.is_empty_packet());
+    /// ```
+    pub fn is_empty_packet(&self) -> bool {
+        matches!(self.kind, ErrorKind::EmptyPacket)
+    }
+}
+
 #[derive(Debug)]
 enum ErrorKind {
+    EmptyPacket,
     Message(String),
     Storage(storage::Error),
     Overflow(usize, usize),
@@ -218,6 +237,7 @@ impl fmt::Display for Error {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
+            ErrorKind::EmptyPacket => write!(f, "Packet is empty"),
             ErrorKind::Message(message) => write!(f, "{message}"),
             ErrorKind::Storage(error) => write!(f, "Encoding error: {error}"),
             ErrorKind::Overflow(at, len) => {
@@ -535,7 +555,7 @@ where
             let at = buf.len().saturating_sub(reader.remaining());
 
             let packet = RawPacket {
-                buf: buf.clone(),
+                buf: Some(buf.clone()),
                 at: Cell::new(at),
                 id: broadcast,
             };
@@ -576,7 +596,7 @@ where
 
             let packet = RawPacket {
                 id: p.kind,
-                buf,
+                buf: Some(buf),
                 at: Cell::new(at),
             };
 
@@ -1404,11 +1424,32 @@ impl Drop for BufRc {
 #[derive(Clone)]
 pub struct RawPacket {
     id: MessageId,
-    buf: BufRc,
+    buf: Option<BufRc>,
     at: Cell<usize>,
 }
 
 impl RawPacket {
+    /// Construct an empty raw packet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::MessageId;
+    /// use musli_web::web::RawPacket;
+    ///
+    /// let packet = RawPacket::empty();
+    ///
+    /// assert!(packet.is_empty());
+    /// assert_eq!(packet.id(), MessageId::EMPTY);
+    /// ```
+    pub const fn empty() -> Self {
+        Self {
+            id: MessageId::EMPTY,
+            buf: None,
+            at: Cell::new(0),
+        }
+    }
+
     /// Decode the contents of a raw packet.
     ///
     /// This can be called multiple times if there are multiple payloads in
@@ -1421,8 +1462,12 @@ impl RawPacket {
     {
         let at = self.at.get();
 
-        let Some(bytes) = self.buf.get(at..) else {
-            return Err(Error::new(ErrorKind::Overflow(at, self.buf.len())));
+        if self.id == MessageId::EMPTY {
+            return Err(Error::new(ErrorKind::EmptyPacket));
+        }
+
+        let Some(bytes) = self.as_slice().get(at..) else {
+            return Err(Error::new(ErrorKind::Overflow(at, self.as_slice().len())));
         };
 
         let mut reader = SliceReader::new(bytes);
@@ -1433,15 +1478,58 @@ impl RawPacket {
                 Ok(value)
             }
             Err(error) => {
-                self.at.set(self.buf.len());
+                self.at.set(self.len());
                 Err(Error::from(error))
             }
         }
     }
 
+    /// Get the underlying byte slice of the packet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::RawPacket;
+    ///
+    /// let packet = RawPacket::empty();
+    /// assert_eq!(packet.as_slice(), &[]);
+    /// ```
+    pub fn as_slice(&self) -> &[u8] {
+        match &self.buf {
+            Some(buf) => buf.as_ref(),
+            None => &[],
+        }
+    }
+
+    /// Get the length of the packet.
+    ///
+    /// # Examples
+    ////
+    /// ```
+    /// use musli_web::web::RawPacket;
+    ///
+    /// let packet = RawPacket::empty();
+    /// assert_eq!(packet.len(), 0);
+    /// ```
+    pub fn len(&self) -> usize {
+        match &self.buf {
+            Some(buf) => buf.len(),
+            None => 0,
+        }
+    }
+
     /// Check if the packet is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::RawPacket;
+    ///
+    /// let packet = RawPacket::empty();
+    /// assert!(packet.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
-        self.at.get() >= self.buf.len()
+        self.at.get() >= self.len()
     }
 
     /// The id of the packet this is a response to as specified by
@@ -1462,6 +1550,26 @@ pub struct Packet<T> {
 }
 
 impl<T> Packet<T> {
+    /// Construct an empty package.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::MessageId;
+    /// use musli_web::web::Packet;
+    ///
+    /// let packet = Packet::<()>::empty();
+    ///
+    /// assert!(packet.is_empty());
+    /// assert_eq!(packet.id(), MessageId::EMPTY);
+    /// ```
+    pub const fn empty() -> Self {
+        Self {
+            raw: RawPacket::empty(),
+            _marker: PhantomData,
+        }
+    }
+
     /// Construct a new typed package from a raw one.
     ///
     /// Note that this does not guarantee that the typed package is correct, but
@@ -1484,6 +1592,15 @@ impl<T> Packet<T> {
     }
 
     /// Check if the packet is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::Packet;
+    ///
+    /// let packet = Packet::<()>::empty();
+    /// assert!(packet.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.raw.is_empty()
     }
@@ -1500,7 +1617,7 @@ impl<T> Packet<T> {
 
 impl<T> Packet<T>
 where
-    T: api::Endpoint,
+    T: api::Decodable,
 {
     /// Decode the contents of a packet.
     ///
@@ -1508,7 +1625,7 @@ where
     /// sequence of the response.
     ///
     /// You can check if the packet is empty using [`Packet::is_empty`].
-    pub fn decode(&self) -> Result<T::Response<'_>> {
+    pub fn decode(&self) -> Result<T::Type<'_>> {
         self.decode_any()
     }
 
@@ -1519,6 +1636,34 @@ where
     ///
     /// You can check if the packet is empty using [`Packet::is_empty`].
     pub fn decode_any<'de, R>(&'de self) -> Result<R>
+    where
+        R: Decode<'de, Binary, Global>,
+    {
+        self.raw.decode()
+    }
+}
+
+impl<T> Packet<T>
+where
+    T: api::Endpoint,
+{
+    /// Decode the contents of a packet.
+    ///
+    /// This can be called multiple times if there are multiple payloads in
+    /// sequence of the response.
+    ///
+    /// You can check if the packet is empty using [`Packet::is_empty`].
+    pub fn decode_response(&self) -> Result<T::Response<'_>> {
+        self.decode_any_response()
+    }
+
+    /// Decode any contents of a packet.
+    ///
+    /// This can be called multiple times if there are multiple payloads in
+    /// sequence of the response.
+    ///
+    /// You can check if the packet is empty using [`Packet::is_empty`].
+    pub fn decode_any_response<'de, R>(&'de self) -> Result<R>
     where
         R: Decode<'de, Binary, Global>,
     {

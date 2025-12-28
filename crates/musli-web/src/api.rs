@@ -35,17 +35,38 @@ impl fmt::Display for MessageId {
     }
 }
 
-/// Start of special identifiers.
-const START: u16 = i16::MAX as u16;
-
 impl MessageId {
     /// The message id for [`ErrorMessage`].
-    pub const ERROR_MESSAGE: Self = unsafe { Self::new_unchecked(START) };
+    pub const ERROR_MESSAGE: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 1) };
+
+    /// The message id for an empty packet constructed using [`Packet::empty`]
+    /// or [`RawPacket::empty`].
+    ///
+    /// [`Packet::empty`]: crate::web::Packet::empty
+    /// [`RawPacket::empty`]: crate::web::RawPacket::empty
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::MessageId;
+    /// use musli_web::web::{RawPacket, Packet};
+    ///
+    /// let packet = RawPacket::empty();
+    /// assert_eq!(packet.id(), MessageId::EMPTY);
+    ///
+    /// let packet = Packet::<()>::empty();
+    /// assert_eq!(packet.id(), MessageId::EMPTY);
+    /// ```
+    pub const EMPTY: Self = unsafe { Self::new_unchecked(u16::MAX) };
 
     /// Try to construct a message id.
     #[doc(hidden)]
     #[inline]
     pub const fn new(id: u16) -> Option<Self> {
+        if id > i16::MAX as u16 {
+            return None;
+        }
+
         let Some(value) = NonZeroU16::new(id) else {
             return None;
         };
@@ -72,9 +93,24 @@ impl MessageId {
     }
 }
 
+/// A trait implemented for types which can be decoded into something.
+///
+/// Do not implement manually, instead use the [`define!`] macro.
+pub trait Decodable {
+    /// The decodable type related to this.
+    type Type<'de>: Decode<'de, Binary, Global>;
+
+    #[doc(hidden)]
+    fn __do_not_implement_decodable();
+}
+
+/// An endpoint marker trait.
+///
+/// Do not implement manually, instead use the [`define!`] macro.
 pub trait Endpoint
 where
     Self: 'static,
+    for<'de> Self: Decodable<Type<'de> = Self::Response<'de>>,
 {
     /// The kind of the endpoint.
     const ID: MessageId;
@@ -101,7 +137,11 @@ where
 }
 
 /// Trait implemented for broadcasts which have a primary event.
-pub trait BroadcastWithEvent: Broadcast {
+pub trait BroadcastWithEvent
+where
+    Self: Broadcast,
+    for<'de> Self: Decodable<Type<'de> = Self::Event<'de>>,
+{
     /// The event type related to the broadcast.
     type Event<'de>: Event<Broadcast = Self> + Decode<'de, Binary, Global>
     where

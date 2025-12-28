@@ -1,3 +1,5 @@
+use core::fmt;
+
 use std::cell::RefCell;
 use std::collections::HashSet;
 
@@ -122,7 +124,7 @@ impl ParsedAttrs {
         if let Some((_, span)) = &self.id {
             cx.errors.borrow_mut().push(syn::Error::new(
                 *span,
-                "The `#[musli(kind)]` attribute cannot be specified here",
+                "The `#[musli(id = ..)]` attribute cannot be specified here",
             ));
         }
     }
@@ -308,6 +310,7 @@ impl Endpoint {
 
         let (impl_generics, type_generics, where_clause) = self.generics.split_for_impl();
 
+        // Implement the Endpoint trait.
         {
             for attr in &self.attrs {
                 attr.to_tokens(t);
@@ -338,6 +341,38 @@ impl Endpoint {
                 self.res.semi.to_tokens(t);
 
                 cx.do_not_implement("__do_not_implement_endpoint", t);
+            });
+        }
+
+        // Implement the Decodable trait.
+        {
+            for attr in &self.attrs {
+                attr.to_tokens(t);
+            }
+
+            self.impl_.to_tokens(t);
+            impl_generics.to_tokens(t);
+            cx.t.api.to_tokens(t);
+            cx.t.colon_colon.to_tokens(t);
+            Ident::new("Decodable", self.what.span()).to_tokens(t);
+            self.for_.to_tokens(t);
+            self.name.to_tokens(t);
+            type_generics.to_tokens(t);
+            where_clause.to_tokens(t);
+
+            self.brace.surround(t, |t| {
+                for attr in &self.res.attrs {
+                    attr.to_tokens(t);
+                }
+
+                self.res.type_.to_tokens(t);
+                Ident::new("Type", self.what.span()).to_tokens(t);
+                self.res.generics.to_tokens(t);
+                self.res.eq.to_tokens(t);
+                self.res.ty.to_tokens(t);
+                self.res.semi.to_tokens(t);
+
+                cx.do_not_implement("__do_not_implement_decodable", t);
             });
         }
 
@@ -511,6 +546,12 @@ impl Broadcast {
 
                     fn __do_not_implement_broadcast_with_event() {}
                 }
+
+                impl #impl_generics #api::Decodable for #name #type_generics #where_clause {
+                    type Type<#decode_lt> = #first_ty where Self: #decode_lt;
+
+                    fn __do_not_implement_decodable() {}
+                }
             });
         }
 
@@ -651,16 +692,13 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
         cx.errors.borrow_mut().push(error);
     }
 
-    let mut alloc = KindAlloc::new();
+    let mut alloc = Ids::new();
 
     for ty in &builders {
-        if let Some((id, span)) = ty.id {
-            if !alloc.used.insert(id) {
-                cx.errors.borrow_mut().push(syn::Error::new(
-                    span,
-                    format_args!("Message id `{id}` has already been used"),
-                ));
-            }
+        if let Some((id, span)) = ty.id
+            && let Err(e) = alloc.insert(id)
+        {
+            cx.errors.borrow_mut().push(syn::Error::new(span, e));
         }
     }
 
@@ -669,7 +707,19 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
     for ty in builders {
         let id = match ty.id {
             Some((id, span)) => (id, span),
-            None => (alloc.allocate(), ty.name.span()),
+            None => {
+                let id = match alloc.allocate() {
+                    Ok(id) => id,
+                    Err(e) => {
+                        cx.errors
+                            .borrow_mut()
+                            .push(syn::Error::new(ty.name.span(), e));
+                        continue;
+                    }
+                };
+
+                (id, ty.name.span())
+            }
         };
 
         types.push(TypeDecl {
@@ -874,12 +924,27 @@ impl ToTokens for TraitPath<'_> {
     }
 }
 
-struct KindAlloc {
+enum IdsError {
+    Used,
+    Unusable,
+}
+
+impl fmt::Display for IdsError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IdsError::Used => write!(f, "id already used"),
+            IdsError::Unusable => write!(f, "id not in usable range 1-32767"),
+        }
+    }
+}
+
+struct Ids {
     used: HashSet<u16>,
     next: u16,
 }
 
-impl KindAlloc {
+impl Ids {
     fn new() -> Self {
         Self {
             used: HashSet::new(),
@@ -887,14 +952,34 @@ impl KindAlloc {
         }
     }
 
-    fn allocate(&mut self) -> u16 {
+    /// Insert a specific id, returning true if it can be used.
+    fn insert(&mut self, id: u16) -> Result<(), IdsError> {
+        if id == 0 {
+            return Err(IdsError::Unusable);
+        }
+
+        if id > i16::MAX as u16 {
+            return Err(IdsError::Unusable);
+        }
+
+        if !self.used.insert(id) {
+            return Err(IdsError::Used);
+        }
+
+        self.next = self.next.wrapping_add(1);
+        Ok(())
+    }
+
+    /// Allocate a new id.
+    fn allocate(&mut self) -> Result<u16, IdsError> {
+        const MASK: u16 = i16::MAX as u16 + 1;
+
         while self.used.contains(&self.next) {
-            self.next = self.next.saturating_add(1);
+            self.next = self.next.wrapping_add(1) % MASK;
         }
 
         let id = self.next;
-        self.used.insert(id);
-        self.next = self.next.saturating_add(1);
-        id
+        self.insert(id)?;
+        Ok(id)
     }
 }
