@@ -4,9 +4,9 @@
 //!
 //! # Examples
 //!
-//! This example uses [`yew021`]:
+//! This example uses [`web03`]:
 //!
-//! [`yew021`]: crate::yew021
+//! [`web03`]: crate::web03
 //!
 //! ```no_run
 //! use musli_web::web03::prelude::*;

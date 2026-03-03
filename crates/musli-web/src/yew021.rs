@@ -2,12 +2,12 @@
 //!
 //! # Examples
 //!
-//! This example uses [`yew021`]:
+//! This example uses [`yew022`]:
 //!
-//! [`yew021`]: crate::yew021
+//! [`yew022`]: crate::yew022
 //!
 //! ```
-//! # extern crate yew021 as yew;
+//! # extern crate yew022 as yew;
 //! # extern crate web_sys03 as web_sys;
 //! use web_sys::HtmlInputElement;
 //! use yew::prelude::*;
