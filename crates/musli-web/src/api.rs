@@ -13,13 +13,11 @@ pub use musli_web_macros::define;
 /// A trait for constructing identifiers.
 pub trait Id
 where
-    Self: 'static + fmt::Debug,
+    Self: 'static + Sized + fmt::Debug,
 {
     /// Construct an identifier from a raw `u16`.
     #[doc(hidden)]
-    fn from_raw(id: u16) -> Option<Self>
-    where
-        Self: Sized;
+    fn from_raw(id: u16) -> Option<Self>;
 }
 
 /// The identifier of a message.

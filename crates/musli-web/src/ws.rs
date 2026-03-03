@@ -291,7 +291,7 @@ pub struct Response {
 /// Trait governing how something can be converted into a response.
 pub trait IntoResponse {
     /// The error variant being produced.
-    type Error: fmt::Display;
+    type Error;
 
     /// Convert self into a response.
     fn into_response(self) -> Result<Response, Self::Error>;
@@ -470,7 +470,7 @@ impl<S, H> Server<S, H>
 where
     S: ServerImpl,
     Error: From<S::Error>,
-    H: Handler,
+    H: Handler<Response: IntoResponse<Error: fmt::Display>>,
 {
     fn format_err(&mut self, error: impl fmt::Display) -> Result<(), Error> {
         self.error.clear();
