@@ -320,7 +320,7 @@ impl Endpoint {
             impl_generics.to_tokens(t);
             cx.t.api.to_tokens(t);
             cx.t.colon_colon.to_tokens(t);
-            Ident::new("Endpoint", self.what.span()).to_tokens(t);
+            self.what.to_tokens(t);
             self.for_.to_tokens(t);
             self.name.to_tokens(t);
             type_generics.to_tokens(t);
@@ -354,7 +354,7 @@ impl Endpoint {
             impl_generics.to_tokens(t);
             cx.t.api.to_tokens(t);
             cx.t.colon_colon.to_tokens(t);
-            Ident::new("Decodable", self.what.span()).to_tokens(t);
+            Ident::new("Decodable", Span::call_site()).to_tokens(t);
             self.for_.to_tokens(t);
             self.name.to_tokens(t);
             type_generics.to_tokens(t);
@@ -366,7 +366,7 @@ impl Endpoint {
                 }
 
                 self.res.type_.to_tokens(t);
-                Ident::new("Type", self.what.span()).to_tokens(t);
+                Ident::new("Type", Span::call_site()).to_tokens(t);
                 self.res.generics.to_tokens(t);
                 self.res.eq.to_tokens(t);
                 self.res.ty.to_tokens(t);
@@ -521,7 +521,7 @@ impl Broadcast {
             impl_generics.to_tokens(t);
             cx.t.api.to_tokens(t);
             cx.t.colon_colon.to_tokens(t);
-            Ident::new("Broadcast", self.what.span()).to_tokens(t);
+            self.what.to_tokens(t);
             self.for_.to_tokens(t);
             self.name.to_tokens(t);
             type_generics.to_tokens(t);
@@ -566,7 +566,7 @@ impl Broadcast {
             impl_generics.to_tokens(t);
             cx.t.api.to_tokens(t);
             cx.t.colon_colon.to_tokens(t);
-            Ident::new("Event", ev.what.span()).to_tokens(t);
+            ev.what.to_tokens(t);
             ev.for_.to_tokens(t);
             ev.ty.to_tokens(t);
             where_clause.to_tokens(t);
