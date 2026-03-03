@@ -26,11 +26,19 @@ This will run all benchmarks, one for each report.
 cargo run -p tools -- bench
 ```
 
-
 #### Running clippy
 
 This will run clippy and sanity check the configuration, one for each report.
 
 ```sh
 cargo run -p tools -- clippy
+```
+
+#### Running checks
+
+This will ensure that every feature combination builds and produces a
+serialization roundtrip which doesn't error or panic.
+
+```sh
+cargo run -p tools -- check
 ```

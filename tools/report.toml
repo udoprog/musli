@@ -154,12 +154,11 @@ expected = [
 ]
 
 [[reports]]
-id = "fewer"
-title = "Fewer features"
-link = "fewer-features"
+id = "cbor"
+title = "CBOR"
+link = "cbor"
 description = [
-    "This is a suite where support for 128-bit integers and maps are disabled.",
-    "Usually because the underlying framework lacks support for them.",
+    "This is a suite which matches the features supported by serde_cbor.",
 ]
 features = [
     "musli-wire",
@@ -168,8 +167,6 @@ features = [
     "musli-packed",
     "musli-value",
     "serde_cbor",
-    # broken
-    # "dlhn",
     "simdutf8",
 ]
 expected = [
@@ -394,9 +391,7 @@ description = [
 features = [
     "musli-json",
     "serde_json",
-    # We don't support not timing a mutable buffer and there is a bug.
-    # See: https://github.com/simd-lite/simd-json/issues/416
-    # "simd-json",
+    "simd-json",
     "miniserde",
 ]
 expected = [
