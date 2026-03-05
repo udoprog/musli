@@ -528,7 +528,7 @@ where
         let header: api::ResponseHeader = storage::decode(&mut reader)?;
 
         if let Some(broadcast) = MessageId::new(header.broadcast) {
-            tracing::debug!(?header.broadcast, "Got broadcast");
+            tracing::debug!(?header, "Got broadcast");
 
             if !self.prepare_broadcast(broadcast) {
                 return Ok(());
@@ -566,13 +566,13 @@ where
                 }
             }
         } else {
-            tracing::debug!(header.serial, "Got response");
+            tracing::debug!(?header, "Got response");
 
             let p = {
                 let mut requests = self.g.requests.borrow_mut();
 
                 let Some(p) = requests.remove(&header.serial) else {
-                    tracing::debug!(header.serial, "Missing request");
+                    tracing::debug!(?header, "Missing request");
                     return Ok(());
                 };
 

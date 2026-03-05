@@ -61,10 +61,6 @@ impl MessageId {
     #[doc(hidden)]
     #[inline]
     pub const fn new(id: u16) -> Option<Self> {
-        if id > i16::MAX as u16 {
-            return None;
-        }
-
         let Some(value) = NonZeroU16::new(id) else {
             return None;
         };
