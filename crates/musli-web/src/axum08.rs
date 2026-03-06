@@ -114,7 +114,7 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///     ws.on_upgrade(move |socket: WebSocket| async move {
 ///         let mut subscribe = sender.subscribe();
 ///
-///         let mut server = pin!(axum08::server(socket, MyHandler));
+///         let mut server = axum08::server(socket, MyHandler);
 ///
 ///         loop {
 ///             tokio::select! {
@@ -125,7 +125,7 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///
 ///                     let result = match message {
 ///                         Broadcast::Tick { tick } => {
-///                             server.as_mut().broadcast(api::TickEvent { message: "tick", tick })
+///                             server.broadcast(api::TickEvent { message: "tick", tick })
 ///                         },
 ///                     };
 ///
@@ -140,7 +140,7 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///                         }
 ///                     }
 ///                 }
-///                 result = server.as_mut().run() => {
+///                 result = server.run() => {
 ///                     if let Err(error) = result {
 ///                         tracing::error!("Websocket error: {error}");
 ///

@@ -97,6 +97,7 @@ use core::future::Future;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
+use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -392,6 +393,26 @@ pub trait Handler {
     ) -> impl Future<Output = Self::Response> + Send + 'this;
 }
 
+struct Pinned<S> {
+    socket: S,
+    close_sleep: Sleep,
+    ping_sleep: Sleep,
+}
+
+impl<S> Pinned<S> {
+    #[inline]
+    fn project(self: Pin<&mut Self>) -> (Pin<&mut Sleep>, Pin<&mut Sleep>, Pin<&mut S>) {
+        unsafe {
+            let this = self.get_unchecked_mut();
+            (
+                Pin::new_unchecked(&mut this.close_sleep),
+                Pin::new_unchecked(&mut this.ping_sleep),
+                Pin::new_unchecked(&mut this.socket),
+            )
+        }
+    }
+}
+
 /// The server side handle of the websocket protocol.
 ///
 /// See [`server()`] for how to use with `axum`.
@@ -404,16 +425,14 @@ where
     closing: bool,
     buf: Buf,
     error: String,
-    socket: S::Socket,
     handler: H,
     last_ping: Option<u32>,
     rng: SmallRng,
-    close_sleep: Sleep,
-    ping_sleep: Sleep,
     max_capacity: usize,
     out: VecDeque<S::Message>,
     socket_send: bool,
     socket_flush: bool,
+    pinned: Pin<Box<Pinned<S::Socket>>>,
 }
 
 impl<S, H> Server<S, H>
@@ -429,17 +448,43 @@ where
             closing: false,
             buf: Buf::default(),
             error: String::new(),
-            socket,
             handler,
             last_ping: None::<u32>,
             rng: SmallRng::seed_from_u64(DEFAULT_SEED),
-            close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
-            ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
             max_capacity: MAX_CAPACITY,
             out: VecDeque::new(),
             socket_send: false,
             socket_flush: false,
+            pinned: Box::pin(Pinned {
+                socket,
+                close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
+                ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
+            }),
         }
+    }
+
+    /// Access a reference to the handler.
+    pub fn handler(&self) -> &H {
+        &self.handler
+    }
+
+    /// Access a mutable reference to the handler.
+    pub fn handler_mut(&mut self) -> &mut H {
+        &mut self.handler
+    }
+
+    /// Modify the maximum capacity of the buffer used for outgoing messages.
+    ///
+    /// This is used to prevent unbounded memory usage when writing large
+    /// messages. If the buffer exceeds this capacity, it will be flushed
+    /// immediately. Note that this is not a hard limit, and messages larger than
+    /// this can still be written, but they will be flushed immediately.
+    ///
+    /// By default, the capacity is 1 MiB.
+    #[inline]
+    pub fn max_capacity(mut self, max_capacity: usize) -> Self {
+        self.max_capacity = max_capacity;
+        self
     }
 
     /// Modify the max allocated capacity of the outgoing buffer.
@@ -476,38 +521,22 @@ where
     Error: From<S::Error>,
     H: Handler<Response: IntoResponse<Error: fmt::Display>>,
 {
-    fn format_err(&mut self, error: impl fmt::Display) -> Result<(), Error> {
-        self.error.clear();
-
-        if write!(self.error, "{error}").is_err() {
-            self.error.clear();
-            return Err(Error::new(ErrorKind::FormatError));
-        }
-
-        Ok(())
-    }
-
     /// Run the server.
     ///
     /// This must be called to handle buffered outgoing and incoming messages.
-    pub async fn run(self: Pin<&mut Self>) -> Result<(), Error> {
-        // SAFETY: This method doesn't violate pin.
-        let this = unsafe { Pin::get_unchecked_mut(self) };
-
+    pub async fn run(&mut self) -> Result<(), Error> {
         loop {
-            if this.closing && this.out.is_empty() && this.buf.is_empty() {
+            if self.closing && self.out.is_empty() && self.buf.is_empty() {
                 break;
             }
 
-            this.handle_send()?;
+            self.handle_send()?;
 
             let result = {
                 let inner = Select {
-                    close: &mut this.close_sleep,
-                    ping: &mut this.ping_sleep,
-                    socket: &mut this.socket,
-                    wants_socket_send: !this.socket_send,
-                    wants_socket_flush: this.socket_flush,
+                    pinned: self.pinned.as_mut(),
+                    wants_socket_send: !self.socket_send,
+                    wants_socket_flush: self.socket_flush,
                 };
 
                 inner.await
@@ -517,38 +546,38 @@ where
 
             match result {
                 Output::Close => {
-                    this.out
+                    self.out
                         .push_back(S::close(CLOSE_NORMAL, "connection timed out"));
-                    this.closing = true;
+                    self.closing = true;
                 }
                 Output::Ping => {
-                    this.handle_ping()?;
+                    self.handle_ping()?;
                 }
                 Output::Recv(message) => {
                     let Some(message) = message else {
-                        this.closing = true;
+                        self.closing = true;
                         continue;
                     };
 
                     match message? {
                         Message::Text => {
-                            this.out.push_back(S::close(
+                            self.out.push_back(S::close(
                                 CLOSE_PROTOCOL_ERROR,
                                 "Unsupported text message",
                             ));
-                            this.closing = true;
+                            self.closing = true;
                         }
                         Message::Binary(bytes) => {
-                            this.handle_message(bytes).await?;
+                            self.handle_message(bytes).await?;
                         }
                         Message::Ping(payload) => {
-                            this.out.push_back(S::pong(payload));
+                            self.out.push_back(S::pong(payload));
                         }
                         Message::Pong(data) => {
-                            this.handle_pong(data)?;
+                            self.handle_pong(data)?;
                         }
                         Message::Close => {
-                            this.closing = true;
+                            self.closing = true;
                         }
                     }
                 }
@@ -557,16 +586,46 @@ where
                         return Err(Error::from(err));
                     };
 
-                    this.socket_send = true;
+                    self.socket_send = true;
                 }
                 Output::Flushed(result) => {
                     if let Err(err) = result {
                         return Err(Error::from(err));
                     };
 
-                    this.socket_flush = false;
+                    self.socket_flush = false;
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    /// Write a broadcast message.
+    ///
+    /// Note that the written message is buffered, and will be sent when
+    /// [`Server::run`] is called.
+    pub fn broadcast<T>(&mut self, message: T) -> Result<(), Error>
+    where
+        T: Event,
+    {
+        self.buf.write(ResponseHeader {
+            serial: 0,
+            broadcast: <T::Broadcast as Broadcast>::ID.get(),
+            error: 0,
+        })?;
+
+        self.buf.write(message)?;
+        self.buf.done();
+        Ok(())
+    }
+
+    fn format_err(&mut self, error: impl fmt::Display) -> Result<(), Error> {
+        self.error.clear();
+
+        if write!(self.error, "{error}").is_err() {
+            self.error.clear();
+            return Err(Error::new(ErrorKind::FormatError));
         }
 
         Ok(())
@@ -640,7 +699,7 @@ where
 
     #[tracing::instrument(skip(self))]
     fn handle_ping(&mut self) -> Result<(), Error> {
-        let mut ping_sleep = unsafe { Pin::new_unchecked(&mut self.ping_sleep) };
+        let (_, mut ping_sleep, _) = self.pinned.as_mut().project();
 
         let payload = self.rng.random::<u32>();
         self.last_ping = Some(payload);
@@ -657,8 +716,7 @@ where
 
     #[tracing::instrument(skip(self, data))]
     fn handle_pong(&mut self, data: Bytes) -> Result<(), Error> {
-        let close_sleep = unsafe { Pin::new_unchecked(&mut self.close_sleep) };
-        let ping_sleep = unsafe { Pin::new_unchecked(&mut self.ping_sleep) };
+        let (close_sleep, ping_sleep, _) = self.pinned.as_mut().project();
 
         tracing::debug!(data = ?&data[..], "Pong");
 
@@ -684,7 +742,7 @@ where
 
     #[tracing::instrument(skip(self))]
     fn handle_send(&mut self) -> Result<(), Error> {
-        let mut socket = unsafe { Pin::new_unchecked(&mut self.socket) };
+        let (_, _, mut socket) = self.pinned.as_mut().project();
 
         if self.socket_send
             && let Some(message) = self.out.pop_front()
@@ -707,27 +765,6 @@ where
             self.socket_send = false;
         }
 
-        Ok(())
-    }
-
-    /// Write a broadcast message.
-    ///
-    /// Note that the written message is buffered, and will be sent when
-    /// [`Server::run`] is called.
-    pub fn broadcast<T>(self: Pin<&mut Self>, message: T) -> Result<(), Error>
-    where
-        T: Event,
-    {
-        let this = unsafe { Pin::get_unchecked_mut(self) };
-
-        this.buf.write(ResponseHeader {
-            serial: 0,
-            broadcast: <T::Broadcast as Broadcast>::ID.get(),
-            error: 0,
-        })?;
-
-        this.buf.write(message)?;
-        this.buf.done();
         Ok(())
     }
 
@@ -783,18 +820,14 @@ enum Output<E> {
     Flushed(Result<(), E>),
 }
 
-struct Select<'a, C, P, S> {
-    close: &'a mut C,
-    ping: &'a mut P,
-    socket: &'a mut S,
+struct Select<'a, S> {
+    pinned: Pin<&'a mut Pinned<S>>,
     wants_socket_send: bool,
     wants_socket_flush: bool,
 }
 
-impl<C, P, S> Future for Select<'_, C, P, S>
+impl<S> Future for Select<'_, S>
 where
-    C: Future,
-    P: Future,
     S: SocketImpl,
 {
     type Output = Output<S::Error>;
@@ -810,9 +843,7 @@ where
         // SAFETY: This type is not Unpin.
         unsafe {
             let this = Pin::get_unchecked_mut(self);
-            close = Pin::new_unchecked(&mut *this.close);
-            ping = Pin::new_unchecked(&mut *this.ping);
-            socket = Pin::new_unchecked(&mut *this.socket);
+            (close, ping, socket) = this.pinned.as_mut().project();
             wants_socket_send = this.wants_socket_send;
             wants_socket_flush = this.wants_socket_flush;
         };
