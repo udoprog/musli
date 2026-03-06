@@ -15,12 +15,17 @@ pub trait Id
 where
     Self: 'static + Sized + fmt::Debug,
 {
-    /// Construct an identifier from a raw `u16`.
+    /// Get the raw message identifier for this type.
+    fn id(&self) -> MessageId;
+
+    /// Construct an identifier from a raw message identifier.
+    fn from_id(id: MessageId) -> Self;
+
     #[doc(hidden)]
-    fn from_raw(id: u16) -> Option<Self>;
+    fn __do_not_implement_id();
 }
 
-/// The identifier of a message.
+/// A raw identifier for a message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
 #[repr(transparent)]
 #[musli(transparent)]
@@ -57,8 +62,7 @@ impl MessageId {
     /// ```
     pub const EMPTY: Self = unsafe { Self::new_unchecked(u16::MAX) };
 
-    /// Try to construct a message id.
-    #[doc(hidden)]
+    /// Construct a raw message id.
     #[inline]
     pub const fn new(id: u16) -> Option<Self> {
         let Some(value) = NonZeroU16::new(id) else {
@@ -69,7 +73,6 @@ impl MessageId {
     }
 
     /// Get a raw message identifier.
-    #[doc(hidden)]
     #[inline]
     pub const fn get(&self) -> u16 {
         self.0.get()
@@ -77,10 +80,9 @@ impl MessageId {
 
     /// Construct a new message ID.
     ///
-    /// # Panics
+    /// # Safety
     ///
-    /// Panics if `id` is zero.
-    #[doc(hidden)]
+    /// The caller must ensure that the provided `id` is non-zero.
     #[inline]
     pub const unsafe fn new_unchecked(id: u16) -> Self {
         Self(unsafe { NonZeroU16::new_unchecked(id) })

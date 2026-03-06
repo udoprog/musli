@@ -79,6 +79,10 @@
 //!
 //!                 Some(())
 //!             }
+//!             api::Request::Unknown(id) => {
+//!                 tracing::info!("Unknown request id: {}", id.get());
+//!                 None
+//!             }
 //!         }
 //!     }
 //! }
@@ -584,10 +588,12 @@ where
         };
 
         let err = 'err: {
-            let Some(id) = <H::Id as Id>::from_raw(header.id) else {
-                self.format_err("Unsupported message id 0")?;
+            let Some(id) = MessageId::new(header.id) else {
+                self.format_err(format_args!("Unsupported message id {}", header.id))?;
                 break 'err true;
             };
+
+            let id = <H::Id as Id>::from_id(id);
 
             let res = match self.handle_request(reader, header.serial, id).await {
                 Ok(res) => res,

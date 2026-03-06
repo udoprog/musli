@@ -123,6 +123,69 @@ mod define;
 ///
 /// <br>
 ///
+/// # Helpers enums
+///
+/// Each type declared within the macro becomes a variant inside of helper enums
+/// that implements the [`api::Id`] trait.
+///
+/// If a type implements `Endpoint`, it becomes part of the `Request` enum. If
+/// it implements `Broadcast` it becomes part of the `Event` enum.
+///
+///
+/// ```
+/// use musli::{Decode, Encode};
+/// use musli_web::api::{self, Id};
+///
+/// #[derive(Encode, Decode)]
+/// pub struct HelloRequest<'de> {
+///     pub message: &'de str,
+/// }
+///
+/// #[derive(Encode, Decode)]
+/// pub struct HelloResponse<'de> {
+///     pub message: &'de str,
+/// }
+///
+/// #[derive(Encode, Decode)]
+/// pub struct TickEvent<'de> {
+///     pub message: &'de str,
+///     pub tick: u32,
+/// }
+///
+/// api::define! {
+///     pub type Hello;
+///
+///     impl Endpoint for Hello {
+///         impl<'de> Request for HelloRequest<'de>;
+///         type Response<'de> = HelloResponse<'de>;
+///     }
+///
+///     pub type Tick;
+///
+///     impl Broadcast for Tick {
+///         impl<'de> Event for TickEvent<'de>;
+///     }
+/// }
+///
+/// fn main() {
+///     let request = Request::from_id(Hello::ID);
+///     assert_eq!(request, Request::Hello);
+///
+///     // Tick is not a request, so it becomes an unknown Request id.
+///     let request = Request::from_id(Tick::ID);
+///     assert_eq!(request, Request::Unknown(Tick::ID));
+///
+///     let event = Event::from_id(Tick::ID);
+///     assert_eq!(event, Event::Tick);
+///
+///     // Hello is not a broadcast, so it becomes an unknown Event id.
+///     let event = Event::from_id(Hello::ID);
+///     assert_eq!(event, Event::Unknown(Hello::ID));
+/// }
+/// ```
+///
+/// <br>
+///
 /// # Examples
 ///
 /// ```
@@ -172,6 +235,7 @@ mod define;
 /// assert_eq!(format!("{:?}", debug_id(Tick::ID)), "Tick");
 /// ```
 ///
+/// [`api::Id`]: <https://docs.rs/musli-web/latest/musli_web/api/trait.Id.html>
 /// [`api::Broadcast`]: <https://docs.rs/musli-web/latest/musli_web/api/trait.Broadcast.html>
 /// [`api::Endpoint`]: <https://docs.rs/musli-web/latest/musli_web/api/trait.Endpoint.html>
 /// [`musli::Decode`]: <https://docs.rs/musli/latest/musli/trait.Decode.html>

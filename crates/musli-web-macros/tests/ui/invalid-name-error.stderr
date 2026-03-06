@@ -1,0 +1,11 @@
+error: Unsupported type name, this is used by generated enums
+ --> tests/ui/invalid-name-error.rs:2:10
+  |
+2 |     type Event;
+  |          ^^^^^
+
+error: Unsupported type name, this is used by generated enums
+ --> tests/ui/invalid-name-error.rs:4:10
+  |
+4 |     type Request;
+  |          ^^^^^^^

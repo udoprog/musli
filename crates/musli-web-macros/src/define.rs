@@ -153,6 +153,13 @@ impl TypeDeclBuilder {
         let name = input.parse::<Ident>()?;
         let semi = input.parse::<Token![;]>()?;
 
+        if is_illegal(&name) {
+            return Err(syn::Error::new(
+                name.span(),
+                "Unsupported type name, this is used by generated enums",
+            ));
+        }
+
         Ok(Self {
             id: parsed_attrs.id,
             attrs,
@@ -224,6 +231,7 @@ impl Endpoint {
 
         let for_ = input.parse()?;
         let name = input.parse::<Ident>()?;
+
         generics.where_clause = input.parse()?;
 
         let content;
@@ -625,13 +633,13 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
             let vis = input.parse::<Visibility>()?;
 
             if let Some(type_) = input.parse::<Option<Token![type]>>()? {
-                builders.push(TypeDeclBuilder::parse(
-                    parsed_attrs,
-                    attrs,
-                    vis,
-                    type_,
-                    input,
-                )?);
+                let result = TypeDeclBuilder::parse(parsed_attrs, attrs, vis, type_, input);
+
+                match result {
+                    Ok(ty) => builders.push(ty),
+                    Err(error) => cx.errors.borrow_mut().push(error),
+                }
+
                 continue;
             };
 
@@ -752,65 +760,79 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
     let fmt = &cx.t.fmt;
     let api = &cx.t.api;
 
-    let idents = types.iter().map(|ty| &ty.name).collect::<Vec<_>>();
-
     let requests = types
         .iter()
         .filter(|ty| ty.endpoint)
         .map(|ty| &ty.name)
         .collect::<Vec<_>>();
 
-    let request_values = types
+    tokens.extend(quote! {
+        /// Enum of request types used in this protocol.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum Request {
+            #(#requests,)*
+            Unknown(#message_id),
+        }
+
+        impl #api::Id for Request {
+            #[inline]
+            fn id(&self) -> #message_id {
+                match *self {
+                    #(Self::#requests => #requests::ID,)*
+                    Self::Unknown(id) => id,
+                }
+            }
+
+            #[inline]
+            fn from_id(id: #message_id) -> Self {
+                match id {
+                    #(#requests::ID => Self::#requests,)*
+                    id => Self::Unknown(id),
+                }
+            }
+
+            #[doc(hidden)]
+            fn __do_not_implement_id() {}
+        }
+    });
+
+    let events = types
         .iter()
-        .filter(|ty| ty.endpoint)
-        .map(|ty| ty.id.0)
+        .filter(|ty| ty.broadcast)
+        .map(|ty| &ty.name)
         .collect::<Vec<_>>();
 
-    if requests.is_empty() {
-        tokens.extend(quote! {
-            /// Enum of request types used in this protocol.
-            pub enum Request {}
+    tokens.extend(quote! {
+        /// Enum of event types used in this protocol.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum Event {
+            #(#events,)*
+            Unknown(#message_id),
+        }
 
-            impl #api::Id for Request {
-                #[inline]
-                fn from_raw(_id: u16) -> Option<Self> {
-                    None
+        impl #api::Id for Event {
+            #[inline]
+            fn id(&self) -> #message_id {
+                match *self {
+                    #(Self::#events => #events::ID,)*
+                    Self::Unknown(id) => id,
                 }
             }
 
-            impl #fmt::Debug for Request {
-                fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
-                    match *self {}
-                }
-            }
-        });
-    } else {
-        tokens.extend(quote! {
-            /// Enum of request types used in this protocol.
-            #[repr(u16)]
-            pub enum Request {
-                #(#requests = #request_values,)*
-            }
-
-            impl #api::Id for Request {
-                #[inline]
-                fn from_raw(id: u16) -> Option<Self> {
-                    match id {
-                        #(#request_values => Some(Self::#requests),)*
-                        _ => None,
-                    }
+            #[inline]
+            fn from_id(id: #message_id) -> Self {
+                match id {
+                    #(#events::ID => Self::#events,)*
+                    id => Self::Unknown(id),
                 }
             }
 
-            impl #fmt::Debug for Request {
-                fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
-                    match *self {
-                        #(Self::#requests => f.write_str(stringify!(#requests)),)*
-                    }
-                }
-            }
-        });
-    }
+            #[doc(hidden)]
+            fn __do_not_implement_id() {}
+        }
+    });
+
+    let idents = types.iter().map(|ty| &ty.name).collect::<Vec<_>>();
 
     tokens.extend(quote! {
         /// Debug a message id.
@@ -982,4 +1004,8 @@ impl Ids {
         self.insert(id)?;
         Ok(id)
     }
+}
+
+fn is_illegal(ident: &Ident) -> bool {
+    ident == "Event" || ident == "Request"
 }

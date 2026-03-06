@@ -103,6 +103,9 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///
 ///                 Some(())
 ///             }
+///             api::Request::Unknown(id) => {
+///                 None
+///             }
 ///         }
 ///     }
 /// }
