@@ -9,8 +9,35 @@ use musli::mode::Binary;
 use musli::{Encode, storage};
 
 #[derive(Debug)]
+enum InvalidFrameWhat {
+    ReadPosition(usize),
+    LengthPrefix,
+    LengthPrefixOverflow(u32),
+    InsufficientLength(usize),
+    InsufficientFrame(usize),
+}
+
+impl fmt::Display for InvalidFrameWhat {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ReadPosition(pos) => write!(f, "read position ({pos}) out of bounds"),
+            Self::LengthPrefix => write!(f, "4 byte length prefix out of bounds"),
+            Self::LengthPrefixOverflow(len) => write!(f, "length prefix {len} overflowed usize"),
+            Self::InsufficientLength(len) => {
+                write!(f, "insufficient data for length (needed {len} bytes)")
+            }
+            Self::InsufficientFrame(len) => {
+                write!(f, "insufficient data for frame (needed {len} bytes)")
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct InvalidFrame {
-    frame: Range<usize>,
+    what: InvalidFrameWhat,
+    range: Range<usize>,
     size: usize,
 }
 
@@ -19,8 +46,8 @@ impl fmt::Display for InvalidFrame {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Invalid frame {}-{} (in {} bytes)",
-            self.frame.start, self.frame.end, self.size
+            "{} {}-{} (has {} bytes)",
+            self.what, self.range.start, self.range.end, self.size
         )
     }
 }
@@ -48,7 +75,7 @@ impl Buf {
         T: Encode<Binary>,
     {
         if self.start.is_none() {
-            let bytes = 0u32.to_ne_bytes();
+            let bytes = 0u32.to_le_bytes();
             self.buffer.extend_from_slice(&bytes);
             self.start = NonZeroUsize::new(self.buffer.len());
         }
@@ -82,7 +109,7 @@ impl Buf {
         if let Some(start) = self.start.take() {
             let l = u32::try_from(self.buffer.len().saturating_sub(start.get()))
                 .unwrap_or(u32::MAX)
-                .to_ne_bytes();
+                .to_le_bytes();
 
             let Some(len) = self.len_at_mut(start.get().saturating_sub(mem::size_of::<u32>()))
             else {
@@ -121,14 +148,16 @@ impl Buf {
 
         let Some(tail) = self.buffer.get(read..) else {
             return Err(InvalidFrame {
-                frame: 0..read,
+                what: InvalidFrameWhat::ReadPosition(read),
+                range: 0..read,
                 size: self.buffer.len(),
             });
         };
 
         let Some((head, tail)) = tail.split_at_checked(mem::size_of::<u32>()) else {
             return Err(InvalidFrame {
-                frame: 0..read,
+                what: InvalidFrameWhat::InsufficientLength(mem::size_of::<u32>()),
+                range: 0..read,
                 size: self.buffer.len(),
             });
         };
@@ -137,29 +166,35 @@ impl Buf {
 
         let &[a, b, c, d] = head else {
             return Err(InvalidFrame {
-                frame: frame.clone(),
+                what: InvalidFrameWhat::LengthPrefix,
+                range: frame.clone(),
                 size: self.buffer.len(),
             });
         };
 
-        let Ok(len) = usize::try_from(u32::from_ne_bytes([a, b, c, d])) else {
+        let len = u32::from_le_bytes([a, b, c, d]);
+
+        let Ok(len) = usize::try_from(len) else {
             return Err(InvalidFrame {
-                frame: frame.clone(),
+                what: InvalidFrameWhat::LengthPrefixOverflow(len),
+                range: frame.clone(),
                 size: self.buffer.len(),
             });
         };
 
         let Some(out) = tail.get(..len) else {
             return Err(InvalidFrame {
-                frame: frame.start..frame.end + len,
+                what: InvalidFrameWhat::InsufficientFrame(len),
+                range: frame.start..frame.end + len,
                 size: self.buffer.len(),
             });
         };
 
-        self.read.set(
-            read.saturating_add(mem::size_of::<u32>())
-                .saturating_add(len),
-        );
+        let next = read
+            .saturating_add(mem::size_of::<u32>())
+            .saturating_add(len);
+
+        self.read.set(next);
         Ok(Some(out))
     }
 }

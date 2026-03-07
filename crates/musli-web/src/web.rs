@@ -1158,6 +1158,15 @@ impl Request {
 
         drop(removed);
     }
+
+    /// Indicate if the update request is pending.
+    pub fn is_pending(&self) -> bool {
+        let Some(g) = self.g.upgrade() else {
+            return false;
+        };
+
+        g.requests.borrow().contains_key(&self.serial)
+    }
 }
 
 impl Default for Request {

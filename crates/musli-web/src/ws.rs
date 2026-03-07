@@ -423,10 +423,10 @@ where
     S: ServerImpl,
 {
     closing: bool,
-    buf: Buf,
+    outbound: Buf,
     error: String,
     handler: H,
-    last_ping: Option<u32>,
+    last_ping: Option<[u8; 4]>,
     rng: SmallRng,
     max_capacity: usize,
     out: VecDeque<S::Message>,
@@ -446,10 +446,10 @@ where
 
         Self {
             closing: false,
-            buf: Buf::default(),
+            outbound: Buf::default(),
             error: String::new(),
             handler,
-            last_ping: None::<u32>,
+            last_ping: None,
             rng: SmallRng::seed_from_u64(DEFAULT_SEED),
             max_capacity: MAX_CAPACITY,
             out: VecDeque::new(),
@@ -526,7 +526,7 @@ where
     /// This must be called to handle buffered outgoing and incoming messages.
     pub async fn run(&mut self) -> Result<(), Error> {
         loop {
-            if self.closing && self.out.is_empty() && self.buf.is_empty() {
+            if self.closing && self.out.is_empty() && self.outbound.is_empty() {
                 break;
             }
 
@@ -609,14 +609,16 @@ where
     where
         T: Event,
     {
-        self.buf.write(ResponseHeader {
+        tracing::debug!(id = ?<T::Broadcast as Broadcast>::ID, "Broadcast");
+
+        self.outbound.write(ResponseHeader {
             serial: 0,
             broadcast: <T::Broadcast as Broadcast>::ID.get(),
             error: 0,
         })?;
 
-        self.buf.write(message)?;
-        self.buf.done();
+        self.outbound.write(message)?;
+        self.outbound.done();
         Ok(())
     }
 
@@ -680,20 +682,20 @@ where
 
         if err {
             // Reset the buffer to the previous start point.
-            self.buf.reset();
+            self.outbound.reset();
 
-            self.buf.write(ResponseHeader {
+            self.outbound.write(ResponseHeader {
                 serial: header.serial,
                 broadcast: 0,
                 error: MessageId::ERROR_MESSAGE.get(),
             })?;
 
-            self.buf.write(ErrorMessage {
+            self.outbound.write(ErrorMessage {
                 message: &self.error,
             })?;
         }
 
-        self.buf.done();
+        self.outbound.done();
         Ok(())
     }
 
@@ -702,33 +704,33 @@ where
         let (_, mut ping_sleep, _) = self.pinned.as_mut().project();
 
         let payload = self.rng.random::<u32>();
-        self.last_ping = Some(payload);
-        let data = payload.to_ne_bytes().into_iter().collect::<Vec<_>>();
+        let payload = payload.to_ne_bytes();
 
-        tracing::debug!(data = ?&data[..], "Sending ping");
-        self.out.push_back(S::ping(data.into()));
+        self.last_ping = Some(payload);
+
+        tracing::debug!(data = ?&payload[..], "Sending ping");
+
+        self.out
+            .push_back(S::ping(Bytes::from_owner(Vec::from(payload))));
 
         let now = Instant::now();
         ping_sleep.as_mut().reset(now + PING_TIMEOUT);
-
         Ok(())
     }
 
-    #[tracing::instrument(skip(self, data))]
-    fn handle_pong(&mut self, data: Bytes) -> Result<(), Error> {
+    #[tracing::instrument(skip(self, payload))]
+    fn handle_pong(&mut self, payload: Bytes) -> Result<(), Error> {
         let (close_sleep, ping_sleep, _) = self.pinned.as_mut().project();
 
-        tracing::debug!(data = ?&data[..], "Pong");
+        tracing::debug!(payload = ?&payload[..], "Pong");
 
         let Some(expected) = self.last_ping else {
             tracing::debug!("No ping sent");
             return Ok(());
         };
 
-        let expected = expected.to_ne_bytes();
-
-        if expected[..] != data[..] {
-            tracing::debug!(?expected, ?data, "Pong doesn't match");
+        if expected[..] != payload[..] {
+            tracing::debug!(?expected, ?payload, "Pong doesn't match");
             return Ok(());
         }
 
@@ -753,12 +755,12 @@ where
         }
 
         if self.socket_send
-            && let Some(frame) = self.buf.read()?
+            && let Some(frame) = self.outbound.read()?
         {
             socket.as_mut().start_send(S::binary(frame))?;
 
-            if self.buf.is_empty() {
-                self.buf.clear();
+            if self.outbound.is_empty() {
+                self.outbound.clear();
             }
 
             self.socket_flush = true;
@@ -776,7 +778,7 @@ where
     ) -> Result<H::Response, storage::Error> {
         tracing::debug!(serial, ?id, "Got request");
 
-        self.buf.write(ResponseHeader {
+        self.outbound.write(ResponseHeader {
             serial,
             broadcast: 0,
             error: 0,
@@ -789,7 +791,7 @@ where
 
         let mut outgoing = Outgoing {
             error: None,
-            buf: &mut self.buf,
+            buf: &mut self.outbound,
         };
 
         let response = self.handler.handle(id, &mut incoming, &mut outgoing).await;
