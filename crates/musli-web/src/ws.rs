@@ -210,12 +210,30 @@ enum ErrorKind {
     AxumCore05 {
         error: axum_core05::Error,
     },
-    Musli {
-        error: storage::Error,
-    },
     FormatError,
     InvalidFrame {
         error: InvalidFrame,
+    },
+    Incoming {
+        error: storage::Error,
+    },
+    OutgoingHeader {
+        error: storage::Error,
+    },
+    Outgoing {
+        error: storage::Error,
+    },
+    EncodeBroadcastHeader {
+        error: storage::Error,
+    },
+    EncodeBroadcast {
+        error: storage::Error,
+    },
+    ErrorMessageHeader {
+        error: storage::Error,
+    },
+    ErrorMessage {
+        error: storage::Error,
     },
 }
 
@@ -230,6 +248,34 @@ impl Error {
     const fn new(kind: ErrorKind) -> Self {
         Self { kind }
     }
+
+    pub(crate) fn incoming(error: storage::Error) -> Self {
+        Self::new(ErrorKind::Incoming { error })
+    }
+
+    pub(crate) fn outgoing_header(error: storage::Error) -> Self {
+        Self::new(ErrorKind::OutgoingHeader { error })
+    }
+
+    pub(crate) fn outgoing(error: storage::Error) -> Self {
+        Self::new(ErrorKind::Outgoing { error })
+    }
+
+    pub(crate) fn encode_broadcast_header(error: storage::Error) -> Self {
+        Self::new(ErrorKind::EncodeBroadcastHeader { error })
+    }
+
+    pub(crate) fn encode_broadcast(error: storage::Error) -> Self {
+        Self::new(ErrorKind::EncodeBroadcast { error })
+    }
+
+    pub(crate) fn encode_error_message_header(error: storage::Error) -> Self {
+        Self::new(ErrorKind::ErrorMessageHeader { error })
+    }
+
+    pub(crate) fn encode_error_message(error: storage::Error) -> Self {
+        Self::new(ErrorKind::ErrorMessage { error })
+    }
 }
 
 impl fmt::Display for Error {
@@ -238,9 +284,29 @@ impl fmt::Display for Error {
         match &self.kind {
             #[cfg(feature = "axum-core05")]
             ErrorKind::AxumCore05 { .. } => write!(f, "Error in axum-core"),
-            ErrorKind::Musli { .. } => write!(f, "Error in musli"),
             ErrorKind::FormatError => write!(f, "Error formatting error response"),
             ErrorKind::InvalidFrame { error } => error.fmt(f),
+            ErrorKind::Incoming { .. } => {
+                write!(f, "Encoding error when decoding incoming message")
+            }
+            ErrorKind::OutgoingHeader { .. } => {
+                write!(f, "Encoding error when encoding outgoing header")
+            }
+            ErrorKind::Outgoing { .. } => {
+                write!(f, "Encoding error when encoding outgoing message")
+            }
+            ErrorKind::EncodeBroadcastHeader { .. } => {
+                write!(f, "Encoding error when encoding broadcast header")
+            }
+            ErrorKind::EncodeBroadcast { .. } => {
+                write!(f, "Encoding error when broadcasting message")
+            }
+            ErrorKind::ErrorMessageHeader { .. } => {
+                write!(f, "Encoding error when encoding error message header")
+            }
+            ErrorKind::ErrorMessage { .. } => {
+                write!(f, "Encoding error when encoding error message")
+            }
         }
     }
 }
@@ -251,7 +317,13 @@ impl core::error::Error for Error {
         match &self.kind {
             #[cfg(feature = "axum-core05")]
             ErrorKind::AxumCore05 { error } => Some(error),
-            ErrorKind::Musli { error } => Some(error),
+            ErrorKind::Incoming { error } => Some(error),
+            ErrorKind::OutgoingHeader { error } => Some(error),
+            ErrorKind::Outgoing { error } => Some(error),
+            ErrorKind::EncodeBroadcastHeader { error } => Some(error),
+            ErrorKind::EncodeBroadcast { error } => Some(error),
+            ErrorKind::ErrorMessageHeader { error } => Some(error),
+            ErrorKind::ErrorMessage { error } => Some(error),
             _ => None,
         }
     }
@@ -262,13 +334,6 @@ impl From<axum_core05::Error> for Error {
     #[inline]
     fn from(error: axum_core05::Error) -> Self {
         Self::new(ErrorKind::AxumCore05 { error })
-    }
-}
-
-impl From<storage::Error> for Error {
-    #[inline]
-    fn from(error: storage::Error) -> Self {
-        Self::new(ErrorKind::Musli { error })
     }
 }
 
@@ -611,21 +676,36 @@ where
     {
         tracing::debug!(id = ?<T::Broadcast as Broadcast>::ID, "Broadcast");
 
-        self.outbound.write(ResponseHeader {
+        let result = self.outbound.write(ResponseHeader {
             serial: 0,
             broadcast: <T::Broadcast as Broadcast>::ID.get(),
             error: 0,
-        })?;
+        });
 
-        self.outbound.write(message)?;
+        result.map_err(Error::encode_broadcast_header)?;
+
+        self.outbound
+            .write(message)
+            .map_err(Error::encode_broadcast)?;
         self.outbound.done();
         Ok(())
     }
 
-    fn format_err(&mut self, error: impl fmt::Display) -> Result<(), Error> {
+    fn format_error_message(&mut self, error: impl fmt::Display) -> Result<(), Error> {
         self.error.clear();
 
         if write!(self.error, "{error}").is_err() {
+            self.error.clear();
+            return Err(Error::new(ErrorKind::FormatError));
+        }
+
+        Ok(())
+    }
+
+    fn format_error(&mut self, error: impl core::error::Error) -> Result<(), Error> {
+        self.error.clear();
+
+        if write!(self.error, "{error:#}").is_err() {
             self.error.clear();
             return Err(Error::new(ErrorKind::FormatError));
         }
@@ -650,7 +730,7 @@ where
 
         let err = 'err: {
             let Some(id) = MessageId::new(header.id) else {
-                self.format_err(format_args!("Unsupported message id {}", header.id))?;
+                self.format_error_message(format_args!("Unsupported message id {}", header.id))?;
                 break 'err true;
             };
 
@@ -658,22 +738,22 @@ where
 
             let res = match self.handle_request(reader, header.serial, id).await {
                 Ok(res) => res,
-                Err(err) => {
-                    self.format_err(err)?;
+                Err(error) => {
+                    self.format_error(error)?;
                     break 'err true;
                 }
             };
 
             let res = match res.into_response() {
                 Ok(res) => res,
-                Err(err) => {
-                    self.format_err(err)?;
+                Err(error) => {
+                    self.format_error_message(format_args!("Error in handler: {error:#}"))?;
                     break 'err true;
                 }
             };
 
             if !res.handled {
-                self.format_err(format_args!("No support for request `{}`", header.id))?;
+                self.format_error_message(format_args!("No support for request {}", header.id))?;
                 break 'err true;
             }
 
@@ -684,15 +764,19 @@ where
             // Reset the buffer to the previous start point.
             self.outbound.reset();
 
-            self.outbound.write(ResponseHeader {
+            let result = self.outbound.write(ResponseHeader {
                 serial: header.serial,
                 broadcast: 0,
                 error: MessageId::ERROR_MESSAGE.get(),
-            })?;
+            });
 
-            self.outbound.write(ErrorMessage {
+            result.map_err(Error::encode_error_message_header)?;
+
+            let result = self.outbound.write(ErrorMessage {
                 message: &self.error,
-            })?;
+            });
+
+            result.map_err(Error::encode_error_message)?;
         }
 
         self.outbound.done();
@@ -775,14 +859,16 @@ where
         reader: SliceReader<'_>,
         serial: u32,
         id: H::Id,
-    ) -> Result<H::Response, storage::Error> {
+    ) -> Result<H::Response, Error> {
         tracing::debug!(serial, ?id, "Got request");
 
-        self.outbound.write(ResponseHeader {
+        let result = self.outbound.write(ResponseHeader {
             serial,
             broadcast: 0,
             error: 0,
-        })?;
+        });
+
+        result.map_err(Error::outgoing_header)?;
 
         let mut incoming = Incoming {
             error: None,
@@ -797,11 +883,11 @@ where
         let response = self.handler.handle(id, &mut incoming, &mut outgoing).await;
 
         if let Some(error) = incoming.error.take() {
-            return Err(error);
+            return Err(Error::incoming(error));
         }
 
         if let Some(error) = outgoing.error.take() {
-            return Err(error);
+            return Err(Error::outgoing(error));
         }
 
         Ok(response)

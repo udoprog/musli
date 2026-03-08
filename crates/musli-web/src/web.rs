@@ -217,7 +217,11 @@ impl Error {
 enum ErrorKind {
     EmptyPacket,
     Message(String),
-    Storage(storage::Error),
+    DecodeResponseHeader(storage::Error),
+    DecodeErrorMessage(storage::Error),
+    DecodePacket(storage::Error),
+    EncodingHeader(storage::Error),
+    EncodingBody(storage::Error),
     Overflow(usize, usize),
 }
 
@@ -225,6 +229,31 @@ impl Error {
     #[inline]
     fn new(kind: ErrorKind) -> Self {
         Self { kind }
+    }
+
+    #[inline]
+    pub(crate) fn decode_response_header(error: storage::Error) -> Self {
+        Self::new(ErrorKind::DecodeResponseHeader(error))
+    }
+
+    #[inline]
+    pub(crate) fn decode_error_message(error: storage::Error) -> Self {
+        Self::new(ErrorKind::DecodeErrorMessage(error))
+    }
+
+    #[inline]
+    pub(crate) fn decode_packet(error: storage::Error) -> Self {
+        Self::new(ErrorKind::DecodePacket(error))
+    }
+
+    #[inline]
+    pub(crate) fn encoding_header(error: storage::Error) -> Self {
+        Self::new(ErrorKind::EncodingHeader(error))
+    }
+
+    #[inline]
+    pub(crate) fn encoding_body(error: storage::Error) -> Self {
+        Self::new(ErrorKind::EncodingBody(error))
     }
 
     #[inline]
@@ -239,7 +268,15 @@ impl fmt::Display for Error {
         match &self.kind {
             ErrorKind::EmptyPacket => write!(f, "Packet is empty"),
             ErrorKind::Message(message) => write!(f, "{message}"),
-            ErrorKind::Storage(error) => write!(f, "Encoding error: {error}"),
+            ErrorKind::DecodeResponseHeader(..) => {
+                write!(f, "Encoding error when decoding response header")
+            }
+            ErrorKind::DecodeErrorMessage(..) => {
+                write!(f, "Encoding error when decoding error response")
+            }
+            ErrorKind::DecodePacket(..) => write!(f, "Encoding error when decoding packet"),
+            ErrorKind::EncodingHeader(..) => write!(f, "Encoding error when encoding header"),
+            ErrorKind::EncodingBody(..) => write!(f, "Encoding error when encoding body"),
             ErrorKind::Overflow(at, len) => {
                 write!(f, "Internal packet overflow, {at} not in range 0-{len}")
             }
@@ -251,16 +288,13 @@ impl core::error::Error for Error {
     #[inline]
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.kind {
-            ErrorKind::Storage(error) => Some(error),
+            ErrorKind::DecodeResponseHeader(error) => Some(error),
+            ErrorKind::DecodeErrorMessage(error) => Some(error),
+            ErrorKind::DecodePacket(error) => Some(error),
+            ErrorKind::EncodingHeader(error) => Some(error),
+            ErrorKind::EncodingBody(error) => Some(error),
             _ => None,
         }
-    }
-}
-
-impl From<storage::Error> for Error {
-    #[inline]
-    fn from(error: storage::Error) -> Self {
-        Self::new(ErrorKind::Storage(error))
     }
 }
 
@@ -490,8 +524,8 @@ where
 
         let out = &mut *self.output.borrow_mut();
 
-        storage::to_writer(&mut *out, &header)?;
-        storage::to_writer(&mut *out, &body)?;
+        storage::to_writer(&mut *out, &header).map_err(Error::encoding_header)?;
+        storage::to_writer(&mut *out, &body).map_err(Error::encoding_body)?;
 
         tracing::debug!(
             header.serial,
@@ -525,7 +559,8 @@ where
         let buf = BufRc::new(buf);
         let mut reader = SliceReader::new(&buf);
 
-        let header: api::ResponseHeader = storage::decode(&mut reader)?;
+        let header: api::ResponseHeader =
+            storage::decode(&mut reader).map_err(Error::decode_response_header)?;
 
         if let Some(broadcast) = MessageId::new(header.broadcast) {
             tracing::debug!(?header, "Got broadcast");
@@ -536,7 +571,7 @@ where
 
             if let Some(id) = MessageId::new(header.error) {
                 let error = if id == MessageId::ERROR_MESSAGE {
-                    storage::decode(&mut reader)?
+                    storage::decode(&mut reader).map_err(Error::decode_error_message)?
                 } else {
                     api::ErrorMessage {
                         message: "Unknown error",
@@ -545,7 +580,10 @@ where
 
                 while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
                     if let Some(callback) = callback.upgrade() {
-                        callback.call(Err(Error::msg(error.message)));
+                        callback.call(Err(Error::msg(format_args!(
+                            "Server error: {}",
+                            error.message
+                        ))));
                     }
                 }
 
@@ -581,14 +619,17 @@ where
 
             if let Some(id) = MessageId::new(header.error) {
                 let error = if id == MessageId::ERROR_MESSAGE {
-                    storage::decode(&mut reader)?
+                    storage::decode(&mut reader).map_err(Error::decode_error_message)?
                 } else {
                     api::ErrorMessage {
                         message: "Unknown error",
                     }
                 };
 
-                p.callback.call(Err(Error::msg(error.message)));
+                p.callback.call(Err(Error::msg(format_args!(
+                    "Server error: {}",
+                    error.message
+                ))));
                 return Ok(());
             }
 
@@ -1488,7 +1529,7 @@ impl RawPacket {
             }
             Err(error) => {
                 self.at.set(self.len());
-                Err(Error::from(error))
+                Err(Error::decode_packet(error))
             }
         }
     }
