@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use core::fmt;
 use core::mem;
-use core::num::NonZeroUsize;
+use core::mem::ManuallyDrop;
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -9,6 +9,7 @@ use musli::mode::Binary;
 use musli::{Encode, storage};
 
 #[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 enum InvalidFrameWhat {
     ReadPosition(usize),
     LengthPrefix,
@@ -35,6 +36,7 @@ impl fmt::Display for InvalidFrameWhat {
 }
 
 #[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub(crate) struct InvalidFrame {
     what: InvalidFrameWhat,
     range: Range<usize>,
@@ -52,16 +54,59 @@ impl fmt::Display for InvalidFrame {
     }
 }
 
+#[must_use = "Writer must be consumed with Writer::flush to have an effect on the underlying buffer"]
+pub(crate) struct Writer<'a> {
+    start: usize,
+    buf: &'a mut Buf,
+}
+
+impl Writer<'_> {
+    /// Write data to the current frame.
+    #[inline]
+    pub(crate) fn write<T>(&mut self, value: T) -> Result<(), storage::Error>
+    where
+        T: Encode<Binary>,
+    {
+        self.buf.write(value)
+    }
+
+    /// Finalize the current frame.
+    #[inline]
+    pub(crate) fn flush(self) {
+        let mut this = ManuallyDrop::new(self);
+        let start = this.start;
+        this.buf.done(start);
+    }
+}
+
+impl Drop for Writer<'_> {
+    #[inline]
+    fn drop(&mut self) {
+        self.buf.reset(self.start);
+    }
+}
+
 /// A length-prefixed buffer which keeps track of the start of each frame and
 /// allows them to be iterated over.
 #[derive(Default)]
 pub(crate) struct Buf {
-    start: Option<NonZeroUsize>,
     buffer: Vec<u8>,
     read: Cell<usize>,
 }
 
 impl Buf {
+    /// Start a write.
+    pub(crate) fn writer(&mut self) -> Writer<'_> {
+        if self.read.get() == self.buffer.len() {
+            self.buffer.clear();
+            self.read.set(0);
+        }
+
+        let start = self.buffer.len();
+        self.buffer.extend_from_slice(&[0; mem::size_of::<u32>()]);
+        Writer { start, buf: self }
+    }
+
     /// Write data to the current frame, or start a new frame if no frame is
     /// being written.
     ///
@@ -70,16 +115,10 @@ impl Buf {
     ///
     /// If a new frame is started, a new start point is recorded.
     #[inline]
-    pub(crate) fn write<T>(&mut self, value: T) -> Result<(), storage::Error>
+    fn write<T>(&mut self, value: T) -> Result<(), storage::Error>
     where
         T: Encode<Binary>,
     {
-        if self.start.is_none() {
-            let bytes = 0u32.to_le_bytes();
-            self.buffer.extend_from_slice(&bytes);
-            self.start = NonZeroUsize::new(self.buffer.len());
-        }
-
         storage::to_writer(&mut self.buffer, &value)?;
         Ok(())
     }
@@ -93,46 +132,40 @@ impl Buf {
     }
 
     fn len_at_mut(&mut self, at: usize) -> Option<&mut [u8; 4]> {
-        match self.buffer.get_mut(at..at + mem::size_of::<u32>())? {
-            bytes if bytes.len() == mem::size_of::<u32>() => {
-                Some(unsafe { &mut *bytes.as_mut_ptr().cast() })
-            }
-            _ => None,
-        }
+        let bytes = self.buffer.get_mut(at..at + mem::size_of::<u32>())?;
+        Some(unsafe { &mut *bytes.as_mut_ptr().cast() })
     }
 
     /// Mark an outgoing frame as done from the previous start point.
     ///
     /// If no start point is recorded, calling this method does nothing.
     #[inline]
-    pub(crate) fn done(&mut self) {
-        if let Some(start) = self.start.take() {
-            let l = u32::try_from(self.buffer.len().saturating_sub(start.get()))
-                .unwrap_or(u32::MAX)
-                .to_le_bytes();
+    fn done(&mut self, start: usize) {
+        let delta = self
+            .buffer
+            .len()
+            .saturating_sub(start)
+            .saturating_sub(mem::size_of::<u32>());
 
-            let Some(len) = self.len_at_mut(start.get().saturating_sub(mem::size_of::<u32>()))
-            else {
-                return;
-            };
+        let l = u32::try_from(delta).unwrap_or(u32::MAX).to_le_bytes();
 
-            *len = l;
-        }
+        let Some(len) = self.len_at_mut(start) else {
+            return;
+        };
+
+        *len = l;
     }
 
     /// Reset the buffer to the previous start point.
     ///
     /// If no start point is set, this method does nothing.
     #[inline]
-    pub(crate) fn reset(&mut self) {
-        if let Some(start) = self.start {
-            self.buffer.truncate(start.get());
-        }
+    fn reset(&mut self, start: usize) {
+        self.buffer.truncate(start);
     }
 
     #[inline]
     pub(crate) fn clear(&mut self) {
-        self.start = None;
         self.buffer.clear();
         self.read.set(0);
     }
@@ -196,5 +229,63 @@ impl Buf {
 
         self.read.set(next);
         Ok(Some(out))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::string::{String, ToString};
+
+    use musli::Encode;
+
+    use super::Buf;
+
+    #[test]
+    fn test_empty_buf() {
+        let buf = Buf::default();
+        assert!(buf.is_empty());
+        assert_eq!(buf.read(), Ok(None));
+    }
+
+    #[derive(Encode)]
+    struct Message {
+        a: u32,
+        b: String,
+    }
+
+    #[test]
+    fn test_two_elements() {
+        let mut buf = Buf::default();
+
+        assert!(buf.is_empty());
+        assert_eq!(buf.read(), Ok(None));
+
+        // Buffer not consumed, so should leave empty.
+        buf.writer()
+            .write(Message {
+                a: 42,
+                b: "hello".to_string(),
+            })
+            .unwrap();
+
+        assert!(buf.is_empty());
+        assert_eq!(buf.read(), Ok(None));
+
+        // Buffer consumed, so should be available for reading.
+        let mut writer = buf.writer();
+        writer
+            .write(Message {
+                a: 42,
+                b: "hello".to_string(),
+            })
+            .unwrap();
+
+        writer.flush();
+
+        assert!(!buf.is_empty());
+        assert!(matches!(buf.read(), Ok(Some(..))));
+
+        assert!(buf.is_empty());
+        assert_eq!(buf.read(), Ok(None));
     }
 }
