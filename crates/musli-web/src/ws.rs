@@ -217,9 +217,6 @@ enum ErrorKind {
     Incoming {
         error: storage::Error,
     },
-    OutgoingHeader {
-        error: storage::Error,
-    },
     Outgoing {
         error: storage::Error,
     },
@@ -251,10 +248,6 @@ impl Error {
 
     pub(crate) fn incoming(error: storage::Error) -> Self {
         Self::new(ErrorKind::Incoming { error })
-    }
-
-    pub(crate) fn outgoing_header(error: storage::Error) -> Self {
-        Self::new(ErrorKind::OutgoingHeader { error })
     }
 
     pub(crate) fn outgoing(error: storage::Error) -> Self {
@@ -289,9 +282,6 @@ impl fmt::Display for Error {
             ErrorKind::Incoming { .. } => {
                 write!(f, "Encoding error when decoding incoming message")
             }
-            ErrorKind::OutgoingHeader { .. } => {
-                write!(f, "Encoding error when encoding outgoing header")
-            }
             ErrorKind::Outgoing { .. } => {
                 write!(f, "Encoding error when encoding outgoing message")
             }
@@ -318,7 +308,6 @@ impl core::error::Error for Error {
             #[cfg(feature = "axum-core05")]
             ErrorKind::AxumCore05 { error } => Some(error),
             ErrorKind::Incoming { error } => Some(error),
-            ErrorKind::OutgoingHeader { error } => Some(error),
             ErrorKind::Outgoing { error } => Some(error),
             ErrorKind::EncodeBroadcastHeader { error } => Some(error),
             ErrorKind::EncodeBroadcast { error } => Some(error),
@@ -676,18 +665,18 @@ where
     {
         tracing::debug!(id = ?<T::Broadcast as Broadcast>::ID, "Broadcast");
 
-        let result = self.outbound.write(ResponseHeader {
-            serial: 0,
-            broadcast: <T::Broadcast as Broadcast>::ID.get(),
-            error: 0,
-        });
+        let mut writer = self.outbound.writer();
 
-        result.map_err(Error::encode_broadcast_header)?;
+        writer
+            .write(ResponseHeader {
+                serial: 0,
+                broadcast: <T::Broadcast as Broadcast>::ID.get(),
+                error: 0,
+            })
+            .map_err(Error::encode_broadcast_header)?;
 
-        self.outbound
-            .write(message)
-            .map_err(Error::encode_broadcast)?;
-        self.outbound.done();
+        writer.write(message).map_err(Error::encode_broadcast)?;
+        writer.flush();
         Ok(())
     }
 
@@ -762,9 +751,9 @@ where
 
         if err {
             // Reset the buffer to the previous start point.
-            self.outbound.reset();
+            let mut writer = self.outbound.writer();
 
-            let result = self.outbound.write(ResponseHeader {
+            let result = writer.write(ResponseHeader {
                 serial: header.serial,
                 broadcast: 0,
                 error: MessageId::ERROR_MESSAGE.get(),
@@ -772,14 +761,14 @@ where
 
             result.map_err(Error::encode_error_message_header)?;
 
-            let result = self.outbound.write(ErrorMessage {
+            let result = writer.write(ErrorMessage {
                 message: &self.error,
             });
 
             result.map_err(Error::encode_error_message)?;
+            writer.flush();
         }
 
-        self.outbound.done();
         Ok(())
     }
 
@@ -862,20 +851,13 @@ where
     ) -> Result<H::Response, Error> {
         tracing::debug!(serial, ?id, "Got request");
 
-        let result = self.outbound.write(ResponseHeader {
-            serial,
-            broadcast: 0,
-            error: 0,
-        });
-
-        result.map_err(Error::outgoing_header)?;
-
         let mut incoming = Incoming {
             error: None,
             reader,
         };
 
         let mut outgoing = Outgoing {
+            serial: Some(serial),
             error: None,
             buf: &mut self.outbound,
         };
@@ -999,12 +981,15 @@ impl<'de> Incoming<'de> {
 ///
 /// [`server()`]: crate::axum08::server
 pub struct Outgoing<'a> {
+    serial: Option<u32>,
     error: Option<storage::Error>,
     buf: &'a mut Buf,
 }
 
 impl Outgoing<'_> {
     /// Write a response.
+    ///
+    /// This can only be called once. Calling this multiple times has no effect.
     ///
     /// See [`server()`] for how to use with `axum`.
     ///
@@ -1013,8 +998,27 @@ impl Outgoing<'_> {
     where
         T: Encode<Binary>,
     {
-        if let Err(error) = self.buf.write(value) {
+        let Some(serial) = self.serial.take() else {
+            return;
+        };
+
+        let mut writer = self.buf.writer();
+
+        let result = writer.write(ResponseHeader {
+            serial,
+            broadcast: 0,
+            error: 0,
+        });
+
+        if let Err(error) = result {
+            self.error = Some(error);
+            return;
+        }
+
+        if let Err(error) = writer.write(value) {
             self.error = Some(error);
         }
+
+        writer.flush();
     }
 }
