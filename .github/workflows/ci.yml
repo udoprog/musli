@@ -169,8 +169,8 @@ jobs:
         features:
         - json
         - api
-        - yew021
         - yew022
+        - yew023
         - web03
         - ws
         - ws,axum08

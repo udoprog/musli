@@ -4,10 +4,10 @@ edition = "2024"
 publish = false
 
 [dependencies]
-musli-web = { path = "../..", features = ["yew021"] }
+musli-web = { path = "../..", features = ["yew023"] }
 api = { package = "musli-web-api-example", path = "../api" }
 
-yew = { version = "0.21.0", features = ["csr"] }
+yew = { version = "0.23.0", features = ["csr"] }
 web-sys = "0.3.77"
 console_error_panic_hook = "0.1.7"
 tracing-wasm = "0.2.1"

@@ -1,13 +1,13 @@
-//! Integration with yew `0.21.x`.
+//! Integration with yew `0.23.x`.
 //!
 //! # Examples
 //!
-//! This example uses [`yew022`]:
+//! This example uses [`yew023`]:
 //!
-//! [`yew022`]: crate::yew022
+//! [`yew023`]: crate::yew023
 //!
 //! ```
-//! # extern crate yew022 as yew;
+//! # extern crate yew023 as yew;
 //! # extern crate web_sys03 as web_sys;
 //! use web_sys::HtmlInputElement;
 //! use yew::prelude::*;
@@ -168,20 +168,7 @@
 //! }
 //! ```
 
-use yew021::Callback;
-use yew021::html::ImplicitClone;
-
-use crate::web::{Handle, WebImpl};
-
-impl<H> ImplicitClone for Handle<H>
-where
-    H: WebImpl,
-{
-    #[inline]
-    fn implicit_clone(&self) -> Self {
-        self.clone()
-    }
-}
+use yew023::Callback;
 
 impl<I> crate::web::Callback<I> for Callback<I>
 where

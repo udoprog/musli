@@ -27,8 +27,8 @@ mod define;
 ///
 /// These are in turn extended with the relevant API using them:
 ///
-/// * [`yew021`] for yew `0.21.x`.
 /// * [`yew022`] for yew `0.22.x`.
+/// * [`yew023`] for yew `0.23.x`.
 ///
 /// <br>
 ///
@@ -242,8 +242,8 @@ mod define;
 /// [`musli::Encode`]: <https://docs.rs/musli/latest/musli/trait.Encode.html>
 /// [`web::Listener`]: <https://docs.rs/musli-web/latest/musli_web/web/struct.Listener.html>
 /// [`web::Request`]: <https://docs.rs/musli-web/latest/musli_web/web/struct.Request.html>
-/// [`yew021`]: <https://docs.rs/musli-web/latest/musli_web/yew021/>
 /// [`yew022`]: <https://docs.rs/musli-web/latest/musli_web/yew022/>
+/// [`yew023`]: <https://docs.rs/musli-web/latest/musli_web/yew023/>
 #[proc_macro]
 pub fn define(input: TokenStream) -> TokenStream {
     let path = syn::parse_quote!(::musli_web);

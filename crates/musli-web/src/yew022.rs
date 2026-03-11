@@ -169,19 +169,6 @@
 //! ```
 
 use yew022::Callback;
-use yew022::html::ImplicitClone;
-
-use crate::web::{Handle, WebImpl};
-
-impl<H> ImplicitClone for Handle<H>
-where
-    H: WebImpl,
-{
-    #[inline]
-    fn implicit_clone(&self) -> Self {
-        self.clone()
-    }
-}
 
 impl<I> crate::web::Callback<I> for Callback<I>
 where

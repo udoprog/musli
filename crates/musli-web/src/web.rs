@@ -902,7 +902,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # extern crate yew021 as yew;
+    /// # extern crate yew023 as yew;
     /// use yew::prelude::*;
     /// use musli_web::web03::prelude::*;
     ///
@@ -1005,7 +1005,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # extern crate yew021 as yew;
+    /// # extern crate yew023 as yew;
     /// use yew::prelude::*;
     /// use musli_web::web03::prelude::*;
     ///
@@ -1765,7 +1765,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # extern crate yew021 as yew;
+    /// # extern crate yew023 as yew;
     /// use yew::prelude::*;
     /// use musli_web::web03::prelude::*;
     ///
@@ -1866,7 +1866,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # extern crate yew021 as yew;
+    /// # extern crate yew023 as yew;
     /// use yew::prelude::*;
     /// use musli_web::web03::prelude::*;
     ///
@@ -1960,7 +1960,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # extern crate yew021 as yew;
+    /// # extern crate yew023 as yew;
     /// use yew::prelude::*;
     /// use musli_web::web03::prelude::*;
     ///
@@ -2074,7 +2074,7 @@ where
     /// # Examples
     ///
     /// ```
-    /// # extern crate yew021 as yew;
+    /// # extern crate yew023 as yew;
     /// use yew::prelude::*;
     /// use musli_web::web03::prelude::*;
     ///
