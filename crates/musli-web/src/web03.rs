@@ -75,6 +75,8 @@ use web_sys03::js_sys::Function;
 use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
 use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, window};
 
+use crate::Framework;
+use crate::Storage;
 use crate::web::{
     Connect, EmptyCallback, Error, Location, PerformanceImpl, ServiceBuilder, Shared, SocketImpl,
     WebImpl, WindowImpl,
@@ -87,6 +89,7 @@ pub mod prelude {
         //! Organization module prefixing all exported items with `ws` for
         //! convenient namespacing.
 
+        use crate::Storage;
         pub use crate::web::{
             Connect, EmptyCallback, Error, Listener, Packet, RawPacket, Request, State,
             StateListener,
@@ -113,12 +116,13 @@ pub mod prelude {
         /// Implementation alias for [`RequestBuilder`].
         ///
         /// [`RequestBuilder`]: crate::web::RequestBuilder
-        pub type RequestBuilder<'a, B, C> = crate::web::RequestBuilder<'a, Web03Impl, B, C>;
+        pub type RequestBuilder<'a, B, C> =
+            crate::web::RequestBuilder<'a, Web03Impl, Storage, B, C>;
 
         /// Implementation alias for [`ServiceBuilder`].
         ///
         /// [`ServiceBuilder`]: crate::web::ServiceBuilder
-        pub type ServiceBuilder<C> = crate::web::ServiceBuilder<Web03Impl, C>;
+        pub type ServiceBuilder<C> = crate::web::ServiceBuilder<Web03Impl, Storage, C>;
     }
 }
 
@@ -139,11 +143,14 @@ pub enum Web03Impl {}
 
 impl crate::web::sealed_socket::Sealed for WebSocket {}
 
-impl SocketImpl for WebSocket {
+impl<F> SocketImpl<F> for WebSocket
+where
+    F: Framework,
+{
     type Handles = Handles;
 
     #[inline]
-    fn new(url: &str, handles: &Self::Handles) -> Result<Self, Error> {
+    fn new(url: &str, handles: &Self::Handles) -> Result<Self, Error<F>> {
         let this = WebSocket::new(url)?;
         this.set_binary_type(BinaryType::Arraybuffer);
         this.set_onopen(Some(handles.open.as_ref().unchecked_ref()));
@@ -154,13 +161,13 @@ impl SocketImpl for WebSocket {
     }
 
     #[inline]
-    fn send(&self, data: &[u8]) -> Result<(), Error> {
+    fn send(&self, data: &[u8]) -> Result<(), Error<F>> {
         self.send_with_u8_array(data)?;
         Ok(())
     }
 
     #[inline]
-    fn close(self) -> Result<(), Error> {
+    fn close(self) -> Result<(), Error<F>> {
         WebSocket::close(&self)?;
         Ok(())
     }
@@ -177,12 +184,15 @@ impl PerformanceImpl for Performance {
 
 impl crate::web::sealed_window::Sealed for Window {}
 
-impl WindowImpl for Window {
+impl<F> WindowImpl<F> for Window
+where
+    F: Framework,
+{
     type Performance = Performance;
     type Timeout = Timeout;
 
     #[inline]
-    fn new() -> Result<Self, Error> {
+    fn new() -> Result<Self, Error<F>> {
         let Some(window) = window() else {
             return Err(Error::msg("No window in web-sys 0.3.x context"));
         };
@@ -191,7 +201,7 @@ impl WindowImpl for Window {
     }
 
     #[inline]
-    fn performance(&self) -> Result<Self::Performance, Error> {
+    fn performance(&self) -> Result<Self::Performance, Error<F>> {
         let Some(performance) = Window::performance(self) else {
             return Err(Error::msg("No window.performance in web-sys 0.3.x context"));
         };
@@ -200,7 +210,7 @@ impl WindowImpl for Window {
     }
 
     #[inline]
-    fn location(&self) -> Result<Location, Error> {
+    fn location(&self) -> Result<Location, Error<F>> {
         let location = Window::location(self);
 
         Ok(Location {
@@ -215,7 +225,7 @@ impl WindowImpl for Window {
         &self,
         millis: u32,
         callback: impl FnOnce() + 'static,
-    ) -> Result<Self::Timeout, Error> {
+    ) -> Result<Self::Timeout, Error<F>> {
         let closure = Closure::once(callback);
 
         let id = self.set_timeout_with_callback_and_timeout_and_arguments_0(
@@ -250,7 +260,10 @@ impl Drop for Timeout {
 
 impl crate::web::sealed_web::Sealed for Web03Impl {}
 
-impl WebImpl for Web03Impl {
+impl<F> WebImpl<F> for Web03Impl
+where
+    F: Framework,
+{
     type Window = Window;
     type Handles = Handles;
     type Socket = WebSocket;
@@ -262,7 +275,7 @@ impl WebImpl for Web03Impl {
 
     #[inline]
     #[allow(private_interfaces)]
-    fn handles(shared: &Weak<Shared<Self>>) -> Self::Handles {
+    fn handles(shared: &Weak<Shared<Self, F>>) -> Self::Handles {
         let open = {
             let shared = shared.clone();
 
@@ -315,11 +328,14 @@ impl WebImpl for Web03Impl {
 /// Construct a new [`ServiceBuilder`] associated with the given [`Connect`]
 /// strategy.
 #[inline]
-pub fn connect(connect: Connect) -> ServiceBuilder<Web03Impl, EmptyCallback> {
+pub fn connect(connect: Connect) -> ServiceBuilder<Web03Impl, Storage, EmptyCallback> {
     crate::web::connect(connect)
 }
 
-impl Shared<Web03Impl> {
+impl<F> Shared<Web03Impl, F>
+where
+    F: Framework,
+{
     fn web03_open(&self) {
         tracing::debug!("Open event");
 
@@ -334,7 +350,7 @@ impl Shared<Web03Impl> {
         }
     }
 
-    fn web03_message(self: &Rc<Shared<Web03Impl>>, e: MessageEvent) {
+    fn web03_message(self: &Rc<Shared<Web03Impl, F>>, e: MessageEvent) {
         tracing::debug!("Message event");
 
         let Ok(array_buffer) = e.data().dyn_into::<ArrayBuffer>() else {

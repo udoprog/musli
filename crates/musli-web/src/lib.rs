@@ -105,6 +105,11 @@ mod implicit_clone06;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "ws")))]
 pub mod ws;
 
+#[cfg(feature = "ws")]
+mod framework;
+#[cfg(feature = "ws")]
+pub use self::framework::{Framework, Storage};
+
 #[doc(hidden)]
 pub mod __macros {
     pub use core::fmt;

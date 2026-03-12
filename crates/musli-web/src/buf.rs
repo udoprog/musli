@@ -1,12 +1,15 @@
 use core::cell::Cell;
 use core::fmt;
+use core::marker::PhantomData;
 use core::mem;
 use core::mem::ManuallyDrop;
 use core::ops::Range;
 
 use alloc::vec::Vec;
+use musli::Encode;
 use musli::mode::Binary;
-use musli::{Encode, storage};
+
+use crate::Framework;
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -55,15 +58,21 @@ impl fmt::Display for InvalidFrame {
 }
 
 #[must_use = "Writer must be consumed with Writer::flush to have an effect on the underlying buffer"]
-pub(crate) struct Writer<'a> {
+pub(crate) struct Writer<'a, F>
+where
+    F: Framework,
+{
     start: usize,
-    buf: &'a mut Buf,
+    buf: &'a mut Buf<F>,
 }
 
-impl Writer<'_> {
+impl<F> Writer<'_, F>
+where
+    F: Framework,
+{
     /// Write data to the current frame.
     #[inline]
-    pub(crate) fn write<T>(&mut self, value: T) -> Result<(), storage::Error>
+    pub(crate) fn write<T>(&mut self, value: T) -> Result<(), F::Error>
     where
         T: Encode<Binary>,
     {
@@ -79,7 +88,10 @@ impl Writer<'_> {
     }
 }
 
-impl Drop for Writer<'_> {
+impl<F> Drop for Writer<'_, F>
+where
+    F: Framework,
+{
     #[inline]
     fn drop(&mut self) {
         self.buf.reset(self.start);
@@ -88,15 +100,29 @@ impl Drop for Writer<'_> {
 
 /// A length-prefixed buffer which keeps track of the start of each frame and
 /// allows them to be iterated over.
-#[derive(Default)]
-pub(crate) struct Buf {
+pub(crate) struct Buf<F>
+where
+    F: Framework,
+{
     buffer: Vec<u8>,
     read: Cell<usize>,
+    _marker: PhantomData<F>,
 }
 
-impl Buf {
+impl<F> Buf<F>
+where
+    F: Framework,
+{
+    pub(crate) fn new() -> Self {
+        Self {
+            buffer: Vec::new(),
+            read: Cell::new(0),
+            _marker: PhantomData,
+        }
+    }
+
     /// Start a write.
-    pub(crate) fn writer(&mut self) -> Writer<'_> {
+    pub(crate) fn writer(&mut self) -> Writer<'_, F> {
         if self.read.get() == self.buffer.len() {
             self.buffer.clear();
             self.read.set(0);
@@ -115,11 +141,8 @@ impl Buf {
     ///
     /// If a new frame is started, a new start point is recorded.
     #[inline]
-    fn write<T>(&mut self, value: T) -> Result<(), storage::Error>
-    where
-        T: Encode<Binary>,
-    {
-        storage::to_writer(&mut self.buffer, &value)?;
+    fn write(&mut self, value: impl Encode<Binary>) -> Result<(), F::Error> {
+        F::to_writer(&mut self.buffer, &value)?;
         Ok(())
     }
 

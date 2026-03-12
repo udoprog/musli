@@ -32,12 +32,16 @@ impl ws::Handler for MyHandler {
     type Id = api::Request;
     type Response = bool;
 
-    async fn handle(
+    async fn handle<I, O>(
         &mut self,
         id: api::Request,
-        incoming: &mut ws::Incoming<'_>,
-        outgoing: &mut ws::Outgoing<'_>,
-    ) -> Self::Response {
+        incoming: &mut I,
+        outgoing: &mut O,
+    ) -> Self::Response
+    where
+        I: for<'de> ws::Incoming<'de>,
+        O: ws::Outgoing,
+    {
         tracing::info!("Handling: {id:?}");
 
         match id {
@@ -56,6 +60,7 @@ impl ws::Handler for MyHandler {
 
                 true
             }
+            _ => false,
         }
     }
 }

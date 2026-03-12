@@ -27,11 +27,11 @@ use musli::Decode;
 use musli::alloc::Global;
 use musli::mode::Binary;
 use musli::reader::SliceReader;
-use musli::storage;
 
 use slab::Slab;
 
 use crate::api::{self, Event, MessageId};
+use crate::{Framework, Storage};
 
 const MAX_CAPACITY: usize = 1048576;
 
@@ -46,11 +46,11 @@ pub struct EmptyCallback;
 /// Slab of state listeners.
 type StateListeners = Slab<Rc<dyn Callback<State>>>;
 /// Slab of broadcast listeners.
-type Broadcasts = HashMap<MessageId, Slab<Rc<dyn Callback<Result<RawPacket>>>>>;
+type Broadcasts<F> = HashMap<MessageId, Slab<Rc<dyn Callback<Result<RawPacket<F>, Error<F>>>>>>;
 /// Queue of recycled buffers.
-type Buffers = VecDeque<Box<BufData>>;
+type Buffers<F> = VecDeque<Box<BufData<F>>>;
 /// Pending requests.
-type Requests = HashMap<u32, Box<Pending<dyn Callback<Result<RawPacket>>>>>;
+type Requests<F> = HashMap<u32, Box<Pending<dyn Callback<Result<RawPacket<F>, Error<F>>>>>>;
 
 /// Location information for websocket implementation.
 #[doc(hidden)]
@@ -64,21 +64,22 @@ pub(crate) mod sealed_socket {
     pub trait Sealed {}
 }
 
-pub(crate) trait SocketImpl
+pub(crate) trait SocketImpl<F>
 where
     Self: Sized + self::sealed_socket::Sealed,
+    F: Framework,
 {
     #[doc(hidden)]
     type Handles;
 
     #[doc(hidden)]
-    fn new(url: &str, handles: &Self::Handles) -> Result<Self, Error>;
+    fn new(url: &str, handles: &Self::Handles) -> Result<Self, Error<F>>;
 
     #[doc(hidden)]
-    fn send(&self, data: &[u8]) -> Result<(), Error>;
+    fn send(&self, data: &[u8]) -> Result<(), Error<F>>;
 
     #[doc(hidden)]
-    fn close(self) -> Result<(), Error>;
+    fn close(self) -> Result<(), Error<F>>;
 }
 
 pub(crate) mod sealed_performance {
@@ -97,9 +98,10 @@ pub(crate) mod sealed_window {
     pub trait Sealed {}
 }
 
-pub(crate) trait WindowImpl
+pub(crate) trait WindowImpl<F>
 where
     Self: Sized + self::sealed_window::Sealed,
+    F: Framework,
 {
     #[doc(hidden)]
     type Performance: PerformanceImpl;
@@ -108,20 +110,20 @@ where
     type Timeout;
 
     #[doc(hidden)]
-    fn new() -> Result<Self, Error>;
+    fn new() -> Result<Self, Error<F>>;
 
     #[doc(hidden)]
-    fn performance(&self) -> Result<Self::Performance, Error>;
+    fn performance(&self) -> Result<Self::Performance, Error<F>>;
 
     #[doc(hidden)]
-    fn location(&self) -> Result<Location, Error>;
+    fn location(&self) -> Result<Location, Error<F>>;
 
     #[doc(hidden)]
     fn set_timeout(
         &self,
         millis: u32,
         callback: impl FnOnce() + 'static,
-    ) -> Result<Self::Timeout, Error>;
+    ) -> Result<Self::Timeout, Error<F>>;
 }
 
 pub(crate) mod sealed_web {
@@ -140,24 +142,25 @@ pub(crate) mod sealed_web {
 /// * [web03] for `web-sys` `0.3.x`.
 ///
 /// [web03]: crate::web03
-pub trait WebImpl
+pub trait WebImpl<F>
 where
     Self: 'static + Copy + Sized + self::sealed_web::Sealed,
+    F: Framework,
 {
     #[doc(hidden)]
     #[allow(private_bounds)]
-    type Window: WindowImpl;
+    type Window: WindowImpl<F>;
 
     #[doc(hidden)]
     type Handles;
 
     #[doc(hidden)]
     #[allow(private_bounds)]
-    type Socket: SocketImpl<Handles = Self::Handles>;
+    type Socket: SocketImpl<F, Handles = Self::Handles>;
 
     #[doc(hidden)]
     #[allow(private_interfaces)]
-    fn handles(shared: &Weak<Shared<Self>>) -> Self::Handles;
+    fn handles(shared: &Weak<Shared<Self, F>>) -> Self::Handles;
 
     #[doc(hidden)]
     fn random(range: u32) -> u32;
@@ -165,9 +168,10 @@ where
 
 /// Construct a new [`ServiceBuilder`] associated with the given [`Connect`]
 /// strategy.
-pub fn connect<H>(connect: Connect) -> ServiceBuilder<H, EmptyCallback>
+pub fn connect<H, F>(connect: Connect) -> ServiceBuilder<H, F, EmptyCallback>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
     ServiceBuilder {
         connect,
@@ -190,12 +194,17 @@ pub enum State {
 }
 
 /// Error type for the WebSocket service.
-#[derive(Debug)]
-pub struct Error {
-    kind: ErrorKind,
+pub struct Error<F>
+where
+    F: Framework,
+{
+    kind: ErrorKind<F::Error>,
 }
 
-impl Error {
+impl<F> Error<F>
+where
+    F: Framework,
+{
     /// Check if the error is caused by an empty packet.
     ///
     /// # Examples
@@ -213,46 +222,59 @@ impl Error {
     }
 }
 
+impl<F> fmt::Debug for Error<F>
+where
+    F: Framework,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
+    }
+}
+
 #[derive(Debug)]
-enum ErrorKind {
+enum ErrorKind<E> {
     EmptyPacket,
     Message(String),
-    DecodeResponseHeader(storage::Error),
-    DecodeErrorMessage(storage::Error),
-    DecodePacket(storage::Error),
-    EncodingHeader(storage::Error),
-    EncodingBody(storage::Error),
+    DecodeResponseHeader(E),
+    DecodeErrorMessage(E),
+    DecodePacket(E),
+    EncodingHeader(E),
+    EncodingBody(E),
     Overflow(usize, usize),
 }
 
-impl Error {
+impl<F> Error<F>
+where
+    F: Framework,
+{
     #[inline]
-    fn new(kind: ErrorKind) -> Self {
+    fn new(kind: ErrorKind<F::Error>) -> Self {
         Self { kind }
     }
 
     #[inline]
-    pub(crate) fn decode_response_header(error: storage::Error) -> Self {
+    pub(crate) fn decode_response_header(error: F::Error) -> Self {
         Self::new(ErrorKind::DecodeResponseHeader(error))
     }
 
     #[inline]
-    pub(crate) fn decode_error_message(error: storage::Error) -> Self {
+    pub(crate) fn decode_error_message(error: F::Error) -> Self {
         Self::new(ErrorKind::DecodeErrorMessage(error))
     }
 
     #[inline]
-    pub(crate) fn decode_packet(error: storage::Error) -> Self {
+    pub(crate) fn decode_packet(error: F::Error) -> Self {
         Self::new(ErrorKind::DecodePacket(error))
     }
 
     #[inline]
-    pub(crate) fn encoding_header(error: storage::Error) -> Self {
+    pub(crate) fn encoding_header(error: F::Error) -> Self {
         Self::new(ErrorKind::EncodingHeader(error))
     }
 
     #[inline]
-    pub(crate) fn encoding_body(error: storage::Error) -> Self {
+    pub(crate) fn encoding_body(error: F::Error) -> Self {
         Self::new(ErrorKind::EncodingBody(error))
     }
 
@@ -262,7 +284,10 @@ impl Error {
     }
 }
 
-impl fmt::Display for Error {
+impl<F> fmt::Display for Error<F>
+where
+    F: Framework,
+{
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
@@ -284,7 +309,10 @@ impl fmt::Display for Error {
     }
 }
 
-impl core::error::Error for Error {
+impl<F> core::error::Error for Error<F>
+where
+    F: Framework,
+{
     #[inline]
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.kind {
@@ -299,14 +327,15 @@ impl core::error::Error for Error {
 }
 
 #[cfg(feature = "wasm_bindgen02")]
-impl From<wasm_bindgen02::JsValue> for Error {
+impl<F> From<wasm_bindgen02::JsValue> for Error<F>
+where
+    F: Framework,
+{
     #[inline]
     fn from(error: wasm_bindgen02::JsValue) -> Self {
         Self::new(ErrorKind::Message(format!("{error:?}")))
     }
 }
-
-type Result<T, E = Error> = core::result::Result<T, E>;
 
 const INITIAL_TIMEOUT: u32 = 250;
 const MAX_TIMEOUT: u32 = 4000;
@@ -347,38 +376,43 @@ impl Connect {
 }
 
 /// Generic but shared fields which do not depend on specialization over `H`.
-struct Generic {
+struct Generic<F>
+where
+    F: Framework,
+{
     state_listeners: RefCell<StateListeners>,
-    requests: RefCell<Requests>,
-    broadcasts: RefCell<Broadcasts>,
-    buffers: RefCell<Buffers>,
+    requests: RefCell<Requests<F>>,
+    broadcasts: RefCell<Broadcasts<F>>,
+    buffers: RefCell<Buffers<F>>,
 }
 
 /// Shared implementation details for websocket implementations.
-pub(crate) struct Shared<H>
+pub(crate) struct Shared<H, F>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
     connect: Connect,
-    pub(crate) on_error: Box<dyn Callback<Error>>,
+    pub(crate) on_error: Box<dyn Callback<Error<F>>>,
     window: H::Window,
-    performance: <H::Window as WindowImpl>::Performance,
+    performance: <H::Window as WindowImpl<F>>::Performance,
     handles: H::Handles,
     state: Cell<State>,
     opened: Cell<Option<f64>>,
     serial: Cell<u32>,
-    defer_broadcasts: RefCell<VecDeque<Weak<dyn Callback<Result<RawPacket>>>>>,
+    defer_broadcasts: RefCell<VecDeque<Weak<dyn Callback<Result<RawPacket<F>, Error<F>>>>>>,
     defer_state_listeners: RefCell<VecDeque<Weak<dyn Callback<State>>>>,
     pub(crate) socket: RefCell<Option<H::Socket>>,
     output: RefCell<Vec<u8>>,
     current_timeout: Cell<u32>,
-    reconnect_timeout: RefCell<Option<<H::Window as WindowImpl>::Timeout>>,
-    g: Rc<Generic>,
+    reconnect_timeout: RefCell<Option<<H::Window as WindowImpl<F>>::Timeout>>,
+    g: Rc<Generic<F>>,
 }
 
-impl<H> Drop for Shared<H>
+impl<H, F> Drop for Shared<H, F>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
     fn drop(&mut self) {
         if let Some(s) = self.socket.take()
@@ -404,24 +438,26 @@ where
 }
 
 /// Builder of a service.
-pub struct ServiceBuilder<H, E>
+pub struct ServiceBuilder<H, F, E>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
     connect: Connect,
     on_error: E,
-    _marker: PhantomData<H>,
+    _marker: PhantomData<(H, F)>,
 }
 
-impl<H, E> ServiceBuilder<H, E>
+impl<H, F, E> ServiceBuilder<H, F, E>
 where
-    H: WebImpl,
-    E: Callback<Error>,
+    H: WebImpl<F>,
+    F: Framework,
+    E: Callback<Error<F>>,
 {
     /// Set the error handler to use for the service.
-    pub fn on_error<U>(self, on_error: U) -> ServiceBuilder<H, U>
+    pub fn on_error<U>(self, on_error: U) -> ServiceBuilder<H, F, U>
     where
-        U: Callback<Error>,
+        U: Callback<Error<F>>,
     {
         ServiceBuilder {
             connect: self.connect,
@@ -431,7 +467,7 @@ where
     }
 
     /// Build a new service and handle.
-    pub fn build(self) -> Service<H> {
+    pub fn build(self) -> Service<H, F> {
         let window = match H::Window::new() {
             Ok(window) => window,
             Err(error) => {
@@ -446,7 +482,7 @@ where
             }
         };
 
-        let shared = Rc::<Shared<H>>::new_cyclic(move |shared| Shared {
+        let shared = Rc::<Shared<H, F>>::new_cyclic(move |shared| Shared {
             connect: self.connect,
             on_error: Box::new(self.on_error),
             window,
@@ -481,17 +517,19 @@ where
 ///
 /// Once dropped this will cause the service to be disconnected and all requests
 /// to be cancelled.
-pub struct Service<H>
+pub struct Service<H, F = Storage>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
-    shared: Rc<Shared<H>>,
-    handle: Handle<H>,
+    shared: Rc<Shared<H, F>>,
+    handle: Handle<H, F>,
 }
 
-impl<H> Service<H>
+impl<H, F> Service<H, F>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
     /// Attempt to establish a websocket connection.
     pub fn connect(&self) {
@@ -499,17 +537,18 @@ where
     }
 
     /// Build a handle to the service.
-    pub fn handle(&self) -> &Handle<H> {
+    pub fn handle(&self) -> &Handle<H, F> {
         &self.handle
     }
 }
 
-impl<H> Shared<H>
+impl<H, F> Shared<H, F>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
     /// Send a client message.
-    fn send_client_request<T>(&self, serial: u32, body: &T) -> Result<()>
+    fn send_client_request<T>(&self, serial: u32, body: T) -> Result<(), Error<F>>
     where
         T: api::Request,
     {
@@ -524,8 +563,8 @@ where
 
         let out = &mut *self.output.borrow_mut();
 
-        storage::to_writer(&mut *out, &header).map_err(Error::encoding_header)?;
-        storage::to_writer(&mut *out, &body).map_err(Error::encoding_body)?;
+        F::to_writer(&mut *out, &header).map_err(Error::encoding_header)?;
+        F::to_writer(&mut *out, &body).map_err(Error::encoding_body)?;
 
         tracing::debug!(
             header.serial,
@@ -541,7 +580,7 @@ where
         Ok(())
     }
 
-    pub(crate) fn next_buffer(self: &Rc<Self>, needed: usize) -> Box<BufData> {
+    pub(crate) fn next_buffer(self: &Rc<Self>, needed: usize) -> Box<BufData<F>> {
         match self.g.buffers.borrow_mut().pop_front() {
             Some(mut buf) => {
                 if buf.data.capacity() < needed {
@@ -554,13 +593,13 @@ where
         }
     }
 
-    pub(crate) fn message(self: &Rc<Self>, buf: Box<BufData>) -> Result<()> {
+    pub(crate) fn message(self: &Rc<Self>, buf: Box<BufData<F>>) -> Result<(), Error<F>> {
         // Wrap the buffer in a simple shared reference-counted container.
         let buf = BufRc::new(buf);
         let mut reader = SliceReader::new(&buf);
 
         let header: api::ResponseHeader =
-            storage::decode(&mut reader).map_err(Error::decode_response_header)?;
+            F::decode(&mut reader).map_err(Error::decode_response_header)?;
 
         if let Some(broadcast) = MessageId::new(header.broadcast) {
             tracing::debug!(?header, "Got broadcast");
@@ -571,7 +610,7 @@ where
 
             if let Some(id) = MessageId::new(header.error) {
                 let error = if id == MessageId::ERROR_MESSAGE {
-                    storage::decode(&mut reader).map_err(Error::decode_error_message)?
+                    F::decode(&mut reader).map_err(Error::decode_error_message)?
                 } else {
                     api::ErrorMessage {
                         message: "Unknown error",
@@ -619,7 +658,7 @@ where
 
             if let Some(id) = MessageId::new(header.error) {
                 let error = if id == MessageId::ERROR_MESSAGE {
-                    storage::decode(&mut reader).map_err(Error::decode_error_message)?
+                    F::decode(&mut reader).map_err(Error::decode_error_message)?
                 } else {
                     api::ErrorMessage {
                         message: "Unknown error",
@@ -683,7 +722,7 @@ where
         (now - at) >= 250.0
     }
 
-    pub(crate) fn close(self: &Rc<Self>) -> Result<(), Error> {
+    pub(crate) fn close(self: &Rc<Self>) -> Result<(), Error<F>> {
         tracing::debug!("Close connection");
 
         // We need a weak reference back to shared state to handle the timeout.
@@ -803,7 +842,7 @@ where
     }
 
     /// Build a websocket connection.
-    fn build(self: &Rc<Self>) -> Result<()> {
+    fn build(self: &Rc<Self>) -> Result<(), Error<F>> {
         let url = match &self.connect.kind {
             ConnectKind::Location { path } => {
                 let Location {
@@ -871,22 +910,24 @@ where
 /// on your needs.
 ///
 /// Send the request with [`RequestBuilder::send`].
-pub struct RequestBuilder<'a, H, B, C>
+pub struct RequestBuilder<'a, H, F, B, C>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
-    shared: &'a Weak<Shared<H>>,
+    shared: &'a Weak<Shared<H, F>>,
     body: B,
     callback: C,
 }
 
-impl<'a, H, B, C> RequestBuilder<'a, H, B, C>
+impl<'a, H, F, B, C> RequestBuilder<'a, H, F, B, C>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
     /// Set the body of the request.
     #[inline]
-    pub fn body<U>(self, body: U) -> RequestBuilder<'a, H, U, C>
+    pub fn body<U>(self, body: U) -> RequestBuilder<'a, H, F, U, C>
     where
         U: api::Request,
     {
@@ -989,12 +1030,12 @@ where
     /// ```
     pub fn on_packet<E>(
         self,
-        callback: impl Callback<Result<Packet<E>>>,
-    ) -> RequestBuilder<'a, H, B, impl Callback<Result<RawPacket>>>
+        callback: impl Callback<Result<Packet<E, F>, Error<F>>>,
+    ) -> RequestBuilder<'a, H, F, B, impl Callback<Result<RawPacket<F>, Error<F>>>>
     where
         E: api::Endpoint,
     {
-        self.on_raw_packet(move |result: Result<RawPacket>| match result {
+        self.on_raw_packet(move |result: Result<RawPacket<F>, Error<F>>| match result {
             Ok(ok) => callback.call(Ok(Packet::new(ok))),
             Err(err) => callback.call(Err(err)),
         })
@@ -1092,9 +1133,9 @@ where
     ///     }
     /// }
     /// ```
-    pub fn on_raw_packet<U>(self, callback: U) -> RequestBuilder<'a, H, B, U>
+    pub fn on_raw_packet<U>(self, callback: U) -> RequestBuilder<'a, H, F, B, U>
     where
-        U: Callback<Result<RawPacket, Error>>,
+        U: Callback<Result<RawPacket<F>, Error<F>>>,
     {
         RequestBuilder {
             shared: self.shared,
@@ -1104,16 +1145,17 @@ where
     }
 }
 
-impl<'a, H, B, C> RequestBuilder<'a, H, B, C>
+impl<'a, H, F, B, C> RequestBuilder<'a, H, F, B, C>
 where
+    H: WebImpl<F>,
+    F: Framework,
     B: api::Request,
-    C: Callback<Result<RawPacket>>,
-    H: WebImpl,
+    C: Callback<Result<RawPacket<F>, Error<F>>>,
 {
     /// Send the request.
     ///
     /// This requires that a body has been set using [`RequestBuilder::body`].
-    pub fn send(self) -> Request {
+    pub fn send(self) -> Request<F> {
         let Some(shared) = self.shared.upgrade() else {
             self.callback
                 .call(Err(Error::msg("WebSocket service is down")));
@@ -1128,7 +1170,7 @@ where
 
         let serial = shared.serial.get();
 
-        if let Err(error) = shared.send_client_request(serial, &self.body) {
+        if let Err(error) = shared.send_client_request(serial, self.body) {
             shared.on_error.call(error);
             return Request::new();
         }
@@ -1163,12 +1205,18 @@ where
 /// Dropping or [`clear()`] this handle will cancel the request.
 ///
 /// [`clear()`]: Self::clear
-pub struct Request {
+pub struct Request<F = Storage>
+where
+    F: Framework,
+{
     serial: u32,
-    g: Weak<Generic>,
+    g: Weak<Generic<F>>,
 }
 
-impl Request {
+impl<F> Request<F>
+where
+    F: Framework,
+{
     /// An empty request handler.
     #[inline]
     pub const fn new() -> Self {
@@ -1210,14 +1258,20 @@ impl Request {
     }
 }
 
-impl Default for Request {
+impl<F> Default for Request<F>
+where
+    F: Framework,
+{
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Drop for Request {
+impl<F> Drop for Request<F>
+where
+    F: Framework,
+{
     #[inline]
     fn drop(&mut self) {
         self.clear();
@@ -1229,13 +1283,19 @@ impl Drop for Request {
 /// Dropping or calling [`clear()`] on this handle remove the listener.
 ///
 /// [`clear()`]: Self::clear
-pub struct Listener {
+pub struct Listener<F = Storage>
+where
+    F: Framework,
+{
     kind: Option<MessageId>,
     index: usize,
-    g: Weak<Generic>,
+    g: Weak<Generic<F>>,
 }
 
-impl Listener {
+impl<F> Listener<F>
+where
+    F: Framework,
+{
     /// Construct an empty listener.
     #[inline]
     pub const fn new() -> Self {
@@ -1298,14 +1358,20 @@ impl Listener {
     }
 }
 
-impl Default for Listener {
+impl<F> Default for Listener<F>
+where
+    F: Framework,
+{
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Drop for Listener {
+impl<F> Drop for Listener<F>
+where
+    F: Framework,
+{
     #[inline]
     fn drop(&mut self) {
         self.clear();
@@ -1318,12 +1384,18 @@ impl Drop for Listener {
 /// callback from being notified.
 ///
 /// [`clear()`]: Self::clear
-pub struct StateListener {
+pub struct StateListener<F = Storage>
+where
+    F: Framework,
+{
     index: usize,
-    g: Weak<Generic>,
+    g: Weak<Generic<F>>,
 }
 
-impl StateListener {
+impl<F> StateListener<F>
+where
+    F: Framework,
+{
     /// Construct an empty state listener.
     #[inline]
     pub const fn new() -> Self {
@@ -1351,31 +1423,43 @@ impl StateListener {
     }
 }
 
-impl Default for StateListener {
+impl<F> Default for StateListener<F>
+where
+    F: Framework,
+{
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Drop for StateListener {
+impl<F> Drop for StateListener<F>
+where
+    F: Framework,
+{
     #[inline]
     fn drop(&mut self) {
         self.clear();
     }
 }
 
-pub(crate) struct BufData {
+pub(crate) struct BufData<F>
+where
+    F: Framework,
+{
     /// Buffer being used.
     pub(crate) data: Vec<u8>,
     /// Number of strong references to this buffer.
     strong: Cell<usize>,
     /// Reference to shared state where the buffer will be recycled to.
-    g: Weak<Generic>,
+    g: Weak<Generic<F>>,
 }
 
-impl BufData {
-    fn with_capacity(g: Weak<Generic>, capacity: usize) -> Self {
+impl<F> BufData<F>
+where
+    F: Framework,
+{
+    fn with_capacity(g: Weak<Generic<F>>, capacity: usize) -> Self {
         Self {
             data: Vec::with_capacity(capacity),
             strong: Cell::new(0),
@@ -1383,7 +1467,7 @@ impl BufData {
         }
     }
 
-    unsafe fn dec(ptr: NonNull<BufData>) {
+    unsafe fn dec(ptr: NonNull<BufData<F>>) {
         unsafe {
             let count = ptr.as_ref().strong.get().wrapping_sub(1);
             ptr.as_ref().strong.set(count);
@@ -1414,7 +1498,7 @@ impl BufData {
         }
     }
 
-    unsafe fn inc(ptr: NonNull<BufData>) {
+    unsafe fn inc(ptr: NonNull<BufData<F>>) {
         unsafe {
             let count = ptr.as_ref().strong.get().wrapping_add(1);
 
@@ -1428,12 +1512,18 @@ impl BufData {
 }
 
 /// A shared buffer of data that is recycled when dropped.
-struct BufRc {
-    data: NonNull<BufData>,
+struct BufRc<F>
+where
+    F: Framework,
+{
+    data: NonNull<BufData<F>>,
 }
 
-impl BufRc {
-    fn new(data: Box<BufData>) -> Self {
+impl<F> BufRc<F>
+where
+    F: Framework,
+{
+    fn new(data: Box<BufData<F>>) -> Self {
         let data = NonNull::from(Box::leak(data));
 
         unsafe {
@@ -1444,7 +1534,10 @@ impl BufRc {
     }
 }
 
-impl Deref for BufRc {
+impl<F> Deref for BufRc<F>
+where
+    F: Framework,
+{
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -1452,7 +1545,10 @@ impl Deref for BufRc {
     }
 }
 
-impl Clone for BufRc {
+impl<F> Clone for BufRc<F>
+where
+    F: Framework,
+{
     fn clone(&self) -> Self {
         unsafe {
             BufData::inc(self.data);
@@ -1462,7 +1558,10 @@ impl Clone for BufRc {
     }
 }
 
-impl Drop for BufRc {
+impl<F> Drop for BufRc<F>
+where
+    F: Framework,
+{
     fn drop(&mut self) {
         unsafe {
             BufData::dec(self.data);
@@ -1471,14 +1570,33 @@ impl Drop for BufRc {
 }
 
 /// A raw packet of data.
-#[derive(Clone)]
-pub struct RawPacket {
+pub struct RawPacket<F = Storage>
+where
+    F: Framework,
+{
     id: MessageId,
-    buf: Option<BufRc>,
+    buf: Option<BufRc<F>>,
     at: Cell<usize>,
 }
 
-impl RawPacket {
+impl<F> Clone for RawPacket<F>
+where
+    F: Framework,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            buf: self.buf.clone(),
+            at: self.at.clone(),
+        }
+    }
+}
+
+impl<F> RawPacket<F>
+where
+    F: Framework,
+{
     /// Construct an empty raw packet.
     ///
     /// # Examples
@@ -1506,7 +1624,7 @@ impl RawPacket {
     /// sequence of the response.
     ///
     /// You can check if the packet is empty using [`RawPacket::is_empty`].
-    pub fn decode<'this, T>(&'this self) -> Result<T>
+    pub fn decode<'this, T>(&'this self) -> Result<T, Error<F>>
     where
         T: Decode<'this, Binary, Global>,
     {
@@ -1522,7 +1640,7 @@ impl RawPacket {
 
         let mut reader = SliceReader::new(bytes);
 
-        match storage::decode(&mut reader) {
+        match F::decode(&mut reader) {
             Ok(value) => {
                 self.at.set(at + bytes.len() - reader.remaining());
                 Ok(value)
@@ -1594,12 +1712,18 @@ impl RawPacket {
 
 /// A typed packet of data.
 #[derive(Clone)]
-pub struct Packet<T> {
-    raw: RawPacket,
+pub struct Packet<T, F = Storage>
+where
+    F: Framework,
+{
+    raw: RawPacket<F>,
     _marker: PhantomData<T>,
 }
 
-impl<T> Packet<T> {
+impl<T, F> Packet<T, F>
+where
+    F: Framework,
+{
     /// Construct an empty package.
     ///
     /// # Examples
@@ -1626,7 +1750,7 @@ impl<T> Packet<T> {
     /// the `T` parameter becomes associated with it allowing it to be used
     /// automatically with methods such as [`Packet::decode`].
     #[inline]
-    pub fn new(raw: RawPacket) -> Self {
+    pub fn new(raw: RawPacket<F>) -> Self {
         Self {
             raw,
             _marker: PhantomData,
@@ -1637,7 +1761,7 @@ impl<T> Packet<T> {
     ///
     /// To determine which endpoint or broadcast it belongs to the
     /// [`RawPacket::id`] method can be used.
-    pub fn into_raw(self) -> RawPacket {
+    pub fn into_raw(self) -> RawPacket<F> {
         self.raw
     }
 
@@ -1665,9 +1789,10 @@ impl<T> Packet<T> {
     }
 }
 
-impl<T> Packet<T>
+impl<T, F> Packet<T, F>
 where
     T: api::Decodable,
+    F: Framework,
 {
     /// Decode the contents of a packet.
     ///
@@ -1675,7 +1800,7 @@ where
     /// sequence of the response.
     ///
     /// You can check if the packet is empty using [`Packet::is_empty`].
-    pub fn decode(&self) -> Result<T::Type<'_>> {
+    pub fn decode(&self) -> Result<T::Type<'_>, Error<F>> {
         self.decode_any()
     }
 
@@ -1685,7 +1810,7 @@ where
     /// sequence of the response.
     ///
     /// You can check if the packet is empty using [`Packet::is_empty`].
-    pub fn decode_any<'de, R>(&'de self) -> Result<R>
+    pub fn decode_any<'de, R>(&'de self) -> Result<R, Error<F>>
     where
         R: Decode<'de, Binary, Global>,
     {
@@ -1693,9 +1818,10 @@ where
     }
 }
 
-impl<T> Packet<T>
+impl<T, F> Packet<T, F>
 where
     T: api::Endpoint,
+    F: Framework,
 {
     /// Decode the contents of a packet.
     ///
@@ -1703,7 +1829,7 @@ where
     /// sequence of the response.
     ///
     /// You can check if the packet is empty using [`Packet::is_empty`].
-    pub fn decode_response(&self) -> Result<T::Response<'_>> {
+    pub fn decode_response(&self) -> Result<T::Response<'_>, Error<F>> {
         self.decode_any_response()
     }
 
@@ -1713,7 +1839,7 @@ where
     /// sequence of the response.
     ///
     /// You can check if the packet is empty using [`Packet::is_empty`].
-    pub fn decode_any_response<'de, R>(&'de self) -> Result<R>
+    pub fn decode_any_response<'de, R>(&'de self) -> Result<R, Error<F>>
     where
         R: Decode<'de, Binary, Global>,
     {
@@ -1721,12 +1847,13 @@ where
     }
 }
 
-impl<T> Packet<T>
+impl<T, F> Packet<T, F>
 where
     T: api::Broadcast,
+    F: Framework,
 {
     /// Decode the primary event related to a broadcast.
-    pub fn decode_event<'de>(&'de self) -> Result<T::Event<'de>>
+    pub fn decode_event<'de>(&'de self) -> Result<T::Event<'de>, Error<F>>
     where
         T: api::BroadcastWithEvent,
     {
@@ -1734,7 +1861,7 @@ where
     }
 
     /// Decode any event related to a broadcast.
-    pub fn decode_event_any<'de, E>(&'de self) -> Result<E>
+    pub fn decode_event_any<'de, E>(&'de self) -> Result<E, Error<F>>
     where
         E: Event<Broadcast = T> + Decode<'de, Binary, Global>,
     {
@@ -1743,18 +1870,32 @@ where
 }
 
 /// A handle to the WebSocket service.
-#[derive(Clone)]
 #[repr(transparent)]
-pub struct Handle<H>
+pub struct Handle<H, F = Storage>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
-    shared: Weak<Shared<H>>,
+    shared: Weak<Shared<H, F>>,
 }
 
-impl<H> Handle<H>
+impl<H, F> Clone for Handle<H, F>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            shared: self.shared.clone(),
+        }
+    }
+}
+
+impl<H, F> Handle<H, F>
+where
+    H: WebImpl<F>,
+    F: Framework,
 {
     /// Send a request of type `T`.
     ///
@@ -1850,7 +1991,7 @@ where
     ///     }
     /// }
     /// ```
-    pub fn request(&self) -> RequestBuilder<'_, H, EmptyBody, EmptyCallback> {
+    pub fn request(&self) -> RequestBuilder<'_, H, F, EmptyBody, EmptyCallback> {
         RequestBuilder {
             shared: &self.shared,
             body: EmptyBody,
@@ -1942,7 +2083,10 @@ where
     ///     }
     /// }
     /// ```
-    pub fn on_broadcast<T>(&self, callback: impl Callback<Result<Packet<T>>>) -> Listener
+    pub fn on_broadcast<T>(
+        &self,
+        callback: impl Callback<Result<Packet<T, F>, Error<F>>>,
+    ) -> Listener<F>
     where
         T: api::Broadcast,
     {
@@ -2037,7 +2181,10 @@ where
     ///     }
     /// }
     /// ```
-    pub fn on_raw_broadcast<T>(&self, callback: impl Callback<Result<RawPacket>>) -> Listener
+    pub fn on_raw_broadcast<T>(
+        &self,
+        callback: impl Callback<Result<RawPacket<F>, Error<F>>>,
+    ) -> Listener<F>
     where
         T: api::Broadcast,
     {
@@ -2127,7 +2274,7 @@ where
     ///         }
     ///     }
     /// }
-    pub fn on_state_change(&self, callback: impl Callback<State>) -> (State, StateListener) {
+    pub fn on_state_change(&self, callback: impl Callback<State>) -> (State, StateListener<F>) {
         let Some(shared) = self.shared.upgrade() else {
             return (
                 State::Closed,
@@ -2156,13 +2303,14 @@ where
     }
 }
 
-impl<H> PartialEq for Handle<H>
+impl<H, F> PartialEq for Handle<H, F>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
     #[inline]
-    fn eq(&self, _: &Self) -> bool {
-        true
+    fn eq(&self, other: &Self) -> bool {
+        Weak::ptr_eq(&self.shared, &other.shared)
     }
 }
 

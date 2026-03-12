@@ -28,17 +28,18 @@ std = ["musli?/std"]
 api = ["alloc", "dep:musli"]
 axum08 = ["dep:axum08", "axum-core05", "dep:bytes", "dep:futures-core03", "dep:futures-sink03", "ws", "dep:tracing"]
 json = ["musli/json", "std", "alloc", "dep:bytes", "dep:mime", "axum-core05", "dep:http"]
-ws = ["musli/storage", "std", "api", "dep:bytes", "dep:rand", "tokio/time", "axum-core05", "axum08/ws", "dep:tracing"]
+ws = ["musli-core", "std", "api", "dep:bytes", "dep:rand", "tokio/time", "axum-core05", "axum08/ws", "dep:tracing"]
 yew022 = ["web03", "dep:yew022", "dep:implicit-clone06"]
 yew023 = ["web03", "dep:yew023", "dep:implicit-clone06"]
-web03 = ["std", "alloc", "api", "slab", "musli/storage", "dep:web-sys03", "dep:tracing", "wasm_bindgen02"]
+web03 = ["std", "alloc", "api", "slab", "musli-core", "dep:web-sys03", "dep:tracing", "wasm_bindgen02"]
 wasm_bindgen02 = ["dep:wasm-bindgen02"]
 test = ["api", "json", "ws", "yew022", "yew023"]
 
 [dependencies]
 musli-web-macros = { path = "../musli-web-macros", version = "0.3.0" }
+musli-core = { path = "../musli-core", version = "0.1.0", default-features = false, optional = true }
+musli = { path = "../musli", version = "0.0.149", default-features = false, features = ["storage"], optional = true }
 
-musli = { path = "../musli", version = "0.0.149", default-features = false, optional = true }
 http = { version = "1.3.1", default-features = false, optional = true }
 bytes = { version = "1.10.0", default-features = false, optional = true }
 mime = { version = "0.3.17", default-features = false, optional = true }

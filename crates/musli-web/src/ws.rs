@@ -61,12 +61,16 @@
 //!     type Id = api::Request;
 //!     type Response = Option<()>;
 //!
-//!     async fn handle(
+//!     async fn handle<I, O>(
 //!         &mut self,
 //!         id: Self::Id,
-//!         incoming: &mut ws::Incoming<'_>,
-//!         outgoing: &mut ws::Outgoing<'_>,
-//!     ) -> Self::Response {
+//!         incoming: &mut I,
+//!         outgoing: &mut O,
+//!     ) -> Self::Response
+//!     where
+//!         I: for<'de> ws::Incoming<'de>,
+//!         O: ws::Outgoing,
+//!     {
 //!         tracing::info!("Handling: {id:?}");
 //!
 //!         match id {
@@ -106,15 +110,14 @@ use bytes::Bytes;
 use musli::alloc::Global;
 use musli::mode::Binary;
 use musli::reader::SliceReader;
-use musli::storage;
 use musli::{Decode, Encode};
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 use tokio::time::{Duration, Instant, Sleep};
 
-use crate::Buf;
 use crate::api::{Broadcast, ErrorMessage, Event, Id, MessageId, RequestHeader, ResponseHeader};
 use crate::buf::InvalidFrame;
+use crate::{Buf, Framework, Storage};
 
 const MAX_CAPACITY: usize = 1048576;
 const CLOSE_NORMAL: u16 = 1000;
@@ -205,7 +208,7 @@ where
 }
 
 #[derive(Debug)]
-enum ErrorKind {
+enum ErrorKind<E> {
     #[cfg(feature = "axum-core05")]
     AxumCore05 {
         error: axum_core05::Error,
@@ -215,63 +218,71 @@ enum ErrorKind {
         error: InvalidFrame,
     },
     Incoming {
-        error: storage::Error,
+        error: E,
     },
     Outgoing {
-        error: storage::Error,
+        error: E,
     },
     EncodeBroadcastHeader {
-        error: storage::Error,
+        error: E,
     },
     EncodeBroadcast {
-        error: storage::Error,
+        error: E,
     },
     ErrorMessageHeader {
-        error: storage::Error,
+        error: E,
     },
     ErrorMessage {
-        error: storage::Error,
+        error: E,
     },
 }
 
 /// The error produced by the server side of the websocket protocol
-#[derive(Debug)]
-pub struct Error {
-    kind: ErrorKind,
+pub struct Error<F>
+where
+    F: Framework,
+{
+    kind: ErrorKind<F::Error>,
 }
 
-impl Error {
+impl<F> Error<F>
+where
+    F: Framework,
+{
     #[inline]
-    const fn new(kind: ErrorKind) -> Self {
+    const fn new(kind: ErrorKind<F::Error>) -> Self {
         Self { kind }
     }
 
-    pub(crate) fn incoming(error: storage::Error) -> Self {
+    pub(crate) fn incoming(error: F::Error) -> Self {
         Self::new(ErrorKind::Incoming { error })
     }
 
-    pub(crate) fn outgoing(error: storage::Error) -> Self {
+    pub(crate) fn outgoing(error: F::Error) -> Self {
         Self::new(ErrorKind::Outgoing { error })
     }
 
-    pub(crate) fn encode_broadcast_header(error: storage::Error) -> Self {
+    pub(crate) fn encode_broadcast_header(error: F::Error) -> Self {
         Self::new(ErrorKind::EncodeBroadcastHeader { error })
     }
 
-    pub(crate) fn encode_broadcast(error: storage::Error) -> Self {
+    pub(crate) fn encode_broadcast(error: F::Error) -> Self {
         Self::new(ErrorKind::EncodeBroadcast { error })
     }
 
-    pub(crate) fn encode_error_message_header(error: storage::Error) -> Self {
+    pub(crate) fn encode_error_message_header(error: F::Error) -> Self {
         Self::new(ErrorKind::ErrorMessageHeader { error })
     }
 
-    pub(crate) fn encode_error_message(error: storage::Error) -> Self {
+    pub(crate) fn encode_error_message(error: F::Error) -> Self {
         Self::new(ErrorKind::ErrorMessage { error })
     }
 }
 
-impl fmt::Display for Error {
+impl<F> fmt::Display for Error<F>
+where
+    F: Framework,
+{
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
@@ -301,7 +312,20 @@ impl fmt::Display for Error {
     }
 }
 
-impl core::error::Error for Error {
+impl<F> fmt::Debug for Error<F>
+where
+    F: Framework,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
+    }
+}
+
+impl<F> core::error::Error for Error<F>
+where
+    F: Framework,
+{
     #[inline]
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.kind {
@@ -319,28 +343,35 @@ impl core::error::Error for Error {
 }
 
 #[cfg(feature = "axum-core05")]
-impl From<axum_core05::Error> for Error {
+impl<F> From<axum_core05::Error> for Error<F>
+where
+    F: Framework,
+{
     #[inline]
     fn from(error: axum_core05::Error) -> Self {
         Self::new(ErrorKind::AxumCore05 { error })
     }
 }
 
-impl From<ErrorKind> for Error {
+impl<F> From<ErrorKind<F::Error>> for Error<F>
+where
+    F: Framework,
+{
     #[inline]
-    fn from(kind: ErrorKind) -> Self {
+    fn from(kind: ErrorKind<F::Error>) -> Self {
         Self::new(kind)
     }
 }
 
-impl From<InvalidFrame> for Error {
+impl<F> From<InvalidFrame> for Error<F>
+where
+    F: Framework,
+{
     #[inline]
     fn from(error: InvalidFrame) -> Self {
         Self::new(ErrorKind::InvalidFrame { error })
     }
 }
-
-type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// The response meta from handling a request.
 pub struct Response {
@@ -439,12 +470,15 @@ pub trait Handler {
     type Response: IntoResponse;
 
     /// Handle a request.
-    fn handle<'this>(
+    fn handle<'this, I, O>(
         &'this mut self,
         id: Self::Id,
-        incoming: &'this mut Incoming<'_>,
-        outgoing: &'this mut Outgoing<'_>,
-    ) -> impl Future<Output = Self::Response> + Send + 'this;
+        incoming: &'this mut I,
+        outgoing: &'this mut O,
+    ) -> impl Future<Output = Self::Response> + Send + 'this
+    where
+        I: ?Sized + Incoming<'this>,
+        O: ?Sized + Outgoing;
 }
 
 struct Pinned<S> {
@@ -472,12 +506,13 @@ impl<S> Pinned<S> {
 /// See [`server()`] for how to use with `axum`.
 ///
 /// [`server()`]: crate::axum08::server
-pub struct Server<S, H>
+pub struct Server<S, H, F = Storage>
 where
     S: ServerImpl,
+    F: Framework,
 {
     closing: bool,
-    outbound: Buf,
+    outbound: Buf<F>,
     error: String,
     handler: H,
     last_ping: Option<[u8; 4]>,
@@ -489,9 +524,10 @@ where
     pinned: Pin<Box<Pinned<S::Socket>>>,
 }
 
-impl<S, H> Server<S, H>
+impl<S, H, F> Server<S, H, F>
 where
     S: ServerImpl,
+    F: Framework,
 {
     /// Construct a new server with the specified handler.
     #[inline]
@@ -500,7 +536,7 @@ where
 
         Self {
             closing: false,
-            outbound: Buf::default(),
+            outbound: Buf::new(),
             error: String::new(),
             handler,
             last_ping: None,
@@ -553,9 +589,10 @@ where
     }
 }
 
-impl<S, H> Server<S, H>
+impl<S, H, F> Server<S, H, F>
 where
     S: ServerImpl,
+    F: Framework,
 {
     /// Associated the specified seed with the server.
     ///
@@ -569,16 +606,17 @@ where
     }
 }
 
-impl<S, H> Server<S, H>
+impl<S, H, F> Server<S, H, F>
 where
     S: ServerImpl,
-    Error: From<S::Error>,
+    Error<F>: From<S::Error>,
     H: Handler<Response: IntoResponse<Error: fmt::Display>>,
+    F: Framework,
 {
     /// Run the server.
     ///
     /// This must be called to handle buffered outgoing and incoming messages.
-    pub async fn run(&mut self) -> Result<(), Error> {
+    pub async fn run(&mut self) -> Result<(), Error<F>> {
         loop {
             if self.closing && self.out.is_empty() && self.outbound.is_empty() {
                 break;
@@ -659,7 +697,7 @@ where
     ///
     /// Note that the written message is buffered, and will be sent when
     /// [`Server::run`] is called.
-    pub fn broadcast<T>(&mut self, message: T) -> Result<(), Error>
+    pub fn broadcast<T>(&mut self, message: T) -> Result<(), Error<F>>
     where
         T: Event,
     {
@@ -680,7 +718,7 @@ where
         Ok(())
     }
 
-    fn format_error_message(&mut self, error: impl fmt::Display) -> Result<(), Error> {
+    fn format_error_message(&mut self, error: impl fmt::Display) -> Result<(), Error<F>> {
         self.error.clear();
 
         if write!(self.error, "{error}").is_err() {
@@ -691,7 +729,7 @@ where
         Ok(())
     }
 
-    fn format_error(&mut self, error: impl core::error::Error) -> Result<(), Error> {
+    fn format_error(&mut self, error: impl core::error::Error) -> Result<(), Error<F>> {
         self.error.clear();
 
         if write!(self.error, "{error:#}").is_err() {
@@ -703,10 +741,10 @@ where
     }
 
     #[tracing::instrument(skip(self, bytes))]
-    async fn handle_message(&mut self, bytes: Bytes) -> Result<(), Error> {
+    async fn handle_message(&mut self, bytes: Bytes) -> Result<(), Error<F>> {
         let mut reader = SliceReader::new(&bytes);
 
-        let header: RequestHeader = match storage::decode(&mut reader) {
+        let header: RequestHeader = match F::decode(&mut reader) {
             Ok(header) => header,
             Err(error) => {
                 tracing::debug!(?error, "Invalid request header");
@@ -773,7 +811,7 @@ where
     }
 
     #[tracing::instrument(skip(self))]
-    fn handle_ping(&mut self) -> Result<(), Error> {
+    fn handle_ping(&mut self) -> Result<(), Error<F>> {
         let (_, mut ping_sleep, _) = self.pinned.as_mut().project();
 
         let payload = self.rng.random::<u32>();
@@ -792,7 +830,7 @@ where
     }
 
     #[tracing::instrument(skip(self, payload))]
-    fn handle_pong(&mut self, payload: Bytes) -> Result<(), Error> {
+    fn handle_pong(&mut self, payload: Bytes) -> Result<(), Error<F>> {
         let (close_sleep, ping_sleep, _) = self.pinned.as_mut().project();
 
         tracing::debug!(payload = ?&payload[..], "Pong");
@@ -816,7 +854,7 @@ where
     }
 
     #[tracing::instrument(skip(self))]
-    fn handle_send(&mut self) -> Result<(), Error> {
+    fn handle_send(&mut self) -> Result<(), Error<F>> {
         let (_, _, mut socket) = self.pinned.as_mut().project();
 
         if self.socket_send
@@ -848,15 +886,15 @@ where
         reader: SliceReader<'_>,
         serial: u32,
         id: H::Id,
-    ) -> Result<H::Response, Error> {
+    ) -> Result<H::Response, Error<F>> {
         tracing::debug!(serial, ?id, "Got request");
 
-        let mut incoming = Incoming {
+        let mut incoming = IncomingImpl {
             error: None,
             reader,
         };
 
-        let mut outgoing = Outgoing {
+        let mut outgoing = OutgoingImpl {
             serial: Some(serial),
             error: None,
             buf: &mut self.outbound,
@@ -942,17 +980,23 @@ where
     }
 }
 
+mod sealed_incoming {
+    use super::{Framework, IncomingImpl};
+
+    pub trait Sealed {}
+
+    impl<'de, F> Sealed for IncomingImpl<'de, F> where F: Framework {}
+}
+
 /// The buffer for incoming requests.
 ///
 /// See [`server()`] for how to use with `axum`.
 ///
 /// [`server()`]: crate::axum08::server
-pub struct Incoming<'de> {
-    error: Option<storage::Error>,
-    reader: SliceReader<'de>,
-}
-
-impl<'de> Incoming<'de> {
+pub trait Incoming<'de>
+where
+    Self: self::sealed_incoming::Sealed,
+{
     /// Read a request and return `Some(T)` if the request was successfully
     /// decoded.
     ///
@@ -960,12 +1004,29 @@ impl<'de> Incoming<'de> {
     /// automatically, the user does not have to deal with it themselves.
     /// Instead, failure to decode should be treated as if the request was
     /// unhandled by returning for example `false` or `Option::None`.
+    fn read<T>(&mut self) -> Option<T>
+    where
+        T: Decode<'de, Binary, Global>;
+}
+
+pub(crate) struct IncomingImpl<'de, F>
+where
+    F: Framework,
+{
+    error: Option<F::Error>,
+    reader: SliceReader<'de>,
+}
+
+impl<'de, F> Incoming<'de> for IncomingImpl<'de, F>
+where
+    F: Framework,
+{
     #[inline]
-    pub fn read<T>(&mut self) -> Option<T>
+    fn read<T>(&mut self) -> Option<T>
     where
         T: Decode<'de, Binary, Global>,
     {
-        match storage::decode(&mut self.reader) {
+        match F::decode(&mut self.reader) {
             Ok(value) => Some(value),
             Err(error) => {
                 self.error = Some(error);
@@ -975,18 +1036,23 @@ impl<'de> Incoming<'de> {
     }
 }
 
+mod sealed_outgoing {
+    use super::{Framework, OutgoingImpl};
+
+    pub trait Sealed {}
+
+    impl<'a, F> Sealed for OutgoingImpl<'a, F> where F: Framework {}
+}
+
 /// The buffer for outgoing responses.
 ///
 /// See [`server()`] for how to use with `axum`.
 ///
 /// [`server()`]: crate::axum08::server
-pub struct Outgoing<'a> {
-    serial: Option<u32>,
-    error: Option<storage::Error>,
-    buf: &'a mut Buf,
-}
-
-impl Outgoing<'_> {
+pub trait Outgoing
+where
+    Self: self::sealed_outgoing::Sealed,
+{
     /// Write a response.
     ///
     /// This can only be called once. Calling this multiple times has no effect.
@@ -994,10 +1060,23 @@ impl Outgoing<'_> {
     /// See [`server()`] for how to use with `axum`.
     ///
     /// [`server()`]: crate::axum08::server
-    pub fn write<T>(&mut self, value: T)
-    where
-        T: Encode<Binary>,
-    {
+    fn write(&mut self, value: impl Encode<Binary>);
+}
+
+pub(crate) struct OutgoingImpl<'a, F>
+where
+    F: Framework,
+{
+    serial: Option<u32>,
+    error: Option<F::Error>,
+    buf: &'a mut Buf<F>,
+}
+
+impl<F> Outgoing for OutgoingImpl<'_, F>
+where
+    F: Framework,
+{
+    fn write(&mut self, value: impl Encode<Binary>) {
         let Some(serial) = self.serial.take() else {
             return;
         };

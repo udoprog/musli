@@ -85,12 +85,16 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///     type Id = api::Request;
 ///     type Response = Option<()>;
 ///
-///     async fn handle(
+///     async fn handle<I, O>(
 ///         &mut self,
 ///         id: Self::Id,
-///         incoming: &mut ws::Incoming<'_>,
-///         outgoing: &mut ws::Outgoing<'_>,
-///     ) -> Self::Response {
+///         incoming: &mut I,
+///         outgoing: &mut O,
+///     ) -> Self::Response
+///     where
+///         I: for<'de> ws::Incoming<'de>,
+///         O: ws::Outgoing,
+///     {
 ///         tracing::info!("Handling: {id:?}");
 ///
 ///         match id {

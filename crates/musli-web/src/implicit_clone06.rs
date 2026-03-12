@@ -1,10 +1,12 @@
 use implicit_clone06::ImplicitClone;
 
+use crate::Framework;
 use crate::web::{Handle, WebImpl};
 
-impl<H> ImplicitClone for Handle<H>
+impl<H, F> ImplicitClone for Handle<H, F>
 where
-    H: WebImpl,
+    H: WebImpl<F>,
+    F: Framework,
 {
     #[inline]
     fn implicit_clone(&self) -> Self {
