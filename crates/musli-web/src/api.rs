@@ -25,6 +25,32 @@ where
     fn __do_not_implement_id();
 }
 
+/// A unique identifier for a channel over the websocket.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
+#[repr(transparent)]
+#[musli(transparent)]
+pub struct ChannelId {
+    repr: u16,
+}
+
+impl ChannelId {
+    /// The channel id used for an invalid channel.
+    pub const NONE: Self = Self::new(0);
+
+    /// Construct a new channel id.
+    #[inline]
+    pub(crate) const fn new(repr: u16) -> Self {
+        Self { repr }
+    }
+}
+
+impl fmt::Debug for ChannelId {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:04x}", self.repr)
+    }
+}
+
 /// A raw identifier for a message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
 #[repr(transparent)]
@@ -41,6 +67,12 @@ impl fmt::Display for MessageId {
 impl MessageId {
     /// The message id for [`ErrorMessage`].
     pub const ERROR_MESSAGE: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 1) };
+
+    /// A connect request.
+    pub const CONNECT: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 2) };
+
+    /// A disconnect request.
+    pub const DISCONNECT: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 3) };
 
     /// The message id for an empty packet constructed using [`Packet::empty`]
     /// or [`RawPacket::empty`].
@@ -175,16 +207,11 @@ where
     fn __do_not_implement_event();
 }
 
-/// A request header.
+/// A request to connect.
 #[derive(Debug, Clone, Copy, Encode, Decode)]
 #[doc(hidden)]
 #[musli(packed)]
-pub struct RequestHeader {
-    /// The serial of the request.
-    pub serial: u32,
-    /// The kind of the request.
-    pub id: u16,
-}
+pub struct Connect;
 
 /// The header of a response.
 #[derive(Debug, Clone, Encode, Decode)]
@@ -198,6 +225,8 @@ pub struct ResponseHeader {
     pub broadcast: u16,
     /// If non-zero, the response contains an error of the given type.
     pub error: u16,
+    /// The channel over which the response will be sent.
+    pub channel: ChannelId,
 }
 
 /// An error response.
@@ -207,4 +236,17 @@ pub struct ResponseHeader {
 pub struct ErrorMessage<'de> {
     /// The error message.
     pub message: &'de str,
+}
+
+/// A request header.
+#[derive(Debug, Clone, Copy, Encode, Decode)]
+#[doc(hidden)]
+#[musli(packed)]
+pub struct RequestHeader {
+    /// The serial of the request.
+    pub serial: u32,
+    /// The kind of the request.
+    pub id: u16,
+    /// The channel over which the request was received.
+    pub channel: ChannelId,
 }

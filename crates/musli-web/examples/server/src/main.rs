@@ -17,9 +17,11 @@ use axum::extract::State;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::any;
-use musli_web::{axum08, ws};
+use musli_web::axum08;
+use musli_web::ws;
 use tokio::sync::broadcast::Sender;
 use tokio::time::{self, Duration};
+use tracing::Level;
 
 #[derive(Debug, Clone)]
 enum Broadcast {
@@ -56,6 +58,7 @@ impl ws::Handler for MyHandler {
 
                 true
             }
+            api::Request::Unknown(..) => false,
         }
     }
 }
@@ -94,7 +97,7 @@ async fn handler(ws: WebSocketUpgrade, State(sender): State<Sender<Broadcast>>) 
                         }
                     }
                 }
-                result = server.as_mut().run() => {
+                result = server.run() => {
                     if let Err(error) = result {
                         tracing::error!("Websocket error: {error}");
 
@@ -115,7 +118,10 @@ async fn handler(ws: WebSocketUpgrade, State(sender): State<Sender<Broadcast>>) 
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt::fmt()
+        .with_max_level(Level::DEBUG)
+        .try_init()
+        .map_err(|error| anyhow::anyhow!("Failed to initialize tracing: {error}"))?;
 
     let (sender, _) = tokio::sync::broadcast::channel::<Broadcast>(1024);
 
