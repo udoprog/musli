@@ -715,11 +715,11 @@ where
         self.broadcast_in(message, ChannelId::NONE)
     }
 
-    /// Write a broadcast message over a specific connection.
+    /// Write a broadcast message over a specific `channel`.
     ///
     /// Note that the written message is buffered, and will be sent when
     /// [`Server::run`] is called.
-    pub fn broadcast_in<T>(&mut self, message: T, connection: ChannelId) -> Result<(), Error>
+    pub fn broadcast_in<T>(&mut self, message: T, channel: ChannelId) -> Result<(), Error>
     where
         T: Event,
     {
@@ -732,7 +732,7 @@ where
                 serial: 0,
                 broadcast: <T::Broadcast as Broadcast>::ID.get(),
                 error: 0,
-                channel: connection,
+                channel,
             })
             .map_err(Error::encode_broadcast_header)?;
 
