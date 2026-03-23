@@ -47,7 +47,11 @@ impl ChannelId {
 impl fmt::Debug for ChannelId {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:04x}", self.repr)
+        if self.repr == 0 {
+            f.write_str("NONE")
+        } else {
+            write!(f, "{:04x}", self.repr)
+        }
     }
 }
 

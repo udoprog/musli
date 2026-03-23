@@ -17,6 +17,7 @@ use axum::extract::State;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::any;
+use musli_web::api::ChannelId;
 use musli_web::axum08;
 use musli_web::ws;
 use tokio::sync::broadcast::Sender;
@@ -33,6 +34,14 @@ struct MyHandler;
 impl ws::Handler for MyHandler {
     type Id = api::Request;
     type Response = bool;
+
+    async fn open_channel(&mut self, channel: ChannelId) {
+        tracing::info!(?channel, "Open");
+    }
+
+    async fn close_channel(&mut self, channel: ChannelId) {
+        tracing::info!(?channel, "Close");
+    }
 
     async fn handle(
         &mut self,

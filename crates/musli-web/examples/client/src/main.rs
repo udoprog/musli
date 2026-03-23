@@ -27,6 +27,7 @@ enum Msg {
     State(ws::State),
     OnConnect1(Result<ws::Channel, ws::Error>),
     OnConnect2(Result<ws::Channel, ws::Error>),
+    Reconnect,
 }
 
 struct App {
@@ -148,30 +149,11 @@ impl Component for App {
                 tracing::debug!(?state);
 
                 self.state = state;
-
-                if state.is_open() {
-                    self._channel1_connect = self
-                        .service
-                        .handle()
-                        .channel()
-                        .on_open(ctx.link().callback(Msg::OnConnect1))
-                        .send();
-
-                    self._channel2_connect = self
-                        .service
-                        .handle()
-                        .channel()
-                        .on_open(ctx.link().callback(Msg::OnConnect2))
-                        .send();
-
-                    self.count = 0;
-                    self.responses.clear();
-                    self.messages.clear();
-                } else {
-                    self.channel1 = ws::Channel::default();
-                    self.channel2 = ws::Channel::default();
-                }
-
+                self.refresh(ctx);
+                true
+            }
+            Msg::Reconnect => {
+                self.refresh(ctx);
                 true
             }
             Msg::OnConnect1(channel1) => {
@@ -211,26 +193,76 @@ impl Component for App {
 
         let onclick = ctx.link().callback(|_: MouseEvent| Msg::Send);
 
+        let close_channel1 = ctx
+            .link()
+            .callback(|_: MouseEvent| Msg::OnConnect1(Err(ws::Error::message("channel closed"))));
+
+        let close_channel2 = ctx
+            .link()
+            .callback(|_: MouseEvent| Msg::OnConnect2(Err(ws::Error::message("channel closed"))));
+
+        let reconnect_channels = ctx.link().callback(|_: MouseEvent| Msg::Reconnect);
+
         html! {
             <div class="container">
+                <div key="state">{format!("State: {:?}", self.state)}</div>
+
                 <div key="input">
                     <input key="input" type="text" {oninput} {onkeydown} value={self.text.clone()} />
                     <button {onclick}>{"Send Message"}</button>
+                </div>
+
+                <div>
+                    <button onclick={reconnect_channels}>{"Reconnect channels"}</button>
                 </div>
 
                 <div key="channel1">
                     {format!("Channel #1: {:?}", self.channel1.id())}
                 </div>
 
+                <div>
+                    <button onclick={close_channel1}>{"Close channel 1"}</button>
+                </div>
+
                 <div key="channel2">
                     {format!("Channel #2: {:?}", self.channel2.id())}
                 </div>
 
-                <div key="state">{format!("State: {:?}", self.state)}</div>
+                <div>
+                    <button onclick={close_channel2}>{"Close channel 2"}</button>
+                </div>
+
                 {for self.responses.iter().enumerate().map(|(index, response)| html!(<div key={format!("response-{index}")}>{format!("Response #{index}: {response}")}</div>))}
                 <div key="tick">{format!("Global tick: {}", self.tick)}</div>
                 {for self.messages.iter().map(|(count, message)| html!(<div key={format!("message-{count}")}>{format!("Message #{count}: {message}")}</div>))}
             </div>
+        }
+    }
+}
+
+impl App {
+    fn refresh(&mut self, ctx: &Context<Self>) {
+        if self.state.is_open() {
+            self._channel1_connect = self
+                .service
+                .handle()
+                .channel()
+                .on_open(ctx.link().callback(Msg::OnConnect1))
+                .send();
+
+            self._channel2_connect = self
+                .service
+                .handle()
+                .channel()
+                .on_open(ctx.link().callback(Msg::OnConnect2))
+                .send();
+
+            self.count = 0;
+            self.responses.clear();
+            self.messages.clear();
+        } else {
+            self.channel1 = ws::Channel::default();
+            self.channel2 = ws::Channel::default();
         }
     }
 }

@@ -452,10 +452,16 @@ pub trait Handler {
     /// The response type returned by the handler.
     type Response: IntoResponse;
 
-    /// Handle a request to connect.
+    /// Indicates that a `channel` has been opened.
     ///
-    /// Any response produced by this call will be forwarded to the client along
-    /// with its channel id.
+    /// This indicates that you are communicating with a client that has opened
+    /// a channel with [`Handle::channel`].
+    ///
+    /// After this has been called, you can expected to receive requests from
+    /// the [`ChannelId`] corresponding to `channel`. The channel id of incoming
+    /// requests can be inspected with [`Incoming::channel`].
+    ///
+    /// [`Handle::channel`]: crate::web::Handle::channel
     fn open_channel<'this>(
         &'this mut self,
         channel: ChannelId,
@@ -465,10 +471,11 @@ pub trait Handler {
         }
     }
 
-    /// Handle a disconnect.
+    /// Indicates that a `channel` has been cleanly closed.
     ///
-    /// Disconnect are when the client side actively decides to disconnect a
-    /// channel.
+    /// This indicates that communicating with a client that has opened a
+    /// channel with [`Handle::channel`] has been cleanly closed, which occurs
+    /// when the channel is cleanly closed by dropping the last handle to it.
     fn close_channel<'this>(
         &'this mut self,
         channel: ChannelId,
@@ -1098,6 +1105,11 @@ pub struct Incoming<'de> {
 
 impl<'de> Incoming<'de> {
     /// The channel over which the incoming request was received.
+    ///
+    /// This is [`ChannelId::NONE`] unless the packet belongs to a response to a
+    /// handle constructed with [`Handle::channel`].
+    ///
+    /// [`Handle::channel`]: crate::web::Handle::channel
     pub fn channel(&self) -> ChannelId {
         self.channel
     }

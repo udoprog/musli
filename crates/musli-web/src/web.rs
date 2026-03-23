@@ -230,6 +230,11 @@ impl Error {
     pub fn is_empty_packet(&self) -> bool {
         matches!(self.kind, ErrorKind::EmptyPacket)
     }
+
+    /// Format a websocket error consisting of a message.
+    pub fn message(message: impl fmt::Display) -> Self {
+        Self::new(ErrorKind::Message(message.to_string()))
+    }
 }
 
 #[derive(Debug)]
@@ -2165,6 +2170,67 @@ where
     /// This can be useful if you for example need to broadcast a message back
     /// over the same websocket connection, but you don't want to send it to the
     /// channel which initially sent the broadcast.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew023 as yew;
+    /// use yew::prelude::*;
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// enum Msg {
+    ///     OnChannel(Result<ws::Channel, ws::Error>),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     _channel_open: ws::Request,
+    ///     channel: ws::Channel,
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let link = ctx.link().clone();
+    ///
+    ///         let _channel_open = ctx.props().ws
+    ///             .channel()
+    ///             .on_open(ctx.link().callback(Msg::OnChannel))
+    ///             .send();
+    ///
+    ///         Self {
+    ///             _channel_open: _channel_open,
+    ///             channel: ws::Channel::default(),
+    ///         }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::OnChannel(result) => {
+    ///                 if let Ok(channel) = result {
+    ///                     self.channel = channel;
+    ///                 }
+    ///
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn channel(&self) -> ChannelBuilder<'_, H, EmptyCallback> {
         ChannelBuilder {
             shared: &self.shared,
@@ -2863,9 +2929,14 @@ where
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Channel")
-            .field("id", &self.id)
-            .finish_non_exhaustive()
+        let mut f = f.debug_struct("Channel");
+
+        if let Some(id) = self.try_id() {
+            f.field("id", &id);
+            f.finish()
+        } else {
+            f.finish_non_exhaustive()
+        }
     }
 }
 
