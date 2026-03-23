@@ -132,7 +132,6 @@ pub mod prelude {
 /// Handles for websocket implementation.
 #[doc(hidden)]
 pub struct Handles {
-    open: Closure<dyn Fn()>,
     close: Closure<dyn Fn(CloseEvent)>,
     message: Closure<dyn Fn(MessageEvent)>,
     error: Closure<dyn Fn(ErrorEvent)>,
@@ -153,7 +152,6 @@ impl SocketImpl for WebSocket {
     fn new(url: &str, handles: &Self::Handles) -> Result<Self, Error> {
         let this = WebSocket::new(url)?;
         this.set_binary_type(BinaryType::Arraybuffer);
-        this.set_onopen(Some(handles.open.as_ref().unchecked_ref()));
         this.set_onclose(Some(handles.close.as_ref().unchecked_ref()));
         this.set_onmessage(Some(handles.message.as_ref().unchecked_ref()));
         this.set_onerror(Some(handles.error.as_ref().unchecked_ref()));
@@ -270,16 +268,6 @@ impl WebImpl for Web03Impl {
     #[inline]
     #[allow(private_interfaces)]
     fn handles(shared: &Weak<Shared<Self>>) -> Self::Handles {
-        let open = {
-            let shared = shared.clone();
-
-            Closure::new(move || {
-                if let Some(shared) = shared.upgrade() {
-                    shared.web03_open();
-                }
-            })
-        };
-
         let close = {
             let shared = shared.clone();
 
@@ -311,7 +299,6 @@ impl WebImpl for Web03Impl {
         };
 
         Self::Handles {
-            open,
             close,
             message,
             error,
@@ -327,12 +314,6 @@ pub fn connect(connect: Connect) -> ServiceBuilder<Web03Impl, EmptyCallback> {
 }
 
 impl Shared<Web03Impl> {
-    fn web03_open(&self) {
-        tracing::debug!("Open event");
-
-        self.set_open();
-    }
-
     fn web03_close(self: &Rc<Self>, e: CloseEvent) {
         tracing::debug!(code = e.code(), reason = e.reason(), "Close event");
 
