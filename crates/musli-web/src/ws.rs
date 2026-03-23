@@ -516,6 +516,7 @@ pub struct Server<S, H>
 where
     S: ServerImpl,
 {
+    started: bool,
     closing: bool,
     outbound: Buf,
     error: String,
@@ -540,6 +541,7 @@ where
         let now = Instant::now();
 
         Self {
+            started: false,
             closing: false,
             outbound: Buf::default(),
             error: String::new(),
@@ -621,6 +623,11 @@ where
     ///
     /// This must be called to handle buffered outgoing and incoming messages.
     pub async fn run(&mut self) -> Result<(), Error> {
+        if !self.started {
+            self.started = true;
+            self.hello()?;
+        }
+
         loop {
             if self.closing && self.out.is_empty() && self.outbound.is_empty() {
                 break;
@@ -730,6 +737,28 @@ where
             .map_err(Error::encode_broadcast_header)?;
 
         writer.write(message).map_err(Error::encode_broadcast)?;
+        writer.flush();
+        Ok(())
+    }
+
+    /// Write a broadcast message over a specific connection.
+    ///
+    /// Note that the written message is buffered, and will be sent when
+    /// [`Server::run`] is called.
+    fn hello(&mut self) -> Result<(), Error> {
+        tracing::debug!("Hello");
+
+        let mut writer = self.outbound.writer();
+
+        writer
+            .write(ResponseHeader {
+                serial: 0,
+                broadcast: MessageId::SERVER_HELLO.get(),
+                error: 0,
+                channel: ChannelId::NONE,
+            })
+            .map_err(Error::encode_broadcast_header)?;
+
         writer.flush();
         Ok(())
     }

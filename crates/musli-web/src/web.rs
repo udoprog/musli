@@ -43,6 +43,18 @@ pub struct EmptyBody;
 #[non_exhaustive]
 pub struct EmptyCallback;
 
+trait RequestCallback {
+    fn error(&self, error: Error);
+
+    fn as_request(&self) -> Option<&(dyn Callback<Result<RawPacket, Error>> + 'static)> {
+        None
+    }
+
+    fn as_channel(&self) -> Option<&(dyn Fn(Result<ChannelId, Error>) + 'static)> {
+        None
+    }
+}
+
 /// Slab of state listeners.
 type StateListeners = Slab<Rc<dyn Callback<State>>>;
 /// Slab of broadcast listeners.
@@ -50,9 +62,7 @@ type Broadcasts = HashMap<MessageId, Slab<Rc<dyn Callback<Result<RawPacket>>>>>;
 /// Queue of recycled buffers.
 type Buffers = VecDeque<Box<BufData>>;
 /// Pending requests.
-type Requests = HashMap<u32, Box<Pending<dyn Callback<Result<RawPacket>>>>>;
-/// Pending channels.
-type Channels = HashMap<u32, Box<Pending<dyn Fn(Result<ChannelId>)>>>;
+type Requests = HashMap<u32, Box<Pending<dyn RequestCallback>>>;
 
 /// Location information for websocket implementation.
 #[doc(hidden)]
@@ -359,7 +369,6 @@ impl Connect {
 struct Generic {
     state_listeners: RefCell<StateListeners>,
     requests: RefCell<Requests>,
-    connects: RefCell<Channels>,
     broadcasts: RefCell<Broadcasts>,
     buffers: RefCell<Buffers>,
 }
@@ -402,18 +411,13 @@ where
         // are all invalid.
         let state_listeners = mem::take(&mut *self.g.state_listeners.borrow_mut());
         let mut requests = self.g.requests.borrow_mut();
-        let mut connects = self.g.connects.borrow_mut();
 
         for (_, listener) in state_listeners {
             listener.call(State::Closed);
         }
 
         for (_, p) in requests.drain() {
-            p.callback.call(Err(Error::msg("Websocket service closed")));
-        }
-
-        for (_, p) in connects.drain() {
-            (p.callback)(Err(Error::msg("Websocket service closed")));
+            p.callback.error(Error::msg("Websocket service closed"));
         }
     }
 }
@@ -480,7 +484,6 @@ where
                 state_listeners: RefCell::new(Slab::new()),
                 broadcasts: RefCell::new(HashMap::new()),
                 requests: RefCell::new(Requests::new()),
-                connects: RefCell::new(Channels::new()),
                 buffers: RefCell::new(VecDeque::new()),
             }),
         });
@@ -648,7 +651,12 @@ where
         if let Some(broadcast) = MessageId::new(header.broadcast) {
             tracing::debug!(?header, "Got broadcast");
 
-            if !self.prepare_broadcast(broadcast) {
+            if broadcast == MessageId::SERVER_HELLO {
+                self.set_open();
+                return Ok(());
+            }
+
+            if !self.defer_broadcasts(broadcast) {
                 return Ok(());
             };
 
@@ -703,48 +711,40 @@ where
                         },
                     };
 
-                    p.callback.call(Err(Error::msg(format_args!(
-                        "Server error: {}",
-                        error.message
-                    ))));
+                    p.callback
+                        .error(Error::msg(format_args!("Server error: {}", error.message)));
                     return Ok(());
                 }
 
-                let at = buf.len().saturating_sub(reader.remaining());
+                match p.id {
+                    MessageId::CONNECT => {
+                        let Some(callback) = &p.callback.as_channel() else {
+                            p.callback.error(Error::msg("Unexpected channel response"));
+                            return Ok(());
+                        };
 
-                let packet = RawPacket {
-                    id: p.kind,
-                    buf: Some(buf),
-                    at: Cell::new(at),
-                    channel: header.channel,
-                };
+                        callback(Ok(header.channel));
+                        return Ok(());
+                    }
+                    _ => {
+                        let Some(callback) = p.callback.as_request() else {
+                            p.callback.error(Error::msg("Unexpected channel response"));
+                            return Ok(());
+                        };
 
-                p.callback.call(Ok(packet));
-                return Ok(());
-            }
+                        let at = buf.len().saturating_sub(reader.remaining());
 
-            let p = self.g.connects.borrow_mut().remove(&header.serial);
+                        let packet = RawPacket {
+                            id: p.id,
+                            buf: Some(buf),
+                            at: Cell::new(at),
+                            channel: header.channel,
+                        };
 
-            if let Some(p) = p {
-                if let Some(id) = MessageId::new(header.error) {
-                    let error = match id {
-                        MessageId::ERROR_MESSAGE => {
-                            storage::decode(&mut reader).map_err(Error::decode_error_message)?
-                        }
-                        _ => api::ErrorMessage {
-                            message: "Unsupported request",
-                        },
-                    };
-
-                    (p.callback)(Err(Error::msg(format_args!(
-                        "Server error: {}",
-                        error.message
-                    ))));
-                    return Ok(());
+                        callback.call(Ok(packet));
+                        return Ok(());
+                    }
                 }
-
-                (p.callback)(Ok(header.channel));
-                return Ok(());
             }
 
             tracing::warn!(?header.serial, "Got message with unknown serial");
@@ -753,7 +753,7 @@ where
         Ok(())
     }
 
-    fn prepare_broadcast(self: &Rc<Self>, kind: MessageId) -> bool {
+    fn defer_broadcasts(self: &Rc<Self>, kind: MessageId) -> bool {
         // Note: We need to defer this, since the outcome of calling
         // the broadcast callback might be that the broadcast
         // listener is modified, which could require mutable access
@@ -857,25 +857,7 @@ where
                 p
             };
 
-            p.callback.call(Err(Error::msg("Connection closed")));
-        }
-
-        loop {
-            let Some(serial) = self.g.connects.borrow().keys().next().copied() else {
-                break;
-            };
-
-            let p = {
-                let mut connects = self.g.connects.borrow_mut();
-
-                let Some(p) = connects.remove(&serial) else {
-                    break;
-                };
-
-                p
-            };
-
-            (p.callback)(Err(Error::msg("Connection closed")));
+            p.callback.error(Error::msg("Connection closed"));
         }
     }
 
@@ -1134,6 +1116,23 @@ where
 {
     /// Send the connection request.
     pub fn send(self) -> Request {
+        struct RequestCallbackImpl<C>(C);
+
+        impl<C> RequestCallback for RequestCallbackImpl<C>
+        where
+            C: Fn(Result<ChannelId, Error>) + 'static,
+        {
+            #[inline]
+            fn as_channel(&self) -> Option<&(dyn Fn(Result<ChannelId, Error>) + 'static)> {
+                Some(&self.0)
+            }
+
+            #[inline]
+            fn error(&self, error: Error) {
+                (self.0)(Err(error));
+            }
+        }
+
         let Some(shared) = self.shared.upgrade() else {
             self.callback
                 .call(Err(Error::msg("WebSocket service is down")));
@@ -1174,19 +1173,19 @@ where
         };
 
         let pending = Pending {
-            kind: MessageId::CONNECT,
+            id: MessageId::CONNECT,
             serial,
-            callback,
+            callback: RequestCallbackImpl(callback),
         };
 
         let existing = shared
             .g
-            .connects
+            .requests
             .borrow_mut()
             .insert(serial, Box::new(pending));
 
         if let Some(p) = existing {
-            (p.callback)(Err(Error::msg("Request cancelled")));
+            p.callback.error(Error::msg("Request cancelled"));
         }
 
         Request {
@@ -1449,6 +1448,23 @@ where
     ///
     /// This requires that a body has been set using [`RequestBuilder::body`].
     pub fn send(self) -> Request {
+        struct RequestCallbackImpl<C>(C);
+
+        impl<C> RequestCallback for RequestCallbackImpl<C>
+        where
+            C: Callback<Result<RawPacket>>,
+        {
+            #[inline]
+            fn as_request(&self) -> Option<&(dyn Callback<Result<RawPacket>> + 'static)> {
+                Some(&self.0)
+            }
+
+            #[inline]
+            fn error(&self, error: Error) {
+                self.0.call(Err(error));
+            }
+        }
+
         let Some(shared) = self.shared.upgrade() else {
             self.callback
                 .call(Err(Error::msg("WebSocket service is down")));
@@ -1471,9 +1487,9 @@ where
         shared.serial.set(serial.wrapping_add(1));
 
         let pending = Pending {
-            kind: <B::Endpoint as api::Endpoint>::ID,
+            id: <B::Endpoint as api::Endpoint>::ID,
             serial,
-            callback: self.callback,
+            callback: RequestCallbackImpl(self.callback),
         };
 
         let existing = shared
@@ -1483,7 +1499,7 @@ where
             .insert(serial, Box::new(pending));
 
         if let Some(p) = existing {
-            p.callback.call(Err(Error::msg("Request cancelled")));
+            p.callback.error(Error::msg("Request cancelled"));
         }
 
         Request {
@@ -2571,6 +2587,16 @@ where
     }
 }
 
+impl<H> fmt::Debug for Handle<H>
+where
+    H: WebImpl,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Handle").finish_non_exhaustive()
+    }
+}
+
 /// A connected handle to the WebSocket service.
 pub struct Channel<H>
 where
@@ -2663,11 +2689,23 @@ where
     }
 }
 
+impl<H> fmt::Debug for Channel<H>
+where
+    H: WebImpl,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Channel")
+            .field("id", &self.id)
+            .finish_non_exhaustive()
+    }
+}
+
 struct Pending<C>
 where
     C: ?Sized,
 {
-    kind: MessageId,
+    id: MessageId,
     serial: u32,
     callback: C,
 }
@@ -2677,10 +2715,11 @@ impl<C> fmt::Debug for Pending<C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Pending")
             .field("serial", &self.serial)
-            .field("kind", &self.kind)
+            .field("id", &self.id)
             .finish_non_exhaustive()
     }
 }
+
 struct ForcePrefix<'a>(&'a str, char);
 
 impl fmt::Display for ForcePrefix<'_> {

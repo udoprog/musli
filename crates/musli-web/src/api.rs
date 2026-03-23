@@ -74,6 +74,9 @@ impl MessageId {
     /// A disconnect request.
     pub const DISCONNECT: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 3) };
 
+    /// The first message the server sends to indicat that a connection is open.
+    pub const SERVER_HELLO: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 4) };
+
     /// The message id for an empty packet constructed using [`Packet::empty`]
     /// or [`RawPacket::empty`].
     ///

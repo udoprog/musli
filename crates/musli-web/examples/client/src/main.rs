@@ -175,6 +175,8 @@ impl Component for App {
                 true
             }
             Msg::OnConnect1(channel1) => {
+                tracing::info!(?channel1);
+
                 if let Ok(channel) = channel1 {
                     self.channel1 = channel;
                 } else {
@@ -184,6 +186,8 @@ impl Component for App {
                 true
             }
             Msg::OnConnect2(channel2) => {
+                tracing::info!(?channel2);
+
                 if let Ok(channel) = channel2 {
                     self.channel2 = channel;
                 } else {
