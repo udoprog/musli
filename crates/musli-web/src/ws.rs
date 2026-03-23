@@ -98,6 +98,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
 use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -113,7 +114,9 @@ use rand::rngs::SmallRng;
 use tokio::time::{Duration, Instant, Sleep};
 
 use crate::Buf;
-use crate::api::{Broadcast, ErrorMessage, Event, Id, MessageId, RequestHeader, ResponseHeader};
+use crate::api::{
+    Broadcast, ChannelId, ErrorMessage, Event, Id, MessageId, RequestHeader, ResponseHeader,
+};
 use crate::buf::InvalidFrame;
 
 const MAX_CAPACITY: usize = 1048576;
@@ -226,6 +229,9 @@ enum ErrorKind {
     EncodeBroadcast {
         error: storage::Error,
     },
+    EncodeConnectHeader {
+        error: storage::Error,
+    },
     ErrorMessageHeader {
         error: storage::Error,
     },
@@ -262,6 +268,10 @@ impl Error {
         Self::new(ErrorKind::EncodeBroadcast { error })
     }
 
+    pub(crate) fn encode_connect_header(error: storage::Error) -> Self {
+        Self::new(ErrorKind::EncodeConnectHeader { error })
+    }
+
     pub(crate) fn encode_error_message_header(error: storage::Error) -> Self {
         Self::new(ErrorKind::ErrorMessageHeader { error })
     }
@@ -291,6 +301,9 @@ impl fmt::Display for Error {
             ErrorKind::EncodeBroadcast { .. } => {
                 write!(f, "Encoding error when broadcasting message")
             }
+            ErrorKind::EncodeConnectHeader { .. } => {
+                write!(f, "Encoding error when encoding connect header")
+            }
             ErrorKind::ErrorMessageHeader { .. } => {
                 write!(f, "Encoding error when encoding error message header")
             }
@@ -311,6 +324,7 @@ impl core::error::Error for Error {
             ErrorKind::Outgoing { error } => Some(error),
             ErrorKind::EncodeBroadcastHeader { error } => Some(error),
             ErrorKind::EncodeBroadcast { error } => Some(error),
+            ErrorKind::EncodeConnectHeader { error } => Some(error),
             ErrorKind::ErrorMessageHeader { error } => Some(error),
             ErrorKind::ErrorMessage { error } => Some(error),
             _ => None,
@@ -438,6 +452,32 @@ pub trait Handler {
     /// The response type returned by the handler.
     type Response: IntoResponse;
 
+    /// Handle a request to connect.
+    ///
+    /// Any response produced by this call will be forwarded to the client along
+    /// with its channel id.
+    fn open_channel<'this>(
+        &'this mut self,
+        channel: ChannelId,
+    ) -> impl Future<Output = ()> + Send + 'this {
+        async {
+            _ = channel;
+        }
+    }
+
+    /// Handle a disconnect.
+    ///
+    /// Disconnect are when the client side actively decides to disconnect a
+    /// channel.
+    fn close_channel<'this>(
+        &'this mut self,
+        channel: ChannelId,
+    ) -> impl Future<Output = ()> + Send + 'this {
+        async {
+            _ = channel;
+        }
+    }
+
     /// Handle a request.
     fn handle<'this>(
         &'this mut self,
@@ -487,6 +527,7 @@ where
     socket_send: bool,
     socket_flush: bool,
     pinned: Pin<Box<Pinned<S::Socket>>>,
+    connections: BTreeSet<ChannelId>,
 }
 
 impl<S, H> Server<S, H>
@@ -514,6 +555,7 @@ where
                 close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
                 ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
             }),
+            connections: BTreeSet::new(),
         }
     }
 
@@ -596,7 +638,7 @@ where
                 inner.await
             };
 
-            tracing::debug!(?result);
+            tracing::trace!(?result);
 
             match result {
                 Output::Close => {
@@ -663,6 +705,17 @@ where
     where
         T: Event,
     {
+        self.broadcast_in(message, ChannelId::NONE)
+    }
+
+    /// Write a broadcast message over a specific connection.
+    ///
+    /// Note that the written message is buffered, and will be sent when
+    /// [`Server::run`] is called.
+    pub fn broadcast_in<T>(&mut self, message: T, connection: ChannelId) -> Result<(), Error>
+    where
+        T: Event,
+    {
         tracing::debug!(id = ?<T::Broadcast as Broadcast>::ID, "Broadcast");
 
         let mut writer = self.outbound.writer();
@@ -672,6 +725,7 @@ where
                 serial: 0,
                 broadcast: <T::Broadcast as Broadcast>::ID.get(),
                 error: 0,
+                channel: connection,
             })
             .map_err(Error::encode_broadcast_header)?;
 
@@ -723,30 +777,68 @@ where
                 break 'err true;
             };
 
-            let id = <H::Id as Id>::from_id(id);
+            match id {
+                MessageId::CONNECT => {
+                    let Some(channel) = self.channel_id() else {
+                        self.format_error_message(format_args!(
+                            "Failed to allocate connection ID"
+                        ))?;
+                        break 'err true;
+                    };
 
-            let res = match self.handle_request(reader, header.serial, id).await {
-                Ok(res) => res,
-                Err(error) => {
-                    self.format_error(error)?;
+                    self.handler.open_channel(channel).await;
+
+                    let mut writer = self.outbound.writer();
+
+                    let result = writer.write(ResponseHeader {
+                        serial: header.serial,
+                        broadcast: 0,
+                        error: 0,
+                        channel,
+                    });
+
+                    result.map_err(Error::encode_connect_header)?;
+                    writer.flush();
+                    break 'err false;
+                }
+                MessageId::DISCONNECT => {
+                    self.handler.close_channel(header.channel).await;
+                    self.connections.remove(&header.channel);
                     break 'err true;
                 }
-            };
+                _ => {
+                    let id = <H::Id as Id>::from_id(id);
 
-            let res = match res.into_response() {
-                Ok(res) => res,
-                Err(error) => {
-                    self.format_error_message(format_args!("Error in handler: {error:#}"))?;
-                    break 'err true;
+                    let res = match self
+                        .handle_request(reader, header.serial, id, header.channel)
+                        .await
+                    {
+                        Ok(res) => res,
+                        Err(error) => {
+                            self.format_error(error)?;
+                            break 'err true;
+                        }
+                    };
+
+                    let res = match res.into_response() {
+                        Ok(res) => res,
+                        Err(error) => {
+                            self.format_error_message(format_args!("Error in handler: {error:#}"))?;
+                            break 'err true;
+                        }
+                    };
+
+                    if !res.handled {
+                        self.format_error_message(format_args!(
+                            "No support for request {}",
+                            header.id
+                        ))?;
+                        break 'err true;
+                    }
+
+                    false
                 }
-            };
-
-            if !res.handled {
-                self.format_error_message(format_args!("No support for request {}", header.id))?;
-                break 'err true;
             }
-
-            false
         };
 
         if err {
@@ -757,6 +849,7 @@ where
                 serial: header.serial,
                 broadcast: 0,
                 error: MessageId::ERROR_MESSAGE.get(),
+                channel: header.channel,
             });
 
             result.map_err(Error::encode_error_message_header)?;
@@ -843,23 +936,44 @@ where
         Ok(())
     }
 
+    fn channel_id(&mut self) -> Option<ChannelId> {
+        let mut id = ChannelId::new(self.rng.random());
+        let mut attempts = 0;
+
+        while id == ChannelId::NONE || self.connections.contains(&id) {
+            if attempts >= 10 {
+                return None;
+            }
+
+            id = ChannelId::new(self.rng.random());
+            attempts += 1;
+        }
+
+        tracing::debug!(?id, "Allocated channel id");
+        self.connections.insert(id);
+        Some(id)
+    }
+
     async fn handle_request(
         &mut self,
         reader: SliceReader<'_>,
         serial: u32,
         id: H::Id,
+        channel: ChannelId,
     ) -> Result<H::Response, Error> {
         tracing::debug!(serial, ?id, "Got request");
 
         let mut incoming = Incoming {
             error: None,
             reader,
+            channel,
         };
 
         let mut outgoing = Outgoing {
             serial: Some(serial),
             error: None,
             buf: &mut self.outbound,
+            channel,
         };
 
         let response = self.handler.handle(id, &mut incoming, &mut outgoing).await;
@@ -950,9 +1064,15 @@ where
 pub struct Incoming<'de> {
     error: Option<storage::Error>,
     reader: SliceReader<'de>,
+    channel: ChannelId,
 }
 
 impl<'de> Incoming<'de> {
+    /// The channel over which the incoming request was received.
+    pub fn channel(&self) -> ChannelId {
+        self.channel
+    }
+
     /// Read a request and return `Some(T)` if the request was successfully
     /// decoded.
     ///
@@ -984,6 +1104,7 @@ pub struct Outgoing<'a> {
     serial: Option<u32>,
     error: Option<storage::Error>,
     buf: &'a mut Buf,
+    channel: ChannelId,
 }
 
 impl Outgoing<'_> {
@@ -1008,6 +1129,7 @@ impl Outgoing<'_> {
             serial,
             broadcast: 0,
             error: 0,
+            channel: self.channel,
         });
 
         if let Err(error) = result {

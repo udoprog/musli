@@ -87,10 +87,12 @@ pub mod prelude {
         //! Organization module prefixing all exported items with `ws` for
         //! convenient namespacing.
 
+        pub use crate::api::ChannelId;
         pub use crate::web::{
             Connect, EmptyCallback, Error, Listener, Packet, RawPacket, Request, State,
             StateListener,
         };
+
         use crate::web03::Web03Impl;
 
         /// Implementation alias for [`connect`].
@@ -109,6 +111,11 @@ pub mod prelude {
         ///
         /// [`Handle`]: crate::web::Handle
         pub type Handle = crate::web::Handle<Web03Impl>;
+
+        /// Implementation alias for [`Channel`].
+        ///
+        /// [`Channel`]: crate::web::Channel
+        pub type Channel = crate::web::Channel<Web03Impl>;
 
         /// Implementation alias for [`RequestBuilder`].
         ///
@@ -335,7 +342,7 @@ impl Shared<Web03Impl> {
     }
 
     fn web03_message(self: &Rc<Shared<Web03Impl>>, e: MessageEvent) {
-        tracing::debug!("Message event");
+        tracing::trace!("Message event");
 
         let Ok(array_buffer) = e.data().dyn_into::<ArrayBuffer>() else {
             self.on_error
@@ -360,7 +367,7 @@ impl Shared<Web03Impl> {
     }
 
     fn web03_error(self: &Rc<Self>, e: ErrorEvent) {
-        tracing::debug!(message = e.message(), "Error event");
+        tracing::trace!(message = e.message(), "Error event");
 
         if let Err(e) = self.close() {
             self.on_error.call(e);

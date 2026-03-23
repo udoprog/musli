@@ -8,6 +8,8 @@
 //!
 //! [`yew`]: https://yew.rs
 
+use std::collections::VecDeque;
+
 use musli_web::web03::prelude::*;
 use tracing::Level;
 use tracing_subscriber::Registry;
@@ -23,6 +25,8 @@ enum Msg {
     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
     Tick(Result<ws::Packet<api::Tick>, ws::Error>),
     State(ws::State),
+    OnConnect1(Result<ws::Channel, ws::Error>),
+    OnConnect2(Result<ws::Channel, ws::Error>),
 }
 
 struct App {
@@ -34,7 +38,12 @@ struct App {
     text: String,
     tick: u32,
     responses: Vec<String>,
-    messages: Vec<String>,
+    messages: VecDeque<(usize, String)>,
+    channel1: ws::Channel,
+    _channel1_connect: ws::Request,
+    channel2: ws::Channel,
+    _channel2_connect: ws::Request,
+    count: usize,
 }
 
 impl Component for App {
@@ -52,7 +61,7 @@ impl Component for App {
             .handle()
             .on_broadcast(ctx.link().callback(Msg::Tick));
 
-        let (state, state_listener) = service
+        let (state, _state_listener) = service
             .handle()
             .on_state_change(ctx.link().callback(Msg::State));
 
@@ -60,12 +69,17 @@ impl Component for App {
             state,
             service,
             _listen: listen,
-            _state_listener: state_listener,
+            _state_listener,
             request: ws::Request::new(),
             text: String::new(),
             tick: 0,
             responses: Vec::new(),
-            messages: Vec::new(),
+            messages: VecDeque::new(),
+            _channel1_connect: ws::Request::new(),
+            _channel2_connect: ws::Request::new(),
+            channel1: ws::Channel::default(),
+            channel2: ws::Channel::default(),
+            count: 0,
         }
     }
 
@@ -115,11 +129,17 @@ impl Component for App {
                 false
             }
             Msg::Tick(Ok(packet)) => {
-                tracing::debug!("Got tick");
+                tracing::trace!("Got tick");
 
                 if let Ok(tick) = packet.decode() {
                     self.tick = tick.tick;
-                    self.messages.push(tick.message.to_owned());
+                    self.messages
+                        .push_back((self.count, tick.message.to_owned()));
+                    self.count += 1;
+
+                    if self.messages.len() > 10 {
+                        self.messages.pop_front();
+                    }
                 }
 
                 true
@@ -128,6 +148,48 @@ impl Component for App {
                 tracing::debug!(?state);
 
                 self.state = state;
+
+                if state.is_open() {
+                    self._channel1_connect = self
+                        .service
+                        .handle()
+                        .channel()
+                        .on_open(ctx.link().callback(Msg::OnConnect1))
+                        .send();
+
+                    self._channel2_connect = self
+                        .service
+                        .handle()
+                        .channel()
+                        .on_open(ctx.link().callback(Msg::OnConnect2))
+                        .send();
+
+                    self.count = 0;
+                    self.responses.clear();
+                    self.messages.clear();
+                } else {
+                    self.channel1 = ws::Channel::default();
+                    self.channel2 = ws::Channel::default();
+                }
+
+                true
+            }
+            Msg::OnConnect1(channel1) => {
+                if let Ok(channel) = channel1 {
+                    self.channel1 = channel;
+                } else {
+                    self.channel1 = ws::Channel::default();
+                }
+
+                true
+            }
+            Msg::OnConnect2(channel2) => {
+                if let Ok(channel) = channel2 {
+                    self.channel2 = channel;
+                } else {
+                    self.channel2 = ws::Channel::default();
+                }
+
                 true
             }
         }
@@ -152,10 +214,18 @@ impl Component for App {
                     <button {onclick}>{"Send Message"}</button>
                 </div>
 
+                <div key="channel1">
+                    {format!("Channel #1: {:?}", self.channel1.id())}
+                </div>
+
+                <div key="channel2">
+                    {format!("Channel #2: {:?}", self.channel2.id())}
+                </div>
+
                 <div key="state">{format!("State: {:?}", self.state)}</div>
                 {for self.responses.iter().enumerate().map(|(index, response)| html!(<div key={format!("response-{index}")}>{format!("Response #{index}: {response}")}</div>))}
                 <div key="tick">{format!("Global tick: {}", self.tick)}</div>
-                {for self.messages.iter().enumerate().map(|(index, message)| html!(<div key={format!("message-{index}")}>{format!("Message #{index}: {message}")}</div>))}
+                {for self.messages.iter().map(|(count, message)| html!(<div key={format!("message-{count}")}>{format!("Message #{count}: {message}")}</div>))}
             </div>
         }
     }
@@ -165,7 +235,7 @@ fn main() {
     console_error_panic_hook::set_once();
 
     let mut config = WASMLayerConfigBuilder::new();
-    config.set_max_level(Level::INFO);
+    config.set_max_level(Level::DEBUG);
 
     if let Err(error) = tracing::subscriber::set_global_default(
         Registry::default().with(WASMLayer::new(config.build())),
