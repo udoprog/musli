@@ -69,7 +69,6 @@ use alloc::rc::Weak;
 
 use wasm_bindgen02::JsCast;
 use wasm_bindgen02::closure::Closure;
-use web_sys03::js_sys::Function;
 use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
 use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, Window, window};
 
@@ -164,6 +163,11 @@ impl SocketImpl for WebSocket {
 
     #[inline]
     fn close(self) -> Result<(), Error> {
+        // Clear event listeners to ensure they don't fire when we dispose of
+        // the socket.
+        WebSocket::set_onclose(&self, None);
+        WebSocket::set_onmessage(&self, None);
+        WebSocket::set_onerror(&self, None);
         WebSocket::close(&self)?;
         Ok(())
     }
@@ -173,11 +177,12 @@ impl crate::web::sealed_window::Sealed for Window {}
 
 impl WindowImpl for Window {
     type Timeout = Timeout;
+    type OnBeforeUnload = Event;
 
     #[inline]
     fn new() -> Result<Self, Error> {
         let Some(window) = window() else {
-            return Err(Error::msg("No window in web-sys 0.3.x context"));
+            return Err(Error::message("No window in web-sys 0.3.x context"));
         };
 
         Ok(window)
@@ -195,15 +200,24 @@ impl WindowImpl for Window {
     }
 
     #[inline]
+    fn onbeforeunload(&self, callback: impl Fn() + 'static) -> Result<Self::OnBeforeUnload, Error> {
+        let closure = Closure::new(callback);
+        window()
+            .unwrap()
+            .set_onbeforeunload(Some(closure.as_ref().unchecked_ref()));
+        Ok(Event { closure })
+    }
+
+    #[inline]
     fn set_timeout(
         &self,
         millis: u32,
-        callback: impl FnOnce() + 'static,
+        callback: impl Fn() + 'static,
     ) -> Result<Self::Timeout, Error> {
-        let closure = Closure::once(callback);
+        let closure = Closure::new(callback);
 
         let id = self.set_timeout_with_callback_and_timeout_and_arguments_0(
-            closure.as_ref().unchecked_ref::<Function>(),
+            closure.as_ref().unchecked_ref(),
             millis as i32,
         )?;
 
@@ -230,6 +244,11 @@ impl Drop for Timeout {
             self.window.clear_timeout_with_handle(id);
         }
     }
+}
+
+pub struct Event {
+    #[allow(dead_code)]
+    closure: Closure<dyn FnMut()>,
 }
 
 impl crate::web::sealed_web::Sealed for Web03Impl {}
@@ -296,17 +315,17 @@ impl Shared<Web03Impl> {
     fn web03_close(self: &Rc<Self>, e: CloseEvent) {
         tracing::debug!(code = e.code(), reason = e.reason(), "Close event");
 
-        if let Err(e) = self.close() {
+        if let Err(e) = self.close_and_reconnect() {
             self.on_error.call(e);
         }
     }
 
     fn web03_message(self: &Rc<Shared<Web03Impl>>, e: MessageEvent) {
-        tracing::trace!("Message event");
+        tracing::debug!("Message event");
 
         let Ok(array_buffer) = e.data().dyn_into::<ArrayBuffer>() else {
             self.on_error
-                .call(Error::msg("Expected message as ArrayBuffer"));
+                .call(Error::message("Expected message as ArrayBuffer"));
             return;
         };
 
@@ -327,9 +346,9 @@ impl Shared<Web03Impl> {
     }
 
     fn web03_error(self: &Rc<Self>, e: ErrorEvent) {
-        tracing::trace!(message = e.message(), "Error event");
+        tracing::debug!(message = e.message(), "Error event");
 
-        if let Err(e) = self.close() {
+        if let Err(e) = self.close_and_reconnect() {
             self.on_error.call(e);
         }
     }

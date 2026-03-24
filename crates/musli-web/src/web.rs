@@ -105,6 +105,9 @@ where
     type Timeout;
 
     #[doc(hidden)]
+    type OnBeforeUnload;
+
+    #[doc(hidden)]
     fn new() -> Result<Self, Error>;
 
     #[doc(hidden)]
@@ -114,8 +117,11 @@ where
     fn set_timeout(
         &self,
         millis: u32,
-        callback: impl FnOnce() + 'static,
+        callback: impl Fn() + 'static,
     ) -> Result<Self::Timeout, Error>;
+
+    #[doc(hidden)]
+    fn onbeforeunload(&self, callback: impl Fn() + 'static) -> Result<Self::OnBeforeUnload, Error>;
 }
 
 pub(crate) mod sealed_web {
@@ -166,6 +172,7 @@ where
     ServiceBuilder {
         connect,
         on_error: EmptyCallback,
+        close_before_unload: false,
         _marker: PhantomData,
     }
 }
@@ -197,6 +204,11 @@ pub struct Error {
 }
 
 impl Error {
+    #[inline]
+    fn new(kind: ErrorKind) -> Self {
+        Self { kind }
+    }
+
     /// Check if the error is caused by an empty packet.
     ///
     /// # Examples
@@ -209,32 +221,15 @@ impl Error {
     ///
     /// assert!(e.is_empty_packet());
     /// ```
+    #[inline]
     pub fn is_empty_packet(&self) -> bool {
         matches!(self.kind, ErrorKind::EmptyPacket)
     }
 
     /// Format a WebSocket error consisting of a message.
+    #[inline]
     pub fn message(message: impl fmt::Display) -> Self {
         Self::new(ErrorKind::Message(message.to_string()))
-    }
-}
-
-#[derive(Debug)]
-enum ErrorKind {
-    EmptyPacket,
-    Message(String),
-    DecodeResponseHeader(storage::Error),
-    DecodeErrorMessage(storage::Error),
-    DecodePacket(storage::Error),
-    EncodingHeader(storage::Error),
-    EncodingBody(storage::Error),
-    Overflow(usize, usize),
-}
-
-impl Error {
-    #[inline]
-    fn new(kind: ErrorKind) -> Self {
-        Self { kind }
     }
 
     #[inline]
@@ -261,11 +256,18 @@ impl Error {
     pub(crate) fn encoding_body(error: storage::Error) -> Self {
         Self::new(ErrorKind::EncodingBody(error))
     }
+}
 
-    #[inline]
-    pub(crate) fn msg(message: impl fmt::Display) -> Self {
-        Self::new(ErrorKind::Message(message.to_string()))
-    }
+#[derive(Debug)]
+enum ErrorKind {
+    EmptyPacket,
+    Message(String),
+    DecodeResponseHeader(storage::Error),
+    DecodeErrorMessage(storage::Error),
+    DecodePacket(storage::Error),
+    EncodingHeader(storage::Error),
+    EncodingBody(storage::Error),
+    Overflow(usize, usize),
 }
 
 impl fmt::Display for Error {
@@ -375,6 +377,8 @@ where
 {
     connect: Connect,
     state: Cell<State>,
+    should_be: Cell<State>,
+    connecting: Cell<bool>,
     handle: Handle<H>,
     pub(crate) on_error: Box<dyn Callback<Error>>,
     window: H::Window,
@@ -386,6 +390,7 @@ where
     output: RefCell<Vec<u8>>,
     current_timeout: Cell<u32>,
     reconnect_timeout: RefCell<Option<<H::Window as WindowImpl>::Timeout>>,
+    _window_onbeforeunload: Option<<H::Window as WindowImpl>::OnBeforeUnload>,
     g: Rc<Generic>,
 }
 
@@ -394,10 +399,12 @@ where
     H: WebImpl,
 {
     fn drop(&mut self) {
-        if let Some(s) = self.socket.take()
-            && let Err(e) = s.close()
-        {
-            self.on_error.call(e);
+        if let Some(s) = self.socket.take() {
+            tracing::debug!("Closing connection during drop");
+
+            if let Err(error) = s.close() {
+                self.on_error.call(error);
+            }
         }
 
         // We don't need to worry about mutable borrows here, since we only have
@@ -411,7 +418,7 @@ where
         }
 
         for (_, p) in requests.drain() {
-            p.callback.error(Error::msg("Websocket service closed"));
+            p.callback.error(Error::message("Websocket service closed"));
         }
     }
 }
@@ -423,6 +430,7 @@ where
 {
     connect: Connect,
     on_error: E,
+    close_before_unload: bool,
     _marker: PhantomData<H>,
 }
 
@@ -439,11 +447,26 @@ where
         ServiceBuilder {
             connect: self.connect,
             on_error,
+            close_before_unload: self.close_before_unload,
             _marker: self._marker,
         }
     }
 
-    /// Build a new service and handle.
+    /// Install an event handler which will try to close the WebSocket
+    /// connection on page unload.
+    ///
+    /// This is not strictly necessary, but some browsers like Firefox might be
+    /// slow to recycle the connection unless it has been explicitly closed.
+    #[inline]
+    pub fn close_before_unload(mut self) -> Self {
+        self.close_before_unload = true;
+        self
+    }
+
+    /// Build a new service and open it.
+    ///
+    /// In order to close or open the service again, see [`Service::close`] and
+    /// [`Service::open`].
     pub fn build(self) -> Service<H> {
         let window = match H::Window::new() {
             Ok(window) => window,
@@ -452,31 +475,62 @@ where
             }
         };
 
-        let shared = Rc::<Shared<H>>::new_cyclic(move |shared| Shared {
-            connect: self.connect,
-            state: Cell::new(State::Closed),
-            handle: Handle {
-                shared: shared.clone(),
-            },
-            on_error: Box::new(self.on_error),
-            window,
-            handles: H::handles(shared),
-            serial: Cell::new(0),
-            defer_broadcasts: RefCell::new(VecDeque::new()),
-            defer_state_listeners: RefCell::new(VecDeque::new()),
-            socket: RefCell::new(None),
-            output: RefCell::new(Vec::new()),
-            current_timeout: Cell::new(INITIAL_TIMEOUT),
-            reconnect_timeout: RefCell::new(None),
-            g: Rc::new(Generic {
-                state_listeners: RefCell::new(Slab::new()),
-                broadcasts: RefCell::new(HashMap::new()),
-                requests: RefCell::new(Requests::new()),
-                buffers: RefCell::new(VecDeque::new()),
-            }),
+        let shared = Rc::<Shared<H>>::new_cyclic(move |shared| {
+            let window_onbeforeunload = if self.close_before_unload {
+                let shared = shared.clone();
+
+                let result = window.onbeforeunload(move || {
+                    tracing::debug!("Trying to close WebSocket connection on page unload");
+
+                    if let Some(shared) = shared.upgrade() {
+                        shared.close();
+                    }
+                });
+
+                match result {
+                    Ok(onbeforeunload) => Some(onbeforeunload),
+                    Err(error) => {
+                        self.on_error.call(Error::message(format_args!(
+                            "Failed to set onbeforeunload: {error}"
+                        )));
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            Shared {
+                connect: self.connect,
+                state: Cell::new(State::Closed),
+                should_be: Cell::new(State::Closed),
+                connecting: Cell::new(false),
+                handle: Handle {
+                    shared: shared.clone(),
+                },
+                on_error: Box::new(self.on_error),
+                window,
+                handles: H::handles(shared),
+                serial: Cell::new(0),
+                defer_broadcasts: RefCell::new(VecDeque::new()),
+                defer_state_listeners: RefCell::new(VecDeque::new()),
+                socket: RefCell::new(None),
+                output: RefCell::new(Vec::new()),
+                current_timeout: Cell::new(INITIAL_TIMEOUT),
+                reconnect_timeout: RefCell::new(None),
+                _window_onbeforeunload: window_onbeforeunload,
+                g: Rc::new(Generic {
+                    state_listeners: RefCell::new(Slab::new()),
+                    broadcasts: RefCell::new(HashMap::new()),
+                    requests: RefCell::new(Requests::new()),
+                    buffers: RefCell::new(VecDeque::new()),
+                }),
+            }
         });
 
-        Service { shared }
+        let service = Service { shared };
+        service.open();
+        service
     }
 }
 
@@ -496,22 +550,29 @@ where
     H: WebImpl,
 {
     /// Attempt to establish a WebSocket connection.
+    #[deprecated(since = "0.3.0", note = "Use `open` instead")]
     pub fn connect(&self) {
-        self.shared.connect()
+        self.shared.open()
     }
 
-    /// Explicitly close the WebSocket connection.
+    /// Open the WebSocket connection.
+    ///
+    /// Calling this method indicates that the connection should stay open, and
+    /// the implementation will attempt to reconnect until [`Service::close`] is
+    /// called.
+    pub fn open(&self) {
+        self.shared.open()
+    }
+
+    /// Close the WebSocket connection.
     ///
     /// This is not strictly necessary, but some browsers like Firefox might be
     /// slow to recycle the connection unless it has been explicitly closed.
     ///
     /// It is generally recommended that you call this when `beforeunload` on
     /// window is fired.
-    /// ```
     pub fn close(&self) {
-        if let Err(error) = self.shared.close() {
-            self.shared.on_error.call(error);
-        }
+        self.shared.close();
     }
 
     /// Return the handle to the service.
@@ -520,6 +581,18 @@ where
     /// connected, and is invalidated when [`Service`] is destructed.
     pub fn handle(&self) -> &Handle<H> {
         &self.shared.handle
+    }
+}
+
+impl<H> Clone for Service<H>
+where
+    H: WebImpl,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            shared: self.shared.clone(),
+        }
     }
 }
 
@@ -533,7 +606,7 @@ where
         T: api::Request,
     {
         let Some(ref socket) = *self.socket.borrow() else {
-            return Err(Error::msg("Socket is not connected"));
+            return Err(Error::message("Socket is not connected"));
         };
 
         let header = api::RequestHeader {
@@ -564,7 +637,7 @@ where
     /// Send a client message.
     fn send_connect(&self, serial: u32) -> Result<()> {
         let Some(ref socket) = *self.socket.borrow() else {
-            return Err(Error::msg("Socket is not connected"));
+            return Err(Error::message("Socket is not connected"));
         };
 
         let header = api::RequestHeader {
@@ -600,7 +673,7 @@ where
 
     fn _send_disconnect(&self, channel: ChannelId) -> Result<()> {
         let Some(ref socket) = *self.socket.borrow() else {
-            return Err(Error::msg("Socket is not connected"));
+            return Err(Error::message("Socket is not connected"));
         };
 
         let header = api::RequestHeader {
@@ -652,7 +725,8 @@ where
             tracing::debug!(?header, "Got broadcast");
 
             if broadcast == MessageId::SERVER_HELLO {
-                self.set_open();
+                tracing::debug!("Server hello (open)");
+                self.emit_state_change(State::Open);
                 return Ok(());
             }
 
@@ -672,7 +746,7 @@ where
 
                 while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
                     if let Some(callback) = callback.upgrade() {
-                        callback.call(Err(Error::msg(format_args!(
+                        callback.call(Err(Error::message(format_args!(
                             "Server error: {}",
                             error.message
                         ))));
@@ -711,15 +785,18 @@ where
                         },
                     };
 
-                    p.callback
-                        .error(Error::msg(format_args!("Server error: {}", error.message)));
+                    p.callback.error(Error::message(format_args!(
+                        "Server error: {}",
+                        error.message
+                    )));
                     return Ok(());
                 }
 
                 match p.id {
                     MessageId::CONNECT => {
                         let Some(callback) = &p.callback.as_channel() else {
-                            p.callback.error(Error::msg("Unexpected channel response"));
+                            p.callback
+                                .error(Error::message("Unexpected channel response"));
                             return Ok(());
                         };
 
@@ -728,7 +805,8 @@ where
                     }
                     _ => {
                         let Some(callback) = p.callback.as_request() else {
-                            p.callback.error(Error::msg("Unexpected channel response"));
+                            p.callback
+                                .error(Error::message("Unexpected channel response"));
                             return Ok(());
                         };
 
@@ -747,7 +825,9 @@ where
                 }
             }
 
-            tracing::warn!(?header.serial, "Got message with unknown serial");
+            // NB: This is normal, it simply indicates that the handler has been
+            // closed.
+            tracing::trace!(?header.serial, "Got message with unknown serial");
         }
 
         Ok(())
@@ -773,20 +853,13 @@ where
         !defer.is_empty()
     }
 
-    pub(crate) fn set_open(&self) {
-        tracing::debug!("Set open");
-        self.emit_state_change(State::Open);
-    }
-
-    pub(crate) fn close(self: &Rc<Self>) -> Result<(), Error> {
-        tracing::debug!("Closing connection");
+    pub(crate) fn close_and_reconnect(self: &Rc<Self>) -> Result<(), Error> {
+        tracing::debug!("Closing and reconnecting");
 
         // We need a weak reference back to shared state to handle the timeout.
         let shared = Rc::downgrade(self);
 
-        tracing::debug!("Set closed timeout={}", self.current_timeout.get(),);
-
-        if !self.is_open() {
+        if self.state.get() == State::Closed {
             let current_timeout = self.current_timeout.get();
 
             if current_timeout < MAX_TIMEOUT {
@@ -801,25 +874,21 @@ where
             }
         } else {
             self.current_timeout.set(INITIAL_TIMEOUT);
+            self.close_once();
         }
 
-        self.emit_state_change(State::Closed);
+        let timeout = self.current_timeout.get();
 
-        if let Some(s) = self.socket.take() {
-            s.close()?;
-        }
+        tracing::debug!(?timeout, "Setting");
 
-        self.close_pending();
-
-        let timeout = self
-            .window
-            .set_timeout(self.current_timeout.get(), move || {
-                if let Some(shared) = shared.upgrade() {
-                    Self::connect(&shared);
-                }
-            })?;
+        let timeout = self.window.set_timeout(timeout, move || {
+            if let Some(shared) = shared.upgrade() {
+                Self::try_once(&shared);
+            }
+        })?;
 
         drop(self.reconnect_timeout.borrow_mut().replace(timeout));
+        self.connecting.set(false);
         Ok(())
     }
 
@@ -841,7 +910,7 @@ where
                 p
             };
 
-            p.callback.error(Error::msg("Connection closed"));
+            p.callback.error(Error::message("Connection closed"));
         }
     }
 
@@ -875,45 +944,70 @@ where
     }
 
     #[inline]
-    fn is_open(&self) -> bool {
-        self.state.get() == State::Open
+    fn open(self: &Rc<Self>) {
+        self.should_be.set(State::Open);
+        self.try_once();
     }
 
     #[inline]
-    fn is_closed(&self) -> bool {
-        self.state.get() == State::Closed
+    fn close(self: &Rc<Self>) {
+        self.should_be.set(State::Closed);
+        self.try_once();
     }
 
-    fn connect(self: &Rc<Self>) {
-        tracing::debug!("Opening connection");
-
-        if let Err(e) = self.build() {
-            self.on_error.call(e);
-        } else {
-            return;
-        }
-
-        if let Err(e) = self.close() {
-            self.on_error.call(e);
+    fn try_once(self: &Rc<Self>) {
+        if self.should_be.get() == State::Open && !self.connecting.get() {
+            tracing::debug!("Trying to open connection");
+            self.connect_once();
         }
     }
 
-    fn build(self: &Rc<Self>) -> Result<()> {
+    fn close_once(self: &Rc<Self>) {
+        self.connecting.set(false);
+        self.emit_state_change(State::Closed);
+
+        if let Some(s) = self.socket.take() {
+            tracing::debug!("Closing old socket once");
+
+            if let Err(error) = s.close() {
+                self.on_error.call(error);
+            }
+        }
+
+        self.close_pending();
+    }
+
+    fn connect_once(self: &Rc<Self>) {
+        self.connecting.set(true);
+
         let url = match &self.connect.kind {
             ConnectKind::Location { path } => {
+                let location = match WindowImpl::location(&self.window) {
+                    Ok(location) => location,
+                    Err(e) => {
+                        self.on_error
+                            .call(Error::message(format_args!("Could not get location: {e}")));
+                        self.should_be.set(State::Closed);
+                        return;
+                    }
+                };
+
                 let Location {
                     protocol,
                     host,
                     port,
-                } = WindowImpl::location(&self.window)?;
+                } = location;
 
                 let protocol = match protocol.as_str() {
                     "https:" => "wss:",
                     "http:" => "ws:",
                     other => {
-                        return Err(Error::msg(format_args!(
-                            "Same host connection is not supported for protocol `{other}`"
+                        self.on_error.call(Error::message(format_args!(
+                            "Unsupported protocol `{other}` for same host connection"
                         )));
+
+                        self.should_be.set(State::Closed);
+                        return;
                     }
                 };
 
@@ -923,15 +1017,25 @@ where
             ConnectKind::Url { url } => url.clone(),
         };
 
-        let ws = SocketImpl::new(&url, &self.handles)?;
+        // We explicitly want to close and dispose of the old socket first.
+        if let Some(s) = self.socket.borrow_mut().take() {
+            tracing::debug!("Closing old socket");
 
-        let old = self.socket.borrow_mut().replace(ws);
-
-        if let Some(old) = old {
-            old.close()?;
+            if let Err(error) = s.close() {
+                self.on_error.call(error);
+            }
         }
 
-        Ok(())
+        let ws = match SocketImpl::new(&url, &self.handles) {
+            Ok(ws) => ws,
+            Err(error) => {
+                self.on_error.call(error);
+                self.should_be.set(State::Closed);
+                return;
+            }
+        };
+
+        *self.socket.borrow_mut() = Some(ws);
     }
 }
 
@@ -1124,13 +1228,13 @@ where
 
         let Some(shared) = self.shared.upgrade() else {
             self.callback
-                .call(Err(Error::msg("WebSocket service is down")));
+                .call(Err(Error::message("WebSocket service is down")));
             return Request::new();
         };
 
-        if shared.is_closed() {
+        if shared.state.get() != State::Open {
             self.callback
-                .call(Err(Error::msg("WebSocket is not connected")));
+                .call(Err(Error::message("WebSocket is not connected")));
             return Request::new();
         }
 
@@ -1172,7 +1276,7 @@ where
             .insert(serial, Box::new(pending));
 
         if let Some(p) = existing {
-            p.callback.error(Error::msg("Request cancelled"));
+            p.callback.error(Error::message("Request cancelled"));
         }
 
         Request {
@@ -1454,19 +1558,19 @@ where
 
         let Some(shared) = self.shared.upgrade() else {
             self.callback
-                .call(Err(Error::msg("WebSocket service is down")));
+                .call(Err(Error::message("WebSocket service is down")));
             return Request::new();
         };
 
-        if shared.is_closed() {
+        if shared.state.get() != State::Open {
             self.callback
-                .call(Err(Error::msg("WebSocket is not connected")));
+                .call(Err(Error::message("WebSocket is not connected")));
             return Request::new();
         }
 
         let Some(channel) = self.channel else {
             self.callback
-                .call(Err(Error::msg("WebSocket request over closed channel")));
+                .call(Err(Error::message("WebSocket request over closed channel")));
             return Request::new();
         };
 
@@ -1492,7 +1596,7 @@ where
             .insert(serial, Box::new(pending));
 
         if let Some(p) = existing {
-            p.callback.error(Error::msg("Request cancelled"));
+            p.callback.error(Error::message("Request cancelled"));
         }
 
         Request {

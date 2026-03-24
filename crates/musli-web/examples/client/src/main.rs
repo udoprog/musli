@@ -53,10 +53,9 @@ impl Component for App {
 
     fn create(ctx: &Context<Self>) -> Self {
         let service = ws::connect(ws::Connect::location("ws"))
+            .close_before_unload()
             .on_error(ctx.link().callback(Msg::Error))
             .build();
-
-        service.connect();
 
         let listen = service
             .handle()
