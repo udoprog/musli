@@ -24,6 +24,17 @@
 //!
 //! <br>
 //!
+//! ## Features
+//!
+//! * A wasm-compatible and convenient websocket protocol with support for
+//!   request-reply and broadcasts.
+//! * [Channel support] allowing the server to identify the source of a message
+//!   and clients to correlate messages.
+//!
+//! [Channel support]: https://docs.rs/musli-web/latest/musli_web/web/struct.Handle.html#method.channel
+//!
+//! <br>
+//!
 //! ## Examples
 //!
 //! * [`api`] is the example crate which defines API types shared between server

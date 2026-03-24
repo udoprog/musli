@@ -94,11 +94,11 @@
 use core::convert::Infallible;
 use core::fmt::{self, Write};
 use core::future::Future;
+use core::num::NonZeroU16;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
 use alloc::collections::VecDeque;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -476,6 +476,8 @@ pub trait Handler {
     /// This indicates that communicating with a client that has opened a
     /// channel with [`Handle::channel`] has been cleanly closed, which occurs
     /// when the channel is cleanly closed by dropping the last handle to it.
+    ///
+    /// [`Handle::channel`]: crate::web::Handle::channel
     fn close_channel<'this>(
         &'this mut self,
         channel: ChannelId,
@@ -535,7 +537,7 @@ where
     socket_send: bool,
     socket_flush: bool,
     pinned: Pin<Box<Pinned<S::Socket>>>,
-    connections: BTreeSet<ChannelId>,
+    channels: Channels,
 }
 
 impl<S, H> Server<S, H>
@@ -564,7 +566,7 @@ where
                 close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
                 ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
             }),
-            connections: BTreeSet::new(),
+            channels: Channels::default(),
         }
     }
 
@@ -815,7 +817,7 @@ where
 
             match id {
                 MessageId::CONNECT => {
-                    let Some(channel) = self.channel_id() else {
+                    let Some(channel) = self.channels.next() else {
                         self.format_error_message(format_args!(
                             "Failed to allocate connection ID"
                         ))?;
@@ -838,8 +840,8 @@ where
                     break 'err false;
                 }
                 MessageId::DISCONNECT => {
+                    self.channels.free(header.channel);
                     self.handler.close_channel(header.channel).await;
-                    self.connections.remove(&header.channel);
                     break 'err true;
                 }
                 _ => {
@@ -970,24 +972,6 @@ where
         }
 
         Ok(())
-    }
-
-    fn channel_id(&mut self) -> Option<ChannelId> {
-        let mut id = ChannelId::new(self.rng.random());
-        let mut attempts = 0;
-
-        while id == ChannelId::NONE || self.connections.contains(&id) {
-            if attempts >= 10 {
-                return None;
-            }
-
-            id = ChannelId::new(self.rng.random());
-            attempts += 1;
-        }
-
-        tracing::debug!(?id, "Allocated channel id");
-        self.connections.insert(id);
-        Some(id)
     }
 
     async fn handle_request(
@@ -1183,5 +1167,64 @@ impl Outgoing<'_> {
         }
 
         writer.flush();
+    }
+}
+
+/// Scramble a sequential channel id into a value that looks random to clients.
+///
+/// Uses an odd multiply followed by an XOR-shift (bijective over u16, preserves
+/// 0, self-inverse).
+#[inline]
+fn scramble_channel(x: u16) -> u16 {
+    let x = x.wrapping_mul(0x9285);
+    x ^ (x >> 8)
+}
+
+/// Inverse of [`scramble_channel`].
+#[inline]
+fn unscramble_channel(x: u16) -> u16 {
+    let x = x ^ (x >> 8);
+    x.wrapping_mul(0x964d)
+}
+
+#[test]
+fn test_scramble() {
+    assert_eq!(scramble_channel(0), 0);
+    assert_eq!(unscramble_channel(0), 0);
+
+    for i in 1..=u16::MAX {
+        let scrambled = scramble_channel(i);
+        let unscrambled = unscramble_channel(scrambled);
+        assert_eq!(i, unscrambled, "Failed to unscramble channel id");
+    }
+}
+
+#[derive(Default)]
+struct Channels {
+    last: u16,
+    free: VecDeque<NonZeroU16>,
+}
+
+impl Channels {
+    fn next(&mut self) -> Option<ChannelId> {
+        if let Some(id) = self.free.pop_front() {
+            return Some(ChannelId::new(scramble_channel(id.get())));
+        }
+
+        let id = NonZeroU16::new(self.last.wrapping_add(1))?;
+        self.last = id.get();
+
+        tracing::debug!(?id, "Allocated channel id");
+        Some(ChannelId::new(scramble_channel(id.get())))
+    }
+
+    fn free(&mut self, id: ChannelId) -> bool {
+        tracing::debug!(?id, "Freeing channel id");
+
+        if let Some(id) = NonZeroU16::new(unscramble_channel(id.raw())) {
+            self.free.push_back(id);
+        }
+
+        true
     }
 }

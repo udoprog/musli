@@ -42,6 +42,13 @@ impl ChannelId {
     pub(crate) const fn new(repr: u16) -> Self {
         Self { repr }
     }
+
+    /// Get the raw channel identifier.
+    #[inline]
+    #[cfg(feature = "ws")]
+    pub(crate) const fn raw(&self) -> u16 {
+        self.repr
+    }
 }
 
 impl fmt::Debug for ChannelId {
@@ -72,10 +79,10 @@ impl MessageId {
     /// The message id for [`ErrorMessage`].
     pub const ERROR_MESSAGE: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 1) };
 
-    /// A connect request.
+    /// A connect of a channel.
     pub const CONNECT: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 2) };
 
-    /// A disconnect request.
+    /// A clean disconnect of a channel.
     pub const DISCONNECT: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 3) };
 
     /// The first message the server sends to indicat that a connection is open.

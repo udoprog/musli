@@ -64,7 +64,7 @@ type Buffers = VecDeque<Box<BufData>>;
 /// Pending requests.
 type Requests = HashMap<u32, Box<Pending<dyn RequestCallback>>>;
 
-/// Location information for websocket implementation.
+/// Location information for WebSocket implementation.
 #[doc(hidden)]
 pub struct Location {
     pub(crate) protocol: String,
@@ -231,7 +231,7 @@ impl Error {
         matches!(self.kind, ErrorKind::EmptyPacket)
     }
 
-    /// Format a websocket error consisting of a message.
+    /// Format a WebSocket error consisting of a message.
     pub fn message(message: impl fmt::Display) -> Self {
         Self::new(ErrorKind::Message(message.to_string()))
     }
@@ -335,13 +335,14 @@ type Result<T, E = Error> = core::result::Result<T, E>;
 const INITIAL_TIMEOUT: u32 = 250;
 const MAX_TIMEOUT: u32 = 4000;
 
-/// How to connect to the websocket.
+/// How to connect to the WebSocket.
+#[derive(Debug)]
 enum ConnectKind {
     Location { path: String },
     Url { url: String },
 }
 
-/// A specification for how to connect a websocket.
+/// A specification for how to connect a WebSocket.
 pub struct Connect {
     kind: ConnectKind,
 }
@@ -370,27 +371,32 @@ impl Connect {
     }
 }
 
+impl fmt::Debug for Connect {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
+    }
+}
+
 /// Generic but shared fields which do not depend on specialization over `H`.
 struct Generic {
     state_listeners: RefCell<StateListeners>,
     requests: RefCell<Requests>,
     broadcasts: RefCell<Broadcasts>,
     buffers: RefCell<Buffers>,
-    /// Channels to users.
-    channels: RefCell<Vec<Rc<ChannelId>>>,
 }
 
-/// Shared implementation details for websocket implementations.
+/// Shared implementation details for WebSocket implementations.
 pub(crate) struct Shared<H>
 where
     H: WebImpl,
 {
     connect: Connect,
+    state: Cell<State>,
     pub(crate) on_error: Box<dyn Callback<Error>>,
     window: H::Window,
     performance: <H::Window as WindowImpl>::Performance,
     handles: H::Handles,
-    state: Cell<State>,
     opened: Cell<Option<f64>>,
     serial: Cell<u32>,
     defer_broadcasts: RefCell<VecDeque<Weak<dyn Callback<Result<RawPacket>>>>>,
@@ -474,11 +480,11 @@ where
 
         let shared = Rc::<Shared<H>>::new_cyclic(move |shared| Shared {
             connect: self.connect,
+            state: Cell::new(State::Closed),
             on_error: Box::new(self.on_error),
             window,
             performance,
             handles: H::handles(shared),
-            state: Cell::new(State::Closed),
             opened: Cell::new(None),
             serial: Cell::new(0),
             defer_broadcasts: RefCell::new(VecDeque::new()),
@@ -492,7 +498,6 @@ where
                 broadcasts: RefCell::new(HashMap::new()),
                 requests: RefCell::new(Requests::new()),
                 buffers: RefCell::new(VecDeque::new()),
-                channels: RefCell::new(Vec::new()),
             }),
         });
 
@@ -520,7 +525,7 @@ impl<H> Service<H>
 where
     H: WebImpl,
 {
-    /// Attempt to establish a websocket connection.
+    /// Attempt to establish a WebSocket connection.
     pub fn connect(&self) {
         self.shared.connect()
     }
@@ -603,12 +608,6 @@ where
     fn remove_channel(&self, channel: ChannelId) {
         if let Err(error) = self._send_disconnect(channel) {
             self.on_error.call(error);
-        }
-
-        let mut channels = self.g.channels.borrow_mut();
-
-        if let Some(index) = channels.iter().position(|c| **c == channel) {
-            channels.swap_remove(index);
         }
     }
 
@@ -841,9 +840,6 @@ where
 
         self.close_pending();
 
-        // Clear channels ensuring they are no longer valid.
-        self.g.channels.borrow_mut().clear();
-
         let timeout = self
             .window
             .set_timeout(self.current_timeout.get(), move || {
@@ -925,7 +921,7 @@ where
         }
     }
 
-    /// Build a websocket connection.
+    /// Build a WebSocket connection.
     fn build(self: &Rc<Self>) -> Result<()> {
         let url = match &self.connect.kind {
             ConnectKind::Location { path } => {
@@ -1177,22 +1173,10 @@ where
             move |result| {
                 let result = match result {
                     Err(error) => Err(error),
-                    Ok(id) => {
-                        let state = if let Some(shared) = shared.upgrade() {
-                            let mut channels = shared.g.channels.borrow_mut();
-                            let new_state = Rc::new(id);
-                            let state = Rc::downgrade(&new_state);
-                            channels.push(new_state);
-                            state
-                        } else {
-                            Weak::new()
-                        };
-
-                        Ok(Channel {
-                            shared: shared.clone(),
-                            id: state,
-                        })
-                    }
+                    Ok(id) => Ok(Channel {
+                        shared: shared.clone(),
+                        id,
+                    }),
                 };
 
                 self.callback.call(result)
@@ -1505,9 +1489,8 @@ where
         }
 
         let Some(channel) = self.channel else {
-            self.callback.call(Err(Error::msg(
-                "WebSocket that channel belonged to is no longer open",
-            )));
+            self.callback
+                .call(Err(Error::msg("WebSocket request over closed channel")));
             return Request::new();
         };
 
@@ -1555,6 +1538,15 @@ pub struct Request {
 
 impl Request {
     /// An empty request handler.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// let mut request = ws::Request::new();
+    /// assert_eq!(request.is_pending(), false);
+    /// ```
     #[inline]
     pub const fn new() -> Self {
         Self {
@@ -1585,7 +1577,17 @@ impl Request {
         drop(removed);
     }
 
-    /// Indicate if the update request is pending.
+    /// Indicates if a request is pending.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// let mut request = ws::Request::new();
+    /// assert_eq!(request.is_pending(), false);
+    /// ```
+    #[inline]
     pub fn is_pending(&self) -> bool {
         let Some(g) = self.g.upgrade() else {
             return false;
@@ -2159,17 +2161,24 @@ impl<H> Handle<H>
 where
     H: WebImpl,
 {
-    /// Open a new logical channel to the websocket server.
+    /// Open a new logical channel to the WebSocket server.
     ///
-    /// A channel which can be uniquely identified both on the client and server
-    /// side. This means for example that if you send a request on a channel,
-    /// the server can access the [`ChannelId`] to determine which channel sent
-    /// a given request. And the client can make use of [`Channel`] to associate
-    /// requests with a given channel.
+    /// A channel can be uniquely identified on the client and server side over
+    /// a single connection. This means that if you send a request over a
+    /// channel using [`Channel::request`], the server can access the
+    /// [`ChannelId`] to determine which channel sent the request and the client
+    /// has the ability to correlate any responses sent by the server by
+    /// inspecting [`Packet::channel`] or [`RawPacket::channel`].
     ///
-    /// This can be useful if you for example need to broadcast a message back
-    /// over the same websocket connection, but you don't want to send it to the
-    /// channel which initially sent the broadcast.
+    /// The [`ChannelId`] can also be sent out-of-bounds, for example as part of
+    /// the body of a [`ws::Server::broadcast`] allowing the client to filter
+    /// broadcasts that originated from itself to avoid bouncing updates.
+    ///
+    /// The maximum number of channels is implementation defined, but expect it
+    /// to be relatively low like `65535` (non-zero 16 bits) to reduce payload
+    /// sizes. Failure to allocate a channel is an error.
+    ///
+    /// [`ws::Server::broadcast`]: crate::ws::Server::broadcast
     ///
     /// # Examples
     ///
@@ -2688,28 +2697,26 @@ where
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Handle").finish_non_exhaustive()
+        let mut f = f.debug_struct("Handle");
+
+        if let Some(shared) = self.shared.upgrade() {
+            f.field("connect", &shared.connect);
+            f.field("state", &shared.state.get());
+        }
+
+        f.finish()
     }
 }
 
-/// A connected handle to the WebSocket service.
+/// A channel to a WebSocket server.
+///
+/// See [`Handle::channel`] for more details.
 pub struct Channel<H>
 where
     H: WebImpl,
 {
     shared: Weak<Shared<H>>,
-    // This might require a bit of explanation.
-    //
-    // Let's say we set up a channel and all is well, but the underlying
-    // websocket gets closed. We want to invalidate any of the channels out
-    // there to ensure that they don't believe they have a valid channel id,
-    // when they don't.
-    //
-    // To achieve this, we hold onto a weak state like here that is owned by the
-    // websocket connection. When the owned end is dropped the channel is no
-    // longer valid, and we can no longer upgrade this and access the underlying
-    // channel id.
-    id: Weak<ChannelId>,
+    id: ChannelId,
 }
 
 impl<H> Channel<H>
@@ -2719,17 +2726,7 @@ where
     /// Get the connection identifier for this handle.
     #[inline]
     pub fn id(&self) -> ChannelId {
-        let Some(id) = self.id.upgrade() else {
-            return ChannelId::NONE;
-        };
-
-        *id
-    }
-
-    /// Try to get an identifier.
-    #[inline]
-    fn try_id(&self) -> Option<ChannelId> {
-        self.id.upgrade().as_deref().copied()
+        self.id
     }
 
     /// Send a request of type `T` over the current channel.
@@ -2848,22 +2845,9 @@ where
     pub fn request(&self) -> RequestBuilder<'_, H, EmptyBody, EmptyCallback> {
         RequestBuilder {
             shared: &self.shared,
-            channel: self.try_id(),
+            channel: (self.id != ChannelId::NONE).then_some(self.id),
             body: EmptyBody,
             callback: EmptyCallback,
-        }
-    }
-}
-
-impl<H> Clone for Channel<H>
-where
-    H: WebImpl,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            shared: self.shared.clone(),
-            id: self.id.clone(),
         }
     }
 }
@@ -2886,7 +2870,7 @@ where
     fn default() -> Self {
         Self {
             shared: Weak::new(),
-            id: Weak::new(),
+            id: ChannelId::NONE,
         }
     }
 }
@@ -2897,7 +2881,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        Weak::ptr_eq(&self.shared, &other.shared) && Weak::ptr_eq(&self.id, &other.id)
+        Weak::ptr_eq(&self.shared, &other.shared) && self.id == other.id
     }
 }
 
@@ -2907,18 +2891,8 @@ where
 {
     #[inline]
     fn drop(&mut self) {
-        let count = Weak::weak_count(&self.id);
-
-        // Dropping this one will not get rid of all weak references, so we
-        // don't have to remove the channel.
-        if count > 1 {
-            return;
-        }
-
-        if let Some(id) = self.id.upgrade()
-            && let Some(shared) = self.shared.upgrade()
-        {
-            shared.remove_channel(*id);
+        if let Some(shared) = self.shared.upgrade() {
+            shared.remove_channel(self.id);
         }
     }
 }
@@ -2931,12 +2905,13 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_struct("Channel");
 
-        if let Some(id) = self.try_id() {
-            f.field("id", &id);
-            f.finish()
-        } else {
-            f.finish_non_exhaustive()
+        if let Some(shared) = self.shared.upgrade() {
+            f.field("connect", &shared.connect);
+            f.field("state", &shared.state.get());
         }
+
+        f.field("id", &self.id);
+        f.finish()
     }
 }
 
