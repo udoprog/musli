@@ -93,18 +93,6 @@ where
     fn close(self) -> Result<(), Error>;
 }
 
-pub(crate) mod sealed_performance {
-    pub trait Sealed {}
-}
-
-pub trait PerformanceImpl
-where
-    Self: Sized + self::sealed_performance::Sealed,
-{
-    #[doc(hidden)]
-    fn now(&self) -> f64;
-}
-
 pub(crate) mod sealed_window {
     pub trait Sealed {}
 }
@@ -114,16 +102,10 @@ where
     Self: Sized + self::sealed_window::Sealed,
 {
     #[doc(hidden)]
-    type Performance: PerformanceImpl;
-
-    #[doc(hidden)]
     type Timeout;
 
     #[doc(hidden)]
     fn new() -> Result<Self, Error>;
-
-    #[doc(hidden)]
-    fn performance(&self) -> Result<Self::Performance, Error>;
 
     #[doc(hidden)]
     fn location(&self) -> Result<Location, Error>;
@@ -393,11 +375,10 @@ where
 {
     connect: Connect,
     state: Cell<State>,
+    handle: Handle<H>,
     pub(crate) on_error: Box<dyn Callback<Error>>,
     window: H::Window,
-    performance: <H::Window as WindowImpl>::Performance,
     handles: H::Handles,
-    opened: Cell<Option<f64>>,
     serial: Cell<u32>,
     defer_broadcasts: RefCell<VecDeque<Weak<dyn Callback<Result<RawPacket>>>>>,
     defer_state_listeners: RefCell<VecDeque<Weak<dyn Callback<State>>>>,
@@ -471,21 +452,15 @@ where
             }
         };
 
-        let performance = match WindowImpl::performance(&window) {
-            Ok(performance) => performance,
-            Err(error) => {
-                panic!("{error}")
-            }
-        };
-
         let shared = Rc::<Shared<H>>::new_cyclic(move |shared| Shared {
             connect: self.connect,
             state: Cell::new(State::Closed),
+            handle: Handle {
+                shared: shared.clone(),
+            },
             on_error: Box::new(self.on_error),
             window,
-            performance,
             handles: H::handles(shared),
-            opened: Cell::new(None),
             serial: Cell::new(0),
             defer_broadcasts: RefCell::new(VecDeque::new()),
             defer_state_listeners: RefCell::new(VecDeque::new()),
@@ -501,11 +476,7 @@ where
             }),
         });
 
-        let handle = Handle {
-            shared: Rc::downgrade(&shared),
-        };
-
-        Service { shared, handle }
+        Service { shared }
     }
 }
 
@@ -518,7 +489,6 @@ where
     H: WebImpl,
 {
     shared: Rc<Shared<H>>,
-    handle: Handle<H>,
 }
 
 impl<H> Service<H>
@@ -530,9 +500,26 @@ where
         self.shared.connect()
     }
 
-    /// Build a handle to the service.
+    /// Explicitly close the WebSocket connection.
+    ///
+    /// This is not strictly necessary, but some browsers like Firefox might be
+    /// slow to recycle the connection unless it has been explicitly closed.
+    ///
+    /// It is generally recommended that you call this when `beforeunload` on
+    /// window is fired.
+    /// ```
+    pub fn close(&self) {
+        if let Err(error) = self.shared.close() {
+            self.shared.on_error.call(error);
+        }
+    }
+
+    /// Return the handle to the service.
+    ///
+    /// A [`Handle`] instances does not force the underlying WebSocket to stay
+    /// connected, and is invalidated when [`Service`] is destructed.
     pub fn handle(&self) -> &Handle<H> {
-        &self.handle
+        &self.shared.handle
     }
 }
 
@@ -788,33 +775,18 @@ where
 
     pub(crate) fn set_open(&self) {
         tracing::debug!("Set open");
-        self.opened
-            .set(Some(PerformanceImpl::now(&self.performance)));
         self.emit_state_change(State::Open);
     }
 
-    fn is_open_for_a_while(&self) -> bool {
-        let Some(at) = self.opened.get() else {
-            return false;
-        };
-
-        let now = PerformanceImpl::now(&self.performance);
-        (now - at) >= 250.0
-    }
-
     pub(crate) fn close(self: &Rc<Self>) -> Result<(), Error> {
-        tracing::debug!("Close connection");
+        tracing::debug!("Closing connection");
 
         // We need a weak reference back to shared state to handle the timeout.
         let shared = Rc::downgrade(self);
 
-        tracing::debug!(
-            "Set closed timeout={}, opened={:?}",
-            self.current_timeout.get(),
-            self.opened.get(),
-        );
+        tracing::debug!("Set closed timeout={}", self.current_timeout.get(),);
 
-        if !self.is_open_for_a_while() {
+        if !self.is_open() {
             let current_timeout = self.current_timeout.get();
 
             if current_timeout < MAX_TIMEOUT {
@@ -831,7 +803,6 @@ where
             self.current_timeout.set(INITIAL_TIMEOUT);
         }
 
-        self.opened.set(None);
         self.emit_state_change(State::Closed);
 
         if let Some(s) = self.socket.take() {
@@ -903,12 +874,18 @@ where
         }
     }
 
+    #[inline]
+    fn is_open(&self) -> bool {
+        self.state.get() == State::Open
+    }
+
+    #[inline]
     fn is_closed(&self) -> bool {
-        self.opened.get().is_none()
+        self.state.get() == State::Closed
     }
 
     fn connect(self: &Rc<Self>) {
-        tracing::debug!("Connect");
+        tracing::debug!("Opening connection");
 
         if let Err(e) = self.build() {
             self.on_error.call(e);
@@ -921,7 +898,6 @@ where
         }
     }
 
-    /// Build a WebSocket connection.
     fn build(self: &Rc<Self>) -> Result<()> {
         let url = match &self.connect.kind {
             ConnectKind::Location { path } => {

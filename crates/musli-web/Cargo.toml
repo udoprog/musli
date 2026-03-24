@@ -60,7 +60,7 @@ wasm-bindgen02 = { package = "wasm-bindgen", version = "0.2.0", default-features
 package = "web-sys"
 version = "0.3.0"
 default-features = false
-features = ["WebSocket", "MessageEvent", "Performance", "BinaryType", "CloseEvent", "ErrorEvent", "Window", "Location"]
+features = ["WebSocket", "MessageEvent", "BinaryType", "CloseEvent", "ErrorEvent", "Window", "Location"]
 optional = true
 
 [target.'cfg(any())'.dependencies]

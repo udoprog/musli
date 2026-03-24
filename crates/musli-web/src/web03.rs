@@ -69,15 +69,13 @@ use alloc::rc::Weak;
 
 use wasm_bindgen02::JsCast;
 use wasm_bindgen02::closure::Closure;
-use web_sys03::Performance;
-use web_sys03::Window;
 use web_sys03::js_sys::Function;
 use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
-use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, window};
+use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, Window, window};
 
 use crate::web::{
-    Connect, EmptyCallback, Error, Location, PerformanceImpl, ServiceBuilder, Shared, SocketImpl,
-    WebImpl, WindowImpl,
+    Connect, EmptyCallback, Error, Location, ServiceBuilder, Shared, SocketImpl, WebImpl,
+    WindowImpl,
 };
 
 pub mod prelude {
@@ -171,19 +169,9 @@ impl SocketImpl for WebSocket {
     }
 }
 
-impl crate::web::sealed_performance::Sealed for Performance {}
-
-impl PerformanceImpl for Performance {
-    #[inline]
-    fn now(&self) -> f64 {
-        Performance::now(self)
-    }
-}
-
 impl crate::web::sealed_window::Sealed for Window {}
 
 impl WindowImpl for Window {
-    type Performance = Performance;
     type Timeout = Timeout;
 
     #[inline]
@@ -193,15 +181,6 @@ impl WindowImpl for Window {
         };
 
         Ok(window)
-    }
-
-    #[inline]
-    fn performance(&self) -> Result<Self::Performance, Error> {
-        let Some(performance) = Window::performance(self) else {
-            return Err(Error::msg("No window.performance in web-sys 0.3.x context"));
-        };
-
-        Ok(performance)
     }
 
     #[inline]
