@@ -7,11 +7,11 @@
 //! [`web03`]: crate::web03
 
 use core::cell::{Cell, RefCell};
-use core::fmt;
 use core::marker::PhantomData;
 use core::mem;
 use core::ops::Deref;
 use core::ptr::NonNull;
+use core::{any, fmt};
 use std::collections::VecDeque;
 
 use alloc::boxed::Box;
@@ -2029,6 +2029,20 @@ impl RawPacket {
         }
     }
 
+    /// Get the number of bytes remaining to be decoded in the packet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::RawPacket;
+    ///
+    /// let packet = RawPacket::empty();
+    /// assert_eq!(packet.remaining(), 0);
+    /// ```
+    pub fn remaining(&self) -> usize {
+        self.as_slice().len().saturating_sub(self.at.get())
+    }
+
     /// Get the length of the packet.
     ///
     /// # Examples
@@ -2070,8 +2084,16 @@ impl RawPacket {
     }
 }
 
+impl fmt::Debug for RawPacket {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RawPacket")
+            .field("remaining", &self.remaining())
+            .finish()
+    }
+}
+
 /// A typed packet of data.
-#[derive(Clone)]
 pub struct Packet<T> {
     raw: RawPacket,
     _marker: PhantomData<T>,
@@ -2126,6 +2148,20 @@ impl<T> Packet<T> {
     /// [`RawPacket::id`] method can be used.
     pub fn into_raw(self) -> RawPacket {
         self.raw
+    }
+
+    /// Get the number of bytes remaining to be decoded in the packet.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::Packet;
+    ///
+    /// let packet = Packet::<()>::empty();
+    /// assert_eq!(packet.remaining(), 0);
+    /// ```
+    pub fn remaining(&self) -> usize {
+        self.raw.remaining()
     }
 
     /// Check if the packet is empty.
@@ -2226,6 +2262,26 @@ where
         E: Event<Broadcast = T> + Decode<'de, Binary, Global>,
     {
         self.raw.decode()
+    }
+}
+
+impl<T> Clone for Packet<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            raw: self.raw.clone(),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T> fmt::Debug for Packet<T> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Packet")
+            .field("type", &any::type_name::<T>())
+            .field("remaining", &self.remaining())
+            .finish()
     }
 }
 
