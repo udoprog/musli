@@ -1254,7 +1254,9 @@ where
                 let result = match result {
                     Err(error) => Err(error),
                     Ok(id) => Ok(Channel {
-                        shared: shared.clone(),
+                        handle: Handle {
+                            shared: shared.clone(),
+                        },
                         id,
                     }),
                 };
@@ -2286,7 +2288,6 @@ impl<T> fmt::Debug for Packet<T> {
 }
 
 /// A handle to the WebSocket service.
-#[repr(transparent)]
 pub struct Handle<H>
 where
     H: WebImpl,
@@ -2298,12 +2299,6 @@ impl<H> Handle<H>
 where
     H: WebImpl,
 {
-    fn by_ref(shared: &Rc<Shared<H>>) -> &Self {
-        // SAFETY: This is correct because `Handle` is `repr(transparent)` over
-        // `Rc<Shared<H>>`.
-        unsafe { &*(shared as *const Rc<Shared<H>> as *const Self) }
-    }
-
     /// Open a new logical channel to the WebSocket server.
     ///
     /// A channel can be uniquely identified on the client and server side over
@@ -2858,7 +2853,7 @@ pub struct Channel<H>
 where
     H: WebImpl,
 {
-    shared: Weak<Shared<H>>,
+    handle: Handle<H>,
     id: ChannelId,
 }
 
@@ -2877,7 +2872,7 @@ where
     /// A handle sheds the channel information and allows for setting up things
     /// like broadcast listener.
     pub fn handle(&self) -> &Handle<H> {
-        Handle::by_ref(&self.shared)
+        &self.handle
     }
 
     /// Send a request of type `T` over the current channel.
@@ -2995,7 +2990,7 @@ where
     /// ```
     pub fn request(&self) -> RequestBuilder<'_, H, EmptyBody, EmptyCallback> {
         RequestBuilder {
-            shared: &self.shared,
+            shared: &self.handle.shared,
             channel: (self.id != ChannelId::NONE).then_some(self.id),
             body: EmptyBody,
             callback: EmptyCallback,
@@ -3020,7 +3015,7 @@ where
     #[inline]
     fn default() -> Self {
         Self {
-            shared: Weak::new(),
+            handle: Handle::default(),
             id: ChannelId::NONE,
         }
     }
@@ -3032,7 +3027,7 @@ where
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        Weak::ptr_eq(&self.shared, &other.shared) && self.id == other.id
+        Weak::ptr_eq(&self.handle.shared, &other.handle.shared) && self.id == other.id
     }
 }
 
@@ -3042,7 +3037,7 @@ where
 {
     #[inline]
     fn drop(&mut self) {
-        if let Some(shared) = self.shared.upgrade() {
+        if let Some(shared) = self.handle.shared.upgrade() {
             shared.remove_channel(self.id);
         }
     }
@@ -3056,7 +3051,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_struct("Channel");
 
-        if let Some(shared) = self.shared.upgrade() {
+        if let Some(shared) = self.handle.shared.upgrade() {
             f.field("connect", &shared.connect);
             f.field("state", &shared.state.get());
         }
