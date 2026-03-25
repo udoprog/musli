@@ -2286,6 +2286,7 @@ impl<T> fmt::Debug for Packet<T> {
 }
 
 /// A handle to the WebSocket service.
+#[repr(transparent)]
 pub struct Handle<H>
 where
     H: WebImpl,
@@ -2297,6 +2298,12 @@ impl<H> Handle<H>
 where
     H: WebImpl,
 {
+    fn by_ref(shared: &Rc<Shared<H>>) -> &Self {
+        // SAFETY: This is correct because `Handle` is `repr(transparent)` over
+        // `Rc<Shared<H>>`.
+        unsafe { &*(shared as *const Rc<Shared<H>> as *const Self) }
+    }
+
     /// Open a new logical channel to the WebSocket server.
     ///
     /// A channel can be uniquely identified on the client and server side over
@@ -2863,6 +2870,14 @@ where
     #[inline]
     pub fn id(&self) -> ChannelId {
         self.id
+    }
+
+    /// Get a handle for this channel.
+    ///
+    /// A handle sheds the channel information and allows for setting up things
+    /// like broadcast listener.
+    pub fn handle(&self) -> &Handle<H> {
+        Handle::by_ref(&self.shared)
     }
 
     /// Send a request of type `T` over the current channel.
