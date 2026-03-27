@@ -691,6 +691,7 @@ pub use self::alloc::{Allocator, GlobalAllocator};
 
 pub mod descriptive;
 pub mod json;
+pub mod jsonb;
 pub mod packed;
 pub mod serde;
 pub mod storage;

@@ -244,6 +244,7 @@ impl fmt::Debug for Builder {
     feature = "wire",
     feature = "descriptive",
     feature = "json",
+    feature = "jsonb",
     feature = "value"
 ))]
 #[inline]
@@ -264,6 +265,7 @@ const fn integer_value(opt: Options) -> Integer {
     feature = "wire",
     feature = "descriptive",
     feature = "json",
+    feature = "jsonb",
     feature = "value"
 ))]
 #[inline]
@@ -286,6 +288,7 @@ const fn float_value(opt: Options) -> Float {
     feature = "wire",
     feature = "descriptive",
     feature = "json",
+    feature = "jsonb",
     feature = "value"
 ))]
 #[inline]
@@ -312,6 +315,7 @@ const fn length_value(opt: Options) -> Width {
     feature = "wire",
     feature = "descriptive",
     feature = "json",
+    feature = "jsonb",
     feature = "value"
 ))]
 #[inline]
@@ -341,6 +345,7 @@ const fn is_map_keys_as_numbers_value(opt: Options) -> bool {
     feature = "storage",
     feature = "wire",
     feature = "descriptive",
+    feature = "jsonb",
     feature = "value"
 ))]
 pub(crate) const fn is_native_fixed<const OPT: Options>() -> bool {
@@ -496,6 +501,7 @@ impl ByteOrder {
     feature = "storage",
     feature = "wire",
     feature = "descriptive",
+    feature = "jsonb",
     feature = "value"
 ))]
 macro_rules! width_arm {
@@ -521,6 +527,7 @@ macro_rules! width_arm {
     feature = "storage",
     feature = "wire",
     feature = "descriptive",
+    feature = "jsonb",
     feature = "value"
 ))]
 pub(crate) use width_arm;

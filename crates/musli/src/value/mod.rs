@@ -5,7 +5,12 @@
 //!
 //! [Müsli data model]: crate::_help::data_model
 
-#![cfg(any(feature = "json", feature = "descriptive", feature = "value"))]
+#![cfg(any(
+    feature = "json",
+    feature = "jsonb",
+    feature = "descriptive",
+    feature = "value"
+))]
 #![cfg_attr(doc_cfg, doc(cfg(feature = "value")))]
 
 mod de;

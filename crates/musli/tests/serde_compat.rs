@@ -198,6 +198,7 @@ macro_rules! tester {
 tester!(storage, Binary);
 tester!(wire, Binary);
 tester!(descriptive, Binary);
+tester!(jsonb, Binary);
 tester!(json, Text);
 
 #[derive(Debug, PartialEq, Eq, Generate, Encode, Decode, Serialize, Deserialize)]

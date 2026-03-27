@@ -58,6 +58,7 @@ pub use musli_core::en::__traits::{
     feature = "storage",
     feature = "wire",
     feature = "descriptive",
+    feature = "jsonb",
     feature = "value"
 ))]
 pub(crate) use musli_core::en::utils;

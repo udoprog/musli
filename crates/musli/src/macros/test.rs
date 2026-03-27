@@ -471,6 +471,8 @@ macro_rules! __test_matrix {
         $call!(descriptive, Binary);
         $call!(descriptive, Text);
         $call!(json, Text);
+        $call!(jsonb, Binary);
+        $call!(jsonb, Text);
     };
 
     (not_packed, $call:path) => {
@@ -478,6 +480,8 @@ macro_rules! __test_matrix {
         $call!(wire, Binary);
         $call!(descriptive, Binary);
         $call!(json, Text);
+        $call!(jsonb, Binary);
+        $call!(jsonb, Text);
     };
 
     (text_mode, $call:path) => {
@@ -485,6 +489,7 @@ macro_rules! __test_matrix {
         $call!(wire, Text);
         $call!(descriptive, Text);
         $call!(json, Text);
+        $call!(jsonb, Text);
     };
 
     (storage, $call:path) => {
@@ -501,6 +506,7 @@ macro_rules! __test_matrix {
         $call!(wire, Binary);
         $call!(descriptive, Binary);
         $call!(json, Binary);
+        $call!(jsonb, Binary);
     };
 
     (no_json, $call:path) => {
@@ -508,11 +514,13 @@ macro_rules! __test_matrix {
         $call!(packed, Binary);
         $call!(wire, Binary);
         $call!(descriptive, Binary);
+        $call!(jsonb, Binary);
     };
 
     (descriptive, $call:path) => {
         $call!(descriptive, Binary);
         $call!(json, Text);
+        $call!(jsonb, Binary);
     };
 
     (json, $call:path) => {
@@ -527,6 +535,8 @@ macro_rules! __test_matrix {
         $call!(wire, Binary);
         $call!(descriptive, Binary);
         $call!(json, Text);
+        $call!(jsonb, Binary);
+        $call!(jsonb, Text);
     };
 }
 

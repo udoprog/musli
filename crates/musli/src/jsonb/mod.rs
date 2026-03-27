@@ -1,19 +1,22 @@
-//! Efficient binary storage encoding for Müsli.
+//! A JSONB format for [Müsli].
 //!
-//! The storage encoding is partially upgrade safe:
+//! JSONB encoding is fully upgrade stable:
 //!
 //! * ✔ Can tolerate missing fields if they are annotated with
 //!   `#[musli(default)]`.
-//! * ✗ Cannot skip over extra unrecognized fields.
+//! * ✔ Can skip over unknown fields.
+//! * ✔ Can be fully converted back and forth between dynamic containers such as
+//!   the [`Value`] type.
+//! * ✔ Can handle coercion from different types of primitive types, such as
+//!   signed to unsigned integers. So primitive field types can be assuming they
+//!   only inhabit compatible values.
 //!
-//! This means that it's suitable as a storage format, since the data model only
-//! evolves in one place. But unsuitable as a wire format since it cannot allow
-//! clients to upgrade independent of each other.
+//! [Müsli]: https://docs.rs/musli
+//! [`Value`]: crate::value
 //!
-//! See [`wire`] or [`descriptive`] for formats which are upgrade stable.
-//!
-//! [`descriptive`]: crate::descriptive
-//! [`wire`]: crate::wire
+//! This means that it's suitable as a wire and general interchange format. It's
+//! also suitable for dynamically translating to and from different wire formats
+//! such as JSON without having access to the data model.
 //!
 //! ```
 //! use musli::{Encode, Decode};
@@ -30,41 +33,31 @@
 //!     age: Option<u32>,
 //! }
 //!
-//! let version2 = musli::storage::to_vec(&Version2 {
+//! let version2 = musli::jsonb::to_vec(&Version2 {
 //!     name: String::from("Aristotle"),
 //!     age: Some(61),
 //! })?;
 //!
-//! assert!(musli::storage::decode::<_, Version1>(version2.as_slice()).is_err());
+//! let version1: Version1 = musli::jsonb::decode(version2.as_slice())?;
 //!
-//! let version1 = musli::storage::to_vec(&Version1 {
+//! assert_eq!(version1, Version1 {
 //!     name: String::from("Aristotle"),
-//! })?;
-//!
-//! let version2: Version2 = musli::storage::decode(version1.as_slice())?;
-//!
-//! assert_eq!(version2, Version2 {
-//!     name: String::from("Aristotle"),
-//!     age: None,
 //! });
-//! # Ok::<_, musli::storage::Error>(())
+//! # Ok::<_, musli::jsonb::Error>(())
 //! ```
 //!
 //! <br>
 //!
 //! ## Configuring
 //!
-//! To tweak the behavior of the storage format you can use the [`Encoding`]
+//! To configure the behavior of the wire format you can use the [`Encoding`]
 //! type:
 //!
 //! ```
 //! use musli::{Encode, Decode};
-//! use musli::mode::Binary;
-//! use musli::options::{self, Options, Integer};
-//! use musli::storage::Encoding;
+//! use musli::jsonb::Encoding;
 //!
-//! const OPTIONS: Options = options::new().integer(Integer::Fixed).build();
-//! const CONFIG: Encoding<OPTIONS> = Encoding::new().with_options();
+//! const CONFIG: Encoding = Encoding::new();
 //!
 //! #[derive(Debug, PartialEq, Encode, Decode)]
 //! struct Person<'a> {
@@ -83,30 +76,32 @@
 //! let actual = CONFIG.decode(&out[..])?;
 //!
 //! assert_eq!(expected, actual);
-//! # Ok::<_, musli::storage::Error>(())
+//! # Ok::<_, musli::jsonb::Error>(())
 //! ```
+//!
+//! <br>
+//!
+//! ## Implementation details
+//!
+//! Each field is prefix *typed* with a single byte tag that describes exactly
+//! the type which is contained in the field.
 
-#![cfg(any(
-    feature = "storage",
-    feature = "wire",
-    feature = "descriptive",
-    feature = "jsonb",
-    feature = "value"
-))]
-#![cfg_attr(doc_cfg, doc(cfg(feature = "storage")))]
+#![cfg(feature = "jsonb")]
+#![cfg_attr(doc_cfg, doc(cfg(feature = "jsonb")))]
 
-pub(crate) mod de;
-pub(crate) mod en;
+mod de;
+mod en;
 mod encoding;
 mod error;
-mod macros;
+mod integer_encoding;
+mod tag;
 
 #[cfg(feature = "test")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "test")))]
 #[doc(hidden)]
 pub mod test;
 
-/// Convenient result alias for use with `musli::storage`.
+/// Convenient result alias for use with `musli::jsonb`.
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 pub type Result<T, E = Error> = core::result::Result<T, E>;
