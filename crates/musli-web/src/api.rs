@@ -13,7 +13,7 @@ pub use musli_web_macros::define;
 /// A trait for constructing identifiers.
 pub trait Id
 where
-    Self: 'static + Sized + fmt::Debug,
+    Self: 'static + Send + Sized + fmt::Debug,
 {
     /// Get the raw message identifier for this type.
     fn id(&self) -> MessageId;

@@ -29,22 +29,23 @@ enum Broadcast {
     Tick { tick: u32 },
 }
 
+#[derive(Clone)]
 struct MyHandler;
 
 impl ws::Handler for MyHandler {
     type Id = api::Request;
     type Response = bool;
 
-    async fn open_channel(&mut self, channel: ChannelId) {
+    async fn open_channel(&self, channel: ChannelId) {
         tracing::info!(?channel, "Open");
     }
 
-    async fn close_channel(&mut self, channel: ChannelId) {
+    async fn close_channel(&self, channel: ChannelId) {
         tracing::info!(?channel, "Close");
     }
 
     async fn handle(
-        &mut self,
+        &self,
         id: api::Request,
         incoming: &mut ws::Incoming<'_>,
         outgoing: &mut ws::Outgoing<'_>,

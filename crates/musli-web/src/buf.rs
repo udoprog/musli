@@ -1,4 +1,5 @@
 use core::cell::Cell;
+use core::cell::RefCell;
 use core::fmt;
 use core::mem;
 use core::mem::ManuallyDrop;
@@ -123,8 +124,8 @@ impl Buf {
         Ok(())
     }
 
-    /// Check if the buffer is empty.
     #[inline]
+    #[cfg(test)]
     pub(crate) fn is_empty(&self) -> bool {
         // NB: Read should never exceed the length of the buffer.
         debug_assert!(self.read.get() <= self.buffer.len());
@@ -229,6 +230,41 @@ impl Buf {
 
         self.read.set(next);
         Ok(Some(out))
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct BufPool {
+    pool: RefCell<Vec<Buf>>,
+}
+
+impl BufPool {
+    /// Try to run the given closure with a pool from the buffer.
+    ///
+    /// If the closure errors, the pool is returned.
+    #[inline]
+    pub(crate) fn with<E>(&self, f: impl FnOnce(&mut Buf) -> Result<(), E>) -> Result<Buf, E> {
+        let mut buf = self.get();
+        let result = f(&mut buf);
+
+        match result {
+            Ok(()) => Ok(buf),
+            Err(err) => {
+                self.put(buf);
+                Err(err)
+            }
+        }
+    }
+
+    #[inline]
+    pub(crate) fn get(&self) -> Buf {
+        self.pool.borrow_mut().pop().unwrap_or_default()
+    }
+
+    #[inline]
+    pub(crate) fn put(&self, mut buf: Buf) {
+        buf.clear();
+        self.pool.borrow_mut().push(buf);
     }
 }
 

@@ -111,13 +111,14 @@ use musli::storage;
 use musli::{Decode, Encode};
 use rand::prelude::*;
 use rand::rngs::SmallRng;
+use tokio::task::JoinSet;
 use tokio::time::{Duration, Instant, Sleep};
 
 use crate::Buf;
 use crate::api::{
     Broadcast, ChannelId, ErrorMessage, Event, Id, MessageId, RequestHeader, ResponseHeader,
 };
-use crate::buf::InvalidFrame;
+use crate::buf::{BufPool, InvalidFrame};
 
 const MAX_CAPACITY: usize = 1048576;
 const CLOSE_NORMAL: u16 = 1000;
@@ -238,6 +239,10 @@ enum ErrorKind {
     ErrorMessage {
         error: storage::Error,
     },
+    OutOfBounds {
+        offset: usize,
+        len: usize,
+    },
 }
 
 /// The error produced by the server side of the websocket protocol
@@ -310,6 +315,13 @@ impl fmt::Display for Error {
             ErrorKind::ErrorMessage { .. } => {
                 write!(f, "Encoding error when encoding error message")
             }
+            ErrorKind::OutOfBounds { offset, len } => {
+                write!(
+                    f,
+                    "Error when reading message: offset {} is out of bounds for length {}",
+                    offset, len
+                )
+            }
         }
     }
 }
@@ -362,7 +374,10 @@ pub struct Response {
 }
 
 /// Trait governing how something can be converted into a response.
-pub trait IntoResponse {
+pub trait IntoResponse
+where
+    Self: 'static + Send,
+{
     /// The error variant being produced.
     type Error;
 
@@ -405,7 +420,7 @@ impl IntoResponse for bool {
 impl<T, E> IntoResponse for Result<T, E>
 where
     T: IntoResponse<Error = Infallible>,
-    E: fmt::Display,
+    E: 'static + Send + fmt::Display,
 {
     type Error = E;
 
@@ -446,7 +461,10 @@ where
 /// See [`server()`] for how to use with `axum`.
 ///
 /// [`server()`]: crate::axum08::server
-pub trait Handler {
+pub trait Handler
+where
+    Self: 'static + Send + Clone,
+{
     /// The type of message id used.
     type Id: Id;
     /// The response type returned by the handler.
@@ -463,7 +481,7 @@ pub trait Handler {
     ///
     /// [`Handle::channel`]: crate::web::Handle::channel
     fn open_channel<'this>(
-        &'this mut self,
+        &'this self,
         channel: ChannelId,
     ) -> impl Future<Output = ()> + Send + 'this {
         async {
@@ -479,7 +497,7 @@ pub trait Handler {
     ///
     /// [`Handle::channel`]: crate::web::Handle::channel
     fn close_channel<'this>(
-        &'this mut self,
+        &'this self,
         channel: ChannelId,
     ) -> impl Future<Output = ()> + Send + 'this {
         async {
@@ -489,7 +507,7 @@ pub trait Handler {
 
     /// Handle a request.
     fn handle<'this>(
-        &'this mut self,
+        &'this self,
         id: Self::Id,
         incoming: &'this mut Incoming<'_>,
         outgoing: &'this mut Outgoing<'_>,
@@ -516,6 +534,8 @@ impl<S> Pinned<S> {
     }
 }
 
+type HandlerOutput<H> = (Result<<H as Handler>::Response, Error>, RequestHeader, Buf);
+
 /// The server side handle of the websocket protocol.
 ///
 /// See [`server()`] for how to use with `axum`.
@@ -524,12 +544,14 @@ impl<S> Pinned<S> {
 pub struct Server<S, H>
 where
     S: ServerImpl,
+    H: Handler,
 {
+    handler: H,
     started: bool,
     closing: bool,
-    outbound: Buf,
+    pool: BufPool,
+    outbound: VecDeque<Buf>,
     error: String,
-    handler: H,
     last_ping: Option<[u8; 4]>,
     rng: SmallRng,
     max_capacity: usize,
@@ -538,11 +560,13 @@ where
     socket_flush: bool,
     pinned: Pin<Box<Pinned<S::Socket>>>,
     channels: Channels,
+    set: JoinSet<HandlerOutput<H>>,
 }
 
 impl<S, H> Server<S, H>
 where
     S: ServerImpl,
+    H: Handler,
 {
     /// Construct a new server with the specified handler.
     #[inline]
@@ -550,11 +574,12 @@ where
         let now = Instant::now();
 
         Self {
+            handler,
             started: false,
             closing: false,
-            outbound: Buf::default(),
+            pool: BufPool::default(),
+            outbound: VecDeque::new(),
             error: String::new(),
-            handler,
             last_ping: None,
             rng: SmallRng::seed_from_u64(DEFAULT_SEED),
             max_capacity: MAX_CAPACITY,
@@ -567,17 +592,14 @@ where
                 ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
             }),
             channels: Channels::default(),
+            set: JoinSet::new(),
         }
     }
 
-    /// Access a reference to the handler.
+    /// Get a reference to the handler.
+    #[inline]
     pub fn handler(&self) -> &H {
         &self.handler
-    }
-
-    /// Access a mutable reference to the handler.
-    pub fn handler_mut(&mut self) -> &mut H {
-        &mut self.handler
     }
 
     /// Modify the maximum capacity of the buffer used for outgoing messages.
@@ -609,6 +631,7 @@ where
 impl<S, H> Server<S, H>
 where
     S: ServerImpl,
+    H: Handler,
 {
     /// Associated the specified seed with the server.
     ///
@@ -645,16 +668,15 @@ where
             self.handle_send()?;
 
             let result = {
-                let inner = Select {
+                let inner = Select::<S::Socket, H> {
                     pinned: self.pinned.as_mut(),
                     wants_socket_send: !self.socket_send,
                     wants_socket_flush: self.socket_flush,
+                    set: &mut self.set,
                 };
 
                 inner.await
             };
-
-            tracing::trace!(?result);
 
             match result {
                 Output::Close => {
@@ -707,6 +729,42 @@ where
 
                     self.socket_flush = false;
                 }
+                Output::Handle(result, header, buf) => {
+                    let err = 'err: {
+                        let res = match result {
+                            Ok(res) => res,
+                            Err(error) => {
+                                self.format_error(error)?;
+                                break 'err true;
+                            }
+                        };
+
+                        let res = match res.into_response() {
+                            Ok(res) => res,
+                            Err(error) => {
+                                self.format_error_message(format_args!(
+                                    "Error in handler: {error:#}"
+                                ))?;
+                                break 'err true;
+                            }
+                        };
+
+                        if !res.handled {
+                            self.format_error_message(format_args!(
+                                "No support for request {}",
+                                header.id
+                            ))?;
+                            break 'err true;
+                        }
+
+                        self.outbound.push_back(buf);
+                        false
+                    };
+
+                    if err {
+                        self.send_error(&header)?;
+                    }
+                }
             }
         }
 
@@ -734,19 +792,24 @@ where
     {
         tracing::debug!(id = ?<T::Broadcast as Broadcast>::ID, "Broadcast");
 
-        let mut writer = self.outbound.writer();
+        let buf = self.pool.with(|buf| {
+            let mut writer = buf.writer();
 
-        writer
-            .write(ResponseHeader {
-                serial: 0,
-                broadcast: <T::Broadcast as Broadcast>::ID.get(),
-                error: 0,
-                channel,
-            })
-            .map_err(Error::encode_broadcast_header)?;
+            writer
+                .write(ResponseHeader {
+                    serial: 0,
+                    broadcast: <T::Broadcast as Broadcast>::ID.get(),
+                    error: 0,
+                    channel,
+                })
+                .map_err(Error::encode_broadcast_header)?;
 
-        writer.write(message).map_err(Error::encode_broadcast)?;
-        writer.flush();
+            writer.write(message).map_err(Error::encode_broadcast)?;
+            writer.flush();
+            Ok::<_, Error>(())
+        })?;
+
+        self.outbound.push_back(buf);
         Ok(())
     }
 
@@ -757,18 +820,30 @@ where
     fn hello(&mut self) -> Result<(), Error> {
         tracing::debug!("Hello");
 
-        let mut writer = self.outbound.writer();
+        let mut buf = self.pool.get();
 
-        writer
-            .write(ResponseHeader {
-                serial: 0,
-                broadcast: MessageId::SERVER_HELLO.get(),
-                error: 0,
-                channel: ChannelId::NONE,
-            })
-            .map_err(Error::encode_broadcast_header)?;
+        let result = (|| {
+            let mut writer = buf.writer();
 
-        writer.flush();
+            writer
+                .write(ResponseHeader {
+                    serial: 0,
+                    broadcast: MessageId::SERVER_HELLO.get(),
+                    error: 0,
+                    channel: ChannelId::NONE,
+                })
+                .map_err(Error::encode_broadcast_header)?;
+
+            writer.flush();
+            Ok::<_, Error>(())
+        })();
+
+        if result.is_err() {
+            self.pool.put(buf);
+        } else {
+            self.outbound.push_back(buf);
+        }
+
         Ok(())
     }
 
@@ -826,62 +901,57 @@ where
 
                     self.handler.open_channel(channel).await;
 
-                    let mut writer = self.outbound.writer();
+                    let mut buf = self.pool.get();
 
-                    let result = writer.write(ResponseHeader {
-                        serial: header.serial,
-                        broadcast: 0,
-                        error: 0,
-                        channel,
-                    });
+                    let result = (|| {
+                        let mut writer = buf.writer();
 
-                    result.map_err(Error::encode_connect_header)?;
-                    writer.flush();
+                        let result = writer.write(ResponseHeader {
+                            serial: header.serial,
+                            broadcast: 0,
+                            error: 0,
+                            channel,
+                        });
+
+                        result.map_err(Error::encode_connect_header)?;
+                        writer.flush();
+                        Ok::<_, Error>(())
+                    })();
+
+                    if result.is_err() {
+                        self.pool.put(buf);
+                    } else {
+                        self.outbound.push_back(buf);
+                    }
+
+                    result?;
                     break 'err false;
                 }
                 MessageId::DISCONNECT => {
                     self.channels.free(header.channel);
                     self.handler.close_channel(header.channel).await;
-                    break 'err true;
+                    break 'err false;
                 }
                 _ => {
                     let id = <H::Id as Id>::from_id(id);
-
-                    let res = match self
-                        .handle_request(reader, header.serial, id, header.channel)
-                        .await
-                    {
-                        Ok(res) => res,
-                        Err(error) => {
-                            self.format_error(error)?;
-                            break 'err true;
-                        }
-                    };
-
-                    let res = match res.into_response() {
-                        Ok(res) => res,
-                        Err(error) => {
-                            self.format_error_message(format_args!("Error in handler: {error:#}"))?;
-                            break 'err true;
-                        }
-                    };
-
-                    if !res.handled {
-                        self.format_error_message(format_args!(
-                            "No support for request {}",
-                            header.id
-                        ))?;
-                        break 'err true;
-                    }
-
-                    false
+                    let offset = bytes.len() - reader.remaining();
+                    self.handle_request(bytes, offset, header, id);
+                    return Ok(());
                 }
             }
         };
 
         if err {
+            self.send_error(&header)?;
+        }
+
+        Ok(())
+    }
+
+    fn send_error(&mut self, header: &RequestHeader) -> Result<(), Error> {
+        let buf = self.pool.with(|buf| {
             // Reset the buffer to the previous start point.
-            let mut writer = self.outbound.writer();
+            let mut writer = buf.writer();
 
             let result = writer.write(ResponseHeader {
                 serial: header.serial,
@@ -898,8 +968,10 @@ where
 
             result.map_err(Error::encode_error_message)?;
             writer.flush();
-        }
+            Ok::<_, Error>(())
+        })?;
 
+        self.outbound.push_back(buf);
         Ok(())
     }
 
@@ -958,60 +1030,74 @@ where
             self.socket_send = false;
         }
 
-        if self.socket_send
-            && let Some(frame) = self.outbound.read()?
+        while self.socket_send
+            && let Some(buf) = self.outbound.front_mut()
         {
-            socket.as_mut().start_send(S::binary(frame))?;
+            let Some(frame) = buf.read()? else {
+                if let Some(buf) = self.outbound.pop_front() {
+                    self.pool.put(buf);
+                }
 
-            if self.outbound.is_empty() {
-                self.outbound.clear();
-            }
+                continue;
+            };
+
+            socket.as_mut().start_send(S::binary(frame))?;
 
             self.socket_flush = true;
             self.socket_send = false;
+            break;
         }
 
         Ok(())
     }
 
-    async fn handle_request(
-        &mut self,
-        reader: SliceReader<'_>,
-        serial: u32,
-        id: H::Id,
-        channel: ChannelId,
-    ) -> Result<H::Response, Error> {
-        tracing::debug!(serial, ?id, "Got request");
+    fn handle_request(&mut self, bytes: Bytes, offset: usize, header: RequestHeader, id: H::Id) {
+        tracing::debug!(header.serial, ?id, "Got request");
 
-        let mut incoming = Incoming {
-            error: None,
-            reader,
-            channel,
-        };
+        let mut buf = self.pool.get();
+        let handler = self.handler.clone();
 
-        let mut outgoing = Outgoing {
-            serial: Some(serial),
-            error: None,
-            buf: &mut self.outbound,
-            channel,
-        };
+        self.set.spawn(async move {
+            let Some(bytes) = bytes.get(offset..) else {
+                let kind = ErrorKind::OutOfBounds {
+                    offset,
+                    len: bytes.len(),
+                };
 
-        let response = self.handler.handle(id, &mut incoming, &mut outgoing).await;
+                return (Err(Error::new(kind)), header, buf);
+            };
 
-        if let Some(error) = incoming.error.take() {
-            return Err(Error::incoming(error));
-        }
+            let reader = SliceReader::new(bytes);
 
-        if let Some(error) = outgoing.error.take() {
-            return Err(Error::outgoing(error));
-        }
+            let mut incoming = Incoming {
+                error: None,
+                reader,
+                channel: header.channel,
+            };
 
-        Ok(response)
+            let mut outgoing = Outgoing {
+                serial: Some(header.serial),
+                error: None,
+                buf: &mut buf,
+                channel: header.channel,
+            };
+
+            let response = handler.handle(id, &mut incoming, &mut outgoing).await;
+
+            if let Some(error) = incoming.error.take() {
+                return (Err(Error::incoming(error)), header, buf);
+            }
+
+            if let Some(error) = outgoing.error.take() {
+                return (Err(Error::outgoing(error)), header, buf);
+            }
+
+            (Ok(response), header, buf)
+        });
     }
 }
 
-#[derive(Debug)]
-enum Output<E> {
+enum Output<E, R> {
     /// The connection should be closed.
     Close,
     /// A ping message was received.
@@ -1022,19 +1108,26 @@ enum Output<E> {
     Send(Result<(), E>),
     /// Outgoing messages have been successfully flushed.
     Flushed(Result<(), E>),
+    /// Handle output.
+    Handle(Result<R, Error>, RequestHeader, Buf),
 }
 
-struct Select<'a, S> {
+struct Select<'a, S, H>
+where
+    H: Handler,
+{
     pinned: Pin<&'a mut Pinned<S>>,
     wants_socket_send: bool,
     wants_socket_flush: bool,
+    set: &'a mut JoinSet<HandlerOutput<H>>,
 }
 
-impl<S> Future for Select<'_, S>
+impl<S, H> Future for Select<'_, S, H>
 where
     S: SocketImpl,
+    H: Handler,
 {
-    type Output = Output<S::Error>;
+    type Output = Output<S::Error, H::Response>;
 
     #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -1043,6 +1136,7 @@ where
         let mut socket;
         let wants_socket_send;
         let wants_socket_flush;
+        let set;
 
         // SAFETY: This type is not Unpin.
         unsafe {
@@ -1050,6 +1144,7 @@ where
             (close, ping, socket) = this.pinned.as_mut().project();
             wants_socket_send = this.wants_socket_send;
             wants_socket_flush = this.wants_socket_flush;
+            set = &mut this.set;
         };
 
         if close.poll(cx).is_ready() {
@@ -1070,6 +1165,21 @@ where
 
         if wants_socket_flush && let Poll::Ready(result) = socket.as_mut().poll_flush(cx) {
             return Poll::Ready(Output::Flushed(result));
+        }
+
+        if let Poll::Ready(output) = set.poll_join_next(cx)
+            && let Some(output) = output
+        {
+            let output = match output {
+                Ok(output) => output,
+                Err(error) => {
+                    tracing::debug!(?error, "Join error in handler task");
+                    return Poll::Ready(Output::Close);
+                }
+            };
+
+            let (result, header, buf) = output;
+            return Poll::Ready(Output::Handle(result, header, buf));
         }
 
         Poll::Pending

@@ -231,9 +231,11 @@ impl Component for App {
                     <button onclick={close_channel2}>{"Close channel 2"}</button>
                 </div>
 
-                {for self.responses.iter().enumerate().map(|(index, response)| html!(<div key={format!("response-{index}")}>{format!("Response #{index}: {response}")}</div>))}
-                <div key="tick">{format!("Global tick: {}", self.tick)}</div>
-                {for self.messages.iter().map(|(count, message)| html!(<div key={format!("message-{count}")}>{format!("Message #{count}: {message}")}</div>))}
+                <div>
+                    {for self.responses.iter().enumerate().map(|(index, response)| html!(<div key={format!("response-{index}")}>{format!("Response #{index}: {response}")}</div>))}
+                    <div key="tick">{format!("Global tick: {}", self.tick)}</div>
+                    {for self.messages.iter().map(|(count, message)| html!(<div key={format!("message-{count}")}>{format!("Message #{count}: {message}")}</div>))}
+                </div>
             </div>
         }
     }
