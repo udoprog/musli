@@ -55,6 +55,7 @@
 //!     Tick { tick: u32 },
 //! }
 //!
+//! #[derive(Clone)]
 //! struct MyHandler;
 //!
 //! impl ws::Handler for MyHandler {
@@ -62,7 +63,7 @@
 //!     type Response = Option<()>;
 //!
 //!     async fn handle(
-//!         &mut self,
+//!         &self,
 //!         id: Self::Id,
 //!         incoming: &mut ws::Incoming<'_>,
 //!         outgoing: &mut ws::Outgoing<'_>,

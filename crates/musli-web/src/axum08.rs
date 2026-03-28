@@ -79,6 +79,7 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///     Tick { tick: u32 },
 /// }
 ///
+/// #[derive(Clone)]
 /// struct MyHandler;
 ///
 /// impl ws::Handler for MyHandler {
@@ -86,7 +87,7 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///     type Response = Option<()>;
 ///
 ///     async fn handle(
-///         &mut self,
+///         &self,
 ///         id: Self::Id,
 ///         incoming: &mut ws::Incoming<'_>,
 ///         outgoing: &mut ws::Outgoing<'_>,
