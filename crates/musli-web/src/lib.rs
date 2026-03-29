@@ -88,6 +88,10 @@ pub use self::json::Json;
 #[cfg(feature = "api")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]
 pub mod api;
+#[doc(inline)]
+#[cfg(feature = "api")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]
+pub use self::api::ChannelId;
 
 #[cfg(feature = "axum08")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "axum08")))]

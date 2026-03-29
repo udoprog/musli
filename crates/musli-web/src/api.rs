@@ -25,9 +25,8 @@ where
     fn __do_not_implement_id();
 }
 
-/// A unique identifier for a channel over the websocket.
+/// A unique and opaque identifier for a channel over the websocket.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Encode, Decode)]
-#[repr(transparent)]
 #[musli(transparent)]
 pub struct ChannelId {
     repr: u16,
@@ -35,11 +34,29 @@ pub struct ChannelId {
 
 impl ChannelId {
     /// The channel id used for an invalid channel.
-    pub const NONE: Self = Self::new(0);
+    pub const NONE: Self = Self::from_u16(0);
 
-    /// Construct a new channel id.
+    /// Construct a new channel id from a raw `u16` representation.
+    ///
+    /// Note that this does not guarantee that the internal representation of a
+    /// channel identifier is exactly a `u16`, only that at least `u16` unique
+    /// identifiers can be constructed.
+    ///
+    /// Using `0` is equivalent to [`ChannelId::NONE`]. When implementing a
+    /// custom [`ChannelAllocator`] the allocator must avoid constructor
+    /// identifiers with this value since it is equivalent to no channel.
+    ///
+    /// [`ChannelAllocator`]: crate::ws::ChannelAllocator
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::ChannelId;
+    /// let id = ChannelId::from_u16(0);
+    /// assert_eq!(id, ChannelId::NONE);
+    /// ```
     #[inline]
-    pub(crate) const fn new(repr: u16) -> Self {
+    pub const fn from_u16(repr: u16) -> Self {
         Self { repr }
     }
 

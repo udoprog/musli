@@ -102,6 +102,7 @@ use core::task::{Context, Poll};
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use bytes::Bytes;
@@ -112,6 +113,7 @@ use musli::storage;
 use musli::{Decode, Encode};
 use rand::prelude::*;
 use rand::rngs::SmallRng;
+use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 use tokio::time::{Duration, Instant, Sleep};
 
@@ -537,17 +539,39 @@ impl<S> Pinned<S> {
 
 type HandlerOutput<H> = (Result<<H as Handler>::Response, Error>, RequestHeader, Buf);
 
+/// Trait which governs how channel identifiers are allocated with a [`Server`].
+///
+/// By default channel identifiers are scoped to the server which is set up
+/// per-connection. If you want distinct and unique channel identifiers across
+/// multiple websocket connections a custom [`ChannelAllocator`] can be
+/// constructed.
+pub trait ChannelAllocator {
+    /// Allocate the next channel id.
+    ///
+    /// Using `0` is equivalent to [`ChannelId::NONE`] so the allocator must
+    /// avoid constructor identifiers with this value since it is equivalent to
+    /// no channel.
+    ///
+    /// [`ChannelAllocator`]: crate::ws::ChannelAllocator
+    fn next(&self) -> impl Future<Output = Option<ChannelId>> + Send + '_;
+
+    /// Free the given channel id.
+    fn free(&self, channel: ChannelId) -> impl Future<Output = ()> + Send + '_;
+}
+
 /// The server side handle of the websocket protocol.
 ///
 /// See [`server()`] for how to use with `axum`.
 ///
 /// [`server()`]: crate::axum08::server
-pub struct Server<S, H>
+pub struct Server<S, H, C = Channels>
 where
     S: ServerImpl,
     H: Handler,
 {
     handler: H,
+    pinned: Pin<Box<Pinned<S::Socket>>>,
+    channels: C,
     started: bool,
     closing: bool,
     pool: BufPool,
@@ -559,12 +583,10 @@ where
     out: VecDeque<S::Message>,
     socket_send: bool,
     socket_flush: bool,
-    pinned: Pin<Box<Pinned<S::Socket>>>,
-    channels: Channels,
     set: JoinSet<HandlerOutput<H>>,
 }
 
-impl<S, H> Server<S, H>
+impl<S, H> Server<S, H, Channels>
 where
     S: ServerImpl,
     H: Handler,
@@ -576,6 +598,13 @@ where
 
         Self {
             handler,
+            socket_flush: false,
+            pinned: Box::pin(Pinned {
+                socket,
+                close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
+                ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
+            }),
+            channels: Channels::default(),
             started: false,
             closing: false,
             pool: BufPool::default(),
@@ -586,14 +615,49 @@ where
             max_capacity: MAX_CAPACITY,
             out: VecDeque::new(),
             socket_send: false,
-            socket_flush: false,
-            pinned: Box::pin(Pinned {
-                socket,
-                close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
-                ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
-            }),
-            channels: Channels::default(),
             set: JoinSet::new(),
+        }
+    }
+}
+
+impl<S, H, C> Server<S, H, C>
+where
+    S: ServerImpl,
+    H: Handler,
+{
+    /// Associated the specified seed with the server.
+    ///
+    /// This affects the random number generation used for ping messages.
+    ///
+    /// By default the seed is a constant value.
+    #[inline]
+    pub fn seed(mut self, seed: u64) -> Self {
+        self.rng = SmallRng::seed_from_u64(seed);
+        self
+    }
+
+    /// Associate the specified channel allocator with the server.
+    #[inline]
+    pub fn with_channel_allocator<U>(self, channels: U) -> Server<S, H, U>
+    where
+        U: ChannelAllocator,
+    {
+        Server {
+            handler: self.handler,
+            pinned: self.pinned,
+            channels,
+            started: self.started,
+            closing: self.closing,
+            pool: self.pool,
+            outbound: self.outbound,
+            error: self.error,
+            last_ping: self.last_ping,
+            rng: self.rng,
+            max_capacity: self.max_capacity,
+            out: self.out,
+            socket_send: self.socket_send,
+            socket_flush: self.socket_flush,
+            set: self.set,
         }
     }
 
@@ -629,28 +693,12 @@ where
     }
 }
 
-impl<S, H> Server<S, H>
-where
-    S: ServerImpl,
-    H: Handler,
-{
-    /// Associated the specified seed with the server.
-    ///
-    /// This affects the random number generation used for ping messages.
-    ///
-    /// By default the seed is a constant value.
-    #[inline]
-    pub fn seed(mut self, seed: u64) -> Self {
-        self.rng = SmallRng::seed_from_u64(seed);
-        self
-    }
-}
-
-impl<S, H> Server<S, H>
+impl<S, H, C> Server<S, H, C>
 where
     S: ServerImpl,
     Error: From<S::Error>,
     H: Handler<Response: IntoResponse<Error: fmt::Display>>,
+    C: ChannelAllocator,
 {
     /// Run the server.
     ///
@@ -893,10 +941,11 @@ where
 
             match id {
                 MessageId::CONNECT => {
-                    let Some(channel) = self.channels.next() else {
+                    let Some(channel) = self.channels.next().await else {
                         self.format_error_message(format_args!(
                             "Failed to allocate connection ID"
                         ))?;
+
                         break 'err true;
                     };
 
@@ -929,7 +978,7 @@ where
                     break 'err false;
                 }
                 MessageId::DISCONNECT => {
-                    self.channels.free(header.channel);
+                    self.channels.free(header.channel).await;
                     self.handler.close_channel(header.channel).await;
                     break 'err false;
                 }
@@ -1293,6 +1342,7 @@ fn scramble_channel(x: u16) -> u16 {
 
 /// Inverse of [`scramble_channel`].
 #[inline]
+#[cfg(test)]
 fn unscramble_channel(x: u16) -> u16 {
     let x = x ^ (x >> 8);
     x.wrapping_mul(0x964d)
@@ -1311,31 +1361,43 @@ fn test_scramble() {
 }
 
 #[derive(Default)]
-struct Channels {
+struct ChannelsInner {
     last: u16,
     free: VecDeque<NonZeroU16>,
 }
 
-impl Channels {
-    fn next(&mut self) -> Option<ChannelId> {
-        if let Some(id) = self.free.pop_front() {
-            return Some(ChannelId::new(scramble_channel(id.get())));
+/// A global channel allocator which can be cloned and re-used across multiple
+/// servers allowing channels across servers to have distinct channel
+/// identifiers.
+#[derive(Default, Clone)]
+pub struct Channels {
+    inner: Arc<Mutex<ChannelsInner>>,
+}
+
+impl ChannelAllocator for Channels {
+    #[inline]
+    async fn next(&self) -> Option<ChannelId> {
+        let mut inner = self.inner.lock().await;
+
+        if let Some(id) = inner.free.pop_front() {
+            return Some(ChannelId::from_u16(id.get()));
         }
 
-        let id = NonZeroU16::new(self.last.wrapping_add(1))?;
-        self.last = id.get();
+        let id = NonZeroU16::new(inner.last.wrapping_add(1))?;
+        inner.last = id.get();
 
         tracing::debug!(?id, "Allocated channel id");
-        Some(ChannelId::new(scramble_channel(id.get())))
+        Some(ChannelId::from_u16(scramble_channel(id.get())))
     }
 
-    fn free(&mut self, id: ChannelId) -> bool {
+    #[inline]
+    async fn free(&self, id: ChannelId) {
         tracing::debug!(?id, "Freeing channel id");
 
-        if let Some(id) = NonZeroU16::new(unscramble_channel(id.raw())) {
-            self.free.push_back(id);
-        }
+        let mut inner = self.inner.lock().await;
 
-        true
+        if let Some(id) = NonZeroU16::new(id.raw()) {
+            inner.free.push_back(id);
+        }
     }
 }
