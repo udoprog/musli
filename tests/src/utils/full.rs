@@ -320,16 +320,6 @@ pub mod derive_bitcode {
         Buffer::new()
     }
 
-    pub fn reset<T>(buf: &mut Buffer, decode_buf: &mut Buffer, value: &T)
-    where
-        for<'de> T: Encode + Decode<'de>,
-    {
-        // Encode a value of the given type to "warm up" the buffer.
-        let encoded = buf.encode(value);
-        // Decode the same value to "warm up" the decode buffer.
-        decode_buf.decode::<T>(encoded).unwrap();
-    }
-
     pub fn encode<'buf, T>(buf: &'buf mut Buffer, value: &T) -> Result<&'buf [u8], bitcode::Error>
     where
         T: Encode,
