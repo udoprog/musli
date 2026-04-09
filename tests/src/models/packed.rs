@@ -23,7 +23,7 @@ use crate::generate::Generate;
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
-#[cfg_attr(feature = "epserde", derive(epserde::Epserde), zero_copy)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde), epserde(zero_copy))]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
 pub struct Packed {
     unsigned8: u8,

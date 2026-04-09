@@ -1,6 +1,7 @@
 //! Module used to generate random structures.
 
 use core::array;
+use core::convert::Infallible;
 #[cfg(all(feature = "alloc", feature = "std"))]
 use core::ffi::CStr;
 #[cfg(feature = "std")]
@@ -23,6 +24,8 @@ use alloc::string::String;
 use alloc::sync::Arc;
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use rand::RngExt;
 
 #[cfg(all(feature = "alloc", feature = "std"))]
 use std::ffi::OsStr;
@@ -95,20 +98,22 @@ impl Rng {
     }
 }
 
-impl rand::RngCore for Rng {
+impl rand::TryRng for Rng {
+    type Error = Infallible;
+
     #[inline]
-    fn next_u32(&mut self) -> u32 {
-        self.rng.next_u32()
+    fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+        self.rng.try_next_u32()
     }
 
     #[inline]
-    fn next_u64(&mut self) -> u64 {
-        self.rng.next_u64()
+    fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+        self.rng.try_next_u64()
     }
 
     #[inline]
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.rng.fill_bytes(dest);
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Infallible> {
+        self.rng.try_fill_bytes(dest)
     }
 }
 
@@ -585,7 +590,7 @@ macro_rules! unsigned {
                 where
                     R: rand::Rng,
                 {
-                    rng.random()
+                    rand::RngExt::random(rng)
                 }
             }
         )*
@@ -604,7 +609,7 @@ macro_rules! primitive {
                 where
                     R: rand::Rng,
                 {
-                    rng.random()
+                    rand::RngExt::random(rng)
                 }
             }
         )*
@@ -664,7 +669,7 @@ impl Generate for isize {
     where
         R: rand::Rng,
     {
-        rng.random::<i64>() as isize
+        RngExt::random::<i64>(rng) as isize
     }
 }
 
@@ -709,7 +714,7 @@ macro_rules! non_zero {
                     R: rand::Rng,
                 {
                     unsafe {
-                        core::num::$non_zero::new_unchecked(rng.random_range(1..=<$ty>::MAX))
+                        core::num::$non_zero::new_unchecked(rand::RngExt::random_range(rng, 1..=<$ty>::MAX))
                     }
                 }
             }
