@@ -219,34 +219,35 @@ pub mod postcard {
         Vec::new()
     }
 
-    pub fn reset<T>(buf: &mut Vec<u8>, size_hint: usize, value: &T)
-    where
-        T: Serialize,
-    {
+    pub fn reset(buf: &mut Vec<u8>, size_hint: usize) {
         if buf.len() < size_hint {
             buf.resize(size_hint, 0);
         }
-
-        // Figure out the size of the buffer to use. Don't worry, anything we do
-        // in `reset` doesn't count towards benchmarking.
-        while let Err(error) = postcard::to_slice(value, buf) {
-            match error {
-                postcard::Error::SerializeBufferFull => {
-                    let new_size = (buf.len() as f32 * 1.5f32) as usize;
-                    buf.resize(new_size, 0);
-                }
-                error => {
-                    panic!("{}", error)
-                }
-            }
-        }
     }
 
-    pub fn encode<'buf, T>(buf: &'buf mut [u8], value: &T) -> Result<&'buf [u8], postcard::Error>
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], postcard::Error>
     where
         T: Serialize,
     {
-        Ok(postcard::to_slice(value, buf)?)
+        // Since there is no way to figure out if the buffer is large enough we
+        // have to do it during encoding. This is a runtime cost associated with
+        // using postcard if you don't know beforehand how large your serialized
+        // state is going to be. Note that we never shrink the buffer to avoid
+        // amortizing that cost, but that is likely something a real world
+        // application would do as well if it grows too large for a given
+        // message.
+        let len = loop {
+            match postcard::to_slice(value, &mut buf[..]) {
+                Ok(buf) => break buf.len(),
+                Err(postcard::Error::SerializeBufferFull) => {}
+                Err(err) => return Err(err),
+            }
+
+            let new_size = (buf.len() as f32 * 1.5f32) as usize;
+            buf.resize(new_size, 0);
+        };
+
+        Ok(&buf[..len])
     }
 
     pub fn decode<'buf, T>(buf: &'buf [u8]) -> Result<T, postcard::Error>
