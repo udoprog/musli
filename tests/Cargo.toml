@@ -20,8 +20,8 @@ harness = false
 
 [features]
 default = ["std", "alloc"]
-std = ["musli?/std", "serde?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std", "epserde?/std", "bincode?/std", "epserde?/std"]
-alloc = ["serde?/alloc", "musli?/alloc", "musli-zerocopy?/alloc", "bincode?/alloc", "rkyv?/alloc"]
+std = ["musli?/std", "serde?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std", "epserde?/std", "bincode?/std", "wincode?/std", "epserde?/std"]
+alloc = ["serde?/alloc", "musli?/alloc", "musli-zerocopy?/alloc", "bincode?/alloc", "wincode?/alloc", "rkyv?/alloc"]
 verbose = ["musli?/verbose"]
 simdutf8 = ["musli?/simdutf8"]
 parse-full = ["musli?/parse-full"]
@@ -336,10 +336,11 @@ tests-macros = { path = "../tests-macros" }
 
 anyhow = "1.0.81"
 serde = { version = "1.0.197", default-features = false, optional = true, features = ["derive", "rc"] }
-rand = { version = "0.9.0", default-features = false, features = ["alloc", "std_rng"] }
+rand = { version = "0.10.0", default-features = false, features = ["alloc", "std_rng"] }
 rmp-serde = { version = "1.1.2", optional = true }
 bincode1 = { package = "bincode", version = "1.0.0", default-features = false, optional = true, features = [] }
 bincode = { version = "2.0.1", default-features = false, optional = true, features = ["serde"] }
+wincode = { version = "0.5.1", default-features = false, optional = true }
 serde_json = { version = "1.0.114", default-features = false, features = ["float_roundtrip"], optional = true }
 serde_cbor = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
 dlhn = { version = "0.1.6", default-features = false, optional = true }
@@ -350,7 +351,7 @@ bson = { version = "3.1.0", default-features = false, optional = true, features 
 zerocopy = { version = "0.8.13", default-features = false, optional = true, features = ["derive"] }
 miniserde = { version = "0.1.38", default-features = false, optional = true }
 speedy = { version = "0.8.7", optional = true }
-epserde = { version = "0.11.0", default-features = false, optional = true, features = ["derive"] }
+epserde = { version = "0.12.6", default-features = false, optional = true, features = ["derive"] }
 simd-json = { version = "0.17.0", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
 
 [dev-dependencies]

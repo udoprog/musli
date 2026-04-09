@@ -29,7 +29,7 @@ alloc = []
 
 [dependencies]
 musli-zerocopy-macros = { version = "=0.1.0", path = "../musli-zerocopy-macros" }
-rand = { version = "0.9.0", default-features = false, features = ["small_rng"] }
+rand = { version = "0.10.0", default-features = false }
 
 # Note that musli-macros is tightly coupled with the version of musli-core used.
 # Never add this as a dependency directly. This section cannot be enabled and

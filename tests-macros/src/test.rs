@@ -86,7 +86,7 @@ pub(super) fn expand(cx: &mut Ctxt, mut input: syn::DeriveInput) -> Result<Token
                 let mut total = #count;
                 #(#totals;)*
 
-                match #rng.gen_range(0..total) {
+                match rand::RngExt::random_range(#rng, 0..total) {
                     #(#variants,)*
                     _ => unreachable!(),
                 }

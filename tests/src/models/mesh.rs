@@ -51,7 +51,12 @@ crate::local_deref_sized! {
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
-#[cfg_attr(feature = "epserde", derive(epserde::Epserde), repr(C), zero_copy)]
+#[cfg_attr(
+    feature = "epserde",
+    derive(epserde::Epserde),
+    repr(C),
+    epserde(zero_copy)
+)]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
 pub struct Triangle {
     pub v0: Vec3,
@@ -74,7 +79,12 @@ pub struct Triangle {
     derive(miniserde::Serialize, miniserde::Deserialize)
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
-#[cfg_attr(feature = "epserde", derive(epserde::Epserde), repr(C), zero_copy)]
+#[cfg_attr(
+    feature = "epserde",
+    derive(epserde::Epserde),
+    repr(C),
+    epserde(zero_copy)
+)]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
 pub struct Vec3 {
     pub x: f32,

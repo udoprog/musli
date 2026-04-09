@@ -42,7 +42,7 @@ musli = { path = "../musli", version = "0.0.149", default-features = false, opti
 http = { version = "1.3.1", default-features = false, optional = true }
 bytes = { version = "1.10.0", default-features = false, optional = true }
 mime = { version = "0.3.17", default-features = false, optional = true }
-rand = { version = "0.9.1", default-features = false, optional = true, features = ["small_rng"] }
+rand = { version = "0.10.0", default-features = false, optional = true }
 tracing = { version = "0.1.40", default-features = false, optional = true, features = ["attributes"] }
 tokio = { version = "1.37.0", default-features = false, optional = true }
 slab = { version = "0.4.9", default-features = false, optional = true }
