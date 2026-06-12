@@ -382,7 +382,7 @@ where
     Self: 'static + Send,
 {
     /// The error variant being produced.
-    type Error;
+    type Error: fmt::Display;
 
     /// Convert self into a response.
     fn into_response(self) -> Result<Response, Self::Error>;
@@ -697,7 +697,7 @@ impl<S, H, C> Server<S, H, C>
 where
     S: ServerImpl,
     Error: From<S::Error>,
-    H: Handler<Response: IntoResponse<Error: fmt::Display>>,
+    H: Handler,
     C: ChannelAllocator,
 {
     /// Run the server.
@@ -791,9 +791,7 @@ where
                         let res = match res.into_response() {
                             Ok(res) => res,
                             Err(error) => {
-                                self.format_error_message(format_args!(
-                                    "Error in handler: {error:#}"
-                                ))?;
+                                self.format_error_message(error)?;
                                 break 'err true;
                             }
                         };
