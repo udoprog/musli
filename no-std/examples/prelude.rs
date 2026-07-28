@@ -10,7 +10,6 @@ unsafe extern "C" {}
 unsafe extern "C" {}
 
 #[panic_handler]
-#[lang = "panic_impl"]
 fn rust_begin_panic(_: &core::panic::PanicInfo) -> ! {
     core::intrinsics::abort();
 }

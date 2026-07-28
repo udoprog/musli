@@ -947,7 +947,9 @@ where
                 #[cfg(unix)]
                 PlatformTag::Unix => {
                     use std::os::unix::ffi::OsStringExt;
-                    Ok(OsString::from_vec(variant.decode_value()?.decode()?))
+
+                    let bytes = Vec::<u8>::decode_bytes(variant.decode_value()?)?;
+                    Ok(OsString::from_vec(bytes))
                 }
                 #[cfg(not(windows))]
                 PlatformTag::Windows => Err(cx.message("Unsupported OsString::Windows variant")),
