@@ -91,7 +91,7 @@ pub mod api;
 #[doc(inline)]
 #[cfg(feature = "api")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]
-pub use self::api::ChannelId;
+pub use self::api::{AtomicChannelId, ChannelId};
 
 #[cfg(feature = "axum08")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "axum08")))]

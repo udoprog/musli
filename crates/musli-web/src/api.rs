@@ -2,6 +2,7 @@
 
 use core::fmt;
 use core::num::NonZeroU16;
+use core::sync::atomic::{AtomicU16, Ordering};
 
 use musli::alloc::Global;
 use musli::mode::Binary;
@@ -76,6 +77,241 @@ impl fmt::Debug for ChannelId {
         } else {
             write!(f, "{:04x}", self.repr)
         }
+    }
+}
+
+/// A [`ChannelId`] which can be shared and updated atomically.
+///
+/// This behaves like an atomic variable holding a [`ChannelId`], where the
+/// value can be read, set, replaced, or taken. Each operation takes an
+/// [`Ordering`] which is passed through to the underlying atomic.
+///
+/// [`Ordering`]: core::sync::atomic::Ordering
+///
+/// # Examples
+///
+/// ```
+/// use core::sync::atomic::Ordering;
+///
+/// use musli_web::api::{AtomicChannelId, ChannelId};
+///
+/// let channel = AtomicChannelId::NONE;
+/// assert_eq!(channel.load(Ordering::Acquire), ChannelId::NONE);
+///
+/// channel.store(ChannelId::from_u16(42), Ordering::Release);
+/// assert_eq!(channel.load(Ordering::Acquire), ChannelId::from_u16(42));
+///
+/// assert_eq!(channel.take(Ordering::AcqRel), ChannelId::from_u16(42));
+/// assert_eq!(channel.load(Ordering::Acquire), ChannelId::NONE);
+/// ```
+#[repr(transparent)]
+pub struct AtomicChannelId {
+    repr: AtomicU16,
+}
+
+impl AtomicChannelId {
+    /// An atomic channel id which contains [`ChannelId::NONE`].
+    ///
+    /// Since this is a constant every use of it constructs a new value, to
+    /// share one it has to be bound to a `static` or a variable.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use musli_web::api::{AtomicChannelId, ChannelId};
+    ///
+    /// let channel = AtomicChannelId::NONE;
+    /// assert_eq!(channel.load(Ordering::Acquire), ChannelId::NONE);
+    /// ```
+    #[allow(clippy::declare_interior_mutable_const)]
+    pub const NONE: Self = Self::new(ChannelId::NONE);
+
+    /// Construct a new atomic channel id containing `id`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use musli_web::api::{AtomicChannelId, ChannelId};
+    ///
+    /// let channel = AtomicChannelId::new(ChannelId::from_u16(1));
+    /// assert_eq!(channel.load(Ordering::Acquire), ChannelId::from_u16(1));
+    /// ```
+    #[inline]
+    pub const fn new(id: ChannelId) -> Self {
+        Self {
+            repr: AtomicU16::new(id.repr),
+        }
+    }
+
+    /// Read the current channel id.
+    ///
+    /// `ordering` describes the memory ordering of this operation. Possible
+    /// values are [`SeqCst`], [`Acquire`] and [`Relaxed`].
+    ///
+    /// [`SeqCst`]: Ordering::SeqCst
+    /// [`Acquire`]: Ordering::Acquire
+    /// [`Relaxed`]: Ordering::Relaxed
+    ///
+    /// # Panics
+    ///
+    /// Panics if `ordering` is [`Release`] or [`AcqRel`].
+    ///
+    /// [`Release`]: Ordering::Release
+    /// [`AcqRel`]: Ordering::AcqRel
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use musli_web::api::{AtomicChannelId, ChannelId};
+    ///
+    /// let channel = AtomicChannelId::new(ChannelId::from_u16(1));
+    /// assert_eq!(channel.load(Ordering::Acquire), ChannelId::from_u16(1));
+    /// ```
+    #[inline]
+    pub fn load(&self, ordering: Ordering) -> ChannelId {
+        ChannelId::from_u16(self.repr.load(ordering))
+    }
+
+    /// Set the current channel id to `id`, discarding the old value.
+    ///
+    /// `ordering` describes the memory ordering of this operation. Possible
+    /// values are [`SeqCst`], [`Release`] and [`Relaxed`].
+    ///
+    /// [`SeqCst`]: Ordering::SeqCst
+    /// [`Release`]: Ordering::Release
+    /// [`Relaxed`]: Ordering::Relaxed
+    ///
+    /// # Panics
+    ///
+    /// Panics if `ordering` is [`Acquire`] or [`AcqRel`].
+    ///
+    /// [`Acquire`]: Ordering::Acquire
+    /// [`AcqRel`]: Ordering::AcqRel
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use musli_web::api::{AtomicChannelId, ChannelId};
+    ///
+    /// let channel = AtomicChannelId::NONE;
+    /// channel.store(ChannelId::from_u16(1), Ordering::Release);
+    /// assert_eq!(channel.load(Ordering::Acquire), ChannelId::from_u16(1));
+    /// ```
+    #[inline]
+    pub fn store(&self, id: ChannelId, ordering: Ordering) {
+        self.repr.store(id.repr, ordering);
+    }
+
+    /// Replace the current channel id with `id`, returning the old value.
+    ///
+    /// `ordering` describes the memory ordering of this operation. All
+    /// orderings are possible. Note that using [`Acquire`] makes the store part
+    /// of this operation [`Relaxed`], and using [`Release`] makes the load part
+    /// [`Relaxed`].
+    ///
+    /// [`Acquire`]: Ordering::Acquire
+    /// [`Release`]: Ordering::Release
+    /// [`Relaxed`]: Ordering::Relaxed
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use musli_web::api::{AtomicChannelId, ChannelId};
+    ///
+    /// let channel = AtomicChannelId::new(ChannelId::from_u16(1));
+    ///
+    /// let old = channel.replace(ChannelId::from_u16(2), Ordering::AcqRel);
+    /// assert_eq!(old, ChannelId::from_u16(1));
+    /// assert_eq!(channel.load(Ordering::Acquire), ChannelId::from_u16(2));
+    /// ```
+    #[inline]
+    pub fn replace(&self, id: ChannelId, ordering: Ordering) -> ChannelId {
+        ChannelId::from_u16(self.repr.swap(id.repr, ordering))
+    }
+
+    /// Take the current channel id, leaving [`ChannelId::NONE`] in its place.
+    ///
+    /// `ordering` describes the memory ordering of this operation. All
+    /// orderings are possible, see [`replace`] for details.
+    ///
+    /// [`replace`]: AtomicChannelId::replace
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use musli_web::api::{AtomicChannelId, ChannelId};
+    ///
+    /// let channel = AtomicChannelId::new(ChannelId::from_u16(1));
+    ///
+    /// assert_eq!(channel.take(Ordering::AcqRel), ChannelId::from_u16(1));
+    /// assert_eq!(channel.load(Ordering::Acquire), ChannelId::NONE);
+    /// assert_eq!(channel.take(Ordering::AcqRel), ChannelId::NONE);
+    /// ```
+    #[inline]
+    pub fn take(&self, ordering: Ordering) -> ChannelId {
+        self.replace(ChannelId::NONE, ordering)
+    }
+
+    /// Consume the atomic channel id, returning the contained value.
+    ///
+    /// Since this takes ownership no synchronization is needed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::{AtomicChannelId, ChannelId};
+    ///
+    /// let channel = AtomicChannelId::new(ChannelId::from_u16(1));
+    /// assert_eq!(channel.into_inner(), ChannelId::from_u16(1));
+    /// ```
+    #[inline]
+    pub fn into_inner(self) -> ChannelId {
+        ChannelId::from_u16(self.repr.into_inner())
+    }
+}
+
+impl Default for AtomicChannelId {
+    /// Construct an atomic channel id containing [`ChannelId::NONE`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use musli_web::api::{AtomicChannelId, ChannelId};
+    ///
+    /// let channel = AtomicChannelId::default();
+    /// assert_eq!(channel.load(Ordering::Acquire), ChannelId::NONE);
+    /// ```
+    #[inline]
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+impl From<ChannelId> for AtomicChannelId {
+    #[inline]
+    fn from(id: ChannelId) -> Self {
+        Self::new(id)
+    }
+}
+
+impl fmt::Debug for AtomicChannelId {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.load(Ordering::Relaxed).fmt(f)
     }
 }
 
