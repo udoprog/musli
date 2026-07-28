@@ -32,15 +32,9 @@ fn named_struct_unpack() {
         unpacked,
         Unpacked {
             field_count: Tag::new(Kind::Sequence, 4),
-            field1_name: Typed::new(
-                Tag::new(Kind::Prefix, 6),
-                [b's', b't', b'r', b'i', b'n', b'g']
-            ),
-            field1_value: Typed::new(Tag::new(Kind::Prefix, 3), [b'f', b'o', b'o']),
-            field2_name: Typed::new(
-                Tag::new(Kind::Prefix, 6),
-                [b'n', b'u', b'm', b'b', b'e', b'r']
-            ),
+            field1_name: Typed::new(Tag::new(Kind::Prefix, 6), *b"string"),
+            field1_value: Typed::new(Tag::new(Kind::Prefix, 3), *b"foo"),
+            field2_name: Typed::new(Tag::new(Kind::Prefix, 6), *b"number"),
             field2_value: Tag::new(Kind::Continuation, 42),
         }
     );
@@ -71,7 +65,7 @@ fn indexed_struct_unpack() {
         Unpacked {
             field_count: Tag::new(Kind::Sequence, 4),
             field1_index: Tag::new(Kind::Continuation, 0),
-            field1_value: Typed::new(Tag::new(Kind::Prefix, 3), [b'f', b'o', b'o']),
+            field1_value: Typed::new(Tag::new(Kind::Prefix, 3), *b"foo"),
             field2_index: Tag::new(Kind::Continuation, 1),
             field2_value: Tag::new(Kind::Continuation, 42),
         }
