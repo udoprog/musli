@@ -2022,7 +2022,7 @@ impl RawPacket {
     /// use musli_web::web::RawPacket;
     ///
     /// let packet = RawPacket::empty();
-    /// assert_eq!(packet.as_slice(), &[]);
+    /// assert_eq!(packet.as_slice(), &[] as &[u8]);
     /// ```
     pub fn as_slice(&self) -> &[u8] {
         match &self.buf {

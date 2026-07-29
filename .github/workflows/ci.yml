@@ -176,6 +176,10 @@ jobs:
         - ws,axum08
         - axum08
         - axum-core05
+        - client
+        - tungstenite029
+        - tungstenite029-rustls
+        - tungstenite029,axum08
     env:
       RUSTFLAGS: -D warnings
     steps:
