@@ -1,15 +1,347 @@
 //! Shared traits for defining API types.
+//!
+//! # Wire format
+//!
+//! Every websocket message is a binary frame consisting of a fixed *envelope*
+//! followed by an optional *body*:
+//!
+//! ```text
+//! +--------------------------+--------------------------------+
+//! | envelope (musli::packed) | body (negotiated api::Format)  |
+//! +--------------------------+--------------------------------+
+//! ```
+//!
+//! The envelope is a [`RequestHeader`] for messages sent by the client and a
+//! [`ResponseHeader`] for messages sent by the server. It is *always* encoded
+//! with [`musli::packed`], is a fixed size, and never changes with the
+//! negotiated format. This is what makes the format negotiable at all, since
+//! both peers can always read the envelope regardless of what they have agreed
+//! on for bodies.
+//!
+//! The body is encoded with the [`Format`] identified by the `format` field of
+//! the envelope, so every message is self-describing in this respect. A `format`
+//! of zero means the message carries no body.
+//!
+//! # Negotiating the format
+//!
+//! A client picks the [`Format`] it wants to use, defaulting to
+//! [`Format::DEFAULT`]. The exchange is:
+//!
+//! 1. The server sends [`MessageId::SERVER_HELLO`] as soon as the connection is
+//!    established. This carries no body.
+//! 2. The client responds with a [`MessageId::NEGOTIATE`] request whose
+//!    envelope carries the desired [`Format`]. This carries no body.
+//! 3. If the server supports that format it records it for the connection and
+//!    replies with an empty response whose envelope carries the format that was
+//!    accepted. If it does not, it replies with an error listing the formats it
+//!    does support, and the connection keeps using [`Format::DEFAULT`].
+//!
+//! A client only reports itself as connected once step 3 succeeds, which
+//! guarantees that server-initiated messages such as broadcasts are encoded
+//! with a format the client understands.
+//!
+//! Requests additionally carry their own format in the envelope, so the server
+//! decodes each request body with the format that request declares and replies
+//! in the same format. Negotiation therefore only matters for messages the
+//! server sends on its own initiative.
+//!
+//! Since formats are gated behind [features], a server may genuinely be unable
+//! to speak a format a client asks for, which is why step 3 can fail.
+//!
+//! [features]: <https://docs.rs/musli-web/latest/musli_web/#features>
 
 use core::fmt;
 use core::num::NonZeroU16;
 use core::sync::atomic::{AtomicU16, Ordering};
 
 use musli::alloc::Global;
-use musli::mode::Binary;
+use musli::mode::{Binary, Text};
 use musli::{Decode, Encode};
 
 #[doc(inline)]
 pub use musli_web_macros::define;
+
+/// The serialization format used for message bodies.
+///
+/// The format is negotiated per connection, see the [negotiation protocol] for the
+/// details of how. Message *headers* are never affected by this and always use
+/// a fixed envelope, which is what makes negotiation possible in the first
+/// place.
+///
+/// The variants are ordered from least to most capable. Each capability that is
+/// dropped makes the encoding more compact:
+///
+/// | | `reorder` | `missing` | `unknown` | `self` |
+/// |-|-|-|-|-|
+/// | [`Packed`] | ✗ | ✗ | ✗ | ✗ |
+/// | [`Storage`] | ✔ | ✔ | ✗ | ✗ |
+/// | [`Wire`] | ✔ | ✔ | ✔ | ✗ |
+/// | [`Descriptive`] | ✔ | ✔ | ✔ | ✔ |
+/// | [`Json`] | ✔ | ✔ | ✔ | ✔ |
+///
+/// * `reorder` determines whether fields may be reordered in the model.
+/// * `missing` determines whether decoding tolerates missing fields, which is
+///   what allows new optional fields to be added.
+/// * `unknown` determines whether decoding can skip fields it does not know
+///   about. A format which can do this is *fully upgrade safe*, since an old
+///   peer can talk to a new one.
+/// * `self` determines whether the format is self-descriptive, so that the data
+///   can be decoded without the model.
+///
+/// [`Packed`]: Format::Packed
+/// [`Storage`]: Format::Storage
+/// [`Wire`]: Format::Wire
+/// [`Descriptive`]: Format::Descriptive
+/// [`Json`]: Format::Json
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::api::Format;
+///
+/// assert_eq!(Format::default(), Format::Wire);
+/// assert!(Format::Wire.is_upgrade_safe());
+/// assert!(!Format::Storage.is_upgrade_safe());
+/// assert!(Format::Json.is_human_readable());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum Format {
+    /// The [`musli::packed`] format.
+    ///
+    /// The most compact format, but it requires that both peers use exactly the
+    /// same model. Suitable when client and server are deployed together.
+    Packed,
+    /// The [`musli::storage`] format.
+    ///
+    /// Tolerates missing fields, but cannot skip fields it does not know about.
+    Storage,
+    /// The [`musli::wire`] format.
+    ///
+    /// Fully upgrade safe, so peers built against different versions of the
+    /// model can talk to each other. This is the default.
+    Wire,
+    /// The [`musli::descriptive`] format.
+    ///
+    /// Fully upgrade safe and self-descriptive, at the cost of a larger
+    /// payload.
+    Descriptive,
+    /// The [`musli::json`] format.
+    ///
+    /// Human readable, which is useful when the traffic has to be inspected by
+    /// hand. Encoded using the [`Text`] mode so that fields are keyed by name.
+    ///
+    /// [`Text`]: musli::mode::Text
+    Json,
+}
+
+impl Format {
+    /// The default format, which is [`Format::Wire`].
+    ///
+    /// This is used by a client which has not picked a format, and by a server
+    /// for a connection which has not negotiated one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert_eq!(Format::DEFAULT, Format::Wire);
+    /// ```
+    pub const DEFAULT: Self = Self::Wire;
+
+    /// Every format in order of increasing capability.
+    ///
+    /// Note that this includes formats which the crate might not have been
+    /// built with support for, see [`Format::is_supported`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert!(Format::ALL.contains(&Format::Json));
+    /// ```
+    pub const ALL: &'static [Format] = &[
+        Format::Packed,
+        Format::Storage,
+        Format::Wire,
+        Format::Descriptive,
+        Format::Json,
+    ];
+
+    /// Get the stable identifier used for this format on the wire.
+    ///
+    /// Zero is never used, so it is available to indicate an absent format.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert_eq!(Format::Wire.to_u8(), 3);
+    /// assert_eq!(Format::from_u8(3), Some(Format::Wire));
+    /// ```
+    #[inline]
+    pub const fn to_u8(self) -> u8 {
+        match self {
+            Format::Packed => 1,
+            Format::Storage => 2,
+            Format::Wire => 3,
+            Format::Descriptive => 4,
+            Format::Json => 5,
+        }
+    }
+
+    /// Construct a format from the stable identifier used on the wire.
+    ///
+    /// Returns `None` if the identifier is not known, which is how a peer
+    /// built against an older version of this crate reports a format it has
+    /// never heard of.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert_eq!(Format::from_u8(1), Some(Format::Packed));
+    /// assert_eq!(Format::from_u8(0), None);
+    /// assert_eq!(Format::from_u8(200), None);
+    /// ```
+    #[inline]
+    pub const fn from_u8(id: u8) -> Option<Self> {
+        match id {
+            1 => Some(Format::Packed),
+            2 => Some(Format::Storage),
+            3 => Some(Format::Wire),
+            4 => Some(Format::Descriptive),
+            5 => Some(Format::Json),
+            _ => None,
+        }
+    }
+
+    /// The name of the format.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert_eq!(Format::Wire.name(), "wire");
+    /// ```
+    #[inline]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Format::Packed => "packed",
+            Format::Storage => "storage",
+            Format::Wire => "wire",
+            Format::Descriptive => "descriptive",
+            Format::Json => "json",
+        }
+    }
+
+    /// Test if the format can skip over unknown fields, making it fully upgrade
+    /// safe.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert!(Format::Wire.is_upgrade_safe());
+    /// assert!(!Format::Packed.is_upgrade_safe());
+    /// ```
+    #[inline]
+    pub const fn is_upgrade_safe(self) -> bool {
+        matches!(self, Format::Wire | Format::Descriptive | Format::Json)
+    }
+
+    /// Test if the format is self-descriptive, so that data can be decoded
+    /// without access to the model.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert!(Format::Descriptive.is_self_descriptive());
+    /// assert!(!Format::Wire.is_self_descriptive());
+    /// ```
+    #[inline]
+    pub const fn is_self_descriptive(self) -> bool {
+        matches!(self, Format::Descriptive | Format::Json)
+    }
+
+    /// Test if the format produces output which is meant to be read by humans.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert!(Format::Json.is_human_readable());
+    /// assert!(!Format::Wire.is_human_readable());
+    /// ```
+    #[inline]
+    pub const fn is_human_readable(self) -> bool {
+        matches!(self, Format::Json)
+    }
+}
+
+impl Default for Format {
+    /// Construct the default format, which is [`Format::DEFAULT`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert_eq!(Format::default(), Format::Wire);
+    /// ```
+    #[inline]
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl fmt::Display for Format {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+/// Types which can be encoded in every mode that this crate supports.
+///
+/// This is a blanket trait covering [`Encode`] in both the [`Binary`] and
+/// [`Text`] modes, which is what allows a message body to be encoded with any
+/// [`Format`] including [`Format::Json`].
+///
+/// Deriving [`Encode`] implements every mode, so this is implemented
+/// automatically unless the type has been restricted to a specific mode.
+pub trait EncodeBody
+where
+    Self: Encode<Binary> + Encode<Text>,
+{
+}
+
+impl<T> EncodeBody for T where T: ?Sized + Encode<Binary> + Encode<Text> {}
+
+/// Types which can be decoded in every mode that this crate supports.
+///
+/// This is a blanket trait covering [`Decode`] in both the [`Binary`] and
+/// [`Text`] modes, which is what allows a message body to be decoded with any
+/// [`Format`] including [`Format::Json`].
+///
+/// Deriving [`Decode`] implements every mode, so this is implemented
+/// automatically unless the type has been restricted to a specific mode.
+pub trait DecodeBody<'de>
+where
+    Self: Decode<'de, Binary, Global> + Decode<'de, Text, Global>,
+{
+}
+
+impl<'de, T> DecodeBody<'de> for T where T: Decode<'de, Binary, Global> + Decode<'de, Text, Global> {}
 
 /// A trait for constructing identifiers.
 pub trait Id
@@ -341,6 +673,12 @@ impl MessageId {
     /// The first message the server sends to indicat that a connection is open.
     pub const SERVER_HELLO: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 4) };
 
+    /// A request from the client to use a particular [`Format`] for the
+    /// remainder of the connection.
+    ///
+    /// See the [negotiation protocol] for how this is used.
+    pub const NEGOTIATE: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 5) };
+
     /// The message id for an empty packet constructed using [`Packet::empty`]
     /// or [`RawPacket::empty`].
     ///
@@ -393,7 +731,7 @@ impl MessageId {
 /// Do not implement manually, instead use the [`define!`] macro.
 pub trait Decodable {
     /// The decodable type related to this.
-    type Type<'de>: Decode<'de, Binary, Global>;
+    type Type<'de>: DecodeBody<'de>;
 
     #[doc(hidden)]
     fn __do_not_implement_decodable();
@@ -411,7 +749,7 @@ where
     const ID: MessageId;
 
     /// The primary response type related to the endpoint.
-    type Response<'de>: Decode<'de, Binary, Global>;
+    type Response<'de>: DecodeBody<'de>;
 
     #[doc(hidden)]
     fn __do_not_implement_endpoint();
@@ -438,7 +776,7 @@ where
     for<'de> Self: Decodable<Type<'de> = Self::Event<'de>>,
 {
     /// The event type related to the broadcast.
-    type Event<'de>: Event<Broadcast = Self> + Decode<'de, Binary, Global>
+    type Event<'de>: Event<Broadcast = Self> + DecodeBody<'de>
     where
         Self: 'de;
 
@@ -451,7 +789,7 @@ where
 /// Do not implement manually, instead use the [`define!`] macro.
 pub trait Request
 where
-    Self: Encode<Binary>,
+    Self: EncodeBody,
 {
     /// The endpoint related to the request.
     type Endpoint: Endpoint;
@@ -465,7 +803,7 @@ where
 /// Do not implement manually, instead use the [`define!`] macro.
 pub trait Event
 where
-    Self: Encode<Binary>,
+    Self: EncodeBody,
 {
     /// The endpoint related to the broadcast.
     type Broadcast: Broadcast;
@@ -481,6 +819,8 @@ where
 pub struct Connect;
 
 /// The header of a response.
+///
+/// This is part of the fixed envelope, see the [negotiation protocol].
 #[derive(Debug, Clone, Encode, Decode)]
 #[doc(hidden)]
 #[musli(packed)]
@@ -492,6 +832,9 @@ pub struct ResponseHeader {
     pub broadcast: u16,
     /// If non-zero, the response contains an error of the given type.
     pub error: u16,
+    /// The [`Format`] the body of this response is encoded with, as given by
+    /// [`Format::to_u8`]. Zero if the response carries no body.
+    pub format: u8,
     /// The channel over which the response will be sent.
     pub channel: ChannelId,
 }
@@ -506,6 +849,8 @@ pub struct ErrorMessage<'de> {
 }
 
 /// A request header.
+///
+/// This is part of the fixed envelope, see the [negotiation protocol].
 #[derive(Debug, Clone, Copy, Encode, Decode)]
 #[doc(hidden)]
 #[musli(packed)]
@@ -514,6 +859,9 @@ pub struct RequestHeader {
     pub serial: u32,
     /// The kind of the request.
     pub id: u16,
+    /// The [`Format`] the body of this request is encoded with, as given by
+    /// [`Format::to_u8`]. Zero if the request carries no body.
+    pub format: u8,
     /// The channel over which the request was received.
     pub channel: ChannelId,
 }

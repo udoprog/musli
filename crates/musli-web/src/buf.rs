@@ -6,8 +6,11 @@ use core::mem::ManuallyDrop;
 use core::ops::Range;
 
 use alloc::vec::Vec;
+use musli::Encode;
 use musli::mode::Binary;
-use musli::{Encode, storage};
+
+use crate::api::{EncodeBody, Format};
+use crate::format;
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -62,13 +65,27 @@ pub(crate) struct Writer<'a> {
 }
 
 impl Writer<'_> {
-    /// Write data to the current frame.
+    /// Write the fixed envelope of a message to the current frame.
+    ///
+    /// The envelope never depends on the negotiated format, see the [wire
+    /// format].
+    ///
+    /// [wire format]: crate::api#wire-format
     #[inline]
-    pub(crate) fn write<T>(&mut self, value: T) -> Result<(), storage::Error>
+    pub(crate) fn envelope<T>(&mut self, value: &T) -> Result<(), format::Error>
     where
-        T: Encode<Binary>,
+        T: ?Sized + Encode<Binary>,
     {
-        self.buf.write(value)
+        format::encode_envelope(&mut self.buf.buffer, value)
+    }
+
+    /// Write the body of a message to the current frame using `format`.
+    #[inline]
+    pub(crate) fn body<T>(&mut self, format: Format, value: &T) -> Result<(), format::Error>
+    where
+        T: ?Sized + EncodeBody,
+    {
+        format.encode(&mut self.buf.buffer, value)
     }
 
     /// Finalize the current frame.
@@ -106,22 +123,6 @@ impl Buf {
         let start = self.buffer.len();
         self.buffer.extend_from_slice(&[0; mem::size_of::<u32>()]);
         Writer { start, buf: self }
-    }
-
-    /// Write data to the current frame, or start a new frame if no frame is
-    /// being written.
-    ///
-    /// This needs to be paired with a call to [`Buf::done`] to complete an
-    /// outgoing frame.
-    ///
-    /// If a new frame is started, a new start point is recorded.
-    #[inline]
-    fn write<T>(&mut self, value: T) -> Result<(), storage::Error>
-    where
-        T: Encode<Binary>,
-    {
-        storage::to_writer(&mut self.buffer, &value)?;
-        Ok(())
     }
 
     #[inline]
@@ -275,6 +276,7 @@ mod tests {
     use musli::Encode;
 
     use super::Buf;
+    use crate::api::Format;
 
     #[test]
     fn test_empty_buf() {
@@ -283,7 +285,7 @@ mod tests {
         assert_eq!(buf.read(), Ok(None));
     }
 
-    #[derive(Encode)]
+    #[derive(Encode, musli::Decode)]
     struct Message {
         a: u32,
         b: String,
@@ -298,10 +300,13 @@ mod tests {
 
         // Buffer not consumed, so should leave empty.
         buf.writer()
-            .write(Message {
-                a: 42,
-                b: "hello".to_string(),
-            })
+            .body(
+                Format::DEFAULT,
+                &Message {
+                    a: 42,
+                    b: "hello".to_string(),
+                },
+            )
             .unwrap();
 
         assert!(buf.is_empty());
@@ -310,10 +315,13 @@ mod tests {
         // Buffer consumed, so should be available for reading.
         let mut writer = buf.writer();
         writer
-            .write(Message {
-                a: 42,
-                b: "hello".to_string(),
-            })
+            .body(
+                Format::DEFAULT,
+                &Message {
+                    a: 42,
+                    b: "hello".to_string(),
+                },
+            )
             .unwrap();
 
         writer.flush();

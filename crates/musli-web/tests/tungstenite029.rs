@@ -15,7 +15,7 @@ use axum::extract::State;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::any;
-use musli_web::api::ChannelId;
+use musli_web::api::{ChannelId, Format};
 use musli_web::client::{self, Handle, State as ClientState};
 use musli_web::{tungstenite029, ws};
 use tokio::net::TcpListener;
@@ -49,6 +49,9 @@ mod api {
     pub struct HelloResponse<'de> {
         pub message: &'de str,
         pub channel: ChannelId,
+        /// The format the server decoded the request with, so tests can observe
+        /// what was actually negotiated from the other end.
+        pub format: u8,
     }
 
     #[derive(Debug, Encode, Decode)]
@@ -159,6 +162,7 @@ impl ws::Handler for TestHandler {
                 outgoing.write(api::HelloResponse {
                     message: request.message,
                     channel: incoming.channel(),
+                    format: incoming.format().to_u8(),
                 });
 
                 Ok(true)
@@ -188,6 +192,7 @@ struct AppState {
     ticks: broadcast::Sender<Tick>,
     shutdown: watch::Receiver<bool>,
     handler: TestHandler,
+    formats: Option<&'static [Format]>,
 }
 
 async fn upgrade(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
@@ -197,6 +202,10 @@ async fn upgrade(ws: WebSocketUpgrade, State(state): State<AppState>) -> Respons
 async fn connection(socket: WebSocket, mut state: AppState) {
     let mut ticks = state.ticks.subscribe();
     let mut server = musli_web::axum08::server(socket, state.handler.clone());
+
+    if let Some(formats) = state.formats {
+        server = server.with_formats(formats);
+    }
 
     if *state.shutdown.borrow_and_update() {
         return;
@@ -248,8 +257,17 @@ impl TestServer {
         Self::bind(SocketAddr::from(([127, 0, 0, 1], 0))).await
     }
 
+    /// Bind a server which only accepts the given formats.
+    async fn with_formats(formats: &'static [Format]) -> Self {
+        Self::bind_with(SocketAddr::from(([127, 0, 0, 1], 0)), Some(formats)).await
+    }
+
     /// Bind a server to the specified address.
     async fn bind(addr: SocketAddr) -> Self {
+        Self::bind_with(addr, None).await
+    }
+
+    async fn bind_with(addr: SocketAddr, formats: Option<&'static [Format]>) -> Self {
         let listener = TcpListener::bind(addr).await.expect("Failed to bind");
         let addr = listener.local_addr().expect("Missing local address");
 
@@ -261,6 +279,7 @@ impl TestServer {
             ticks: ticks.clone(),
             shutdown: shutdown_rx.clone(),
             handler: TestHandler { events: events_tx },
+            formats,
         };
 
         let app = Router::new().route("/ws", any(upgrade).with_state(state));
@@ -328,19 +347,29 @@ impl TestServer {
 struct TestClient {
     handle: Handle,
     task: JoinHandle<()>,
+    errors: mpsc::UnboundedReceiver<String>,
 }
 
 impl TestClient {
     /// Connect a client to the specified url and drive it in the background.
     fn new(url: &str) -> Self {
-        Self::builder(url, true)
+        Self::builder(url, true, Format::DEFAULT)
     }
 
-    fn builder(url: &str, reconnect: bool) -> Self {
+    /// Connect a client which asks for the specified format.
+    fn with_format(url: &str, format: Format) -> Self {
+        Self::builder(url, true, format)
+    }
+
+    fn builder(url: &str, reconnect: bool, format: Format) -> Self {
+        let (errors_tx, errors) = mpsc::unbounded_channel();
+
         let mut service = tungstenite029::connect(url)
             .reconnect(reconnect)
-            .on_error(|error: client::Error| {
+            .format(format)
+            .on_error(move |error: client::Error| {
                 tracing::debug!("Client error: {error}");
+                _ = errors_tx.send(error.to_string());
             })
             .build();
 
@@ -350,7 +379,16 @@ impl TestClient {
             service.run().await.expect("Client service failed");
         });
 
-        Self { handle, task }
+        Self {
+            handle,
+            task,
+            errors,
+        }
+    }
+
+    /// Receive the next error reported by the client service.
+    async fn error(&mut self) -> String {
+        timeout!(self.errors.recv()).expect("Client service is gone")
     }
 
     /// Wait until the client is connected.
@@ -368,11 +406,24 @@ impl TestClient {
 
 /// Send a hello request and return the echoed message.
 async fn hello(handle: &Handle, message: &str) -> (String, ChannelId) {
+    let (message, channel, _) = hello_full(handle, message).await;
+    (message, channel)
+}
+
+/// Send a hello request, additionally reporting the format the server decoded
+/// it with.
+async fn hello_full(handle: &Handle, message: &str) -> (String, ChannelId, Format) {
     let packet = timeout!(handle.request().body(api::HelloRequest { message }).send())
         .expect("Hello request failed");
 
     let response = packet.decode().expect("Failed to decode response");
-    (response.message.to_owned(), response.channel)
+
+    let format = Format::from_u8(response.format).expect("Server reported an unknown format");
+
+    // The response body must be encoded with the same format as the request.
+    assert_eq!(packet.format(), format);
+
+    (response.message.to_owned(), response.channel, format)
 }
 
 #[tokio::test]
@@ -536,7 +587,7 @@ async fn request_while_not_connected() {
 #[tokio::test]
 async fn state_transitions() {
     let server = TestServer::new().await;
-    let client = TestClient::builder(&server.url(), false);
+    let client = TestClient::builder(&server.url(), false, Format::DEFAULT);
 
     let mut states = client.handle.on_state_change();
     assert_eq!(states.state(), ClientState::Closed);
@@ -770,7 +821,7 @@ async fn keepalive_survives_the_server_close_timeout() {
 
     // NB: Reconnecting is disabled so that a dropped connection is observable
     // rather than being silently repaired.
-    let client = TestClient::builder(&server.url(), false);
+    let client = TestClient::builder(&server.url(), false, Format::DEFAULT);
     let handle = client.open().await;
 
     tokio::time::sleep(Duration::from_secs(35)).await;
@@ -874,5 +925,245 @@ async fn multiple_clients() {
 
     first.close().await;
     second.close().await;
+    server.shutdown().await;
+}
+
+/// Exercise the paths that carry a body end to end using `format`.
+///
+/// This covers requests, responses, server errors and broadcasts, each of which
+/// encodes a body and therefore depends on the negotiated format.
+async fn exercise(format: Format) {
+    let mut server = TestServer::new().await;
+    let client = TestClient::with_format(&server.url(), format);
+    let handle = client.open().await;
+
+    // The client reports the format the server agreed to.
+    assert_eq!(
+        handle.format(),
+        format,
+        "client did not settle on `{format}`"
+    );
+
+    // Requests and responses round-trip, and the server decoded the request
+    // with the format the client asked for.
+    let (message, channel, server_format) = hello_full(handle, "Hello!").await;
+    assert_eq!(message, "Hello!");
+    assert_eq!(channel, ChannelId::NONE);
+    assert_eq!(server_format, format, "server used the wrong format");
+
+    // Borrowed strings survive the round trip in every format.
+    let (message, ..) = hello_full(handle, "a string with spaces").await;
+    assert_eq!(message, "a string with spaces");
+
+    // Error bodies are encoded with a format the client can read.
+    let error = timeout!(
+        handle
+            .request()
+            .body(api::FailRequest { reason: "nope" })
+            .send()
+    )
+    .expect_err("Expected the request to fail");
+
+    assert_eq!(error.as_server_error(), Some("nope"));
+
+    // Broadcasts are encoded with the negotiated format, since the server
+    // originates them without a request to take the format from.
+    let mut listener = handle.on_broadcast::<api::Tick>();
+    server.tick(11);
+
+    let packet = timeout!(listener.recv())
+        .expect("Listener is closed")
+        .expect("Broadcast failed");
+
+    assert_eq!(packet.format(), format, "broadcast used the wrong format");
+
+    let event = packet.decode_event().expect("Failed to decode event");
+    assert_eq!(event.tick, 11);
+    assert_eq!(event.message, "tick");
+
+    // Channels work the same regardless of format.
+    let channel = timeout!(handle.channel()).expect("Failed to open channel");
+    assert_eq!(server.event().await, Event::OpenChannel(channel.id()));
+
+    let packet = timeout!(
+        channel
+            .request()
+            .body(api::HelloRequest {
+                message: "over a channel"
+            })
+            .send()
+    )
+    .expect("Hello request failed");
+
+    assert_eq!(packet.channel(), channel.id());
+    assert_eq!(packet.format(), format);
+
+    let response = packet.decode().expect("Failed to decode response");
+    assert_eq!(response.message, "over a channel");
+
+    drop(channel);
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+macro_rules! format_tests {
+    ($($name:ident => $format:expr,)*) => {
+        $(
+            #[tokio::test]
+            async fn $name() {
+                let format = $format;
+
+                assert!(
+                    format.is_supported(),
+                    "`{format}` must be built in for this test",
+                );
+
+                exercise(format).await;
+            }
+        )*
+    };
+}
+
+format_tests! {
+    format_packed => Format::Packed,
+    format_storage => Format::Storage,
+    format_wire => Format::Wire,
+    format_descriptive => Format::Descriptive,
+    format_json => Format::Json,
+}
+
+#[tokio::test]
+async fn default_format_is_wire() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    assert_eq!(handle.format(), Format::Wire);
+
+    let (_, _, server_format) = hello_full(handle, "Hello!").await;
+    assert_eq!(server_format, Format::Wire);
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn unsupported_format_falls_back_to_default() {
+    // A server which refuses everything except the default.
+    let server = TestServer::with_formats(&[Format::Wire]).await;
+    let mut client = TestClient::with_format(&server.url(), Format::Json);
+
+    let error = client.error().await;
+
+    assert!(
+        error.contains("rejected format `json`") && error.contains("falling back to `wire`"),
+        "Unexpected error: {error}"
+    );
+
+    // Falling back leaves the connection fully usable.
+    let handle = client.open().await;
+    assert_eq!(handle.format(), Format::Wire);
+
+    let (message, _, server_format) = hello_full(handle, "after fallback").await;
+    assert_eq!(message, "after fallback");
+    assert_eq!(server_format, Format::Wire);
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn server_reports_which_formats_it_accepts() {
+    let server = TestServer::with_formats(&[Format::Wire, Format::Storage]).await;
+    let mut client = TestClient::with_format(&server.url(), Format::Descriptive);
+
+    let error = client.error().await;
+
+    assert!(
+        error.contains("`wire`") && error.contains("`storage`"),
+        "The rejection must list what the server does accept: {error}"
+    );
+
+    assert!(
+        !error.contains("`json`"),
+        "The rejection must not list formats the server refuses: {error}"
+    );
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn negotiation_survives_a_reconnect() {
+    let server = TestServer::new().await;
+    let addr = server.addr();
+
+    let client = TestClient::with_format(&server.url(), Format::Json);
+    let handle = client.open().await;
+
+    let (_, _, server_format) = hello_full(handle, "before").await;
+    assert_eq!(server_format, Format::Json);
+
+    let mut states = handle.on_state_change();
+
+    server.shutdown().await;
+    assert!(timeout!(states.wait_until(ClientState::Closed)));
+
+    // The replacement server is a fresh connection, so the format has to be
+    // negotiated again rather than assumed.
+    let server = TestServer::bind(addr).await;
+    assert!(timeout!(states.wait_until(ClientState::Open)));
+
+    assert_eq!(handle.format(), Format::Json);
+
+    let (message, _, server_format) = hello_full(handle, "after").await;
+    assert_eq!(message, "after");
+    assert_eq!(server_format, Format::Json);
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn clients_may_use_different_formats_on_one_server() {
+    let server = TestServer::new().await;
+
+    let json = TestClient::with_format(&server.url(), Format::Json);
+    let packed = TestClient::with_format(&server.url(), Format::Packed);
+
+    let json_handle = json.open().await;
+    let packed_handle = packed.open().await;
+
+    let (message, _, format) = hello_full(json_handle, "json client").await;
+    assert_eq!(message, "json client");
+    assert_eq!(format, Format::Json);
+
+    let (message, _, format) = hello_full(packed_handle, "packed client").await;
+    assert_eq!(message, "packed client");
+    assert_eq!(format, Format::Packed);
+
+    // Each connection broadcasts in its own negotiated format.
+    let mut json_listener = json_handle.on_broadcast::<api::Tick>();
+    let mut packed_listener = packed_handle.on_broadcast::<api::Tick>();
+
+    server.tick(5);
+
+    let packet = timeout!(json_listener.recv())
+        .expect("Listener is closed")
+        .expect("Broadcast failed");
+
+    assert_eq!(packet.format(), Format::Json);
+    assert_eq!(packet.decode_event().unwrap().tick, 5);
+
+    let packet = timeout!(packed_listener.recv())
+        .expect("Listener is closed")
+        .expect("Broadcast failed");
+
+    assert_eq!(packet.format(), Format::Packed);
+    assert_eq!(packet.decode_event().unwrap().tick, 5);
+
+    json.close().await;
+    packed.close().await;
     server.shutdown().await;
 }
