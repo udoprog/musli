@@ -36,8 +36,17 @@ See the following modules for how to use:
   request-reply and broadcasts.
 * [Channel support] allowing the server to identify the source of a message
   and clients to correlate messages.
+* A [negotiable body format], so a client can pick how much schema evolution
+  it needs and the server adapts to it. Message envelopes use a fixed
+  encoding so negotiation itself never depends on the outcome.
+
+The available formats, from most compact to most capable, are
+[`Format::Packed`], [`Format::Storage`], [`Format::Wire`] (the default, and
+the least capable one which is fully upgrade safe), [`Format::Descriptive`]
+and [`Format::Json`]. Each is gated behind a `format-*` feature.
 
 [Channel support]: https://docs.rs/musli-web/latest/musli_web/web/struct.Handle.html#method.channel
+[negotiable body format]: https://docs.rs/musli-web/latest/musli_web/api/index.html#wire-format
 
 <br>
 

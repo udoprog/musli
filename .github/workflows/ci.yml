@@ -180,6 +180,15 @@ jobs:
         - tungstenite029
         - tungstenite029-rustls
         - tungstenite029,axum08
+        - formats
+        - api,format-packed
+        - api,format-storage
+        - api,format-wire
+        - api,format-descriptive
+        - api,format-json
+        - ws,formats
+        - web03,formats
+        - tungstenite029,axum08,formats
     env:
       RUSTFLAGS: -D warnings
     steps:

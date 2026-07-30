@@ -23,15 +23,10 @@ use alloc::vec::Vec;
 
 use std::collections::hash_map::{Entry, HashMap};
 
-use musli::Decode;
-use musli::alloc::Global;
-use musli::mode::Binary;
-use musli::reader::SliceReader;
-use musli::storage;
-
 use slab::Slab;
 
-use crate::api::{self, ChannelId, Event, MessageId};
+use crate::api::{self, ChannelId, DecodeBody, Event, Format, MessageId};
+use crate::format;
 
 const MAX_CAPACITY: usize = 1048576;
 
@@ -52,6 +47,27 @@ trait RequestCallback {
 
     fn as_channel(&self) -> Option<&(dyn Fn(Result<ChannelId, Error>) + 'static)> {
         None
+    }
+
+    /// The format this is a negotiation for, if it is one.
+    fn as_negotiate(&self) -> Option<Format> {
+        None
+    }
+}
+
+/// The pending callback used for a format negotiation issued by the service
+/// itself.
+struct NegotiateCallback(Format);
+
+impl RequestCallback for NegotiateCallback {
+    #[inline]
+    fn as_negotiate(&self) -> Option<Format> {
+        Some(self.0)
+    }
+
+    #[inline]
+    fn error(&self, error: Error) {
+        tracing::debug!("Format negotiation failed: {error}");
     }
 }
 
@@ -173,6 +189,7 @@ where
         connect,
         on_error: EmptyCallback,
         close_before_unload: false,
+        format: Format::DEFAULT,
         _marker: PhantomData,
     }
 }
@@ -233,27 +250,27 @@ impl Error {
     }
 
     #[inline]
-    pub(crate) fn decode_response_header(error: storage::Error) -> Self {
+    pub(crate) fn decode_response_header(error: format::Error) -> Self {
         Self::new(ErrorKind::DecodeResponseHeader(error))
     }
 
     #[inline]
-    pub(crate) fn decode_error_message(error: storage::Error) -> Self {
+    pub(crate) fn decode_error_message(error: format::Error) -> Self {
         Self::new(ErrorKind::DecodeErrorMessage(error))
     }
 
     #[inline]
-    pub(crate) fn decode_packet(error: storage::Error) -> Self {
+    pub(crate) fn decode_packet(error: format::Error) -> Self {
         Self::new(ErrorKind::DecodePacket(error))
     }
 
     #[inline]
-    pub(crate) fn encoding_header(error: storage::Error) -> Self {
+    pub(crate) fn encoding_header(error: format::Error) -> Self {
         Self::new(ErrorKind::EncodingHeader(error))
     }
 
     #[inline]
-    pub(crate) fn encoding_body(error: storage::Error) -> Self {
+    pub(crate) fn encoding_body(error: format::Error) -> Self {
         Self::new(ErrorKind::EncodingBody(error))
     }
 }
@@ -262,12 +279,11 @@ impl Error {
 enum ErrorKind {
     EmptyPacket,
     Message(String),
-    DecodeResponseHeader(storage::Error),
-    DecodeErrorMessage(storage::Error),
-    DecodePacket(storage::Error),
-    EncodingHeader(storage::Error),
-    EncodingBody(storage::Error),
-    Overflow(usize, usize),
+    DecodeResponseHeader(format::Error),
+    DecodeErrorMessage(format::Error),
+    DecodePacket(format::Error),
+    EncodingHeader(format::Error),
+    EncodingBody(format::Error),
 }
 
 impl fmt::Display for Error {
@@ -285,9 +301,6 @@ impl fmt::Display for Error {
             ErrorKind::DecodePacket(..) => write!(f, "Encoding error when decoding packet"),
             ErrorKind::EncodingHeader(..) => write!(f, "Encoding error when encoding header"),
             ErrorKind::EncodingBody(..) => write!(f, "Encoding error when encoding body"),
-            ErrorKind::Overflow(at, len) => {
-                write!(f, "Internal packet overflow, {at} not in range 0-{len}")
-            }
         }
     }
 }
@@ -379,6 +392,12 @@ where
     state: Cell<State>,
     should_be: Cell<State>,
     connecting: Cell<bool>,
+    /// The format in effect, as agreed by the [negotiation protocol].
+    ///
+    /// [negotiation protocol]: crate::api#negotiating-the-format
+    format: Cell<Format>,
+    /// The format the user asked for, re-negotiated on every reconnect.
+    requested: Format,
     handle: Handle<H>,
     pub(crate) on_error: Box<dyn Callback<Error>>,
     window: H::Window,
@@ -431,6 +450,7 @@ where
     connect: Connect,
     on_error: E,
     close_before_unload: bool,
+    format: Format,
     _marker: PhantomData<H>,
 }
 
@@ -448,8 +468,26 @@ where
             connect: self.connect,
             on_error,
             close_before_unload: self.close_before_unload,
+            format: self.format,
             _marker: self._marker,
         }
+    }
+
+    /// Set the [`Format`] to use for message bodies.
+    ///
+    /// The format is negotiated with the server once the connection is
+    /// established, see the [negotiation protocol]. If the server does not
+    /// support it the error is reported through [`ServiceBuilder::on_error`]
+    /// and the connection falls back to [`Format::DEFAULT`], which can be
+    /// observed through [`Handle::format`].
+    ///
+    /// Defaults to [`Format::DEFAULT`].
+    ///
+    /// [negotiation protocol]: crate::api#negotiating-the-format
+    #[inline]
+    pub fn format(mut self, format: Format) -> ServiceBuilder<H, E> {
+        self.format = format;
+        self
     }
 
     /// Install an event handler which will try to close the WebSocket
@@ -505,6 +543,8 @@ where
                 state: Cell::new(State::Closed),
                 should_be: Cell::new(State::Closed),
                 connecting: Cell::new(false),
+                format: Cell::new(self.format),
+                requested: self.format,
                 handle: Handle {
                     shared: shared.clone(),
                 },
@@ -609,16 +649,21 @@ where
             return Err(Error::message("Socket is not connected"));
         };
 
+        let format = self.format.get();
+
         let header = api::RequestHeader {
             serial,
             id: <T::Endpoint as api::Endpoint>::ID.get(),
+            format: format.to_u8(),
             channel,
         };
 
         let out = &mut *self.output.borrow_mut();
 
-        storage::to_writer(&mut *out, &header).map_err(Error::encoding_header)?;
-        storage::to_writer(&mut *out, &body).map_err(Error::encoding_body)?;
+        format::encode_envelope(&mut *out, &header).map_err(Error::encoding_header)?;
+        format
+            .encode(&mut *out, body)
+            .map_err(Error::encoding_body)?;
 
         tracing::debug!(
             header.serial,
@@ -643,12 +688,14 @@ where
         let header = api::RequestHeader {
             serial,
             id: MessageId::CONNECT.get(),
+            // NB: Carries no body.
+            format: 0,
             channel: ChannelId::NONE,
         };
 
         let out = &mut *self.output.borrow_mut();
 
-        storage::to_writer(&mut *out, &header).map_err(Error::encoding_header)?;
+        format::encode_envelope(&mut *out, &header).map_err(Error::encoding_header)?;
 
         tracing::debug!(
             header.serial,
@@ -661,6 +708,57 @@ where
 
         out.clear();
         out.shrink_to(MAX_CAPACITY);
+        Ok(())
+    }
+
+    /// Ask the server to use the requested format for the rest of the
+    /// connection.
+    fn send_negotiate(self: &Rc<Self>) -> Result<()> {
+        let format = self.requested;
+        let serial = self.serial.get();
+        self.serial.set(serial.wrapping_add(1));
+
+        {
+            let Some(ref socket) = *self.socket.borrow() else {
+                return Err(Error::message("Socket is not connected"));
+            };
+
+            let header = api::RequestHeader {
+                serial,
+                id: MessageId::NEGOTIATE.get(),
+                format: format.to_u8(),
+                // NB: Carries no body.
+                channel: ChannelId::NONE,
+            };
+
+            let out = &mut *self.output.borrow_mut();
+
+            format::encode_envelope(&mut *out, &header).map_err(Error::encoding_header)?;
+
+            tracing::debug!(?format, "Requesting format");
+
+            socket.send(out.as_slice())?;
+
+            out.clear();
+            out.shrink_to(MAX_CAPACITY);
+        }
+
+        let pending = Pending {
+            id: MessageId::NEGOTIATE,
+            serial,
+            callback: NegotiateCallback(format),
+        };
+
+        let existing = self
+            .g
+            .requests
+            .borrow_mut()
+            .insert(serial, Box::new(pending));
+
+        if let Some(p) = existing {
+            p.callback.error(Error::message("Request cancelled"));
+        }
+
         Ok(())
     }
 
@@ -679,12 +777,14 @@ where
         let header = api::RequestHeader {
             serial: 0,
             id: MessageId::DISCONNECT.get(),
+            // NB: Carries no body.
+            format: 0,
             channel,
         };
 
         let out = &mut *self.output.borrow_mut();
 
-        storage::to_writer(&mut *out, &header).map_err(Error::encoding_header)?;
+        format::encode_envelope(&mut *out, &header).map_err(Error::encoding_header)?;
 
         tracing::debug!(
             header.serial,
@@ -713,20 +813,35 @@ where
         }
     }
 
+    /// Resolve the format a message body is encoded with from its envelope.
+    fn body_format(header: &api::ResponseHeader) -> Result<Format> {
+        let Some(format) = Format::from_u8(header.format) else {
+            return Err(Error::message(format_args!(
+                "Server used unknown format id {} for a message body",
+                header.format
+            )));
+        };
+
+        Ok(format)
+    }
+
     pub(crate) fn message(self: &Rc<Self>, buf: Box<BufData>) -> Result<()> {
         // Wrap the buffer in a simple shared reference-counted container.
         let buf = BufRc::new(buf);
-        let mut reader = SliceReader::new(&buf);
+        let mut at = 0;
 
         let header: api::ResponseHeader =
-            storage::decode(&mut reader).map_err(Error::decode_response_header)?;
+            format::decode_envelope(&buf, &mut at).map_err(Error::decode_response_header)?;
 
         if let Some(broadcast) = MessageId::new(header.broadcast) {
             tracing::debug!(?header, "Got broadcast");
 
             if broadcast == MessageId::SERVER_HELLO {
-                tracing::debug!("Server hello (open)");
-                self.emit_state_change(State::Open);
+                // NB: The connection is not reported as open until the format
+                // has been negotiated, so that server-initiated messages are
+                // never encoded with a format this client did not agree to.
+                tracing::debug!("Server hello, negotiating format");
+                self.send_negotiate()?;
                 return Ok(());
             }
 
@@ -736,9 +851,9 @@ where
 
             if let Some(id) = MessageId::new(header.error) {
                 let error = match id {
-                    MessageId::ERROR_MESSAGE => {
-                        storage::decode(&mut reader).map_err(Error::decode_error_message)?
-                    }
+                    MessageId::ERROR_MESSAGE => Self::body_format(&header)?
+                        .decode(&buf, &mut at)
+                        .map_err(Error::decode_error_message)?,
                     _ => api::ErrorMessage {
                         message: "Unsupported broadcast",
                     },
@@ -756,12 +871,13 @@ where
                 return Ok(());
             }
 
-            let at = buf.len().saturating_sub(reader.remaining());
+            let format = Self::body_format(&header)?;
 
             let packet = RawPacket {
                 buf: Some(buf.clone()),
                 at: Cell::new(at),
                 id: broadcast,
+                format,
                 channel: header.channel,
             };
 
@@ -777,13 +893,28 @@ where
             if let Some(p) = p {
                 if let Some(id) = MessageId::new(header.error) {
                     let error = match id {
-                        MessageId::ERROR_MESSAGE => {
-                            storage::decode(&mut reader).map_err(Error::decode_error_message)?
-                        }
+                        MessageId::ERROR_MESSAGE => Self::body_format(&header)?
+                            .decode(&buf, &mut at)
+                            .map_err(Error::decode_error_message)?,
                         _ => api::ErrorMessage {
                             message: "Unsupported request",
                         },
                     };
+
+                    if let Some(format) = p.callback.as_negotiate() {
+                        // NB: The server cannot speak the requested format, so
+                        // fall back to the default rather than leaving the
+                        // connection unusable.
+                        self.on_error.call(Error::message(format_args!(
+                            "Server rejected format `{format}` ({}), falling back to `{}`",
+                            error.message,
+                            Format::DEFAULT
+                        )));
+
+                        self.format.set(Format::DEFAULT);
+                        self.emit_state_change(State::Open);
+                        return Ok(());
+                    }
 
                     p.callback.error(Error::message(format_args!(
                         "Server error: {}",
@@ -793,6 +924,22 @@ where
                 }
 
                 match p.id {
+                    MessageId::NEGOTIATE => {
+                        let Some(requested) = p.callback.as_negotiate() else {
+                            p.callback
+                                .error(Error::message("Unexpected negotiate response"));
+                            return Ok(());
+                        };
+
+                        // NB: Trust the format the server echoed back over the
+                        // one that was asked for, so that a server which
+                        // downgrades is honored.
+                        let accepted = Format::from_u8(header.format).unwrap_or(requested);
+                        tracing::debug!(?accepted, "Format negotiated");
+                        self.format.set(accepted);
+                        self.emit_state_change(State::Open);
+                        return Ok(());
+                    }
                     MessageId::CONNECT => {
                         let Some(callback) = &p.callback.as_channel() else {
                             p.callback
@@ -810,12 +957,13 @@ where
                             return Ok(());
                         };
 
-                        let at = buf.len().saturating_sub(reader.remaining());
+                        let format = Self::body_format(&header)?;
 
                         let packet = RawPacket {
                             id: p.id,
                             buf: Some(buf),
                             at: Cell::new(at),
+                            format,
                             channel: header.channel,
                         };
 
@@ -1945,6 +2093,7 @@ pub struct RawPacket {
     id: MessageId,
     buf: Option<BufRc>,
     at: Cell<usize>,
+    format: Format,
     channel: ChannelId,
 }
 
@@ -1967,8 +2116,25 @@ impl RawPacket {
             id: MessageId::EMPTY,
             buf: None,
             at: Cell::new(0),
+            format: Format::DEFAULT,
             channel: ChannelId::NONE,
         }
+    }
+
+    /// The [`Format`] the body of this packet is encoded with.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    /// use musli_web::web::RawPacket;
+    ///
+    /// let packet = RawPacket::empty();
+    /// assert_eq!(packet.format(), Format::DEFAULT);
+    /// ```
+    #[inline]
+    pub fn format(&self) -> Format {
+        self.format
     }
 
     /// Return the connection this packet belongs to.
@@ -1988,23 +2154,17 @@ impl RawPacket {
     /// You can check if the packet is empty using [`RawPacket::is_empty`].
     pub fn decode<'this, T>(&'this self) -> Result<T>
     where
-        T: Decode<'this, Binary, Global>,
+        T: DecodeBody<'this>,
     {
-        let at = self.at.get();
-
         if self.id == MessageId::EMPTY {
             return Err(Error::new(ErrorKind::EmptyPacket));
         }
 
-        let Some(bytes) = self.as_slice().get(at..) else {
-            return Err(Error::new(ErrorKind::Overflow(at, self.as_slice().len())));
-        };
+        let mut at = self.at.get();
 
-        let mut reader = SliceReader::new(bytes);
-
-        match storage::decode(&mut reader) {
+        match self.format.decode(self.as_slice(), &mut at) {
             Ok(value) => {
-                self.at.set(at + bytes.len() - reader.remaining());
+                self.at.set(at);
                 Ok(value)
             }
             Err(error) => {
@@ -2131,6 +2291,12 @@ impl<T> Packet<T> {
         self.raw.channel()
     }
 
+    /// The [`Format`] the body of this packet is encoded with.
+    #[inline]
+    pub fn format(&self) -> Format {
+        self.raw.format()
+    }
+
     /// Construct a new typed package from a raw one.
     ///
     /// Note that this does not guarantee that the typed package is correct, but
@@ -2212,7 +2378,7 @@ where
     /// You can check if the packet is empty using [`Packet::is_empty`].
     pub fn decode_any<'de, R>(&'de self) -> Result<R>
     where
-        R: Decode<'de, Binary, Global>,
+        R: DecodeBody<'de>,
     {
         self.raw.decode()
     }
@@ -2240,7 +2406,7 @@ where
     /// You can check if the packet is empty using [`Packet::is_empty`].
     pub fn decode_any_response<'de, R>(&'de self) -> Result<R>
     where
-        R: Decode<'de, Binary, Global>,
+        R: DecodeBody<'de>,
     {
         self.raw.decode()
     }
@@ -2261,7 +2427,7 @@ where
     /// Decode any event related to a broadcast.
     pub fn decode_event_any<'de, E>(&'de self) -> Result<E>
     where
-        E: Event<Broadcast = T> + Decode<'de, Binary, Global>,
+        E: Event<Broadcast = T> + DecodeBody<'de>,
     {
         self.raw.decode()
     }
@@ -2378,6 +2544,20 @@ where
     ///     }
     /// }
     /// ```
+    /// The [`Format`] currently in effect for message bodies.
+    ///
+    /// Before the connection has been opened this is the format which was
+    /// requested through [`ServiceBuilder::format`]. Once the connection is
+    /// open it is the format the server actually agreed to, which can differ if
+    /// the server does not support what was asked for.
+    pub fn format(&self) -> Format {
+        let Some(shared) = self.shared.upgrade() else {
+            return Format::DEFAULT;
+        };
+
+        shared.format.get()
+    }
+
     pub fn channel(&self) -> ChannelBuilder<'_, H, EmptyCallback> {
         ChannelBuilder {
             shared: &self.shared,

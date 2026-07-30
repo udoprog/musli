@@ -106,11 +106,6 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use bytes::Bytes;
-use musli::alloc::Global;
-use musli::mode::Binary;
-use musli::reader::SliceReader;
-use musli::storage;
-use musli::{Decode, Encode};
 use rand::prelude::*;
 use rand::rngs::SmallRng;
 use tokio::sync::Mutex;
@@ -119,9 +114,11 @@ use tokio::time::{Duration, Instant, Sleep};
 
 use crate::Buf;
 use crate::api::{
-    Broadcast, ChannelId, ErrorMessage, Event, Id, MessageId, RequestHeader, ResponseHeader,
+    Broadcast, ChannelId, DecodeBody, EncodeBody, ErrorMessage, Event, Format, Id, MessageId,
+    RequestHeader, ResponseHeader,
 };
 use crate::buf::{BufPool, InvalidFrame};
+use crate::format;
 
 const MAX_CAPACITY: usize = 1048576;
 const CLOSE_NORMAL: u16 = 1000;
@@ -222,25 +219,25 @@ enum ErrorKind {
         error: InvalidFrame,
     },
     Incoming {
-        error: storage::Error,
+        error: format::Error,
     },
     Outgoing {
-        error: storage::Error,
+        error: format::Error,
     },
     EncodeBroadcastHeader {
-        error: storage::Error,
+        error: format::Error,
     },
     EncodeBroadcast {
-        error: storage::Error,
+        error: format::Error,
     },
     EncodeConnectHeader {
-        error: storage::Error,
+        error: format::Error,
     },
     ErrorMessageHeader {
-        error: storage::Error,
+        error: format::Error,
     },
     ErrorMessage {
-        error: storage::Error,
+        error: format::Error,
     },
     OutOfBounds {
         offset: usize,
@@ -260,31 +257,31 @@ impl Error {
         Self { kind }
     }
 
-    pub(crate) fn incoming(error: storage::Error) -> Self {
+    pub(crate) fn incoming(error: format::Error) -> Self {
         Self::new(ErrorKind::Incoming { error })
     }
 
-    pub(crate) fn outgoing(error: storage::Error) -> Self {
+    pub(crate) fn outgoing(error: format::Error) -> Self {
         Self::new(ErrorKind::Outgoing { error })
     }
 
-    pub(crate) fn encode_broadcast_header(error: storage::Error) -> Self {
+    pub(crate) fn encode_broadcast_header(error: format::Error) -> Self {
         Self::new(ErrorKind::EncodeBroadcastHeader { error })
     }
 
-    pub(crate) fn encode_broadcast(error: storage::Error) -> Self {
+    pub(crate) fn encode_broadcast(error: format::Error) -> Self {
         Self::new(ErrorKind::EncodeBroadcast { error })
     }
 
-    pub(crate) fn encode_connect_header(error: storage::Error) -> Self {
+    pub(crate) fn encode_connect_header(error: format::Error) -> Self {
         Self::new(ErrorKind::EncodeConnectHeader { error })
     }
 
-    pub(crate) fn encode_error_message_header(error: storage::Error) -> Self {
+    pub(crate) fn encode_error_message_header(error: format::Error) -> Self {
         Self::new(ErrorKind::ErrorMessageHeader { error })
     }
 
-    pub(crate) fn encode_error_message(error: storage::Error) -> Self {
+    pub(crate) fn encode_error_message(error: format::Error) -> Self {
         Self::new(ErrorKind::ErrorMessage { error })
     }
 }
@@ -584,6 +581,14 @@ where
     socket_send: bool,
     socket_flush: bool,
     set: JoinSet<HandlerOutput<H>>,
+    /// The format used for messages the server originates on this connection,
+    /// as agreed by the [negotiation protocol].
+    ///
+    /// [negotiation protocol]: crate::api#negotiating-the-format
+    format: Format,
+    /// Formats this server is willing to negotiate, or `None` to accept every
+    /// format it was built with support for.
+    formats: Option<&'static [Format]>,
 }
 
 impl<S, H> Server<S, H, Channels>
@@ -616,6 +621,8 @@ where
             out: VecDeque::new(),
             socket_send: false,
             set: JoinSet::new(),
+            format: Format::DEFAULT,
+            formats: None,
         }
     }
 }
@@ -658,6 +665,8 @@ where
             socket_send: self.socket_send,
             socket_flush: self.socket_flush,
             set: self.set,
+            format: self.format,
+            formats: self.formats,
         }
     }
 
@@ -665,6 +674,38 @@ where
     #[inline]
     pub fn handler(&self) -> &H {
         &self.handler
+    }
+
+    /// Restrict the set of [`Format`]s this server is willing to negotiate.
+    ///
+    /// By default every format the crate was built with support for is
+    /// accepted. A client which asks for a format outside of this set is
+    /// rejected during the [negotiation protocol] and the connection keeps
+    /// using [`Format::DEFAULT`].
+    ///
+    /// Note that this cannot widen the set, a format which was not compiled in
+    /// is never accepted.
+    ///
+    /// [negotiation protocol]: crate::api#negotiating-the-format
+    #[inline]
+    pub fn with_formats(mut self, formats: &'static [Format]) -> Self {
+        self.formats = Some(formats);
+        self
+    }
+
+    /// The [`Format`] currently used for messages this server originates, such
+    /// as broadcasts.
+    ///
+    /// This is [`Format::DEFAULT`] until a client negotiates something else.
+    #[inline]
+    pub fn format(&self) -> Format {
+        self.format
+    }
+
+    /// Test if this server is willing to negotiate `format`.
+    #[inline]
+    pub fn accepts(&self, format: Format) -> bool {
+        format.is_supported() && self.formats.is_none_or(|f| f.contains(&format))
     }
 
     /// Modify the maximum capacity of the buffer used for outgoing messages.
@@ -839,19 +880,24 @@ where
     {
         tracing::debug!(id = ?<T::Broadcast as Broadcast>::ID, "Broadcast");
 
+        let format = self.format;
+
         let buf = self.pool.with(|buf| {
             let mut writer = buf.writer();
 
             writer
-                .write(ResponseHeader {
+                .envelope(&ResponseHeader {
                     serial: 0,
                     broadcast: <T::Broadcast as Broadcast>::ID.get(),
                     error: 0,
+                    format: format.to_u8(),
                     channel,
                 })
                 .map_err(Error::encode_broadcast_header)?;
 
-            writer.write(message).map_err(Error::encode_broadcast)?;
+            writer
+                .body(format, &message)
+                .map_err(Error::encode_broadcast)?;
             writer.flush();
             Ok::<_, Error>(())
         })?;
@@ -873,10 +919,12 @@ where
             let mut writer = buf.writer();
 
             writer
-                .write(ResponseHeader {
+                .envelope(&ResponseHeader {
                     serial: 0,
                     broadcast: MessageId::SERVER_HELLO.get(),
                     error: 0,
+                    // NB: Carries no body, so no format applies.
+                    format: 0,
                     channel: ChannelId::NONE,
                 })
                 .map_err(Error::encode_broadcast_header)?;
@@ -918,9 +966,9 @@ where
 
     #[tracing::instrument(skip(self, bytes))]
     async fn handle_message(&mut self, bytes: Bytes) -> Result<(), Error> {
-        let mut reader = SliceReader::new(&bytes);
+        let mut at = 0;
 
-        let header: RequestHeader = match storage::decode(&mut reader) {
+        let header: RequestHeader = match format::decode_envelope(&bytes, &mut at) {
             Ok(header) => header,
             Err(error) => {
                 tracing::debug!(?error, "Invalid request header");
@@ -954,10 +1002,11 @@ where
                     let result = (|| {
                         let mut writer = buf.writer();
 
-                        let result = writer.write(ResponseHeader {
+                        let result = writer.envelope(&ResponseHeader {
                             serial: header.serial,
                             broadcast: 0,
                             error: 0,
+                            format: 0,
                             channel,
                         });
 
@@ -980,10 +1029,77 @@ where
                     self.handler.close_channel(header.channel).await;
                     break 'err false;
                 }
+                MessageId::NEGOTIATE => {
+                    let Some(format) = Format::from_u8(header.format) else {
+                        self.format_error_message(format_args!(
+                            "Unknown format id {}, supported: {}",
+                            header.format,
+                            SupportedFormats(self.formats)
+                        ))?;
+
+                        break 'err true;
+                    };
+
+                    if !self.accepts(format) {
+                        self.format_error_message(format_args!(
+                            "Unsupported format `{format}`, supported: {}",
+                            SupportedFormats(self.formats)
+                        ))?;
+
+                        break 'err true;
+                    }
+
+                    tracing::debug!(?format, "Negotiated format");
+                    self.format = format;
+
+                    let mut buf = self.pool.get();
+
+                    let result = (|| {
+                        let mut writer = buf.writer();
+
+                        let result = writer.envelope(&ResponseHeader {
+                            serial: header.serial,
+                            broadcast: 0,
+                            error: 0,
+                            format: format.to_u8(),
+                            channel: header.channel,
+                        });
+
+                        result.map_err(Error::encode_connect_header)?;
+                        writer.flush();
+                        Ok::<_, Error>(())
+                    })();
+
+                    if result.is_err() {
+                        self.pool.put(buf);
+                    } else {
+                        self.outbound.push_back(buf);
+                    }
+
+                    result?;
+                    break 'err false;
+                }
                 _ => {
+                    let Some(format) = Format::from_u8(header.format) else {
+                        self.format_error_message(format_args!(
+                            "Unknown format id {}",
+                            header.format
+                        ))?;
+
+                        break 'err true;
+                    };
+
+                    if !self.accepts(format) {
+                        self.format_error_message(format_args!(
+                            "Unsupported format `{format}`, supported: {}",
+                            SupportedFormats(self.formats)
+                        ))?;
+
+                        break 'err true;
+                    }
+
                     let id = <H::Id as Id>::from_id(id);
-                    let offset = bytes.len() - reader.remaining();
-                    self.handle_request(bytes, offset, header, id);
+                    self.handle_request(bytes, at, header, id, format);
                     return Ok(());
                 }
             }
@@ -997,22 +1113,32 @@ where
     }
 
     fn send_error(&mut self, header: &RequestHeader) -> Result<(), Error> {
+        // NB: Errors are encoded with the connection format rather than the
+        // format the request asked for, since the request might have failed
+        // precisely because that format is not supported. The client reads the
+        // format back out of the response envelope either way.
+        let format = self.format;
+
         let buf = self.pool.with(|buf| {
             // Reset the buffer to the previous start point.
             let mut writer = buf.writer();
 
-            let result = writer.write(ResponseHeader {
+            let result = writer.envelope(&ResponseHeader {
                 serial: header.serial,
                 broadcast: 0,
                 error: MessageId::ERROR_MESSAGE.get(),
+                format: format.to_u8(),
                 channel: header.channel,
             });
 
             result.map_err(Error::encode_error_message_header)?;
 
-            let result = writer.write(ErrorMessage {
-                message: &self.error,
-            });
+            let result = writer.body(
+                format,
+                &ErrorMessage {
+                    message: &self.error,
+                },
+            );
 
             result.map_err(Error::encode_error_message)?;
             writer.flush();
@@ -1099,27 +1225,34 @@ where
         Ok(())
     }
 
-    fn handle_request(&mut self, bytes: Bytes, offset: usize, header: RequestHeader, id: H::Id) {
-        tracing::debug!(header.serial, ?id, "Got request");
+    fn handle_request(
+        &mut self,
+        bytes: Bytes,
+        offset: usize,
+        header: RequestHeader,
+        id: H::Id,
+        format: Format,
+    ) {
+        tracing::debug!(header.serial, ?id, ?format, "Got request");
 
         let mut buf = self.pool.get();
         let handler = self.handler.clone();
 
         self.set.spawn(async move {
-            let Some(bytes) = bytes.get(offset..) else {
+            if offset > bytes.len() {
                 let kind = ErrorKind::OutOfBounds {
                     offset,
                     len: bytes.len(),
                 };
 
                 return (Err(Error::new(kind)), header, buf);
-            };
-
-            let reader = SliceReader::new(bytes);
+            }
 
             let mut incoming = Incoming {
                 error: None,
-                reader,
+                buf: &bytes,
+                at: offset,
+                format,
                 channel: header.channel,
             };
 
@@ -1127,6 +1260,7 @@ where
                 serial: Some(header.serial),
                 error: None,
                 buf: &mut buf,
+                format,
                 channel: header.channel,
             };
 
@@ -1240,8 +1374,10 @@ where
 ///
 /// [`server()`]: crate::axum08::server
 pub struct Incoming<'de> {
-    error: Option<storage::Error>,
-    reader: SliceReader<'de>,
+    error: Option<format::Error>,
+    buf: &'de [u8],
+    at: usize,
+    format: Format,
     channel: ChannelId,
 }
 
@@ -1256,6 +1392,15 @@ impl<'de> Incoming<'de> {
         self.channel
     }
 
+    /// The [`Format`] the incoming request body is encoded with.
+    ///
+    /// This is the format the client declared for this particular request, and
+    /// is also the format the response will be written with.
+    #[inline]
+    pub fn format(&self) -> Format {
+        self.format
+    }
+
     /// Read a request and return `Some(T)` if the request was successfully
     /// decoded.
     ///
@@ -1266,9 +1411,9 @@ impl<'de> Incoming<'de> {
     #[inline]
     pub fn read<T>(&mut self) -> Option<T>
     where
-        T: Decode<'de, Binary, Global>,
+        T: DecodeBody<'de>,
     {
-        match storage::decode(&mut self.reader) {
+        match self.format.decode(self.buf, &mut self.at) {
             Ok(value) => Some(value),
             Err(error) => {
                 self.error = Some(error);
@@ -1285,12 +1430,20 @@ impl<'de> Incoming<'de> {
 /// [`server()`]: crate::axum08::server
 pub struct Outgoing<'a> {
     serial: Option<u32>,
-    error: Option<storage::Error>,
+    error: Option<format::Error>,
     buf: &'a mut Buf,
+    format: Format,
     channel: ChannelId,
 }
 
 impl Outgoing<'_> {
+    /// The [`Format`] the response will be encoded with, which is the format
+    /// the corresponding request declared.
+    #[inline]
+    pub fn format(&self) -> Format {
+        self.format
+    }
+
     /// Write a response.
     ///
     /// This can only be called once. Calling this multiple times has no effect.
@@ -1300,7 +1453,7 @@ impl Outgoing<'_> {
     /// [`server()`]: crate::axum08::server
     pub fn write<T>(&mut self, value: T)
     where
-        T: Encode<Binary>,
+        T: EncodeBody,
     {
         let Some(serial) = self.serial.take() else {
             return;
@@ -1308,10 +1461,11 @@ impl Outgoing<'_> {
 
         let mut writer = self.buf.writer();
 
-        let result = writer.write(ResponseHeader {
+        let result = writer.envelope(&ResponseHeader {
             serial,
             broadcast: 0,
             error: 0,
+            format: self.format.to_u8(),
             channel: self.channel,
         });
 
@@ -1320,7 +1474,7 @@ impl Outgoing<'_> {
             return;
         }
 
-        if let Err(error) = writer.write(value) {
+        if let Err(error) = writer.body(self.format, &value) {
             self.error = Some(error);
         }
 
@@ -1397,5 +1551,35 @@ impl ChannelAllocator for Channels {
         if let Some(id) = NonZeroU16::new(id.raw()) {
             inner.free.push_back(id);
         }
+    }
+}
+
+/// Renders the formats a server is willing to negotiate, for error messages.
+struct SupportedFormats(Option<&'static [Format]>);
+
+impl fmt::Display for SupportedFormats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut first = true;
+
+        for format in Format::supported() {
+            if let Some(formats) = self.0
+                && !formats.contains(&format)
+            {
+                continue;
+            }
+
+            if !first {
+                f.write_str(", ")?;
+            }
+
+            write!(f, "`{format}`")?;
+            first = false;
+        }
+
+        if first {
+            f.write_str("none")?;
+        }
+
+        Ok(())
     }
 }

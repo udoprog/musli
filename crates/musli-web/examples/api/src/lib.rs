@@ -1,6 +1,5 @@
-use musli::mode::Binary;
 use musli::{Decode, Encode};
-use musli_web::api;
+use musli_web::api::{self, EncodeBody};
 
 #[derive(Encode, Decode)]
 pub struct HelloRequest<'de> {
@@ -41,6 +40,10 @@ api::define! {
 
     impl Broadcast for Tick {
         impl<'de> Event for TickEvent<'de>;
-        impl<S> Event for OwnedTickEvent<S> where S: AsRef<str> + Encode<Binary>;
+        // NB: `EncodeBody` covers every mode a body can be encoded in, which
+        // is what allows this event to be sent using any `api::Format`. A
+        // generic body has to ask for it explicitly, while a plain
+        // `#[derive(Encode)]` type gets it for free.
+        impl<S> Event for OwnedTickEvent<S> where S: AsRef<str> + EncodeBody;
     }
 }

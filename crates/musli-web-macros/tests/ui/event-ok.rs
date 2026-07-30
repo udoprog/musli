@@ -1,6 +1,5 @@
 use musli::{Encode, Decode};
-use musli::mode::Binary;
-use musli::alloc::Global;
+use musli_web::api::EncodeBody;
 
 #[derive(Encode, Decode)]
 struct Lifetime<'a> {
@@ -21,8 +20,10 @@ musli_web_macros::define! {
 
     type Type2;
 
+    // NB: A generic body has to ask for `EncodeBody`, which covers every mode a
+    // body can be encoded in and is what allows any `api::Format` to be used.
     impl Broadcast for Type2 {
-        impl<'de, T> Event for Types<T> where T: Decode<'de, Binary, Global> + Encode<Binary>;
+        impl<T> Event for Types<T> where T: EncodeBody;
     }
 }
 
