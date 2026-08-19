@@ -191,6 +191,8 @@ impl crate::ws::server_sealed::Sealed for AxumServer {}
 /// implementation uses axum.
 ///
 /// See [`server()`] for how this is constructed and used.
+///
+/// [`Server`]: crate::ws::Server
 #[non_exhaustive]
 pub enum AxumServer {}
 
