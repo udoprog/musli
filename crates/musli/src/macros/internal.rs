@@ -245,6 +245,14 @@ macro_rules! bare_encoding {
         /// Decode the given type `T` from the given slice using the default
         /// [`Encoding`].
         ///
+        /// The whole slice has to be consumed by the value being decoded, and
+        /// anything left over is reported as an error. Use [`decode`] with a
+        /// [`Reader`] to instead stop at the end of the value, which is what
+        /// allows several values to be read out of one buffer.
+        ///
+        /// [`decode`]: self::decode
+        /// [`Reader`]: crate::Reader
+        ///
         /// # Examples
         ///
         /// ```
@@ -290,6 +298,7 @@ macro_rules! encoding_impls {
         $encoder_new:path,
         $decoder_new:path,
         $reader_trait:ident :: $into_reader:ident,
+        $reader_kind:path,
         $writer_trait:ident :: $into_writer:ident $(,)?
     ) => {
         /// Encode the given value to the given [`Writer`] using the current
@@ -561,6 +570,14 @@ macro_rules! encoding_impls {
         /// Decode the given type `T` from the given slice using the current
         /// [`Encoding`].
         ///
+        /// The whole slice has to be consumed by the value being decoded, and
+        /// anything left over is reported as an error. Use
+        /// [`Encoding::decode`] with a [`Reader`] to instead stop at the end of
+        /// the value, which is what allows several values to be read out of one
+        /// buffer.
+        ///
+        /// [`Reader`]: crate::Reader
+        ///
         /// # Examples
         ///
         /// ```
@@ -599,6 +616,9 @@ macro_rules! encoding_impls {
 
         /// Decode the given type `T` from the given string using the current
         /// [`Encoding`].
+        ///
+        /// The whole string has to be consumed by the value being decoded, and
+        /// anything left over is reported as an error.
         ///
         /// This is an alias over [`Encoding::from_slice`] for convenience. See
         /// its documentation for more.
@@ -927,6 +947,9 @@ macro_rules! encoding_impls {
         /// Decode the given type `T` from the given slice using the current
         /// [`Encoding`].
         ///
+        /// The whole slice has to be consumed by the value being decoded, and
+        /// anything left over is reported as an error.
+        ///
         /// This is the same as [`Encoding::from_slice`], but allows for using a
         /// configurable [`Context`].
         ///
@@ -967,7 +990,18 @@ macro_rules! encoding_impls {
             C: Context,
             T: Decode<'de, $mode, C::Allocator>,
         {
-            self.decode_with(cx, bytes)
+            cx.clear();
+            let mut reader = $reader_trait::$into_reader(bytes);
+            let value = T::decode($decoder_new(
+                cx,
+                <_ as $reader_kind>::borrow_mut(&mut reader),
+            ))?;
+
+            if !<_ as $reader_kind>::is_exhausted(&mut reader, cx) {
+                return Err($crate::Context::message(cx, "Trailing input"));
+            }
+
+            Ok(value)
         }
 
         /// Decode the given type `T` from the given string using the current

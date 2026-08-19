@@ -126,6 +126,7 @@ where
         StorageEncoder::<OPT, false, _, _, M>::new,
         StorageDecoder::<OPT, false, _, _, M>::new,
         IntoReader::into_reader,
+        crate::Reader,
         IntoWriter::into_writer,
     );
 }

@@ -60,6 +60,21 @@ pub trait Reader<'de>: self::sealed::Sealed {
     /// Test if the reader is at end of input.
     fn is_eof(&mut self) -> bool;
 
+    /// Test if the input has been fully consumed.
+    ///
+    /// This is used by entry points which are handed the whole input, such as
+    /// [`Encoding::from_slice`], to reject anything left over. A textual format
+    /// overrides this to ignore trailing whitespace.
+    ///
+    /// [`Encoding::from_slice`]: crate::storage::Encoding::from_slice
+    #[doc(hidden)]
+    fn is_exhausted<C>(&mut self, _: C) -> bool
+    where
+        C: Context,
+    {
+        self.is_eof()
+    }
+
     /// Skip over the given number of bytes.
     fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where

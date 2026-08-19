@@ -127,6 +127,7 @@ where
         WireEncoder::<OPT, _, _, M>::new,
         WireDecoder::<OPT, _, _, M>::new,
         IntoReader::into_reader,
+        crate::Reader,
         IntoWriter::into_writer,
     );
 }
