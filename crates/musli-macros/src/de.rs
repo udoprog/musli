@@ -308,37 +308,35 @@ fn decode_untagged_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum<'_>) -> Result<T
         }
     });
 
-    let mut it = en.variants.iter();
+    let index_var = b.cx.ident("index");
 
-    let decode_last = match it.next_back() {
-        Some(last) => {
-            let decode = decode_struct(cx, b, &last.st)?;
+    // Each variant is probed through a clone of the decoder, since a failed
+    // attempt must not consume any input. Once the matching variant is known it
+    // is decoded again through the original decoder, so that the input is
+    // actually consumed by the value which was decoded.
+    let mut probes = Vec::new();
+    let mut commits = Vec::new();
 
-            Some(quote! {
-                let #result_var: #result<_, <#d_param as #decoder_t<#lt>>::Error> = (|| #decode)();
-
-                if let #result::Ok(output) = #result_var {
-                    break 'output output;
-                }
-            })
-        }
-        None => None,
-    };
-
-    let mut decode_head = Vec::new();
-
-    for v in it {
+    for (index, v) in en.variants.iter().enumerate() {
         let decode = decode_struct(cx, b, &v.st)?;
+        let index = syn::Index::from(index);
 
-        decode_head.push(quote! {
+        probes.push(quote! {
             if let #option::Some(#decoder_var) = #decoder_t::try_clone(&#decoder_var) {
                 #context_t::restore(#ctx_var, &#mark_var);
 
                 let #result_var: #result<_, <#d_param as #decoder_t<#lt>>::Error> = (|| #decode)();
 
-                if let #result::Ok(output) = #result_var {
-                    break 'output output;
+                if #result::is_ok(&#result_var) {
+                    break 'index #index;
                 }
+            }
+        });
+
+        commits.push(quote! {
+            #index => {
+                #context_t::restore(#ctx_var, &#mark_var);
+                (|| #decode)()?
             }
         });
     }
@@ -346,13 +344,17 @@ fn decode_untagged_enum(cx: &Ctxt<'_>, b: &Build<'_>, en: &Enum<'_>) -> Result<T
     let decode = quote! {{
         #enter
 
-        let #output_var: Self = 'output: {
-            let #mark_var = #context_t::mark(#ctx_var);
+        let #mark_var = #context_t::mark(#ctx_var);
 
-            #(#decode_head)*
-            #decode_last
+        let #index_var: usize = 'index: {
+            #(#probes)*
 
             return #result::Err(#messages::untagged_mismatch(#ctx_var, #type_name));
+        };
+
+        let #output_var: Self = match #index_var {
+            #(#commits)*
+            _ => return #result::Err(#messages::untagged_mismatch(#ctx_var, #type_name)),
         };
 
         #leave

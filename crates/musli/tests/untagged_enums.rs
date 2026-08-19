@@ -129,3 +129,38 @@ fn untagged_enum() {
         json = r#"{"foo":1,"bar":2,"baz":3}"#,
     };
 }
+
+/// A variant which is not the last one is probed through a clone of the
+/// decoder, so the input has to be consumed through the original decoder once
+/// the variant is known. Otherwise the reader is left where it started and the
+/// same value is read over and over.
+// NB: `&mut reader` is load bearing. A `&[u8]` is `Copy`, so passing it by
+// value would decode out of a copy and leave `reader` where it was, which is
+// exactly what this test is checking against.
+#[allow(clippy::needless_borrows_for_generic_args)]
+#[test]
+fn untagged_advances_the_reader() {
+    let first = Untagged::Person {
+        name: String::from("John"),
+        age: 37,
+    };
+
+    let second = Untagged::Struct(Struct {
+        foo: 1,
+        bar: 2,
+        baz: 3,
+    });
+
+    let mut bytes = musli::storage::to_vec(&first).unwrap();
+    bytes.extend_from_slice(&musli::storage::to_vec(&second).unwrap());
+
+    let mut reader = &bytes[..];
+
+    let a: Untagged = musli::storage::decode(&mut reader).unwrap();
+    assert_eq!(a, first);
+
+    let b: Untagged = musli::storage::decode(&mut reader).unwrap();
+    assert_eq!(b, second);
+
+    assert!(reader.is_empty(), "the whole input should be consumed");
+}
