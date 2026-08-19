@@ -83,9 +83,10 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
     }
 
     let allocator_ident = &b.p.allocator_ident;
+    let allocator = &b.p.allocator;
     let mode_ident = b.expansion.mode_path(b.tokens);
 
-    if !b.p.allocator_exists {
+    if !b.p.allocator_fixed && !b.p.allocator_exists {
         generics
             .params
             .push(syn::GenericParam::Type(allocator_ident.clone().into()));
@@ -114,7 +115,7 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
         }
 
         let mut bounds = Punctuated::new();
-        bounds.push(syn::parse_quote!(#decode_t<#lt, #mode_ident, #allocator_ident>));
+        bounds.push(syn::parse_quote!(#decode_t<#lt, #mode_ident, #allocator>));
 
         generics
             .make_where_clause()
@@ -143,7 +144,7 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
         const _: () = {
             #[automatically_derived]
             #(#attributes)*
-            impl #impl_generics #decode_t<#lt, #mode_ident, #allocator_ident> for #type_ident #type_generics
+            impl #impl_generics #decode_t<#lt, #mode_ident, #allocator> for #type_ident #type_generics
             #where_clause
             {
                 const IS_BITWISE_DECODE: bool = #packed;
@@ -151,7 +152,7 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
                 #[inline]
                 fn decode<#d_param>(#decoder_var: #d_param) -> #result<Self, <#d_param as #decoder_t<#lt>>::Error>
                 where
-                    #d_param: #decoder_t<#lt, Mode = #mode_ident, Allocator = #allocator_ident>,
+                    #d_param: #decoder_t<#lt, Mode = #mode_ident, Allocator = #allocator>,
                 {
                     let #ctx_var = #decoder_t::cx(&#decoder_var);
 

@@ -16,6 +16,13 @@ mod allocator;
 #[doc(inline)]
 pub use self::allocator::{Allocator, GlobalAllocator};
 
+#[cfg(feature = "alloc")]
+mod global;
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[doc(inline)]
+pub use self::global::{Global, GlobalAlloc};
+
 mod string;
 pub(crate) use self::string::collect_string;
 #[doc(inline)]

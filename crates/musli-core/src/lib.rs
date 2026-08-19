@@ -186,6 +186,8 @@ pub mod __priv {
     use core::marker::PhantomData;
 
     pub use crate::alloc::Allocator;
+    #[cfg(feature = "alloc")]
+    pub use crate::alloc::Global;
     use crate::alloc::String;
     pub use crate::context::Context;
     pub use crate::de::{

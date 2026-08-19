@@ -88,10 +88,9 @@ pub use musli_core::alloc::{
 };
 
 #[cfg(feature = "alloc")]
-mod global;
-#[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
-pub use self::global::{Global, GlobalAlloc};
+#[doc(inline)]
+pub use musli_core::alloc::{Global, GlobalAlloc};
 
 #[doc(hidden)]
 #[cfg(feature = "alloc")]
