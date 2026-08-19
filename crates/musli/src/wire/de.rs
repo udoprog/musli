@@ -63,7 +63,7 @@ where
 {
     /// Skip over any sequences of values.
     pub(crate) fn skip_any(mut self) -> Result<(), C::Error> {
-        let mut remaining = 1;
+        let mut remaining = 1usize;
 
         while remaining > 0 {
             remaining -= 1;
@@ -87,7 +87,14 @@ where
                         crate::int::decode_usize::<_, _, OPT>(self.cx, self.reader.borrow_mut())?
                     };
 
-                    remaining += len;
+                    // The length is decoded from the input, so it cannot be
+                    // trusted to be anywhere near the amount of data which is
+                    // actually available.
+                    let Some(value) = remaining.checked_add(len) else {
+                        return Err(self.cx.message("Overflow while skipping over value"));
+                    };
+
+                    remaining = value;
                 }
                 Kind::Continuation => {
                     if tag.data().is_none() {
