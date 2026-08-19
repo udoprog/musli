@@ -40,4 +40,4 @@ musli-macros = { version = "0.1.5", path = "../musli-macros", default-features =
 musli-macros = { version = "=0.1.5", path = "../musli-macros" }
 
 [dev-dependencies]
-musli = { version = "=0.1.1", path = "../musli", features = ["json"] }
+musli = { version = "=0.1.5", path = "../musli", features = ["json"] }
