@@ -13,7 +13,7 @@ use crate::en::{MapEncoder, SequenceEncoder, VariantEncoder};
 use crate::{Allocator, Context, Options};
 
 use super::de::ValueDecoder;
-use super::type_hint::{NumberHint, TypeHint};
+use super::type_hint::{FloatKind, IntegerKind, NumberHint, TypeHint};
 
 /// This is a type-erased value which can be deserialized from any [Müsli]
 /// supported type.
@@ -65,7 +65,7 @@ where
 }
 
 macro_rules! number {
-    ($ty:ty, $variant:ident, $constructor:ident, $test:ident, $example:expr) => {
+    ($ty:ty, $variant:ident, $kind:path, $as:ty, $constructor:ident, $test:ident, $example:expr) => {
         #[doc = concat!(" Construct a `", stringify!($ty), "` value.")]
         ///
         /// # Examples
@@ -81,7 +81,7 @@ macro_rules! number {
         /// assert_ne!(value, value2);
         /// ```
         pub const fn $constructor(value: $ty) -> Self {
-            Self::new(ValueKind::Number(Number::$variant(value)))
+            Self::new(ValueKind::Number(Number::$variant($kind, value as $as)))
         }
 
         #[doc = concat!(" Check if the value is a `", stringify!($ty), "`.")]
@@ -96,7 +96,7 @@ macro_rules! number {
         #[doc = concat!(" assert!(value.", stringify!($test), "());")]
         /// ```
         pub fn $test(&self) -> bool {
-            matches!(self.kind, ValueKind::Number(Number::$variant(_)))
+            matches!(self.kind, ValueKind::Number(Number::$variant($kind, _)))
         }
     }
 }
@@ -210,20 +210,36 @@ where
         matches!(self.kind, ValueKind::Char(_))
     }
 
-    number!(u8, U8, u8, is_u8, "42");
-    number!(u16, U16, u16, is_u16, "42");
-    number!(u32, U32, u32, is_u32, "42");
-    number!(u64, U64, u64, is_u64, "42");
-    number!(u128, U128, u128, is_u128, "42");
-    number!(i8, I8, i8, is_i8, "42");
-    number!(i16, I16, i16, is_i16, "42");
-    number!(i32, I32, i32, is_i32, "42");
-    number!(i64, I64, i64, is_i64, "42");
-    number!(i128, I128, i128, is_i128, "42");
-    number!(usize, Usize, usize, is_usize, "42");
-    number!(isize, Isize, isize, is_isize, "42");
-    number!(f32, F32, f32, is_f32, "3.14");
-    number!(f64, F64, f64, is_f64, "3.14");
+    number!(u8, Integer, IntegerKind::U8, u128, u8, is_u8, "42");
+    number!(u16, Integer, IntegerKind::U16, u128, u16, is_u16, "42");
+    number!(u32, Integer, IntegerKind::U32, u128, u32, is_u32, "42");
+    number!(u64, Integer, IntegerKind::U64, u128, u64, is_u64, "42");
+    number!(u128, Integer, IntegerKind::U128, u128, u128, is_u128, "42");
+    number!(i8, Integer, IntegerKind::I8, u128, i8, is_i8, "42");
+    number!(i16, Integer, IntegerKind::I16, u128, i16, is_i16, "42");
+    number!(i32, Integer, IntegerKind::I32, u128, i32, is_i32, "42");
+    number!(i64, Integer, IntegerKind::I64, u128, i64, is_i64, "42");
+    number!(i128, Integer, IntegerKind::I128, u128, i128, is_i128, "42");
+    number!(
+        usize,
+        Integer,
+        IntegerKind::USIZE,
+        u128,
+        usize,
+        is_usize,
+        "42"
+    );
+    number!(
+        isize,
+        Integer,
+        IntegerKind::ISIZE,
+        u128,
+        isize,
+        is_isize,
+        "42"
+    );
+    number!(f32, Float, FloatKind::F32, f64, f32, is_f32, "3.14");
+    number!(f64, Float, FloatKind::F64, f64, f64, is_f64, "3.14");
 
     /// Construct a map out of entries in the given iterator.
     ///
@@ -494,59 +510,48 @@ where
 
 /// A dynamic number value.
 ///
-/// This can represent any of the primitive number types in Rust.
-/// Used internally by the Value enum to store numeric data.
-#[derive(Clone, Copy, PartialEq, PartialOrd)]
+/// This can represent any of the primitive number types in Rust. The exact
+/// representation is preserved through the associated kind, while the value
+/// itself is stored in a normalized form so that it can be converted to any
+/// other number type on demand.
+#[derive(Clone, Copy, PartialEq)]
 #[non_exhaustive]
 pub(crate) enum Number {
-    /// `u8`
-    U8(u8),
-    /// `u16`
-    U16(u16),
-    /// `u32`
-    U32(u32),
-    /// `u64`
-    U64(u64),
-    /// `u128`
-    U128(u128),
-    /// `u8`
-    I8(i8),
-    /// `u16`
-    I16(i16),
-    /// `u32`
-    I32(i32),
-    /// `u64`
-    I64(i64),
-    /// `u128`
-    I128(i128),
-    /// `usize`
-    Usize(usize),
-    /// `isize`
-    Isize(isize),
-    /// `f32`
-    F32(f32),
-    /// `f64`
-    F64(f64),
+    /// An integer. Signed integers are stored sign extended, so their value is
+    /// recovered by casting the bits to an `i128`.
+    Integer(IntegerKind, u128),
+    /// A float. Every float is widened to an `f64`, which represents all of
+    /// them exactly.
+    Float(FloatKind, f64),
 }
 
 impl fmt::Debug for Number {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Number::U8(n) => n.fmt(f),
-            Number::U16(n) => n.fmt(f),
-            Number::U32(n) => n.fmt(f),
-            Number::U64(n) => n.fmt(f),
-            Number::U128(n) => n.fmt(f),
-            Number::I8(n) => n.fmt(f),
-            Number::I16(n) => n.fmt(f),
-            Number::I32(n) => n.fmt(f),
-            Number::I64(n) => n.fmt(f),
-            Number::I128(n) => n.fmt(f),
-            Number::Usize(n) => n.fmt(f),
-            Number::Isize(n) => n.fmt(f),
-            Number::F32(n) => n.fmt(f),
-            Number::F64(n) => n.fmt(f),
+            Number::Integer(kind, bits) if kind.is_signed() => (*bits as i128).fmt(f),
+            Number::Integer(_, bits) => bits.fmt(f),
+            Number::Float(FloatKind::F32, n) => (*n as f32).fmt(f),
+            Number::Float(_, n) => n.fmt(f),
+        }
+    }
+}
+
+impl PartialOrd for Number {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Number::Integer(lhs, a), Number::Integer(rhs, b)) => match lhs.cmp(rhs) {
+                Ordering::Equal if lhs.is_signed() => (*a as i128).partial_cmp(&(*b as i128)),
+                Ordering::Equal => a.partial_cmp(b),
+                ordering => Some(ordering),
+            },
+            (Number::Float(lhs, a), Number::Float(rhs, b)) => match lhs.cmp(rhs) {
+                Ordering::Equal => a.partial_cmp(b),
+                ordering => Some(ordering),
+            },
+            (Number::Integer(..), Number::Float(..)) => Some(Ordering::Less),
+            (Number::Float(..), Number::Integer(..)) => Some(Ordering::Greater),
         }
     }
 }
@@ -561,20 +566,18 @@ impl<M> Encode<M> for Number {
         E: Encoder<Mode = M>,
     {
         match self {
-            Number::U8(n) => encoder.encode_u8(*n),
-            Number::U16(n) => encoder.encode_u16(*n),
-            Number::U32(n) => encoder.encode_u32(*n),
-            Number::U64(n) => encoder.encode_u64(*n),
-            Number::U128(n) => encoder.encode_u128(*n),
-            Number::I8(n) => encoder.encode_i8(*n),
-            Number::I16(n) => encoder.encode_i16(*n),
-            Number::I32(n) => encoder.encode_i32(*n),
-            Number::I64(n) => encoder.encode_i64(*n),
-            Number::I128(n) => encoder.encode_i128(*n),
-            Number::Usize(n) => encoder.encode_usize(*n),
-            Number::Isize(n) => encoder.encode_isize(*n),
-            Number::F32(n) => encoder.encode_f32(*n),
-            Number::F64(n) => encoder.encode_f64(*n),
+            Number::Integer(IntegerKind::U8, n) => encoder.encode_u8(*n as u8),
+            Number::Integer(IntegerKind::U16, n) => encoder.encode_u16(*n as u16),
+            Number::Integer(IntegerKind::U32, n) => encoder.encode_u32(*n as u32),
+            Number::Integer(IntegerKind::U64, n) => encoder.encode_u64(*n as u64),
+            Number::Integer(IntegerKind::U128, n) => encoder.encode_u128(*n),
+            Number::Integer(IntegerKind::I8, n) => encoder.encode_i8(*n as i8),
+            Number::Integer(IntegerKind::I16, n) => encoder.encode_i16(*n as i16),
+            Number::Integer(IntegerKind::I32, n) => encoder.encode_i32(*n as i32),
+            Number::Integer(IntegerKind::I64, n) => encoder.encode_i64(*n as i64),
+            Number::Integer(IntegerKind::I128, n) => encoder.encode_i128(*n as i128),
+            Number::Float(FloatKind::F32, n) => encoder.encode_f32(*n as f32),
+            Number::Float(FloatKind::F64, n) => encoder.encode_f64(*n),
         }
     }
 
@@ -588,20 +591,8 @@ impl Number {
     /// Get the type hint for the number.
     pub(crate) fn type_hint(&self) -> NumberHint {
         match self {
-            Number::U8(_) => NumberHint::U8,
-            Number::U16(_) => NumberHint::U16,
-            Number::U32(_) => NumberHint::U32,
-            Number::U64(_) => NumberHint::U64,
-            Number::U128(_) => NumberHint::U128,
-            Number::I8(_) => NumberHint::I8,
-            Number::I16(_) => NumberHint::I16,
-            Number::I32(_) => NumberHint::I32,
-            Number::I64(_) => NumberHint::I64,
-            Number::I128(_) => NumberHint::I128,
-            Number::Usize(_) => NumberHint::Usize,
-            Number::Isize(_) => NumberHint::Isize,
-            Number::F32(_) => NumberHint::F32,
-            Number::F64(_) => NumberHint::F64,
+            Number::Integer(kind, _) => NumberHint::Integer(*kind),
+            Number::Float(kind, _) => NumberHint::Float(*kind),
         }
     }
 }
@@ -639,72 +630,114 @@ where
 
     #[inline]
     fn visit_u8(self, _: C, value: u8) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::U8(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::U8,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_u16(self, _: C, value: u16) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::U16(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::U16,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_u32(self, _: C, value: u32) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::U32(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::U32,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_u64(self, _: C, value: u64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::U64(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::U64,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_u128(self, _: C, value: u128) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::U128(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::U128,
+            value,
+        ))))
     }
 
     #[inline]
     fn visit_i8(self, _: C, value: i8) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::I8(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::I8,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_i16(self, _: C, value: i16) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::I16(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::I16,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_i32(self, _: C, value: i32) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::I32(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::I32,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_i64(self, _: C, value: i64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::I64(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::I64,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_i128(self, _: C, value: i128) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::I128(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::I128,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_usize(self, _: C, value: usize) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Usize(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::USIZE,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_isize(self, _: C, value: isize) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Isize(value))))
+        Ok(Value::new(ValueKind::Number(Number::Integer(
+            IntegerKind::ISIZE,
+            value as u128,
+        ))))
     }
 
     #[inline]
     fn visit_f32(self, _: C, value: f32) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::F32(value))))
+        Ok(Value::new(ValueKind::Number(Number::Float(
+            FloatKind::F32,
+            value as f64,
+        ))))
     }
 
     #[inline]
     fn visit_f64(self, _: C, value: f64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::F64(value))))
+        Ok(Value::new(ValueKind::Number(Number::Float(
+            FloatKind::F64,
+            value,
+        ))))
     }
 
     #[inline]
@@ -1252,7 +1285,7 @@ where
 }
 
 macro_rules! number_from {
-    ($($ty:ty => $variant:ident, $example:expr, $min:expr, $max:expr, $test:ident),* $(,)?) => {
+    ($($ty:ty => $variant:ident($kind:path) as $as:ty, $example:expr, $min:expr, $max:expr, $test:ident),* $(,)?) => {
         $(
             /// Convert from a primitive number.
             ///
@@ -1283,7 +1316,7 @@ macro_rules! number_from {
             {
                 #[inline]
                 fn from(value: $ty) -> Self {
-                    Value::new(ValueKind::Number(Number::$variant(value)))
+                    Value::new(ValueKind::Number(Number::$variant($kind, value as $as)))
                 }
             }
         )*
@@ -1291,20 +1324,20 @@ macro_rules! number_from {
 }
 
 number_from! {
-    i8 => I8, 42, i8::MAX, i8::MIN, is_i8,
-    i16 => I16, 42, i16::MAX, i16::MIN, is_i16,
-    i32 => I32, 42, i32::MAX, i32::MIN, is_i32,
-    i64 => I64, 42, i64::MAX, i64::MIN, is_i64,
-    i128 => I128, 42, i128::MAX, i128::MIN, is_i128,
-    isize => Isize, 42, isize::MAX, isize::MIN, is_isize,
-    u8 => U8, 42, u8::MAX, u8::MIN, is_u8,
-    u16 => U16, 42, u16::MAX, u16::MIN, is_u16,
-    u32 => U32, 42, u32::MAX, u32::MIN, is_u32,
-    u64 => U64, 42, u64::MAX, u64::MIN, is_u64,
-    u128 => U128, 42, u128::MAX, u128::MIN, is_u128,
-    usize => Usize, 42, usize::MAX, usize::MIN, is_usize,
-    f32 => F32, 42.42, 0.42, 100000.42, is_f32,
-    f64 => F64, 42.42, 0.42, 100000.42, is_f64,
+    i8 => Integer(IntegerKind::I8) as u128, 42, i8::MAX, i8::MIN, is_i8,
+    i16 => Integer(IntegerKind::I16) as u128, 42, i16::MAX, i16::MIN, is_i16,
+    i32 => Integer(IntegerKind::I32) as u128, 42, i32::MAX, i32::MIN, is_i32,
+    i64 => Integer(IntegerKind::I64) as u128, 42, i64::MAX, i64::MIN, is_i64,
+    i128 => Integer(IntegerKind::I128) as u128, 42, i128::MAX, i128::MIN, is_i128,
+    isize => Integer(IntegerKind::ISIZE) as u128, 42, isize::MAX, isize::MIN, is_isize,
+    u8 => Integer(IntegerKind::U8) as u128, 42, u8::MAX, u8::MIN, is_u8,
+    u16 => Integer(IntegerKind::U16) as u128, 42, u16::MAX, u16::MIN, is_u16,
+    u32 => Integer(IntegerKind::U32) as u128, 42, u32::MAX, u32::MIN, is_u32,
+    u64 => Integer(IntegerKind::U64) as u128, 42, u64::MAX, u64::MIN, is_u64,
+    u128 => Integer(IntegerKind::U128) as u128, 42, u128::MAX, u128::MIN, is_u128,
+    usize => Integer(IntegerKind::USIZE) as u128, 42, usize::MAX, usize::MIN, is_usize,
+    f32 => Float(FloatKind::F32) as f64, 42.42, 0.42, 100000.42, is_f32,
+    f64 => Float(FloatKind::F64) as f64, 42.42, 0.42, 100000.42, is_f64,
 }
 
 #[repr(transparent)]

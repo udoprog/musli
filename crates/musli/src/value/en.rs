@@ -10,6 +10,7 @@ use crate::storage::en::StorageEncoder;
 use crate::writer::BufWriter;
 use crate::{Allocator, Context, Options};
 
+use super::type_hint::{FloatKind, IntegerKind};
 use super::{Number, Value, ValueKind};
 
 /// Insert a value into the given receiver.
@@ -146,99 +147,141 @@ where
 
     #[inline]
     fn encode_u8(self, n: u8) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::U8(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::U8, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_u16(self, n: u16) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::U16(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::U16, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_u32(self, n: u32) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::U32(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::U32, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_u64(self, n: u64) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::U64(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::U64, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_u128(self, n: u128) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::U128(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::U128, n)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_i8(self, n: i8) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::I8(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::I8, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_i16(self, n: i16) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::I16(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::I16, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_i32(self, n: i32) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::I32(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::I32, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_i64(self, n: i64) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::I64(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::I64, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_i128(self, n: i128) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::I128(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::I128, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_f32(self, n: f32) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::F32(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Float(FloatKind::F32, n as f64)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_f64(self, n: f64) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::F64(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Float(FloatKind::F64, n)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_usize(self, n: usize) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::Usize(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::USIZE, n as u128)),
+        )?;
         Ok(())
     }
 
     #[inline]
     fn encode_isize(self, n: isize) -> Result<(), Self::Error> {
-        self.output
-            .write(self.cx, self.some, ValueKind::Number(Number::Isize(n)))?;
+        self.output.write(
+            self.cx,
+            self.some,
+            ValueKind::Number(Number::Integer(IntegerKind::ISIZE, n as u128)),
+        )?;
         Ok(())
     }
 

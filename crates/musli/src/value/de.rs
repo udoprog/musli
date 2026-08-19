@@ -16,7 +16,7 @@ use crate::storage::de::StorageDecoder;
 use crate::{Context, Options};
 
 use super::error::ErrorMessage;
-use super::type_hint::{NumberHint, TypeHint};
+use super::type_hint::{FloatKind, IntegerKind, NumberHint, TypeHint};
 use super::{AsValueDecoder, Number, Value, ValueKind};
 
 /// Encoder for a single value.
@@ -60,7 +60,7 @@ where
 }
 
 macro_rules! ensure_number {
-    ($self:expr, $opt:expr, $hint_type:ident, $value:ident::$variant:ident($v:ident) => $ty:ty) => {
+    ($self:expr, $opt:expr, $value:ident::$variant:ident($v:ident) => $ty:ty) => {
         match &$self.value.kind {
             $value::$variant($v) => <$ty>::from_number($v).map_err(|e| $self.cx.message(e)),
             ValueKind::String(string)
@@ -75,7 +75,7 @@ macro_rules! ensure_number {
                 let hint = $self.value.type_hint();
                 return Err($self
                     .cx
-                    .message(ErrorMessage::ExpectedNumber(NumberHint::$hint_type, hint)));
+                    .message(ErrorMessage::ExpectedNumber(<$ty>::NUMBER_HINT, hint)));
             }
         }
     };
@@ -160,72 +160,72 @@ where
 
     #[inline]
     fn decode_u8(self) -> Result<u8, Self::Error> {
-        ensure_number!(self, OPT, U8, ValueKind::Number(n) => u8)
+        ensure_number!(self, OPT, ValueKind::Number(n) => u8)
     }
 
     #[inline]
     fn decode_u16(self) -> Result<u16, Self::Error> {
-        ensure_number!(self, OPT, U16, ValueKind::Number(n) => u16)
+        ensure_number!(self, OPT, ValueKind::Number(n) => u16)
     }
 
     #[inline]
     fn decode_u32(self) -> Result<u32, Self::Error> {
-        ensure_number!(self, OPT, U32, ValueKind::Number(n) => u32)
+        ensure_number!(self, OPT, ValueKind::Number(n) => u32)
     }
 
     #[inline]
     fn decode_u64(self) -> Result<u64, Self::Error> {
-        ensure_number!(self, OPT, U64, ValueKind::Number(n) => u64)
+        ensure_number!(self, OPT, ValueKind::Number(n) => u64)
     }
 
     #[inline]
     fn decode_u128(self) -> Result<u128, Self::Error> {
-        ensure_number!(self, OPT, U128, ValueKind::Number(n) => u128)
+        ensure_number!(self, OPT, ValueKind::Number(n) => u128)
     }
 
     #[inline]
     fn decode_i8(self) -> Result<i8, Self::Error> {
-        ensure_number!(self, OPT, I8, ValueKind::Number(n) => i8)
+        ensure_number!(self, OPT, ValueKind::Number(n) => i8)
     }
 
     #[inline]
     fn decode_i16(self) -> Result<i16, Self::Error> {
-        ensure_number!(self, OPT, I16, ValueKind::Number(n) => i16)
+        ensure_number!(self, OPT, ValueKind::Number(n) => i16)
     }
 
     #[inline]
     fn decode_i32(self) -> Result<i32, Self::Error> {
-        ensure_number!(self, OPT, I32, ValueKind::Number(n) => i32)
+        ensure_number!(self, OPT, ValueKind::Number(n) => i32)
     }
 
     #[inline]
     fn decode_i64(self) -> Result<i64, Self::Error> {
-        ensure_number!(self, OPT, I64, ValueKind::Number(n) => i64)
+        ensure_number!(self, OPT, ValueKind::Number(n) => i64)
     }
 
     #[inline]
     fn decode_i128(self) -> Result<i128, Self::Error> {
-        ensure_number!(self, OPT, I128, ValueKind::Number(n) => i128)
+        ensure_number!(self, OPT, ValueKind::Number(n) => i128)
     }
 
     #[inline]
     fn decode_f32(self) -> Result<f32, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::F32, hint), ValueKind::Number(Number::F32(n)) => Ok(*n))
+        ensure_number!(self, OPT, ValueKind::Number(n) => f32)
     }
 
     #[inline]
     fn decode_f64(self) -> Result<f64, Self::Error> {
-        ensure!(self, hint, ExpectedNumber(NumberHint::F64, hint), ValueKind::Number(Number::F64(n)) => Ok(*n))
+        ensure_number!(self, OPT, ValueKind::Number(n) => f64)
     }
 
     #[inline]
     fn decode_usize(self) -> Result<usize, Self::Error> {
-        ensure_number!(self, OPT, Usize, ValueKind::Number(n) => usize)
+        ensure_number!(self, OPT, ValueKind::Number(n) => usize)
     }
 
     #[inline]
     fn decode_isize(self) -> Result<isize, Self::Error> {
-        ensure_number!(self, OPT, Isize, ValueKind::Number(n) => isize)
+        ensure_number!(self, OPT, ValueKind::Number(n) => isize)
     }
 
     #[inline]
@@ -332,20 +332,18 @@ where
             ValueKind::Bool(value) => visitor.visit_bool(self.cx, *value),
             ValueKind::Char(value) => visitor.visit_char(self.cx, *value),
             ValueKind::Number(number) => match number {
-                Number::U8(value) => visitor.visit_u8(self.cx, *value),
-                Number::U16(value) => visitor.visit_u16(self.cx, *value),
-                Number::U32(value) => visitor.visit_u32(self.cx, *value),
-                Number::U64(value) => visitor.visit_u64(self.cx, *value),
-                Number::U128(value) => visitor.visit_u128(self.cx, *value),
-                Number::I8(value) => visitor.visit_i8(self.cx, *value),
-                Number::I16(value) => visitor.visit_i16(self.cx, *value),
-                Number::I32(value) => visitor.visit_i32(self.cx, *value),
-                Number::I64(value) => visitor.visit_i64(self.cx, *value),
-                Number::I128(value) => visitor.visit_i128(self.cx, *value),
-                Number::Usize(value) => visitor.visit_usize(self.cx, *value),
-                Number::Isize(value) => visitor.visit_isize(self.cx, *value),
-                Number::F32(value) => visitor.visit_f32(self.cx, *value),
-                Number::F64(value) => visitor.visit_f64(self.cx, *value),
+                Number::Integer(IntegerKind::U8, n) => visitor.visit_u8(self.cx, *n as u8),
+                Number::Integer(IntegerKind::U16, n) => visitor.visit_u16(self.cx, *n as u16),
+                Number::Integer(IntegerKind::U32, n) => visitor.visit_u32(self.cx, *n as u32),
+                Number::Integer(IntegerKind::U64, n) => visitor.visit_u64(self.cx, *n as u64),
+                Number::Integer(IntegerKind::U128, n) => visitor.visit_u128(self.cx, *n),
+                Number::Integer(IntegerKind::I8, n) => visitor.visit_i8(self.cx, *n as i8),
+                Number::Integer(IntegerKind::I16, n) => visitor.visit_i16(self.cx, *n as i16),
+                Number::Integer(IntegerKind::I32, n) => visitor.visit_i32(self.cx, *n as i32),
+                Number::Integer(IntegerKind::I64, n) => visitor.visit_i64(self.cx, *n as i64),
+                Number::Integer(IntegerKind::I128, n) => visitor.visit_i128(self.cx, *n as i128),
+                Number::Float(FloatKind::F32, n) => visitor.visit_f32(self.cx, *n as f32),
+                Number::Float(FloatKind::F64, n) => visitor.visit_f64(self.cx, *n),
             },
             ValueKind::Bytes(bytes) => {
                 let visitor = visitor.visit_bytes(self.cx, SizeHint::exact(bytes.len()))?;
@@ -722,27 +720,18 @@ trait FromNumber: Sized {
 }
 
 macro_rules! integer_from {
-    ($ty:ty, $variant:ident) => {
+    ($ty:ty, $kind:ident) => {
         impl FromNumber for $ty {
-            const NUMBER_HINT: NumberHint = NumberHint::$variant;
+            const NUMBER_HINT: NumberHint = NumberHint::Integer(IntegerKind::$kind);
 
             #[inline]
             fn from_number(number: &Number) -> Result<Self, ErrorMessage> {
                 let out = match number {
-                    Number::U8(n) => Self::try_from(*n).ok(),
-                    Number::U16(n) => Self::try_from(*n).ok(),
-                    Number::U32(n) => Self::try_from(*n).ok(),
-                    Number::U64(n) => Self::try_from(*n).ok(),
-                    Number::U128(n) => Self::try_from(*n).ok(),
-                    Number::I8(n) => Self::try_from(*n).ok(),
-                    Number::I16(n) => Self::try_from(*n).ok(),
-                    Number::I32(n) => Self::try_from(*n).ok(),
-                    Number::I64(n) => Self::try_from(*n).ok(),
-                    Number::I128(n) => Self::try_from(*n).ok(),
-                    Number::Usize(n) => Self::try_from(*n).ok(),
-                    Number::Isize(n) => Self::try_from(*n).ok(),
-                    Number::F32(v) => Some(*v as $ty),
-                    Number::F64(v) => Some(*v as $ty),
+                    Number::Integer(kind, bits) if kind.is_signed() => {
+                        Self::try_from(*bits as i128).ok()
+                    }
+                    Number::Integer(_, bits) => Self::try_from(*bits).ok(),
+                    Number::Float(_, value) => Some(*value as $ty),
                 };
 
                 match out {
@@ -763,36 +752,17 @@ macro_rules! integer_from {
 }
 
 macro_rules! float_from {
-    ($ty:ty, $variant:ident) => {
+    ($ty:ty, $kind:ident) => {
         impl FromNumber for $ty {
-            const NUMBER_HINT: NumberHint = NumberHint::$variant;
+            const NUMBER_HINT: NumberHint = NumberHint::Float(FloatKind::$kind);
 
             #[inline]
             fn from_number(number: &Number) -> Result<Self, ErrorMessage> {
-                let out = match number {
-                    Number::U8(n) => Some(*n as $ty),
-                    Number::U16(n) => Some(*n as $ty),
-                    Number::U32(n) => Some(*n as $ty),
-                    Number::U64(n) => Some(*n as $ty),
-                    Number::U128(n) => Some(*n as $ty),
-                    Number::I8(n) => Some(*n as $ty),
-                    Number::I16(n) => Some(*n as $ty),
-                    Number::I32(n) => Some(*n as $ty),
-                    Number::I64(n) => Some(*n as $ty),
-                    Number::I128(n) => Some(*n as $ty),
-                    Number::Usize(n) => Some(*n as $ty),
-                    Number::Isize(n) => Some(*n as $ty),
-                    Number::F32(v) => Some(*v as $ty),
-                    Number::F64(v) => Some(*v as $ty),
-                };
-
-                match out {
-                    Some(out) => Ok(out),
-                    None => Err(ErrorMessage::ExpectedNumber(
-                        Self::NUMBER_HINT,
-                        TypeHint::Number(number.type_hint()),
-                    )),
-                }
+                Ok(match number {
+                    Number::Integer(kind, bits) if kind.is_signed() => *bits as i128 as $ty,
+                    Number::Integer(_, bits) => *bits as $ty,
+                    Number::Float(_, value) => *value as $ty,
+                })
             }
 
             #[inline]
@@ -813,7 +783,7 @@ integer_from!(i16, I16);
 integer_from!(i32, I32);
 integer_from!(i64, I64);
 integer_from!(i128, I128);
-integer_from!(usize, Usize);
-integer_from!(isize, Isize);
+integer_from!(usize, USIZE);
+integer_from!(isize, ISIZE);
 float_from!(f32, F32);
 float_from!(f64, F64);
