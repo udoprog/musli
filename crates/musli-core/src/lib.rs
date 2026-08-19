@@ -18,7 +18,8 @@ extern crate std;
 
 mod expecting;
 mod impls;
-mod internal;
+#[doc(hidden)]
+pub mod internal;
 mod never;
 
 pub mod alloc;

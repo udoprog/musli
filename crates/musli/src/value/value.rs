@@ -3,6 +3,8 @@ use core::fmt::{self, Write};
 use core::marker::PhantomData;
 use core::str;
 
+use musli_core::internal::size_hint::cautious;
+
 use crate::alloc::{AllocError, Box, GlobalAllocator, String, Vec};
 use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 use crate::de::{
@@ -763,8 +765,8 @@ where
     {
         let cx = seq.cx();
 
-        let mut out =
-            Vec::with_capacity_in(seq.size_hint().or_default(), cx.alloc()).map_err(cx.map())?;
+        let size = cautious::<Value<C::Allocator>>(seq.size_hint());
+        let mut out = Vec::with_capacity_in(size, cx.alloc()).map_err(cx.map())?;
 
         while let Some(item) = seq.try_next()? {
             out.push(item).map_err(cx.map())?;
@@ -780,8 +782,8 @@ where
     {
         let cx = map.cx();
 
-        let mut out =
-            Vec::with_capacity_in(map.size_hint().or_default(), cx.alloc()).map_err(cx.map())?;
+        let size = cautious::<(Value<C::Allocator>, Value<C::Allocator>)>(map.size_hint());
+        let mut out = Vec::with_capacity_in(size, cx.alloc()).map_err(cx.map())?;
 
         while let Some(mut entry) = map.decode_entry()? {
             let first = entry.decode_key()?.decode()?;
