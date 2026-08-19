@@ -172,6 +172,15 @@ impl Buf {
         self.read.set(0);
     }
 
+    /// Release any allocation beyond `capacity`.
+    ///
+    /// A single large message would otherwise pin its allocation for as long as
+    /// the buffer is pooled.
+    #[inline]
+    pub(crate) fn shrink_to(&mut self, capacity: usize) {
+        self.buffer.shrink_to(capacity);
+    }
+
     /// Get the next frame starting at the given location.
     #[inline]
     pub(crate) fn read(&self) -> Result<Option<&[u8]>, InvalidFrame> {
@@ -234,12 +243,24 @@ impl Buf {
     }
 }
 
-#[derive(Default)]
 pub(crate) struct BufPool {
     pool: RefCell<Vec<Buf>>,
+    /// Buffers are shrunk back down to this when they are returned, so a single
+    /// large message does not pin its allocation for the lifetime of the
+    /// connection.
+    max_capacity: usize,
 }
 
 impl BufPool {
+    /// Construct a pool which shrinks returned buffers to `max_capacity`.
+    #[inline]
+    pub(crate) fn new(max_capacity: usize) -> Self {
+        Self {
+            pool: RefCell::new(Vec::new()),
+            max_capacity,
+        }
+    }
+
     /// Try to run the given closure with a pool from the buffer.
     ///
     /// If the closure errors, the pool is returned.
@@ -265,6 +286,7 @@ impl BufPool {
     #[inline]
     pub(crate) fn put(&self, mut buf: Buf) {
         buf.clear();
+        buf.shrink_to(self.max_capacity);
         self.pool.borrow_mut().push(buf);
     }
 }
@@ -275,8 +297,31 @@ mod tests {
 
     use musli::Encode;
 
-    use super::Buf;
+    use super::{Buf, BufPool};
     use crate::api::Format;
+
+    /// A pooled buffer which grew past the pool's capacity must give the
+    /// allocation back when it is returned, or one large message would pin it
+    /// for the lifetime of the connection.
+    #[test]
+    fn test_pool_shrinks_returned_buffers() {
+        let pool = BufPool::new(16);
+
+        let mut buf = pool.get();
+        buf.buffer.extend_from_slice(&[0; 1024]);
+        assert!(buf.buffer.capacity() >= 1024);
+
+        pool.put(buf);
+
+        let buf = pool.get();
+        assert!(buf.buffer.is_empty());
+
+        assert!(
+            buf.buffer.capacity() <= 16,
+            "Expected the allocation to be released, got {}",
+            buf.buffer.capacity()
+        );
+    }
 
     #[test]
     fn test_empty_buf() {

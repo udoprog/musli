@@ -825,12 +825,13 @@ where
         accepts(self.formats, format)
     }
 
-    /// Modify the maximum capacity of the buffer used for outgoing messages.
+    /// Modify the max allocated capacity of the buffers used for outgoing
+    /// messages.
     ///
-    /// This is used to prevent unbounded memory usage when writing large
-    /// messages. If the buffer exceeds this capacity, it will be flushed
-    /// immediately. Note that this is not a hard limit, and messages larger than
-    /// this can still be written, but they will be flushed immediately.
+    /// This is not a hard limit. A message larger than this is still written,
+    /// but once it has been flushed the allocation is released back down to the
+    /// specified value rather than being kept for the lifetime of the
+    /// connection.
     ///
     /// By default, the capacity is 1 MiB.
     #[inline]
@@ -839,15 +840,12 @@ where
         self
     }
 
-    /// Modify the max allocated capacity of the outgoing buffer.
+    /// Modify the max allocated capacity of the outgoing buffers.
     ///
-    /// Note that this capacity can be exceeded by writing large messages, but
-    /// once messages have been flushed the allocation will be shrunk to the
-    /// specified value.
+    /// This is an alias for [`Connect::max_capacity`].
     #[inline]
-    pub fn with_max_capacity(mut self, max_capacity: usize) -> Self {
-        self.max_capacity = max_capacity;
-        self
+    pub fn with_max_capacity(self, max_capacity: usize) -> Self {
+        self.max_capacity(max_capacity)
     }
 }
 
@@ -888,12 +886,11 @@ where
             }),
             channels: self.channels,
             closing: false,
-            pool: BufPool::default(),
+            pool: BufPool::new(self.max_capacity),
             outbound: VecDeque::new(),
             error: String::new(),
             last_ping: None,
             rng: SmallRng::seed_from_u64(self.seed),
-            max_capacity: self.max_capacity,
             out: VecDeque::new(),
             socket_send: false,
             socket_flush: false,
@@ -939,10 +936,6 @@ where
     error: String,
     last_ping: Option<[u8; 4]>,
     rng: SmallRng,
-    // NB: Carried from `Connect` but not consulted anywhere yet, the outgoing
-    // buffers are never shrunk back down to it.
-    #[allow(dead_code)]
-    max_capacity: usize,
     out: VecDeque<S::Message>,
     socket_send: bool,
     socket_flush: bool,
