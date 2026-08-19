@@ -36,6 +36,7 @@ pub trait Parser<'de>: private::Sealed {
     fn try_clone(&self) -> Option<Self::TryClone>;
 
     #[doc(hidden)]
+    #[inline]
     fn parse_string<'scratch, C>(
         &mut self,
         cx: C,
