@@ -61,6 +61,15 @@ unsafe impl GlobalAllocator for Global {
 
     #[inline]
     fn clone_alloc<T>(alloc: &Self::Alloc<T>) -> Self::Alloc<T> {
+        if size_of::<T>() == 0 {
+            // Zero-sized types are never actually allocated, so cloning must
+            // not go through the global allocator with a zero-sized layout.
+            return GlobalAlloc {
+                data: NonNull::dangling(),
+                size: alloc.size,
+            };
+        }
+
         if alloc.size == 0 {
             return GlobalAlloc::DANGLING;
         }
