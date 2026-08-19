@@ -63,7 +63,21 @@ where
 {
     /// Skip over any sequences of values.
     pub(crate) fn skip_any(mut self) -> Result<(), C::Error> {
-        let mut remaining = 1;
+        let cx = self.cx;
+        let mut remaining = 1usize;
+
+        // Lengths are decoded from the input, so they cannot be trusted to be
+        // anywhere near the amount of data which is actually available.
+        macro_rules! reserve {
+            ($expr:expr) => {
+                match Option::and_then($expr, |n| remaining.checked_add(n)) {
+                    Some(value) => remaining = value,
+                    None => {
+                        return Err(cx.message("Overflow while skipping over value"));
+                    }
+                }
+            };
+        }
 
         while remaining > 0 {
             let tag = Tag::from_byte(self.reader.read_byte(self.cx)?);
@@ -74,10 +88,10 @@ where
                 }
                 Kind::Mark => match tag.mark() {
                     Mark::Variant => {
-                        remaining += 2;
+                        reserve!(Some(2));
                     }
                     Mark::Some => {
-                        remaining += 1;
+                        reserve!(Some(1));
                     }
                     Mark::Char => {
                         _ = c::decode::<_, _, u32>(self.cx, self.reader.borrow_mut())?;
@@ -95,11 +109,11 @@ where
                 }
                 Kind::Sequence => {
                     let len = self.decode_len(tag)?;
-                    remaining += len;
+                    reserve!(Some(len));
                 }
                 Kind::Map => {
                     let len = self.decode_len(tag)?;
-                    remaining += len * 2;
+                    reserve!(len.checked_mul(2));
                 }
                 kind => {
                     return Err(self
