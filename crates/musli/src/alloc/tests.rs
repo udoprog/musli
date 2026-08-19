@@ -1,6 +1,6 @@
 use crate::alloc::Disabled;
 
-use super::{Allocator, ArrayBuffer, Global, Slice, String, Vec};
+use super::{Allocator, ArrayBuffer, Box, Global, Slice, String, Vec};
 
 macro_rules! test_for_each {
     ($global:ident, $stack:ident, $inner:ident) => {
@@ -105,6 +105,14 @@ where
     assert_eq!(b.len(), 100);
 
     assert_eq!(a.as_slice(), b.as_slice());
+}
+
+/// Cloning a zero-sized allocation must not try to allocate.
+#[test]
+fn zst_box_clone() {
+    let a = Box::new_in((), Global::new()).unwrap();
+    let b = a.clone();
+    assert_eq!(*b, ());
 }
 
 test_for_each!(global_basic, stack_basic, basic_allocations);
