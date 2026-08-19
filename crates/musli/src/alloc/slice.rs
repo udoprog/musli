@@ -414,9 +414,17 @@ impl<T> Alloc<T> for SliceAlloc<'_, T> {
         let this_len = this_len * size_of::<T>();
         let other_len = other_len * size_of::<T>();
 
-        // NB: Placing this here to make miri happy, since accessing the
+        // NB: Placing these here to make miri happy, since accessing the
         // slice will mean mutably accessing the internal state.
         let other_ptr = buf.as_ptr().cast();
+        let other_capacity = buf.capacity();
+
+        // An empty region has no unique address, since every empty region
+        // starts wherever the free region does. Such a buffer cannot be
+        // identified by its pointer, and there is nothing to merge anyway.
+        if other_capacity == 0 {
+            return Err(buf);
+        }
 
         unsafe {
             let i = &mut *internal.get();
@@ -436,11 +444,18 @@ impl<T> Alloc<T> for SliceAlloc<'_, T> {
                 return Err(buf);
             };
 
+            let next = i.region(next);
+
+            // The following region might be an empty region which merely starts
+            // at the same address as the buffer being merged in, in which case
+            // it belongs to some other live allocation.
+            if next.capacity() == 0 || !ptr::eq(next.range.start.cast_const(), other_ptr) {
+                return Err(buf);
+            }
+
             // Prevent the other buffer from being dropped, since we're
             // taking care of the allocation in here directly instead.
             forget(buf);
-
-            let next = i.region(next);
 
             let to = this.range.start.wrapping_add(this_len);
 
