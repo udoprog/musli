@@ -35,10 +35,33 @@ use crate::value::en::ValueEncoder;
 use crate::{Context, Decode, Decoder, Encode, Encoder, Options};
 
 const ENCODING_BINARY: Encoding<OPTIONS, Binary> = Encoding::new();
-const ENCODING_TEXT: Encoding<OPTIONS, Text> = Encoding::new().with_mode();
+const ENCODING_TEXT: Encoding<TEXT_OPTIONS, Text> = Encoding::new().with_mode().with_options();
 
 /// The default options used in the value encoding and decoding.
 pub const OPTIONS: Options = crate::options::new().build();
+
+/// The options used in the [`Text`] mode value encoding and decoding.
+///
+/// Textual formats such as JSON can only use strings as map keys, so decoding a
+/// map with numerical keys has to parse them back out of the string. This
+/// matches what the JSON decoder does, so that a document decodes the same
+/// whether or not it is routed through a [`Value`].
+///
+/// # Examples
+///
+/// ```
+/// use std::collections::HashMap;
+///
+/// use musli::alloc::Global;
+/// use musli::value::{self, Value};
+///
+/// let value: Value<Global> = musli::json::from_str(r#"{"1":2}"#)?;
+/// let map: HashMap<u32, u32> = value::decode_text(&value)?;
+///
+/// assert_eq!(map.get(&1), Some(&2));
+/// # Ok::<_, Box<dyn core::error::Error>>(())
+/// ```
+pub const TEXT_OPTIONS: Options = crate::options::new().map_keys_as_numbers().build();
 
 /// Encode something that implements [`Encode`] into a [`Value`] in the
 /// [`Binary`] mode.
