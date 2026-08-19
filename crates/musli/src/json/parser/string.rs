@@ -348,6 +348,18 @@ where
                     let slice = &self.slice[open..self.index];
                     self.check_utf8(slice, start)?;
 
+                    // Hitting an escape means the string has to be unescaped
+                    // into the scratch buffer. Reserve room for a typical
+                    // string up front so that it usually only has to be
+                    // allocated once.
+                    if scratch.capacity() == 0 {
+                        const MIN_SCRATCH: usize = 64;
+
+                        if scratch.reserve(slice.len().max(MIN_SCRATCH)).is_err() {
+                            return Err(self.cx.message("Scratch buffer overflow"));
+                        }
+                    }
+
                     if scratch.extend_from_slice(slice).is_err() {
                         return Err(self.cx.message("Scratch buffer overflow"));
                     }
