@@ -63,5 +63,11 @@ default-features = false
 features = ["WebSocket", "MessageEvent", "BinaryType", "CloseEvent", "ErrorEvent", "Window", "Location"]
 optional = true
 
+# This cfg cannot be enabled, but it still forces Cargo to keep
+# musli-web-macros's version in lockstep with musli-web's, even if someone
+# depends on the two crates separately with musli-web's "macros" feature
+# disabled. Every musli-web-macros release is compatible with exactly one
+# musli-web release because the generated code involves nonpublic APIs which are
+# not bound by semver.
 [target.'cfg(any())'.dependencies]
 musli-web-macros = { path = "../musli-web-macros", version = "=0.4.5" }

@@ -286,6 +286,12 @@ layer! {
         content_format_with: syn::Path,
         /// `#[musli(packed)]` or `#[musli(transparent)]`.
         packing: Packing,
+        /// `#[musli(allocator = <type>)]`.
+        #[example = "allocator = <type>"]
+        allocator: syn::Type,
+        /// `#[musli(global)]`.
+        #[example = "global"]
+        global: (),
         @multiple
         /// Bounds in a where predicate.
         bounds: MusliBound,
@@ -427,6 +433,17 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
                 new.name_type.extend(ty.ty);
                 new.name_method.extend(ty.method);
                 new.name_format_with.extend(ty.format_with);
+                return Ok(());
+            }
+
+            if meta.path.is_ident("allocator") {
+                meta.input.parse::<Token![=]>()?;
+                new.allocator.push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            if meta.path.is_ident("global") {
+                new.global.push((meta.path.span(), ()));
                 return Ok(());
             }
 
@@ -831,13 +848,13 @@ impl Field {
         &self,
         mode: &Mode<'a>,
         span: Span,
-        allocator_ident: &syn::Ident,
+        allocator: &syn::Type,
     ) -> (Span, DefaultOrCustom<'a>) {
         if let Some(&(span, ref decode_path)) = self.decode_path(mode) {
             (span, DefaultOrCustom::Custom(decode_path.clone()))
         } else {
             let field_encoding = self.encoding(mode).map(|&(_, e)| e).unwrap_or_default();
-            let decode_path = mode.decode_t_decode(field_encoding, allocator_ident);
+            let decode_path = mode.decode_t_decode(field_encoding, allocator);
             (span, DefaultOrCustom::Default(decode_path))
         }
     }

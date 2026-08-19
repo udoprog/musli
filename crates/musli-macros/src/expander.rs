@@ -6,7 +6,9 @@ use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 
 use crate::internals::attr::{self, ModeIdent, ModeKind, TypeAttr};
-use crate::internals::{Build, Ctxt, Expansion, Mode, NameAll, Only, Parameters, Result, Tokens};
+use crate::internals::{
+    ATTR, Build, Ctxt, Expansion, Mode, NameAll, Only, Parameters, Result, Tokens,
+};
 
 #[derive(Clone, Copy)]
 pub(crate) enum UnsizedMethod {
@@ -273,12 +275,7 @@ impl<'a> Expander<'a> {
             )
         };
 
-        let p = Parameters {
-            lt,
-            lt_exists,
-            allocator_ident,
-            allocator_exists,
-        };
+        let p = Parameters::generic(lt, lt_exists, allocator_ident, allocator_exists);
 
         for mode_ident in modes {
             missing.remove(&mode_ident.kind);
@@ -286,7 +283,7 @@ impl<'a> Expander<'a> {
             let expansion = Expansion { mode_ident };
 
             let mode = expansion.as_mode(tokens, only);
-            let p = self.decorate(&p, &mode);
+            let p = self.decorate(&p, &mode, tokens);
 
             builds.push(crate::internals::build::setup(
                 self, expansion, mode, tokens, p,
@@ -297,7 +294,7 @@ impl<'a> Expander<'a> {
             let expansion = Expansion { mode_ident };
 
             let mode = expansion.as_mode(tokens, only);
-            let p = self.decorate(&p, &mode);
+            let p = self.decorate(&p, &mode, tokens);
 
             builds.push(crate::internals::build::setup(
                 self, expansion, mode, tokens, p,
@@ -307,7 +304,7 @@ impl<'a> Expander<'a> {
         Ok(builds)
     }
 
-    fn decorate(&self, p: &Parameters, mode: &Mode<'_>) -> Parameters {
+    fn decorate(&self, p: &Parameters, mode: &Mode<'_>, tokens: &Tokens<'_>) -> Parameters {
         let (lt, lt_exists) = 'out: {
             let list = self.type_attr.decode_bounds_lifetimes(mode);
 
@@ -342,11 +339,64 @@ impl<'a> Expander<'a> {
             (&p.allocator_ident, p.allocator_exists)
         };
 
-        Parameters {
-            lt: lt.clone(),
+        let mut p = Parameters::generic(
+            lt.clone(),
             lt_exists,
-            allocator_ident: allocator_ident.clone(),
+            allocator_ident.clone(),
             allocator_exists,
+        );
+
+        if let Some((allocator, span)) = self.fixed_allocator(mode, tokens) {
+            if allocator_exists {
+                self.cx.error_span(
+                    span,
+                    format_args!(
+                        "#[{ATTR}] the allocator cannot be pinned for a type which already has an \
+                         `A` allocator parameter"
+                    ),
+                );
+            }
+
+            if let Some(&(span, _)) = self.type_attr.decode_bounds_types(mode).first() {
+                self.cx.error_span(
+                    span,
+                    format_args!(
+                        "#[{ATTR}] the allocator parameter cannot be named when the allocator is \
+                         pinned to a concrete type"
+                    ),
+                );
+            }
+
+            p.allocator = allocator;
+            p.allocator_fixed = true;
+        }
+
+        p
+    }
+
+    /// Resolve the concrete allocator to use, as specified through
+    /// `#[musli(allocator = <type>)]` or `#[musli(global)]`.
+    fn fixed_allocator(&self, mode: &Mode<'_>, tokens: &Tokens<'_>) -> Option<(syn::Type, Span)> {
+        let allocator = self.type_attr.allocator(mode);
+        let global = self.type_attr.global(mode);
+
+        match (allocator, global) {
+            (Some((span, ty)), None) => Some((ty.clone(), *span)),
+            (None, Some(&(span, ()))) => {
+                let global = tokens.global;
+                Some((syn::parse_quote_spanned!(span => #global), span))
+            }
+            (Some(_), Some(&(span, ()))) => {
+                self.cx.error_span(
+                    span,
+                    format_args!(
+                        "#[{ATTR}(global)] cannot be combined with #[{ATTR}(allocator = <type>)]"
+                    ),
+                );
+
+                None
+            }
+            (None, None) => None,
         }
     }
 

@@ -536,6 +536,80 @@ pub struct GenericWithBound<T> {
 
 <br>
 
+#### `#[musli(allocator = <type>)]` and `#[musli(global)]`
+
+By default the [`Decode`] implementation is generic over the allocator of the
+decoder, expanding to something like this:
+
+```rust,ignore
+impl<'de, A> Decode<'de, Binary, A> for Struct
+where
+    A: Allocator
+{
+    /* .. */
+}
+```
+
+This is a problem for fields whose type is tied to a *specific* allocator, such
+as [`Value<Global>`] or [`String<Global>`]. These only implement [`Decode`] for
+the allocator they are allocated in, so the bound `Value<Global>: Decode<'de,
+Binary, A>` can never be satisfied for a generic `A`.
+
+`#[musli(allocator = <type>)]` pins the allocator of the generated [`Decode`]
+implementation to a concrete type instead, so that such fields can be used:
+
+```rust
+use musli::alloc::Global;
+use musli::value::Value;
+use musli::{Decode, Encode};
+
+#[derive(Encode, Decode)]
+#[musli(allocator = Global)]
+struct Struct {
+    value: Value<Global>,
+}
+```
+
+`#[musli(global)]` is shorthand for pinning the allocator to the [`Global`]
+allocator, so the following is equivalent to the above:
+
+```rust
+use musli::alloc::Global;
+use musli::value::Value;
+use musli::{Decode, Encode};
+
+#[derive(Encode, Decode)]
+#[musli(global)]
+struct Struct {
+    value: Value<Global>,
+}
+```
+
+Note that this restricts the type to being decoded by a decoder using that exact
+allocator. The alternative is to make the container generic over the allocator,
+which keeps it usable with any of them:
+
+```rust
+use musli::alloc::Global;
+use musli::value::Value;
+use musli::{Allocator, Decode, Encode};
+
+#[derive(Encode, Decode)]
+struct Struct<A = Global>
+where
+    A: Allocator,
+{
+    value: Value<A>,
+}
+```
+
+These attributes only affect the [`Decode`] implementation, since [`Encode`] is
+not parameterized over the allocator. They cannot be combined with each other,
+with a type which already has an `A` allocator parameter, or with
+`#[musli(decode_bound<'de, A> = {..})]`.
+
+<br>
+
 ## Enum attributes
 
 <br>
@@ -1682,6 +1756,7 @@ which decoder implementation to call.
 [`DecodeTrace`]: <https://docs.rs/musli/latest/musli/trait.DecodeTrace.html>
 [`Drop`]: <https://doc.rust-lang.org/std/ops/trait.Drop.html>
 [`Encode`]: <https://docs.rs/musli/latest/musli/trait.Encode.html>
+[`Global`]: <https://docs.rs/musli/latest/musli/alloc/struct.Global.html>
 [`EncodeBytes`]: <https://docs.rs/musli/latest/musli/en/trait.EncodeBytes.html>
 [`EncodePacked`]: <https://docs.rs/musli/latest/musli/en/trait.EncodePacked.html>
 [`Encoder::encode_variant`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html#method.encode_variant>
@@ -1689,6 +1764,8 @@ which decoder implementation to call.
 [`EncodeTrace`]: <https://docs.rs/musli/latest/musli/en/trait.EncodeTrace.html>
 [`musli::is_bitwise_decode`]: https://docs.rs/musli/latest/musli/fn.is_bitwise_decode.html
 [`musli::is_bitwise_encode`]: https://docs.rs/musli/latest/musli/fn.is_bitwise_encode.html
+[`String<Global>`]: <https://docs.rs/musli/latest/musli/alloc/struct.String.html>
 [`Text`]: <https://docs.rs/musli/latest/musli/mode/enum.Text.html>
+[`Value<Global>`]: <https://docs.rs/musli/latest/musli/value/struct.Value.html>
 [default mode]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
 [repr-rust]: <https://doc.rust-lang.org/nomicon/repr-rust.html>

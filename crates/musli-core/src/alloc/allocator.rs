@@ -10,7 +10,7 @@ use super::{Alloc, AllocError};
 /// is backed by the global allocator [`Global`] and subsequently is what will
 /// be used to allocate and free data.
 ///
-/// [`Global`]: rust_alloc::alloc::Global
+/// [`Global`]: super::Global
 pub unsafe trait GlobalAllocator
 where
     Self: Allocator,
@@ -28,7 +28,7 @@ where
     /// Construct an allocation from the given raw parts assuming they are
     /// allocated using the [`Global`] allocator.
     ///
-    /// [`Global`]: std::alloc::Global
+    /// [`Global`]: super::Global
     #[doc(hidden)]
     fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T>;
 }

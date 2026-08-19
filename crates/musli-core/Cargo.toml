@@ -31,12 +31,11 @@ verbose = ["musli-macros/verbose"]
 [dependencies]
 musli-macros = { version = "0.1.4", path = "../musli-macros", default-features = false }
 
-# Note that musli-macros is tightly coupled with the version of musli-core used.
-# Never add this as a dependency directly. This section cannot be enabled and
-# ensures that the musli-macros dependency used exactly matches the version of
-# musli-core.
-#
-# See https://github.com/serde-rs/serde/blob/master/serde/Cargo.toml
+# This cfg cannot be enabled, but it still forces Cargo to keep musli-macros's
+# version in lockstep with musli's, even if someone depends on the two crates
+# separately with musli's "macros" feature disabled. Every musli-macros release
+# is compatible with exactly one musli release because the generated code
+# involves nonpublic APIs which are not bound by semver.
 [target.'cfg(any())'.dependencies]
 musli-macros = { version = "=0.1.4", path = "../musli-macros" }
 

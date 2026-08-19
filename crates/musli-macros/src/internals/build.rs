@@ -21,9 +21,35 @@ pub(crate) struct Parameters {
     pub(crate) lt_exists: bool,
     pub(crate) allocator_ident: syn::Ident,
     pub(crate) allocator_exists: bool,
+    /// The type used for the allocator parameter of the `Decode`
+    /// implementation. This is either `allocator_ident` or the concrete type
+    /// specified through `#[musli(allocator = <type>)]` / `#[musli(global)]`.
+    pub(crate) allocator: syn::Type,
+    /// Whether the allocator is a concrete type rather than a generic
+    /// parameter, in which case no allocator parameter is introduced.
+    pub(crate) allocator_fixed: bool,
 }
 
 impl Parameters {
+    /// Construct parameters over a generic allocator parameter.
+    pub(crate) fn generic(
+        lt: syn::Lifetime,
+        lt_exists: bool,
+        allocator_ident: syn::Ident,
+        allocator_exists: bool,
+    ) -> Self {
+        let allocator = syn::parse_quote!(#allocator_ident);
+
+        Self {
+            lt,
+            lt_exists,
+            allocator_ident,
+            allocator_exists,
+            allocator,
+            allocator_fixed: false,
+        }
+    }
+
     /// Get extra idents from known parameters.
     pub(crate) fn extra_idents(&self) -> Option<&syn::Ident> {
         self.allocator_exists.then_some(&self.allocator_ident)
@@ -371,11 +397,9 @@ pub(crate) fn setup<'a>(
 ) -> Result<Build<'a>> {
     let data = match &e.data {
         Data::Struct(data) => {
-            BuildData::Struct(Box::new(setup_struct(e, &mode, data, &p.allocator_ident)))
+            BuildData::Struct(Box::new(setup_struct(e, &mode, data, &p.allocator)))
         }
-        Data::Enum(data) => {
-            BuildData::Enum(Box::new(setup_enum(e, &mode, data, &p.allocator_ident)))
-        }
+        Data::Enum(data) => BuildData::Enum(Box::new(setup_enum(e, &mode, data, &p.allocator))),
         Data::Union => {
             e.cx.error_span(e.input.ident.span(), "musli: not supported for unions");
             return Err(());
@@ -386,7 +410,7 @@ pub(crate) fn setup<'a>(
         return Err(());
     }
 
-    let decode_t_decode = mode.decode_t_decode(FieldEncoding::Default, &p.allocator_ident);
+    let decode_t_decode = mode.decode_t_decode(FieldEncoding::Default, &p.allocator);
     let encode_t_encode = mode.encode_t_encode(FieldEncoding::Default);
 
     let bounds = e.type_attr.bounds(&mode);
@@ -415,7 +439,7 @@ fn setup_struct<'a>(
     e: &'a Expander,
     mode: &Mode<'a>,
     data: &'a StructData<'a>,
-    allocator_ident: &syn::Ident,
+    allocator: &syn::Type,
 ) -> Body<'a> {
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
@@ -441,7 +465,7 @@ fn setup_struct<'a>(
     let path = syn::Path::from(syn::Ident::new("Self", e.input.ident.span()));
 
     for f in &data.fields {
-        all_fields.push(setup_field(e, mode, f, name_all, None, allocator_ident));
+        all_fields.push(setup_field(e, mode, f, name_all, None, allocator));
     }
 
     Body {
@@ -463,7 +487,7 @@ fn setup_enum<'a>(
     e: &'a Expander,
     mode: &Mode<'a>,
     data: &'a EnumData<'a>,
-    allocator_ident: &syn::Ident,
+    allocator: &syn::Type,
 ) -> Enum<'a> {
     let mut variants = Vec::with_capacity(data.variants.len());
     let mut fallback = None;
@@ -497,7 +521,7 @@ fn setup_enum<'a>(
     );
 
     for v in &data.variants {
-        variants.push(setup_variant(e, mode, v, &mut fallback, allocator_ident));
+        variants.push(setup_variant(e, mode, v, &mut fallback, allocator));
     }
 
     Enum {
@@ -520,7 +544,7 @@ fn setup_variant<'a>(
     mode: &Mode<'a>,
     data: &'a VariantData<'a>,
     fallback: &mut Option<&'a syn::Ident>,
-    allocator_ident: &syn::Ident,
+    allocator: &syn::Type,
 ) -> Variant<'a> {
     let mut all_fields = Vec::with_capacity(data.fields.len());
 
@@ -576,7 +600,7 @@ fn setup_variant<'a>(
     let mut patterns = Punctuated::default();
 
     for f in &data.fields {
-        let field = setup_field(e, mode, f, name_all, Some(&mut patterns), allocator_ident);
+        let field = setup_field(e, mode, f, name_all, Some(&mut patterns), allocator);
 
         all_fields.push(field);
     }
@@ -611,12 +635,10 @@ fn setup_field<'a>(
     data: &'a FieldData<'a>,
     name_all: NameAll,
     patterns: Option<&mut Punctuated<syn::FieldPat, Token![,]>>,
-    allocator_ident: &syn::Ident,
+    allocator: &syn::Type,
 ) -> Field<'a> {
     let encode_path = data.attr.encode_path_expanded(mode, data.span);
-    let decode_path = data
-        .attr
-        .decode_path_expanded(mode, data.span, allocator_ident);
+    let decode_path = data.attr.decode_path_expanded(mode, data.span, allocator);
     let size_hint_path = data.attr.size_hint_path_expanded(mode, data.span);
 
     let (name, name_span) = expander::expand_name(data, mode, name_all, data.ident);
