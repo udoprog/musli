@@ -675,7 +675,10 @@ impl Internal {
 
         let ptr = self.free.end.cast::<Header>().wrapping_sub(1);
 
-        if ptr < self.free.start.cast() || ptr >= self.free.end.cast() {
+        // The header is carved out of the end of the free region, so it must
+        // not overlap the region being allocated, which spans
+        // `self.free.start..end`.
+        if ptr.cast::<MaybeUninit<u8>>() < end || ptr >= self.free.end.cast() {
             return None;
         }
 

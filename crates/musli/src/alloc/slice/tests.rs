@@ -596,3 +596,46 @@ fn limits() {
 
     assert!(a.extend_from_slice(&[0]).is_err());
 }
+
+/// A sized allocation must leave room for the header describing it, otherwise
+/// the header ends up written inside of the region it describes.
+#[test]
+fn sized_allocation_leaves_room_for_header() {
+    use crate::alloc::Box;
+
+    // The largest allocation which can fit alongside its own header.
+    const LIMIT: usize = 128 - size_of::<Header>();
+
+    macro_rules! test {
+        ($n:expr) => {{
+            let mut buf = ArrayBuffer::<128>::with_size();
+            let alloc = Slice::new(&mut buf);
+
+            let result = Box::new_in([0xAAu8; $n], &alloc);
+
+            if $n <= LIMIT {
+                let value = result.expect("allocation of {$n} bytes should fit");
+                assert_eq!(value.as_ref(), &[0xAAu8; $n]);
+                // The header is intact if the region can still be described.
+                drop(value);
+            } else {
+                assert!(
+                    result.is_err(),
+                    "allocation of {} bytes must not fit in 128 bytes alongside a {} byte header",
+                    $n,
+                    size_of::<Header>()
+                );
+            }
+        }};
+    }
+
+    test!(96);
+    test!(100);
+    test!(104);
+    test!(105);
+    test!(106);
+    test!(112);
+    test!(120);
+    test!(127);
+    test!(128);
+}
