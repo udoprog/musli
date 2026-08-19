@@ -123,6 +123,17 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn peek(&mut self) -> Option<u8>;
 
+    /// Test if the input has been fully consumed, ignoring trailing whitespace
+    /// since that is not part of a JSON value.
+    #[doc(hidden)]
+    fn is_exhausted<C>(&mut self, cx: C) -> bool
+    where
+        C: Context,
+    {
+        self.skip_whitespace(cx);
+        self.peek().is_none()
+    }
+
     #[doc(hidden)]
     fn lex<C>(&mut self, cx: C) -> Token
     where

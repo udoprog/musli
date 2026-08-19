@@ -134,9 +134,9 @@ fn untagged_enum() {
 /// decoder, so the input has to be consumed through the original decoder once
 /// the variant is known. Otherwise the reader is left where it started and the
 /// same value is read over and over.
-// NB: `&mut reader` is load bearing. A `&[u8]` is `Copy`, so passing it by
-// value would decode out of a copy and leave `reader` where it was, which is
-// exactly what this test is checking against.
+// NB: the borrow cannot be removed. A `&[u8]` is `Copy`, so passing it by value
+// would decode out of a copy and leave `reader` where it was, which is exactly
+// what this test is checking against.
 #[allow(clippy::needless_borrows_for_generic_args)]
 #[test]
 fn untagged_advances_the_reader() {

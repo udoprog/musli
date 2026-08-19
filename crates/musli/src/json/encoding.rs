@@ -179,6 +179,7 @@ where
         JsonEncoder::<_, _, M>::new,
         JsonDecoder::<_, _, M>::new,
         IntoParser::into_parser,
+        crate::json::parser::Parser,
         IntoWriter::into_writer,
     );
 

@@ -125,6 +125,7 @@ where
         SelfEncoder::<OPT, _, _, M>::new,
         SelfDecoder::<OPT, _, _, M>::new,
         IntoReader::into_reader,
+        crate::Reader,
         IntoWriter::into_writer,
     );
 }
