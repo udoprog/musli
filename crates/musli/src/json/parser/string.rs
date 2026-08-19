@@ -299,6 +299,8 @@ where
         start: &C::Mark,
         scratch: &'scratch mut Vec<u8, C::Allocator>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error> {
+        // Index of the first byte of the string.
+        let string = self.index;
         // Index of the first byte not yet copied into the scratch space.
         let mut open_mark = self.cx.mark();
         let mut open = self.index;
@@ -330,7 +332,11 @@ where
                         return Ok(StringReference::Borrowed(borrowed));
                     } else {
                         let slice = &self.slice[open..self.index];
-                        self.check_utf8(slice, start)?;
+
+                        // Escape sequences only ever consist of ASCII, so
+                        // validating the raw string in one go is equivalent to
+                        // validating each segment which was copied out of it.
+                        self.check_utf8(&self.slice[string..self.index], start)?;
 
                         if scratch.extend_from_slice(slice).is_err() {
                             return Err(self.cx.message("Scratch buffer overflow"));
@@ -346,7 +352,6 @@ where
                 }
                 b'\\' => {
                     let slice = &self.slice[open..self.index];
-                    self.check_utf8(slice, start)?;
 
                     // Hitting an escape means the string has to be unescaped
                     // into the scratch buffer. Reserve room for a typical
