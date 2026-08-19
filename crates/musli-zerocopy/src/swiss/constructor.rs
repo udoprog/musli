@@ -84,7 +84,10 @@ where
 
     /// Get the length of the table.
     pub(crate) fn len(&self) -> usize {
-        self.bucket_mask - self.growth_left
+        // NB: `growth_left` starts out at the effective capacity of the table
+        // rather than at the number of buckets, since a portion of the buckets
+        // is reserved to always stay empty.
+        bucket_mask_to_capacity(self.bucket_mask) - self.growth_left
     }
 
     /// Returns the number of buckets in the table.
