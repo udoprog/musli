@@ -79,6 +79,41 @@ fn float_to_integer_coercion() -> Result<()> {
     Ok(())
 }
 
+/// A JSON document with numerical map keys must decode the same whether or not
+/// it is routed through a [`Value`], since object keys are always strings.
+#[test]
+fn numeric_map_keys() -> Result<()> {
+    use std::collections::BTreeMap;
+
+    for (input, expected) in [
+        (r#"{}"#, BTreeMap::new()),
+        (r#"{"1":2}"#, BTreeMap::from([(1u32, 2u32)])),
+        (
+            r#"{"0":1,"4294967295":2}"#,
+            BTreeMap::from([(0u32, 1u32), (u32::MAX, 2u32)]),
+        ),
+    ] {
+        assert_eq!(json::from_str::<BTreeMap<u32, u32>>(input)?, expected);
+
+        let value: Value<Global> = json::from_str(input)?;
+        assert_eq!(value::decode_text::<BTreeMap<u32, u32>>(&value)?, expected);
+    }
+
+    // Signed and wide keys.
+    let expected = BTreeMap::from([(i64::MIN, 1u32), (-1i64, 2u32)]);
+    let value: Value<Global> = json::from_str(&json::to_string(&expected)?)?;
+    assert_eq!(value::decode_text::<BTreeMap<i64, u32>>(&value)?, expected);
+
+    let expected = BTreeMap::from([(u128::MAX, 1u32)]);
+    let value: Value<Global> = json::from_str(&json::to_string(&expected)?)?;
+    assert_eq!(value::decode_text::<BTreeMap<u128, u32>>(&value)?, expected);
+
+    // Binary mode does not coerce string keys into numbers.
+    let value: Value<Global> = json::from_str(r#"{"1":2}"#)?;
+    assert!(value::decode::<BTreeMap<u32, u32>>(&value).is_err());
+    Ok(())
+}
+
 /// The exact number representation is preserved.
 #[test]
 fn number_representation() -> Result<()> {
