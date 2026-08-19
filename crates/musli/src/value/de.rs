@@ -732,14 +732,13 @@ macro_rules! integer_from {
                     }
                     Number::Integer(_, bits) => Self::try_from(*bits).ok(),
                     Number::Float(_, value) => {
-                        // Casting a float to an integer saturates, so the range
-                        // has to be checked to avoid silently coercing an out of
-                        // range value. Note that `MAX as f64` might round up,
-                        // which is why the upper bound is exclusive.
-                        let value = value.trunc();
-
-                        if value >= <$ty>::MIN as f64 && value < <$ty>::MAX as f64 + 1.0 {
-                            Some(value as $ty)
+                        // Casting a float to an integer truncates towards zero
+                        // but saturates when out of range, so the range has to
+                        // be checked to avoid silently coercing an out of range
+                        // value. Note that `MAX as f64` might round up, which is
+                        // why the upper bound is exclusive.
+                        if *value >= <$ty>::MIN as f64 && *value < <$ty>::MAX as f64 + 1.0 {
+                            Some(*value as $ty)
                         } else {
                             None
                         }

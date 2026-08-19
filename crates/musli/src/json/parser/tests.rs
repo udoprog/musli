@@ -206,7 +206,11 @@ fn test_decode_overflow() {
         test!(parse_unsigned_full, u16, "65536");
         test!(parse_unsigned_full, u32, "4294967299");
         test!(parse_unsigned_full, u64, "18446744073709551616");
-        test!(parse_unsigned_full, u128, "340282366920938463463374607431768211456");
+        test!(
+            parse_unsigned_full,
+            u128,
+            "340282366920938463463374607431768211456"
+        );
         test!(parse_signed_full, i8, "128");
         test!(parse_signed_full, i16, "32768");
         test!(parse_signed_full, i32, "2147483648");
@@ -215,4 +219,27 @@ fn test_decode_overflow() {
         // The exponent is accumulated with the same routine.
         test!(parse_unsigned_full, u64, "1e4294967299");
     })
+}
+
+/// The `powf` fallback used when `std` is unavailable must agree with `powi`,
+/// in particular for the negative exponents used to decode fractions.
+#[test]
+fn test_powf_fallback() {
+    use crate::json::parser::integer::traits::no_std::{powf32, powf64};
+
+    for e in -340..=340 {
+        assert_eq!(
+            powf64(10.0, e).to_bits(),
+            f64::powi(10.0, e).to_bits(),
+            "10f64^{e}"
+        );
+    }
+
+    for e in -50..=50 {
+        assert_eq!(
+            powf32(10.0, e).to_bits(),
+            f32::powi(10.0, e).to_bits(),
+            "10f32^{e}"
+        );
+    }
 }

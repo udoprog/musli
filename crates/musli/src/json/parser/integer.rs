@@ -559,7 +559,7 @@ fn is_digit_nonzero(b: u8) -> bool {
     (b'1'..=b'9').contains(&b)
 }
 
-mod traits {
+pub(crate) mod traits {
     use core::fmt;
     use core::ops::{Add, Not};
 
@@ -907,37 +907,40 @@ mod traits {
     float!(f32, self::no_std::powf32);
     float!(f64, self::no_std::powf64);
 
-    #[cfg(not(feature = "std"))]
-    mod no_std {
+    // NB: always compiled so that it can be tested, but only used when `std` is
+    // unavailable and `powi` can't be called.
+    #[cfg_attr(feature = "std", allow(unused))]
+    pub(crate) mod no_std {
         macro_rules! powf {
             ($ty:ty, $name:ident) => {
                 #[inline(never)]
-                pub(crate) fn $name(mut base: $ty, mut exp: i32) -> $ty {
-                    if exp == 0 {
-                        return 1.0;
-                    }
+                pub(crate) fn $name(base: $ty, exp: i32) -> $ty {
+                    fn powu(mut base: $ty, mut exp: u32) -> $ty {
+                        let mut acc = 1.0;
 
-                    while exp & 1 == 0 {
-                        base = base * base;
-                        exp >>= 1;
-                    }
+                        while exp > 0 {
+                            if exp & 1 == 1 {
+                                acc = acc * base;
+                            }
 
-                    if exp == 1 {
-                        return base;
-                    }
+                            exp >>= 1;
 
-                    let mut acc = base;
-
-                    while exp > 1 {
-                        exp >>= 1;
-                        base = base * base;
-
-                        if exp & 1 == 1 {
-                            acc = acc * base;
+                            if exp > 0 {
+                                base = base * base;
+                            }
                         }
+
+                        acc
                     }
 
-                    acc
+                    // A negative exponent is the reciprocal of the positive one.
+                    // Note that `unsigned_abs` is needed since `i32::MIN` cannot
+                    // be negated.
+                    if exp < 0 {
+                        1.0 / powu(base, exp.unsigned_abs())
+                    } else {
+                        powu(base, exp as u32)
+                    }
                 }
             };
         }
