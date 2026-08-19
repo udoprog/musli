@@ -4,7 +4,9 @@ use rust_alloc::format;
 
 use crate::context;
 use crate::json::parser::SliceParser;
-use crate::json::parser::integer::{parse_signed_full, parse_unsigned_full};
+use crate::json::parser::integer::{
+    parse_signed_base, parse_signed_full, parse_unsigned_base, parse_unsigned_full,
+};
 
 #[test]
 fn test_decode_exponent() {
@@ -218,6 +220,29 @@ fn test_decode_overflow() {
 
         // The exponent is accumulated with the same routine.
         test!(parse_unsigned_full, u64, "1e4294967299");
+
+        // The same must hold for the base-only routines.
+        test!(parse_unsigned_base, u8, "256");
+        test!(parse_unsigned_base, u16, "65536");
+        test!(parse_unsigned_base, u32, "4294967299");
+        test!(parse_unsigned_base, u64, "18446744073709551616");
+        test!(
+            parse_unsigned_base,
+            u128,
+            "340282366920938463463374607431768211456"
+        );
+        test!(parse_signed_base, i8, "128");
+        test!(parse_signed_base, i16, "32768");
+        test!(parse_signed_base, i32, "2147483648");
+        test!(parse_signed_base, i64, "9223372036854775808");
+
+        // Numbers with far more digits than the target type can hold.
+        test!(parse_unsigned_base, u8, "999999999999");
+        test!(parse_unsigned_full, u8, "999999999999");
+        test!(parse_unsigned_base, u32, "999999999999999999999999");
+        test!(parse_unsigned_full, u32, "999999999999999999999999");
+        test!(parse_signed_base, i64, "-99999999999999999999999999");
+        test!(parse_signed_full, i64, "-99999999999999999999999999");
     })
 }
 

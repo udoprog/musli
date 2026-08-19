@@ -410,9 +410,25 @@ where
 
             // Consume the remaining digits directly out of the input buffer to
             // avoid per-digit parser dispatch.
-            let n = {
+            let n = 'digits: {
                 let buf = p.remaining();
                 let mut n = 0;
+
+                // The first digit has already been decoded, so one less than
+                // the maximum number of digits can be decoded without any
+                // chance of overflowing.
+                let unchecked = buf.len().min(T::MAX_SAFE_DIGITS - 1);
+
+                while n < unchecked {
+                    let b = buf[n];
+
+                    if !is_digit(b) {
+                        break 'digits n;
+                    }
+
+                    base = base.wrapping_mul10_add(b - b'0');
+                    n += 1;
+                }
 
                 while let Some(&b) = buf.get(n) {
                     if !is_digit(b) {
@@ -586,12 +602,24 @@ pub(crate) mod traits {
     use core::fmt;
     use core::ops::{Add, Not};
 
-    pub(crate) trait Unsigned: Sized + fmt::Debug + Add<Self, Output = Self> {
+    pub(crate) trait Unsigned: Sized + Copy + fmt::Debug + Add<Self, Output = Self> {
         type Signed: Signed<Unsigned = Self>;
 
         const ZERO: Self;
 
+        /// The number of decimal digits which can always be represented by this
+        /// type without overflowing.
+        const MAX_SAFE_DIGITS: usize;
+
         fn from_byte(b: u8) -> Self;
+
+        /// Calculate `self * 10 + digit` without checking for overflow.
+        ///
+        /// Only called while the number of digits decoded so far is known to
+        /// stay within [`MAX_SAFE_DIGITS`].
+        ///
+        /// [`MAX_SAFE_DIGITS`]: Self::MAX_SAFE_DIGITS
+        fn wrapping_mul10_add(self, digit: u8) -> Self;
 
         fn is_zero(&self) -> bool;
 
@@ -677,9 +705,16 @@ pub(crate) mod traits {
 
                 const ZERO: Self = 0;
 
+                const MAX_SAFE_DIGITS: usize = count!(() $($pows)*) - 1;
+
                 #[inline]
                 fn from_byte(b: u8) -> Self {
                     b as $unsigned
+                }
+
+                #[inline]
+                fn wrapping_mul10_add(self, digit: u8) -> Self {
+                    self.wrapping_mul(10).wrapping_add(digit as $unsigned)
                 }
 
                 #[inline]
