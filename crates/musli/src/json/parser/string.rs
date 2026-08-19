@@ -55,13 +55,16 @@ impl StringReference<'_, '_> {
 }
 
 /// Accessor for a slice.
-pub(crate) struct SliceAccess<'de, C> {
+///
+/// If `UTF8` is set the underlying slice is known to be valid UTF-8, which
+/// allows string contents to be used without being validated again.
+pub(crate) struct SliceAccess<'de, C, const UTF8: bool> {
     cx: C,
     slice: &'de [u8],
     pub(crate) index: usize,
 }
 
-impl<'de, C> SliceAccess<'de, C>
+impl<'de, C, const UTF8: bool> SliceAccess<'de, C, UTF8>
 where
     C: Context,
 {
@@ -404,6 +407,10 @@ where
     /// Check that the given slice is valid UTF-8.
     #[inline]
     fn check_utf8(&self, bytes: &[u8], start: &C::Mark) -> Result<(), C::Error> {
+        if UTF8 {
+            return Ok(());
+        }
+
         if crate::str::from_utf8(bytes).is_err() {
             Err(self.cx.message_at(start, "Invalid unicode string"))
         } else {

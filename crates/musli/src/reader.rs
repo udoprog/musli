@@ -16,6 +16,7 @@ mod sealed {
     pub trait Sealed {}
 
     impl Sealed for &[u8] {}
+    impl Sealed for &str {}
     impl Sealed for super::SliceReader<'_> {}
     impl<'de, R> Sealed for Limit<R> where R: Reader<'de> {}
     impl<'de, R> Sealed for &mut R where R: ?Sized + Reader<'de> {}
@@ -194,6 +195,15 @@ impl<'de> IntoReader<'de> for &'de [u8] {
     #[inline]
     fn into_reader(self) -> Self::Reader {
         self
+    }
+}
+
+impl<'de> IntoReader<'de> for &'de str {
+    type Reader = &'de [u8];
+
+    #[inline]
+    fn into_reader(self) -> Self::Reader {
+        self.as_bytes()
     }
 }
 

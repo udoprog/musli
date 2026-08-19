@@ -29,11 +29,11 @@ impl<'de> IntoParser<'de> for &'de [u8] {
 }
 
 impl<'de> IntoParser<'de> for &'de str {
-    type Parser = SliceParser<'de>;
+    type Parser = SliceParser<'de, true>;
 
     #[inline]
     fn into_parser(self) -> Self::Parser {
-        SliceParser::new(self.as_bytes())
+        SliceParser::new_utf8(self)
     }
 }
 
@@ -47,11 +47,13 @@ impl<'a, 'de> IntoParser<'de> for &'a mut &'de [u8] {
 }
 
 impl<'a, 'de> IntoParser<'de> for &'a mut &'de str {
-    type Parser = MutSliceParser<'a, 'de>;
+    type Parser = MutSliceParser<'a, 'de, true>;
 
     #[inline]
     fn into_parser(self) -> Self::Parser {
-        // SAFETY: Parsing ensures that the slice being processes keeps being valid UTF-8.
-        MutSliceParser::new(unsafe { transmute::<Self, &'a mut &'de [u8]>(self) })
+        // SAFETY: The slice is valid UTF-8 since it comes from a string, and
+        // parsing ensures that the slice being processed keeps being valid
+        // UTF-8.
+        unsafe { MutSliceParser::new_utf8(transmute::<Self, &'a mut &'de [u8]>(self)) }
     }
 }

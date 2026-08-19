@@ -16,7 +16,7 @@ use super::string::SliceAccess;
 /// valid UTF-8. We transmute a `&'a mut &'de str` in order to construct this
 /// efficiently.
 #[repr(transparent)]
-pub struct MutSliceParser<'a, 'de> {
+pub struct MutSliceParser<'a, 'de, const UTF8: bool = false> {
     slice: &'a mut &'de [u8],
 }
 
@@ -28,17 +28,32 @@ impl<'a, 'de> MutSliceParser<'a, 'de> {
     }
 }
 
-impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
+impl<'a, 'de> MutSliceParser<'a, 'de, true> {
+    /// Construct a new instance around a slice which is known to be valid
+    /// UTF-8.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the slice contains valid UTF-8. Parsing
+    /// keeps it valid UTF-8, since the slice is only ever advanced past
+    /// complete tokens.
+    #[inline]
+    pub(crate) unsafe fn new_utf8(slice: &'a mut &'de [u8]) -> Self {
+        Self { slice }
+    }
+}
+
+impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
     type Mut<'this>
-        = MutSliceParser<'this, 'de>
+        = MutSliceParser<'this, 'de, UTF8>
     where
         Self: 'this;
 
-    type TryClone = MutSliceParser<'a, 'de>;
+    type TryClone = MutSliceParser<'a, 'de, UTF8>;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
-        MutSliceParser::new(self.slice)
+        MutSliceParser { slice: self.slice }
     }
 
     #[inline]
@@ -57,7 +72,7 @@ impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
     where
         C: Context,
     {
-        let mut access = SliceAccess::new(cx, self.slice, 0);
+        let mut access = SliceAccess::<_, UTF8>::new(cx, self.slice, 0);
         let out = access.parse_string(validate, start, scratch);
         *self.slice = &self.slice[access.index..];
         out
@@ -68,7 +83,7 @@ impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
     where
         C: Context,
     {
-        let mut access = SliceAccess::new(cx, self.slice, 0);
+        let mut access = SliceAccess::<_, UTF8>::new(cx, self.slice, 0);
         let out = access.skip_string();
         *self.slice = &self.slice[access.index..];
         out

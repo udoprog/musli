@@ -673,9 +673,6 @@ macro_rules! encoding_impls {
         ///
         /// The whole string has to be consumed by the value being decoded, and
         /// anything left over is reported as an error.
-        ///
-        /// This is an alias over [`Encoding::from_slice`] for convenience. See
-        /// its documentation for more.
         #[cfg(feature = "alloc")]
         #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
         #[inline]
@@ -683,7 +680,8 @@ macro_rules! encoding_impls {
         where
             T: Decode<'de, M, Global>,
         {
-            self.from_slice(string.as_bytes())
+            let cx = $crate::context::new().with_error();
+            self.from_str_with(&cx, string)
         }
 
         /// Encode the given value to the given [`Writer`] using the current
@@ -1063,9 +1061,6 @@ macro_rules! encoding_impls {
         /// This is the same as [`Encoding::from_str`] but allows for using a
         /// configurable [`Context`].
         ///
-        /// This is an alias over [`Encoding::from_slice_with`] for convenience.
-        /// See its documentation for more.
-        ///
         /// [`Context`]: crate::Context
         #[inline]
         pub fn from_str_with<'de, C, T>(self, cx: C, string: &'de str) -> Result<T, C::Error>
@@ -1073,7 +1068,18 @@ macro_rules! encoding_impls {
             C: Context,
             T: Decode<'de, $mode, C::Allocator>,
         {
-            self.from_slice_with(cx, string.as_bytes())
+            cx.clear();
+            let mut reader = $reader_trait::$into_reader(string);
+            let value = T::decode($decoder_new(
+                cx,
+                <_ as $reader_kind>::borrow_mut(&mut reader),
+            ))?;
+
+            if !<_ as $reader_kind>::is_exhausted(&mut reader, cx) {
+                return Err($crate::Context::message(cx, "Trailing input"));
+            }
+
+            Ok(value)
         }
     };
 }

@@ -6,8 +6,8 @@ use crate::json::parser::{StringReference, Token};
 
 mod private {
     pub trait Sealed {}
-    impl Sealed for crate::json::parser::SliceParser<'_> {}
-    impl Sealed for crate::json::parser::MutSliceParser<'_, '_> {}
+    impl<const UTF8: bool> Sealed for crate::json::parser::SliceParser<'_, UTF8> {}
+    impl<const UTF8: bool> Sealed for crate::json::parser::MutSliceParser<'_, '_, UTF8> {}
     impl<'de, R> Sealed for &mut R where R: ?Sized + super::Parser<'de> {}
 }
 
