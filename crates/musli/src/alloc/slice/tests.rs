@@ -639,3 +639,77 @@ fn sized_allocation_leaves_room_for_header() {
     test!(127);
     test!(128);
 }
+
+/// Randomized stress test which checks that concurrently live allocations
+/// never observe each other's data.
+///
+/// This is what caught a reused free-list header keeping its stale `next` link,
+/// which corrupted the chain of allocated regions.
+#[test]
+fn stress() {
+    /// Deterministic xorshift so that failures are reproducible.
+    struct Rng(u64);
+
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            let mut x = self.0;
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            self.0 = x;
+            x
+        }
+
+        fn below(&mut self, n: usize) -> usize {
+            (self.next() % n as u64) as usize
+        }
+    }
+
+    fn run(seed: u64, buf: &mut [core::mem::MaybeUninit<u8>]) {
+        let buf_size = buf.len();
+        let alloc = Slice::new(buf);
+        let mut rng = Rng(seed);
+
+        // Each allocation is paired with what it is expected to contain.
+        let mut vecs: StdVec<(Vec<u8, &Slice<'_>>, StdVec<u8>)> = StdVec::new();
+
+        for _ in 0..300 {
+            match rng.below(4) {
+                0 if vecs.len() < 6 => {
+                    vecs.push((Vec::new_in(&alloc), StdVec::new()));
+                }
+                1 | 3 if !vecs.is_empty() => {
+                    let i = rng.below(vecs.len());
+                    let n = rng.below(24);
+                    let tag = (rng.next() & 0xFF) as u8;
+                    let data = std::vec![tag; n];
+                    let (v, model) = &mut vecs[i];
+
+                    if v.extend_from_slice(&data).is_ok() {
+                        model.extend_from_slice(&data);
+                    }
+                }
+                2 if !vecs.is_empty() => {
+                    let i = rng.below(vecs.len());
+                    vecs.remove(i);
+                }
+                _ => {}
+            }
+
+            for (n, (v, model)) in vecs.iter().enumerate() {
+                assert_eq!(
+                    v.as_slice(),
+                    &model[..],
+                    "buf={buf_size} seed={seed} vec={n}"
+                );
+            }
+        }
+    }
+
+    for buf_size in [64usize, 96, 128, 192, 256, 1024] {
+        for seed in 1..200u64 {
+            let mut buf = std::vec![core::mem::MaybeUninit::<u8>::uninit(); buf_size];
+            run(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15), &mut buf);
+        }
+    }
+}
