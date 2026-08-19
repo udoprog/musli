@@ -49,6 +49,25 @@ impl fmt::Display for TypeHint {
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub(crate) enum NumberHint {
+    /// An integer of the given kind.
+    Integer(IntegerKind),
+    /// A float of the given kind.
+    Float(FloatKind),
+}
+
+impl fmt::Display for NumberHint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NumberHint::Integer(kind) => kind.fmt(f),
+            NumberHint::Float(kind) => kind.fmt(f),
+        }
+    }
+}
+
+/// The kind of an integer, which identifies its exact representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub(crate) enum IntegerKind {
     /// An unsigned 8-bit integer.
     U8,
     /// An unsigned 16-bit integer.
@@ -69,33 +88,68 @@ pub(crate) enum NumberHint {
     I64,
     /// A signed 128-bit integer.
     I128,
-    /// A [usize]-typed value.
-    Usize,
-    /// A [isize]-typed value.
-    Isize,
+}
+
+impl IntegerKind {
+    /// The kind a [usize] is represented as.
+    #[cfg(target_pointer_width = "32")]
+    pub(crate) const USIZE: Self = IntegerKind::U32;
+    /// The kind a [usize] is represented as.
+    #[cfg(target_pointer_width = "64")]
+    pub(crate) const USIZE: Self = IntegerKind::U64;
+    /// The kind an [isize] is represented as.
+    #[cfg(target_pointer_width = "32")]
+    pub(crate) const ISIZE: Self = IntegerKind::I32;
+    /// The kind an [isize] is represented as.
+    #[cfg(target_pointer_width = "64")]
+    pub(crate) const ISIZE: Self = IntegerKind::I64;
+
+    /// Test if the integer kind is signed.
+    #[inline]
+    pub(crate) const fn is_signed(self) -> bool {
+        matches!(
+            self,
+            IntegerKind::I8
+                | IntegerKind::I16
+                | IntegerKind::I32
+                | IntegerKind::I64
+                | IntegerKind::I128
+        )
+    }
+}
+
+impl fmt::Display for IntegerKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IntegerKind::U8 => write!(f, "u8"),
+            IntegerKind::U16 => write!(f, "u16"),
+            IntegerKind::U32 => write!(f, "u32"),
+            IntegerKind::U64 => write!(f, "u64"),
+            IntegerKind::U128 => write!(f, "u128"),
+            IntegerKind::I8 => write!(f, "i8"),
+            IntegerKind::I16 => write!(f, "i16"),
+            IntegerKind::I32 => write!(f, "i32"),
+            IntegerKind::I64 => write!(f, "i64"),
+            IntegerKind::I128 => write!(f, "i128"),
+        }
+    }
+}
+
+/// The kind of a float, which identifies its exact representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub(crate) enum FloatKind {
     /// A 32-bit float.
     F32,
     /// A 64-bit float.
     F64,
 }
 
-impl fmt::Display for NumberHint {
+impl fmt::Display for FloatKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NumberHint::U8 => write!(f, "u8"),
-            NumberHint::U16 => write!(f, "u16"),
-            NumberHint::U32 => write!(f, "u32"),
-            NumberHint::U64 => write!(f, "u64"),
-            NumberHint::U128 => write!(f, "u128"),
-            NumberHint::I8 => write!(f, "i8"),
-            NumberHint::I16 => write!(f, "i16"),
-            NumberHint::I32 => write!(f, "i32"),
-            NumberHint::I64 => write!(f, "i64"),
-            NumberHint::I128 => write!(f, "i128"),
-            NumberHint::Usize => write!(f, "usize"),
-            NumberHint::Isize => write!(f, "isize"),
-            NumberHint::F32 => write!(f, "f32"),
-            NumberHint::F64 => write!(f, "f64"),
+            FloatKind::F32 => write!(f, "f32"),
+            FloatKind::F64 => write!(f, "f64"),
         }
     }
 }
