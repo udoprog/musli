@@ -13,7 +13,8 @@ use axum08 as axum;
 use axum::Router;
 use axum::extract::State;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
-use axum::response::Response;
+use axum::http::StatusCode;
+use axum::response::{Redirect, Response};
 use axum::routing::any;
 use musli_web::api::{ChannelId, Format};
 use musli_web::client::{self, Handle, State as ClientState};
@@ -282,7 +283,11 @@ impl TestServer {
             formats,
         };
 
-        let app = Router::new().route("/ws", any(upgrade).with_state(state));
+        let app = Router::new()
+            .route("/ws", any(upgrade).with_state(state))
+            .route("/unauthorized", any(async || StatusCode::UNAUTHORIZED))
+            .route("/forbidden", any(async || StatusCode::FORBIDDEN))
+            .route("/login", any(async || Redirect::temporary("/login-page")));
 
         let task = tokio::spawn(async move {
             let mut shutdown_rx = shutdown_rx;
@@ -347,7 +352,7 @@ impl TestServer {
 struct TestClient {
     handle: Handle,
     task: JoinHandle<()>,
-    errors: mpsc::UnboundedReceiver<String>,
+    errors: mpsc::UnboundedReceiver<client::Error>,
 }
 
 impl TestClient {
@@ -369,7 +374,7 @@ impl TestClient {
             .format(format)
             .on_error(move |error: client::Error| {
                 tracing::debug!("Client error: {error}");
-                _ = errors_tx.send(error.to_string());
+                _ = errors_tx.send(error);
             })
             .build();
 
@@ -387,7 +392,7 @@ impl TestClient {
     }
 
     /// Receive the next error reported by the client service.
-    async fn error(&mut self) -> String {
+    async fn error(&mut self) -> client::Error {
         timeout!(self.errors.recv()).expect("Client service is gone")
     }
 
@@ -1054,7 +1059,7 @@ async fn unsupported_format_falls_back_to_default() {
     let server = TestServer::with_formats(&[Format::Wire]).await;
     let mut client = TestClient::with_format(&server.url(), Format::Json);
 
-    let error = client.error().await;
+    let error = client.error().await.to_string();
 
     assert!(
         error.contains("rejected format `json`") && error.contains("falling back to `wire`"),
@@ -1078,7 +1083,7 @@ async fn server_reports_which_formats_it_accepts() {
     let server = TestServer::with_formats(&[Format::Wire, Format::Storage]).await;
     let mut client = TestClient::with_format(&server.url(), Format::Descriptive);
 
-    let error = client.error().await;
+    let error = client.error().await.to_string();
 
     assert!(
         error.contains("`wire`") && error.contains("`storage`"),
@@ -1089,6 +1094,82 @@ async fn server_reports_which_formats_it_accepts() {
         !error.contains("`json`"),
         "The rejection must not list formats the server refuses: {error}"
     );
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn handshake_rejection_reports_http_status() {
+    let server = TestServer::new().await;
+    let url = format!("ws://{}/unauthorized", server.addr());
+
+    // With reconnecting disabled the service exits after the first failed
+    // attempt.
+    let mut client = TestClient::builder(&url, false, Format::DEFAULT);
+
+    let error = client.error().await;
+    assert_eq!(error.http_status(), Some(401));
+    assert!(error.is_unauthorized());
+    assert!(!error.is_login_redirect());
+
+    assert!(
+        error.to_string().contains("401"),
+        "The error must mention the status: {error}"
+    );
+
+    // The underlying handshake error is preserved as the source.
+    assert!(core::error::Error::source(&error).is_some());
+
+    timeout!(client.task).expect("Client task panicked");
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn forbidden_handshake_is_unauthorized() {
+    let server = TestServer::new().await;
+    let url = format!("ws://{}/forbidden", server.addr());
+
+    let mut client = TestClient::builder(&url, false, Format::DEFAULT);
+
+    let error = client.error().await;
+    assert_eq!(error.http_status(), Some(403));
+    assert!(error.is_unauthorized());
+
+    timeout!(client.task).expect("Client task panicked");
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn handshake_redirect_is_login_redirect() {
+    let server = TestServer::new().await;
+    let url = format!("ws://{}/login", server.addr());
+
+    let mut client = TestClient::builder(&url, false, Format::DEFAULT);
+
+    let error = client.error().await;
+    assert_eq!(error.http_status(), Some(307));
+    assert!(error.is_login_redirect());
+    assert!(!error.is_unauthorized());
+
+    timeout!(client.task).expect("Client task panicked");
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn handshake_rejection_keeps_reconnecting() {
+    let server = TestServer::new().await;
+    let url = format!("ws://{}/unauthorized", server.addr());
+
+    let mut client = TestClient::builder(&url, true, Format::DEFAULT);
+
+    // Every failed attempt is classified, so the same error keeps being
+    // reported while the reconnect loop is running.
+    for _ in 0..2 {
+        let error = client.error().await;
+        assert_eq!(error.http_status(), Some(401));
+        assert!(error.is_unauthorized());
+    }
 
     client.close().await;
     server.shutdown().await;

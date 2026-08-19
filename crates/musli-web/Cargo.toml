@@ -79,9 +79,9 @@ optional = true
 
 [dependencies.web-sys03]
 package = "web-sys"
-version = "0.3.0"
+version = "0.3.70"
 default-features = false
-features = ["WebSocket", "MessageEvent", "BinaryType", "CloseEvent", "ErrorEvent", "Window", "Location"]
+features = ["WebSocket", "MessageEvent", "BinaryType", "CloseEvent", "ErrorEvent", "Window", "Location", "RequestInit", "RequestCache", "RequestCredentials", "RequestRedirect", "Response", "ResponseType"]
 optional = true
 
 [dev-dependencies]

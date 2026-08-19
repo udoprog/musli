@@ -142,6 +142,14 @@ where
 
     #[doc(hidden)]
     fn connect(url: &str) -> impl Future<Output = Result<Self::Socket, Self::Error>> + Send;
+
+    /// Extract the HTTP status code from a failed websocket handshake, if the
+    /// underlying error carries one.
+    #[doc(hidden)]
+    #[inline]
+    fn http_status(_error: &Self::Error) -> Option<u16> {
+        None
+    }
 }
 
 /// Construct a new [`ServiceBuilder`] which will connect to `url`.
@@ -266,6 +274,42 @@ impl Error {
         }
     }
 
+    /// The HTTP status code of a rejected websocket handshake, if any.
+    ///
+    /// This is reported when the server (or an intermediary proxy) responds to
+    /// the websocket handshake with a plain HTTP response instead of
+    /// completing the upgrade, such as `401 Unauthorized` from an
+    /// authenticating proxy whose session has expired.
+    #[inline]
+    pub fn http_status(&self) -> Option<u16> {
+        match self.kind {
+            ErrorKind::Handshake { status, .. } => Some(status),
+            _ => None,
+        }
+    }
+
+    /// Check if the websocket handshake was rejected with `401 Unauthorized`
+    /// or `403 Forbidden`.
+    ///
+    /// This typically indicates that authentication is required or has
+    /// expired, such as when connecting through an authenticating proxy. The
+    /// client will keep trying to reconnect as usual, so the application is
+    /// expected to react to this error, for example by asking the user to log
+    /// in again.
+    #[inline]
+    pub fn is_unauthorized(&self) -> bool {
+        matches!(self.http_status(), Some(401 | 403))
+    }
+
+    /// Check if the websocket handshake was answered with a redirect (3xx).
+    ///
+    /// This typically indicates being redirected towards a login page by an
+    /// authenticating proxy.
+    #[inline]
+    pub fn is_login_redirect(&self) -> bool {
+        matches!(self.http_status(), Some(300..=399))
+    }
+
     /// Format a client error consisting of a message.
     #[inline]
     pub fn message(message: impl fmt::Display) -> Self {
@@ -283,6 +327,17 @@ impl Error {
         E: 'static + Send + Sync + core::error::Error,
     {
         Self::new(ErrorKind::Transport(Box::new(error)))
+    }
+
+    #[inline]
+    fn handshake<E>(status: u16, error: E) -> Self
+    where
+        E: 'static + Send + Sync + core::error::Error,
+    {
+        Self::new(ErrorKind::Handshake {
+            status,
+            source: Box::new(error),
+        })
     }
 
     #[inline]
@@ -318,6 +373,10 @@ enum ErrorKind {
     Message(String),
     Server(String),
     Transport(Box<dyn core::error::Error + Send + Sync>),
+    Handshake {
+        status: u16,
+        source: Box<dyn core::error::Error + Send + Sync>,
+    },
     DecodeResponseHeader(format::Error),
     DecodeErrorMessage(format::Error),
     DecodePacket(format::Error),
@@ -334,6 +393,9 @@ impl fmt::Display for Error {
             ErrorKind::Message(message) => write!(f, "{message}"),
             ErrorKind::Server(message) => write!(f, "Server error: {message}"),
             ErrorKind::Transport(..) => write!(f, "Error in underlying transport"),
+            ErrorKind::Handshake { status, .. } => {
+                write!(f, "WebSocket handshake failed with HTTP status {status}")
+            }
             ErrorKind::DecodeResponseHeader(..) => {
                 write!(f, "Encoding error when decoding response header")
             }
@@ -352,6 +414,7 @@ impl core::error::Error for Error {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.kind {
             ErrorKind::Transport(error) => Some(&**error),
+            ErrorKind::Handshake { source, .. } => Some(&**source),
             ErrorKind::DecodeResponseHeader(error) => Some(error),
             ErrorKind::DecodeErrorMessage(error) => Some(error),
             ErrorKind::DecodePacket(error) => Some(error),
@@ -737,7 +800,12 @@ where
                 self.timeout = INITIAL_TIMEOUT;
             }
             Err(error) => {
-                self.on_error.call(Error::transport(error));
+                let error = match T::http_status(&error) {
+                    Some(status) => Error::handshake(status, error),
+                    None => Error::transport(error),
+                };
+
+                self.on_error.call(error);
                 self.schedule_reconnect();
             }
         }

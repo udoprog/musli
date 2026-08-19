@@ -67,14 +67,17 @@
 use alloc::rc::Rc;
 use alloc::rc::Weak;
 
-use wasm_bindgen02::JsCast;
 use wasm_bindgen02::closure::Closure;
+use wasm_bindgen02::{JsCast, JsValue};
 use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
-use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, Window, window};
+use web_sys03::{
+    BinaryType, CloseEvent, ErrorEvent, MessageEvent, RequestCache, RequestCredentials, RequestInit,
+    RequestRedirect, Response, ResponseType, WebSocket, Window, window,
+};
 
 use crate::web::{
-    Connect, EmptyCallback, Error, Location, ServiceBuilder, Shared, SocketImpl, WebImpl,
-    WindowImpl,
+    Connect, EmptyCallback, Error, Location, ProbeOutcome, ServiceBuilder, Shared, SocketImpl,
+    WebImpl, WindowImpl,
 };
 
 pub mod prelude {
@@ -178,6 +181,7 @@ impl crate::web::sealed_window::Sealed for Window {}
 impl WindowImpl for Window {
     type Timeout = Timeout;
     type OnBeforeUnload = Event;
+    type Fetch = Fetch;
 
     #[inline]
     fn new() -> Result<Self, Error> {
@@ -227,6 +231,51 @@ impl WindowImpl for Window {
             closure: Some(closure),
         })
     }
+
+    fn fetch(
+        &self,
+        url: &str,
+        callback: impl Fn(ProbeOutcome) + 'static,
+    ) -> Result<Self::Fetch, Error> {
+        let init = RequestInit::new();
+        init.set_method("GET");
+        init.set_credentials(RequestCredentials::Include);
+        init.set_redirect(RequestRedirect::Manual);
+        // NB: A redirect towards a login page might be cacheable, and replaying
+        // it would report a stale authentication signal.
+        init.set_cache(RequestCache::NoStore);
+
+        let promise = self.fetch_with_str_and_init(url, &init);
+
+        let callback = Rc::new(callback);
+
+        let resolved = {
+            let callback = callback.clone();
+
+            Closure::<dyn FnMut(JsValue)>::new(move |value: JsValue| {
+                let outcome = match value.dyn_into::<Response>() {
+                    Ok(response) if response.type_() == ResponseType::Opaqueredirect => {
+                        ProbeOutcome::Redirect
+                    }
+                    Ok(response) => ProbeOutcome::Status(response.status()),
+                    Err(..) => ProbeOutcome::Failed,
+                };
+
+                callback(outcome);
+            })
+        };
+
+        let rejected = Closure::<dyn FnMut(JsValue)>::new(move |_: JsValue| {
+            callback(ProbeOutcome::Failed);
+        });
+
+        let _ = promise.then2(&resolved, &rejected);
+
+        Ok(Fetch {
+            _resolved: resolved,
+            _rejected: rejected,
+        })
+    }
 }
 
 pub struct Timeout {
@@ -249,6 +298,12 @@ impl Drop for Timeout {
 pub struct Event {
     #[allow(dead_code)]
     closure: Closure<dyn FnMut()>,
+}
+
+/// Keeps the callbacks of an in-flight probe request alive.
+pub struct Fetch {
+    _resolved: Closure<dyn FnMut(JsValue)>,
+    _rejected: Closure<dyn FnMut(JsValue)>,
 }
 
 impl crate::web::sealed_web::Sealed for Web03Impl {}

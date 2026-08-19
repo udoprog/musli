@@ -113,6 +113,18 @@ pub(crate) mod sealed_window {
     pub trait Sealed {}
 }
 
+/// The outcome of a probe request, as observed by a fetch implementation.
+pub(crate) enum ProbeOutcome {
+    /// A response was received with the specified HTTP status.
+    Status(u16),
+    /// The request was answered with a redirect. Browsers do not expose the
+    /// target or status of the redirect.
+    Redirect,
+    /// The fetch failed, such as due to a network error or the server being
+    /// unreachable.
+    Failed,
+}
+
 pub(crate) trait WindowImpl
 where
     Self: Sized + self::sealed_window::Sealed,
@@ -122,6 +134,9 @@ where
 
     #[doc(hidden)]
     type OnBeforeUnload;
+
+    #[doc(hidden)]
+    type Fetch;
 
     #[doc(hidden)]
     fn new() -> Result<Self, Error>;
@@ -138,6 +153,16 @@ where
 
     #[doc(hidden)]
     fn onbeforeunload(&self, callback: impl Fn() + 'static) -> Result<Self::OnBeforeUnload, Error>;
+
+    /// Issue a credentialed, non-redirect-following GET request towards `url`
+    /// and report the outcome through `callback` exactly once. The returned
+    /// handle keeps the request alive.
+    #[doc(hidden)]
+    fn fetch(
+        &self,
+        url: &str,
+        callback: impl Fn(ProbeOutcome) + 'static,
+    ) -> Result<Self::Fetch, Error>;
 }
 
 pub(crate) mod sealed_web {
@@ -190,6 +215,7 @@ where
         on_error: EmptyCallback,
         close_before_unload: false,
         format: Format::DEFAULT,
+        probe: None,
         _marker: PhantomData,
     }
 }
@@ -243,6 +269,47 @@ impl Error {
         matches!(self.kind, ErrorKind::EmptyPacket)
     }
 
+    /// The HTTP status code reported by a probe request, if any.
+    ///
+    /// Probes are enabled through [`ServiceBuilder::probe`] or
+    /// [`ServiceBuilder::probe_url`] and are performed when a connection
+    /// attempt fails. Note that only statuses indicating an authentication
+    /// problem are reported as errors.
+    #[inline]
+    pub fn http_status(&self) -> Option<u16> {
+        match self.kind {
+            ErrorKind::Unauthorized { status } => Some(status),
+            _ => None,
+        }
+    }
+
+    /// Check if a probe request determined that the endpoint rejects us with
+    /// `401 Unauthorized` or `403 Forbidden`.
+    ///
+    /// This typically indicates that authentication is required or has
+    /// expired, such as when connecting through an authenticating proxy. The
+    /// service will keep trying to reconnect as usual, so the application is
+    /// expected to react to this error, for example by asking the user to log
+    /// in again.
+    ///
+    /// See [`ServiceBuilder::probe`].
+    #[inline]
+    pub fn is_unauthorized(&self) -> bool {
+        matches!(self.kind, ErrorKind::Unauthorized { .. })
+    }
+
+    /// Check if a probe request was answered with a redirect.
+    ///
+    /// This typically indicates being redirected towards a login page by an
+    /// authenticating proxy. Note that browsers do not expose the target or
+    /// status of the redirect, so no more information is available.
+    ///
+    /// See [`ServiceBuilder::probe`].
+    #[inline]
+    pub fn is_login_redirect(&self) -> bool {
+        matches!(self.kind, ErrorKind::LoginRedirect)
+    }
+
     /// Format a WebSocket error consisting of a message.
     #[inline]
     pub fn message(message: impl fmt::Display) -> Self {
@@ -279,6 +346,8 @@ impl Error {
 enum ErrorKind {
     EmptyPacket,
     Message(String),
+    Unauthorized { status: u16 },
+    LoginRedirect,
     DecodeResponseHeader(format::Error),
     DecodeErrorMessage(format::Error),
     DecodePacket(format::Error),
@@ -292,6 +361,18 @@ impl fmt::Display for Error {
         match &self.kind {
             ErrorKind::EmptyPacket => write!(f, "Packet is empty"),
             ErrorKind::Message(message) => write!(f, "{message}"),
+            ErrorKind::Unauthorized { status } => {
+                write!(
+                    f,
+                    "Probe request was rejected with HTTP status {status}, authentication may be required"
+                )
+            }
+            ErrorKind::LoginRedirect => {
+                write!(
+                    f,
+                    "Probe request was redirected, authentication may be required"
+                )
+            }
             ErrorKind::DecodeResponseHeader(..) => {
                 write!(f, "Encoding error when decoding response header")
             }
@@ -337,6 +418,15 @@ const MAX_TIMEOUT: u32 = 4000;
 enum ConnectKind {
     Location { path: String },
     Url { url: String },
+}
+
+/// How to determine the URL to probe when a connection attempt fails.
+#[derive(Debug)]
+enum ProbeTarget {
+    /// Derive an HTTP(S) URL from the connect strategy.
+    Derive,
+    /// Probe an explicit URL.
+    Url(String),
 }
 
 /// A specification for how to connect a WebSocket.
@@ -409,6 +499,12 @@ where
     output: RefCell<Vec<u8>>,
     current_timeout: Cell<u32>,
     reconnect_timeout: RefCell<Option<<H::Window as WindowImpl>::Timeout>>,
+    probe: Option<ProbeTarget>,
+    probe_inflight: Cell<bool>,
+    // NB: Holds the handle of the most recent probe. It is only replaced when
+    // a new probe starts, never from within the probe callback itself, since
+    // dropping the underlying closure during its own invocation is unsound.
+    probe_fetch: RefCell<Option<<H::Window as WindowImpl>::Fetch>>,
     _window_onbeforeunload: Option<<H::Window as WindowImpl>::OnBeforeUnload>,
     g: Rc<Generic>,
 }
@@ -451,6 +547,7 @@ where
     on_error: E,
     close_before_unload: bool,
     format: Format,
+    probe: Option<ProbeTarget>,
     _marker: PhantomData<H>,
 }
 
@@ -469,6 +566,7 @@ where
             on_error,
             close_before_unload: self.close_before_unload,
             format: self.format,
+            probe: self.probe,
             _marker: self._marker,
         }
     }
@@ -498,6 +596,72 @@ where
     #[inline]
     pub fn close_before_unload(mut self) -> Self {
         self.close_before_unload = true;
+        self
+    }
+
+    /// Probe the endpoint over regular HTTP when a connection attempt fails,
+    /// in order to distinguish authentication failures from an unreachable
+    /// server.
+    ///
+    /// Browsers do not expose why a WebSocket connection failed to establish,
+    /// so when connecting through an authenticating proxy there is no direct
+    /// way to tell an expired session apart from the server being down. When
+    /// enabled, each failed connection attempt is followed by a credentialed
+    /// HTTP `GET` request towards the endpoint, and its outcome is classified
+    /// as follows:
+    ///
+    /// * `401 Unauthorized` or `403 Forbidden` is reported through
+    ///   [`ServiceBuilder::on_error`] as an error for which
+    ///   [`Error::is_unauthorized`] returns `true`.
+    /// * A redirect, which typically leads to a login page, is reported as an
+    ///   error for which [`Error::is_login_redirect`] returns `true`.
+    /// * Any other outcome is ignored, since it carries no authentication
+    ///   signal.
+    ///
+    /// Reconnection attempts continue as usual regardless of the probe
+    /// outcome, so it is up to the application to act on these errors, for
+    /// example by asking the user to log in again.
+    ///
+    /// The probe URL is derived from the connect strategy by mapping the `ws`
+    /// and `wss` protocols to `http` and `https` respectively. To probe a
+    /// different URL, use [`ServiceBuilder::probe_url`].
+    ///
+    /// The method is `GET` because the WebSocket handshake is itself a `GET`
+    /// carrying upgrade headers, so the probe replays the request which was
+    /// rejected. Any other method risks being treated differently by a
+    /// method-sensitive intermediary, which would make the probe disagree with
+    /// the handshake it is trying to explain. The response body is never read.
+    ///
+    /// Note that a cross-origin probe which is blocked by CORS is
+    /// indistinguishable from the server being unreachable, so probing is only
+    /// reliable towards the same origin or an endpoint which permits
+    /// cross-origin requests.
+    #[inline]
+    pub fn probe(mut self) -> Self {
+        self.probe = Some(ProbeTarget::Derive);
+        self
+    }
+
+    /// Same as [`ServiceBuilder::probe`], but probes the specified HTTP(S) URL
+    /// instead of deriving one from the connect strategy.
+    ///
+    /// Probing the WebSocket endpoint itself is what [`ServiceBuilder::probe`]
+    /// does, and is what most deployments want. An explicit URL is needed
+    /// when:
+    ///
+    /// * The endpoint is cross-origin and does not permit credentialed
+    ///   cross-origin requests, in which case a probe against it is blocked by
+    ///   CORS and fails indistinguishably from the server being unreachable.
+    ///   Point the probe at a same-origin URL guarded by the same
+    ///   authentication instead.
+    /// * The authenticating proxy only guards specific paths, and the
+    ///   WebSocket path is exempted so that upgrades are not redirected. A
+    ///   probe against it would then carry no authentication signal.
+    /// * The connect strategy uses a URL which is neither `ws` nor `wss`, from
+    ///   which no probe URL can be derived.
+    #[inline]
+    pub fn probe_url(mut self, url: impl AsRef<str>) -> Self {
+        self.probe = Some(ProbeTarget::Url(String::from(url.as_ref())));
         self
     }
 
@@ -558,6 +722,9 @@ where
                 output: RefCell::new(Vec::new()),
                 current_timeout: Cell::new(INITIAL_TIMEOUT),
                 reconnect_timeout: RefCell::new(None),
+                probe: self.probe,
+                probe_inflight: Cell::new(false),
+                probe_fetch: RefCell::new(None),
                 _window_onbeforeunload: window_onbeforeunload,
                 g: Rc::new(Generic {
                     state_listeners: RefCell::new(Slab::new()),
@@ -1020,6 +1187,11 @@ where
                         .min(MAX_TIMEOUT),
                 );
             }
+
+            // The connection was closed before it was fully established, so
+            // the attempt failed. Probe the endpoint to figure out why, if
+            // configured.
+            self.maybe_probe();
         } else {
             self.current_timeout.set(INITIAL_TIMEOUT);
             self.close_once();
@@ -1038,6 +1210,81 @@ where
         drop(self.reconnect_timeout.borrow_mut().replace(timeout));
         self.connecting.set(false);
         Ok(())
+    }
+
+    /// Probe the endpoint over HTTP after a failed connection attempt, if
+    /// configured through [`ServiceBuilder::probe`] or
+    /// [`ServiceBuilder::probe_url`].
+    fn maybe_probe(self: &Rc<Self>) {
+        let Some(target) = &self.probe else {
+            return;
+        };
+
+        if self.probe_inflight.get() {
+            return;
+        }
+
+        let url = match self.derive_probe_url(target) {
+            Ok(url) => url,
+            Err(error) => {
+                self.on_error.call(error);
+                return;
+            }
+        };
+
+        tracing::debug!(url = url.as_str(), "Probing endpoint");
+
+        let shared = Rc::downgrade(self);
+
+        let fetch = self.window.fetch(&url, move |outcome| {
+            let Some(shared) = shared.upgrade() else {
+                return;
+            };
+
+            shared.probe_inflight.set(false);
+
+            if let Some(kind) = classify_probe(outcome) {
+                shared.on_error.call(Error::new(kind));
+            }
+        });
+
+        match fetch {
+            Ok(fetch) => {
+                self.probe_inflight.set(true);
+                // NB: This drops the handle of the previous, completed probe.
+                // See the field documentation for why this must not happen
+                // from within the probe callback.
+                *self.probe_fetch.borrow_mut() = Some(fetch);
+            }
+            Err(error) => {
+                self.on_error.call(error);
+            }
+        }
+    }
+
+    /// Determine the URL to probe for the given target.
+    fn derive_probe_url(&self, target: &ProbeTarget) -> Result<String> {
+        match target {
+            ProbeTarget::Url(url) => Ok(url.clone()),
+            ProbeTarget::Derive => match &self.connect.kind {
+                ConnectKind::Location { path } => {
+                    let Location {
+                        protocol,
+                        host,
+                        port,
+                    } = WindowImpl::location(&self.window)?;
+
+                    let path = ForcePrefix(path, '/');
+                    Ok(format!("{protocol}//{host}:{port}{path}"))
+                }
+                ConnectKind::Url { url } => match probe_url_from_ws_url(url) {
+                    Some(url) => Ok(url),
+                    None => Err(Error::message(format_args!(
+                        "Cannot derive a probe URL from `{url}`, use `probe_url` to specify one"
+                    ))),
+                },
+            },
+        }
     }
 
     /// Close an pending requests with an error, since there is no chance they
@@ -3269,5 +3516,71 @@ impl fmt::Display for ForcePrefix<'_> {
         prefix.fmt(f)?;
         string.trim_start_matches(prefix).fmt(f)?;
         Ok(())
+    }
+}
+
+/// Derive an HTTP(S) URL to probe from a WebSocket URL.
+fn probe_url_from_ws_url(url: &str) -> Option<String> {
+    if let Some(rest) = url.strip_prefix("wss:") {
+        Some(format!("https:{rest}"))
+    } else if let Some(rest) = url.strip_prefix("ws:") {
+        Some(format!("http:{rest}"))
+    } else {
+        None
+    }
+}
+
+/// Classify the outcome of a probe request.
+///
+/// Only outcomes carrying an authentication signal are reported as errors,
+/// everything else means the endpoint is either reachable and accepting us, or
+/// unreachable, both of which the reconnect loop already covers.
+fn classify_probe(outcome: ProbeOutcome) -> Option<ErrorKind> {
+    match outcome {
+        ProbeOutcome::Status(status @ (401 | 403)) => Some(ErrorKind::Unauthorized { status }),
+        ProbeOutcome::Redirect => Some(ErrorKind::LoginRedirect),
+        ProbeOutcome::Status(..) | ProbeOutcome::Failed => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, ProbeOutcome, classify_probe, probe_url_from_ws_url};
+
+    #[test]
+    fn probe_url_derivation() {
+        assert_eq!(
+            probe_url_from_ws_url("ws://example.com:8080/ws").as_deref(),
+            Some("http://example.com:8080/ws")
+        );
+
+        assert_eq!(
+            probe_url_from_ws_url("wss://example.com/ws").as_deref(),
+            Some("https://example.com/ws")
+        );
+
+        assert_eq!(probe_url_from_ws_url("https://example.com/ws"), None);
+        assert_eq!(probe_url_from_ws_url("example.com/ws"), None);
+    }
+
+    #[test]
+    fn probe_classification() {
+        let error = Error::new(classify_probe(ProbeOutcome::Status(401)).unwrap());
+        assert!(error.is_unauthorized());
+        assert_eq!(error.http_status(), Some(401));
+
+        let error = Error::new(classify_probe(ProbeOutcome::Status(403)).unwrap());
+        assert!(error.is_unauthorized());
+        assert_eq!(error.http_status(), Some(403));
+
+        let error = Error::new(classify_probe(ProbeOutcome::Redirect).unwrap());
+        assert!(error.is_login_redirect());
+        assert!(!error.is_unauthorized());
+        assert_eq!(error.http_status(), None);
+
+        assert!(classify_probe(ProbeOutcome::Status(200)).is_none());
+        assert!(classify_probe(ProbeOutcome::Status(426)).is_none());
+        assert!(classify_probe(ProbeOutcome::Status(500)).is_none());
+        assert!(classify_probe(ProbeOutcome::Failed).is_none());
     }
 }

@@ -144,6 +144,14 @@ impl ClientImpl for Tungstenite029Impl {
         let (socket, _) = connect_async(url).await?;
         Ok(socket)
     }
+
+    #[inline]
+    fn http_status(error: &Self::Error) -> Option<u16> {
+        match error {
+            Error::Http(response) => Some(response.status().as_u16()),
+            _ => None,
+        }
+    }
 }
 
 impl crate::client::sealed_socket::Sealed for Socket {}
