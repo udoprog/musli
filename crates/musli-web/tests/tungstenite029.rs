@@ -15,7 +15,7 @@ use axum::extract::State;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::any;
-use musli_web::api::{ChannelId, Format};
+use musli_web::api::{ChannelId, Format, MessageId};
 use musli_web::client::{self, Handle, State as ClientState};
 use musli_web::{tungstenite029, ws};
 use tokio::net::TcpListener;
@@ -201,15 +201,25 @@ async fn upgrade(ws: WebSocketUpgrade, State(state): State<AppState>) -> Respons
 
 async fn connection(socket: WebSocket, mut state: AppState) {
     let mut ticks = state.ticks.subscribe();
-    let mut server = musli_web::axum08::server(socket, state.handler.clone());
+    let mut connect = musli_web::axum08::server(socket, state.handler.clone());
 
     if let Some(formats) = state.formats {
-        server = server.with_formats(formats);
+        connect = connect.with_formats(formats);
     }
 
     if *state.shutdown.borrow_and_update() {
         return;
     }
+
+    // NB: Nothing can be broadcast until this resolves, which is exactly the
+    // guarantee the connection step exists to provide.
+    let mut server = match connect.connect().await {
+        Ok(server) => server,
+        Err(error) => {
+            tracing::debug!("Failed to negotiate connection: {error}");
+            return;
+        }
+    };
 
     loop {
         tokio::select! {
@@ -1165,5 +1175,293 @@ async fn clients_may_use_different_formats_on_one_server() {
 
     json.close().await;
     packed.close().await;
+    server.shutdown().await;
+}
+
+/// A websocket client which speaks the wire protocol by hand.
+///
+/// The real client always negotiates before it does anything else, which is
+/// precisely the behaviour the tests below need to violate in order to show
+/// that the server refuses to play along.
+mod raw {
+    use core::future::poll_fn;
+    use core::pin::Pin;
+    use core::time::Duration;
+
+    use bytes::Bytes;
+    use futures_core03::Stream;
+    use futures_sink03::Sink;
+    use musli::reader::SliceReader;
+    use musli_web::api::{ChannelId, Format, MessageId, RequestHeader, ResponseHeader};
+    use tokio::net::TcpStream;
+
+    use crate::TIMEOUT;
+    use tokio_tungstenite029::tungstenite::Message as WsMessage;
+    use tokio_tungstenite029::{MaybeTlsStream, WebSocketStream, connect_async};
+
+    /// One binary frame received from the server, split into its fixed envelope
+    /// and whatever body followed it.
+    pub(crate) struct Frame {
+        pub(crate) header: ResponseHeader,
+        bytes: Bytes,
+        at: usize,
+    }
+
+    impl Frame {
+        /// The body of the frame, which is encoded with the format the envelope
+        /// declares.
+        pub(crate) fn body(&self) -> &[u8] {
+            &self.bytes[self.at..]
+        }
+
+        /// The [`Format`] the body is encoded with.
+        pub(crate) fn format(&self) -> Option<Format> {
+            Format::from_u8(self.header.format)
+        }
+    }
+
+    pub(crate) struct RawClient {
+        socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    }
+
+    impl RawClient {
+        /// Open a websocket connection without saying anything over it.
+        pub(crate) async fn connect(url: &str) -> Self {
+            let (socket, _) = connect_async(url).await.expect("Failed to connect");
+            Self { socket }
+        }
+
+        /// Send an envelope with no body.
+        pub(crate) async fn send(&mut self, header: RequestHeader) {
+            let mut data = Vec::new();
+            musli::packed::encode(&mut data, &header).expect("Failed to encode envelope");
+            self.send_raw(data).await;
+        }
+
+        /// Ask the server to use `format` for the rest of the connection.
+        pub(crate) async fn negotiate(&mut self, serial: u32, format: Format) {
+            self.send(RequestHeader {
+                serial,
+                id: MessageId::NEGOTIATE.get(),
+                format: format.to_u8(),
+                channel: ChannelId::NONE,
+            })
+            .await;
+        }
+
+        async fn send_raw(&mut self, data: Vec<u8>) {
+            let message = WsMessage::Binary(Bytes::from(data));
+
+            poll_fn(|cx| Pin::new(&mut self.socket).poll_ready(cx))
+                .await
+                .expect("Socket is not ready");
+
+            Pin::new(&mut self.socket)
+                .start_send(message)
+                .expect("Failed to send");
+
+            poll_fn(|cx| Pin::new(&mut self.socket).poll_flush(cx))
+                .await
+                .expect("Failed to flush");
+        }
+
+        /// Receive the next message, whatever it is.
+        async fn next(&mut self) -> Option<WsMessage> {
+            let message = poll_fn(|cx| Pin::new(&mut self.socket).poll_next(cx)).await?;
+            Some(message.expect("Socket error"))
+        }
+
+        /// Receive the next frame, ignoring keepalive traffic.
+        pub(crate) async fn frame(&mut self) -> Frame {
+            loop {
+                let message = timeout!(self.next()).expect("Connection closed unexpectedly");
+
+                let bytes = match message {
+                    WsMessage::Binary(bytes) => bytes,
+                    WsMessage::Ping(..) | WsMessage::Pong(..) => continue,
+                    message => panic!("Unexpected message: {message:?}"),
+                };
+
+                let mut reader = SliceReader::new(&bytes[..]);
+
+                let header: ResponseHeader =
+                    musli::packed::decode(&mut reader).expect("Failed to decode envelope");
+
+                let at = bytes.len() - reader.remaining();
+                return Frame { header, bytes, at };
+            }
+        }
+
+        /// Assert that the server sends no frame for the given duration.
+        ///
+        /// Keepalive traffic is allowed, since it carries nothing that depends
+        /// on the format.
+        pub(crate) async fn expect_silence(&mut self, duration: Duration) {
+            let deadline = tokio::time::Instant::now() + duration;
+
+            loop {
+                let message = match tokio::time::timeout_at(deadline, self.next()).await {
+                    Ok(message) => message.expect("Connection closed unexpectedly"),
+                    // NB: The timeout elapsing is the outcome being asserted.
+                    Err(..) => return,
+                };
+
+                match message {
+                    WsMessage::Ping(..) | WsMessage::Pong(..) => continue,
+                    message => panic!("The server sent {message:?} before the format was agreed"),
+                }
+            }
+        }
+
+        /// Wait for the server to close the connection and return the close
+        /// code it used.
+        pub(crate) async fn expect_close(mut self) -> Option<u16> {
+            loop {
+                let message = timeout!(self.next())?;
+
+                match message {
+                    WsMessage::Close(frame) => return frame.map(|f| u16::from(f.code)),
+                    WsMessage::Ping(..) | WsMessage::Pong(..) => continue,
+                    message => panic!("Expected a close, got {message:?}"),
+                }
+            }
+        }
+    }
+}
+
+/// The close code a websocket peer uses to report a protocol violation.
+const CLOSE_PROTOCOL_ERROR: u16 = 1002;
+
+/// Nothing at all may reach a client which has not agreed on a format, not even
+/// a broadcast the application asked for while the handshake was in flight.
+#[tokio::test]
+async fn nothing_is_sent_before_the_format_is_negotiated() {
+    use musli_web::api::Broadcast;
+
+    let server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    // The hello is the one thing the server may send unprompted, and it
+    // deliberately carries no body so no format applies to it.
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+    assert_eq!(frame.header.format, 0);
+    assert!(frame.body().is_empty());
+
+    // Receiving the hello proves the connection task is subscribed, so these
+    // ticks are seen by a connection which has not negotiated yet.
+    for tick in 0..4 {
+        server.tick(tick);
+    }
+
+    raw.expect_silence(Duration::from_millis(500)).await;
+
+    // Negotiating releases them, and every one arrives in the format that was
+    // just agreed rather than the default.
+    raw.negotiate(7, Format::Json).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.serial, 7);
+    assert_eq!(frame.header.broadcast, 0);
+    assert_eq!(frame.header.error, 0);
+    assert_eq!(frame.format(), Some(Format::Json));
+
+    for tick in 0..4 {
+        let frame = raw.frame().await;
+
+        assert_eq!(
+            frame.header.broadcast,
+            <api::Tick as Broadcast>::ID.get(),
+            "Expected the broadcast for tick {tick}"
+        );
+
+        assert_eq!(
+            frame.format(),
+            Some(Format::Json),
+            "A broadcast must use the negotiated format"
+        );
+    }
+
+    server.shutdown().await;
+}
+
+/// Every message other than a negotiation is a protocol violation while the
+/// format is still undecided.
+async fn first_message_is_rejected(id: MessageId) {
+    let server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    raw.send(musli_web::api::RequestHeader {
+        serial: 1,
+        id: id.get(),
+        format: Format::DEFAULT.to_u8(),
+        channel: ChannelId::NONE,
+    })
+    .await;
+
+    assert_eq!(
+        raw.expect_close().await,
+        Some(CLOSE_PROTOCOL_ERROR),
+        "Message id {id} must not be accepted before negotiating"
+    );
+
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn a_request_before_negotiating_is_rejected() {
+    use musli_web::api::Endpoint;
+
+    first_message_is_rejected(<api::Hello as Endpoint>::ID).await;
+}
+
+#[tokio::test]
+async fn opening_a_channel_before_negotiating_is_rejected() {
+    first_message_is_rejected(MessageId::CONNECT).await;
+}
+
+/// The format is settled once and for all by the connection step, so a second
+/// negotiation is refused rather than silently moving it.
+#[tokio::test]
+async fn the_format_cannot_be_renegotiated() {
+    use musli_web::api::{Broadcast, ErrorMessage};
+
+    let server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    raw.negotiate(1, Format::Wire).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.serial, 1);
+    assert_eq!(frame.format(), Some(Format::Wire));
+
+    raw.negotiate(2, Format::Json).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.serial, 2);
+    assert_eq!(frame.header.error, MessageId::ERROR_MESSAGE.get());
+
+    let error: ErrorMessage<'_> = musli::wire::from_slice(frame.body()).expect("Failed to decode");
+
+    assert!(
+        error.message.contains("already been negotiated"),
+        "Unexpected error: {}",
+        error.message
+    );
+
+    // The connection is still usable, and still on the format it first agreed
+    // to rather than the one it was just refused.
+    server.tick(1);
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, <api::Tick as Broadcast>::ID.get());
+    assert_eq!(frame.format(), Some(Format::Wire));
+
     server.shutdown().await;
 }

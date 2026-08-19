@@ -77,7 +77,17 @@ async fn handler(ws: WebSocketUpgrade, State(sender): State<Sender<Broadcast>>) 
     ws.on_upgrade(move |socket: WebSocket| async move {
         let mut subscribe = sender.subscribe();
 
-        let mut server = pin!(axum08::server(socket, MyHandler));
+        // NB: The format has to be negotiated before anything can be sent, so
+        // there is no `Server` to broadcast on until this resolves.
+        let server = match axum08::server(socket, MyHandler).connect().await {
+            Ok(server) => server,
+            Err(error) => {
+                tracing::error!("Failed to negotiate connection: {error}");
+                return;
+            }
+        };
+
+        let mut server = pin!(server);
 
         loop {
             tokio::select! {

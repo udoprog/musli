@@ -34,11 +34,21 @@
 //! 3. If the server supports that format it records it for the connection and
 //!    replies with an empty response whose envelope carries the format that was
 //!    accepted. If it does not, it replies with an error listing the formats it
-//!    does support, and the connection keeps using [`Format::DEFAULT`].
+//!    does support, and the connection settles on [`Format::DEFAULT`].
 //!
-//! A client only reports itself as connected once step 3 succeeds, which
-//! guarantees that server-initiated messages such as broadcasts are encoded
-//! with a format the client understands.
+//! Both peers are forced through this before anything else can happen:
+//!
+//! * A client only reports itself as connected once step 3 has resolved.
+//! * A server has no way to write a message until then either, since
+//!   [`ws::Connect::connect`] is what produces the [`ws::Server`] which can, and
+//!   it does not resolve until step 3 has been flushed. Any other message
+//!   arriving in place of step 2 is a protocol violation which closes the
+//!   connection.
+//!
+//! Together this guarantees that server-initiated messages such as broadcasts
+//! are encoded with a format the client understands. The format is fixed for
+//! the lifetime of a connection, so a second negotiation is refused — a client
+//! which wants a different one reconnects.
 //!
 //! Requests additionally carry their own format in the envelope, so the server
 //! decodes each request body with the format that request declares and replies
@@ -49,6 +59,8 @@
 //! to speak a format a client asks for, which is why step 3 can fail.
 //!
 //! [features]: <https://docs.rs/musli-web/latest/musli_web/#features>
+//! [`ws::Connect::connect`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Connect.html#method.connect>
+//! [`ws::Server`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html>
 
 use core::fmt;
 use core::num::NonZeroU16;

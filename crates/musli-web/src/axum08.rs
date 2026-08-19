@@ -15,9 +15,18 @@ use axum08::extract::ws::{CloseFrame, Message, WebSocket};
 use futures_core03::Stream;
 use futures_sink03::Sink;
 
-use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
+use crate::ws::{self, Connect, Handler, ServerImpl, SocketImpl};
 
-/// Construct a new axum server with the specified handler.
+/// Construct a new axum connection with the specified handler.
+///
+/// The returned [`Connect`] cannot send anything. Call [`Connect::connect`] to
+/// perform the [negotiation protocol], which hands back the [`Server`] that
+/// can. This is what makes it impossible to write a message before the client
+/// has agreed on the [`Format`] it will be encoded with.
+///
+/// [`Format`]: crate::api::Format
+/// [`Server`]: crate::ws::Server
+/// [negotiation protocol]: crate::api#negotiating-the-format
 ///
 /// # Examples
 ///
@@ -115,7 +124,15 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 ///     ws.on_upgrade(move |socket: WebSocket| async move {
 ///         let mut subscribe = sender.subscribe();
 ///
-///         let mut server = axum08::server(socket, MyHandler);
+///         // NB: Nothing can be sent until the client has negotiated a format,
+///         // which is what this step waits for.
+///         let mut server = match axum08::server(socket, MyHandler).connect().await {
+///             Ok(server) => server,
+///             Err(error) => {
+///                 tracing::error!("Failed to negotiate: {error}");
+///                 return;
+///             }
+///         };
 ///
 ///         loop {
 ///             tokio::select! {
@@ -161,11 +178,11 @@ use crate::ws::{self, Handler, Server, ServerImpl, SocketImpl};
 /// }
 /// ```
 #[inline]
-pub fn server<H>(socket: WebSocket, handler: H) -> Server<AxumServer, H>
+pub fn server<H>(socket: WebSocket, handler: H) -> Connect<AxumServer, H>
 where
     H: Handler,
 {
-    Server::new(socket, handler)
+    Connect::new(socket, handler)
 }
 
 impl crate::ws::server_sealed::Sealed for AxumServer {}

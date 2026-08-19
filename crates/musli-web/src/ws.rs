@@ -2,6 +2,12 @@
 //!
 //! See [`server()`] for how to use with [axum].
 //!
+//! A connection starts life as a [`Connect`], which cannot send anything.
+//! [`Connect::connect`] performs the [negotiation protocol] and hands back the
+//! [`Server`], so by the time there is anything able to write a message the
+//! [`Format`] it will be encoded with has been agreed with the client. A client
+//! which does not negotiate never gets a [`Server`] at all.
+//!
 //! Handlers are implemented via the [`Handler`] trait, which allows returning
 //! various forms of responses dictated through the [`IntoResponse`] trait. This
 //! is primarily implemented for `bool`, where returning `false` indicates that
@@ -91,6 +97,7 @@
 //!
 //! [`server()`]: crate::axum08::server
 //! [axum]: <https://docs.rs/axum>
+//! [negotiation protocol]: crate::api#negotiating-the-format
 
 use core::convert::Infallible;
 use core::fmt::{self, Write};
@@ -243,6 +250,16 @@ enum ErrorKind {
         offset: usize,
         len: usize,
     },
+    /// The connection went away before the format had been negotiated.
+    NotNegotiated,
+    /// The client sent a message other than a negotiation as its first message.
+    ExpectedNegotiate {
+        id: u16,
+    },
+    /// The client sent a malformed envelope during negotiation.
+    NegotiateHeader {
+        error: format::Error,
+    },
 }
 
 /// The error produced by the server side of the websocket protocol
@@ -322,6 +339,18 @@ impl fmt::Display for Error {
                     offset, len
                 )
             }
+            ErrorKind::NotNegotiated => {
+                write!(f, "Connection closed before the format was negotiated")
+            }
+            ErrorKind::ExpectedNegotiate { id } => {
+                write!(
+                    f,
+                    "Expected a negotiation as the first message, but got message id {id}"
+                )
+            }
+            ErrorKind::NegotiateHeader { .. } => {
+                write!(f, "Encoding error when decoding negotiation header")
+            }
         }
     }
 }
@@ -339,6 +368,7 @@ impl core::error::Error for Error {
             ErrorKind::EncodeConnectHeader { error } => Some(error),
             ErrorKind::ErrorMessageHeader { error } => Some(error),
             ErrorKind::ErrorMessage { error } => Some(error),
+            ErrorKind::NegotiateHeader { error } => Some(error),
             _ => None,
         }
     }
@@ -556,116 +586,212 @@ pub trait ChannelAllocator {
     fn free(&self, channel: ChannelId) -> impl Future<Output = ()> + Send + '_;
 }
 
-/// The server side handle of the websocket protocol.
+/// A connection which has not yet completed the [negotiation protocol].
 ///
-/// See [`server()`] for how to use with `axum`.
+/// This is what [`server()`] hands back, and it is the only way to obtain a
+/// [`Server`]. Configuration lives here rather than on [`Server`], since every
+/// setting has to be in place before the first byte goes over the wire.
+///
+/// Crucially this type cannot send messages. A [`Server`] — which can — only
+/// exists once [`Connect::connect`] has resolved, which is precisely the point
+/// at which the [`Format`] for the connection has been settled. Attempting to
+/// broadcast before that is a compile error rather than a message the client
+/// cannot read.
 ///
 /// [`server()`]: crate::axum08::server
-pub struct Server<S, H, C = Channels>
+/// [negotiation protocol]: crate::api#negotiating-the-format
+///
+/// # Examples
+///
+/// ```
+/// # extern crate axum08 as axum;
+/// # use axum::extract::ws::WebSocket;
+/// use musli_web::api::Format;
+/// use musli_web::{axum08, ws};
+///
+/// mod api {
+///     use musli::{Decode, Encode};
+///     use musli_web::api;
+///
+///     #[derive(Encode, Decode)]
+///     pub struct HelloRequest<'de> {
+///         pub message: &'de str,
+///     }
+///
+///     #[derive(Encode, Decode)]
+///     pub struct HelloResponse<'de> {
+///         pub message: &'de str,
+///     }
+///
+///     api::define! {
+///         pub type Hello;
+///
+///         impl Endpoint for Hello {
+///             impl<'de> Request for HelloRequest<'de>;
+///             type Response<'de> = HelloResponse<'de>;
+///         }
+///     }
+/// }
+///
+/// #[derive(Clone)]
+/// struct MyHandler;
+///
+/// impl ws::Handler for MyHandler {
+///     type Id = api::Request;
+///     type Response = bool;
+///
+///     async fn handle(
+///         &self,
+///         id: Self::Id,
+///         incoming: &mut ws::Incoming<'_>,
+///         outgoing: &mut ws::Outgoing<'_>,
+///     ) -> bool {
+///         false
+///     }
+/// }
+///
+/// # async fn example(socket: WebSocket) -> Result<(), ws::Error> {
+/// let mut server = axum08::server(socket, MyHandler)
+///     .with_formats(&[Format::Wire, Format::Json])
+///     .connect()
+///     .await?;
+///
+/// // Only reachable once the client has negotiated a format.
+/// server.run().await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Skipping the connection step does not compile, since a [`Connect`] has
+/// nothing to broadcast with:
+///
+/// ```compile_fail
+/// # extern crate axum08 as axum;
+/// # use axum::extract::ws::WebSocket;
+/// use musli_web::{axum08, ws};
+///
+/// mod api {
+///     use musli::{Decode, Encode};
+///     use musli_web::api;
+///
+///     #[derive(Encode, Decode)]
+///     pub struct HelloRequest<'de> {
+///         pub message: &'de str,
+///     }
+///
+///     #[derive(Encode, Decode)]
+///     pub struct HelloResponse<'de> {
+///         pub message: &'de str,
+///     }
+///
+///     #[derive(Encode, Decode)]
+///     pub struct TickEvent {
+///         pub tick: u32,
+///     }
+///
+///     api::define! {
+///         pub type Hello;
+///
+///         impl Endpoint for Hello {
+///             impl<'de> Request for HelloRequest<'de>;
+///             type Response<'de> = HelloResponse<'de>;
+///         }
+///
+///         pub type Tick;
+///
+///         impl Broadcast for Tick {
+///             impl Event for TickEvent;
+///         }
+///     }
+/// }
+///
+/// #[derive(Clone)]
+/// struct MyHandler;
+///
+/// impl ws::Handler for MyHandler {
+///     type Id = api::Request;
+///     type Response = bool;
+///
+///     async fn handle(
+///         &self,
+///         id: Self::Id,
+///         incoming: &mut ws::Incoming<'_>,
+///         outgoing: &mut ws::Outgoing<'_>,
+///     ) -> bool {
+///         false
+///     }
+/// }
+///
+/// # async fn example(socket: WebSocket) -> Result<(), ws::Error> {
+/// let mut server = axum08::server(socket, MyHandler);
+/// // `Connect` has no `broadcast`, only the `Server` that `connect()` hands
+/// // back does.
+/// server.broadcast(api::TickEvent { tick: 1 })?;
+/// # Ok(())
+/// # }
+/// ```
+pub struct Connect<S, H, C = Channels>
 where
     S: ServerImpl,
     H: Handler,
 {
     handler: H,
-    pinned: Pin<Box<Pinned<S::Socket>>>,
+    socket: S::Socket,
     channels: C,
-    started: bool,
-    closing: bool,
-    pool: BufPool,
-    outbound: VecDeque<Buf>,
-    error: String,
-    last_ping: Option<[u8; 4]>,
-    rng: SmallRng,
+    seed: u64,
     max_capacity: usize,
-    out: VecDeque<S::Message>,
-    socket_send: bool,
-    socket_flush: bool,
-    set: JoinSet<HandlerOutput<H>>,
-    /// The format used for messages the server originates on this connection,
-    /// as agreed by the [negotiation protocol].
-    ///
-    /// [negotiation protocol]: crate::api#negotiating-the-format
-    format: Format,
     /// Formats this server is willing to negotiate, or `None` to accept every
     /// format it was built with support for.
     formats: Option<&'static [Format]>,
 }
 
-impl<S, H> Server<S, H, Channels>
+impl<S, H> Connect<S, H, Channels>
 where
     S: ServerImpl,
     H: Handler,
 {
-    /// Construct a new server with the specified handler.
+    /// Construct a new pending connection with the specified handler.
     #[inline]
     pub(crate) fn new(socket: S::Socket, handler: H) -> Self {
-        let now = Instant::now();
-
         Self {
             handler,
-            socket_flush: false,
-            pinned: Box::pin(Pinned {
-                socket,
-                close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
-                ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
-            }),
+            socket,
             channels: Channels::default(),
-            started: false,
-            closing: false,
-            pool: BufPool::default(),
-            outbound: VecDeque::new(),
-            error: String::new(),
-            last_ping: None,
-            rng: SmallRng::seed_from_u64(DEFAULT_SEED),
+            seed: DEFAULT_SEED,
             max_capacity: MAX_CAPACITY,
-            out: VecDeque::new(),
-            socket_send: false,
-            set: JoinSet::new(),
-            format: Format::DEFAULT,
             formats: None,
         }
     }
 }
 
-impl<S, H, C> Server<S, H, C>
+impl<S, H, C> Connect<S, H, C>
 where
     S: ServerImpl,
     H: Handler,
 {
-    /// Associated the specified seed with the server.
+    /// Associate the specified seed with the connection.
     ///
     /// This affects the random number generation used for ping messages.
     ///
     /// By default the seed is a constant value.
     #[inline]
     pub fn seed(mut self, seed: u64) -> Self {
-        self.rng = SmallRng::seed_from_u64(seed);
+        self.seed = seed;
         self
     }
 
-    /// Associate the specified channel allocator with the server.
+    /// Associate the specified channel allocator with the connection.
     #[inline]
-    pub fn with_channel_allocator<U>(self, channels: U) -> Server<S, H, U>
+    pub fn with_channel_allocator<U>(self, channels: U) -> Connect<S, H, U>
     where
         U: ChannelAllocator,
     {
-        Server {
+        Connect {
             handler: self.handler,
-            pinned: self.pinned,
+            socket: self.socket,
             channels,
-            started: self.started,
-            closing: self.closing,
-            pool: self.pool,
-            outbound: self.outbound,
-            error: self.error,
-            last_ping: self.last_ping,
-            rng: self.rng,
+            seed: self.seed,
             max_capacity: self.max_capacity,
-            out: self.out,
-            socket_send: self.socket_send,
-            socket_flush: self.socket_flush,
-            set: self.set,
-            format: self.format,
             formats: self.formats,
         }
     }
@@ -680,8 +806,8 @@ where
     ///
     /// By default every format the crate was built with support for is
     /// accepted. A client which asks for a format outside of this set is
-    /// rejected during the [negotiation protocol] and the connection keeps
-    /// using [`Format::DEFAULT`].
+    /// rejected during the [negotiation protocol] and the connection settles on
+    /// [`Format::DEFAULT`] instead.
     ///
     /// Note that this cannot widen the set, a format which was not compiled in
     /// is never accepted.
@@ -693,19 +819,10 @@ where
         self
     }
 
-    /// The [`Format`] currently used for messages this server originates, such
-    /// as broadcasts.
-    ///
-    /// This is [`Format::DEFAULT`] until a client negotiates something else.
-    #[inline]
-    pub fn format(&self) -> Format {
-        self.format
-    }
-
     /// Test if this server is willing to negotiate `format`.
     #[inline]
     pub fn accepts(&self, format: Format) -> bool {
-        format.is_supported() && self.formats.is_none_or(|f| f.contains(&format))
+        accepts(self.formats, format)
     }
 
     /// Modify the maximum capacity of the buffer used for outgoing messages.
@@ -734,6 +851,140 @@ where
     }
 }
 
+impl<S, H, C> Connect<S, H, C>
+where
+    S: ServerImpl,
+    Error: From<S::Error>,
+    H: Handler,
+    C: ChannelAllocator,
+{
+    /// Perform the [negotiation protocol] and hand back the [`Server`] it
+    /// produced.
+    ///
+    /// This sends [`MessageId::SERVER_HELLO`] and then drives the socket —
+    /// including keepalive pings — until the client has answered with a
+    /// [`MessageId::NEGOTIATE`] request and the reply to it has been flushed.
+    ///
+    /// Until that has happened the connection has no [`Server`], so there is no
+    /// way to write a message which the client might not be able to decode.
+    ///
+    /// # Errors
+    ///
+    /// Errors if the connection goes away before the format has been
+    /// negotiated, or if the client sends anything other than a negotiation as
+    /// its first message. Both tear the connection down, since a peer which
+    /// does not negotiate cannot be talked to safely.
+    ///
+    /// [negotiation protocol]: crate::api#negotiating-the-format
+    pub async fn connect(self) -> Result<Server<S, H, C>, Error> {
+        let now = Instant::now();
+
+        let mut server = Server {
+            handler: self.handler,
+            pinned: Box::pin(Pinned {
+                socket: self.socket,
+                close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
+                ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
+            }),
+            channels: self.channels,
+            closing: false,
+            pool: BufPool::default(),
+            outbound: VecDeque::new(),
+            error: String::new(),
+            last_ping: None,
+            rng: SmallRng::seed_from_u64(self.seed),
+            max_capacity: self.max_capacity,
+            out: VecDeque::new(),
+            socket_send: false,
+            socket_flush: false,
+            set: JoinSet::new(),
+            format: Format::DEFAULT,
+            formats: self.formats,
+        };
+
+        server.hello()?;
+        server.negotiate().await?;
+        Ok(server)
+    }
+}
+
+/// Test if `formats` is willing to negotiate `format`.
+#[inline]
+fn accepts(formats: Option<&'static [Format]>, format: Format) -> bool {
+    format.is_supported() && formats.is_none_or(|f| f.contains(&format))
+}
+
+/// The server side handle of the websocket protocol.
+///
+/// This can only be constructed by completing the [negotiation protocol]
+/// through [`Connect::connect`], so its mere existence means that the
+/// [`Format`] used for everything the server originates has been agreed with
+/// the client.
+///
+/// See [`server()`] for how to use with `axum`.
+///
+/// [`server()`]: crate::axum08::server
+/// [negotiation protocol]: crate::api#negotiating-the-format
+pub struct Server<S, H, C = Channels>
+where
+    S: ServerImpl,
+    H: Handler,
+{
+    handler: H,
+    pinned: Pin<Box<Pinned<S::Socket>>>,
+    channels: C,
+    closing: bool,
+    pool: BufPool,
+    outbound: VecDeque<Buf>,
+    error: String,
+    last_ping: Option<[u8; 4]>,
+    rng: SmallRng,
+    // NB: Carried from `Connect` but not consulted anywhere yet, the outgoing
+    // buffers are never shrunk back down to it.
+    #[allow(dead_code)]
+    max_capacity: usize,
+    out: VecDeque<S::Message>,
+    socket_send: bool,
+    socket_flush: bool,
+    set: JoinSet<HandlerOutput<H>>,
+    /// The format used for messages the server originates on this connection,
+    /// as agreed by the [negotiation protocol].
+    ///
+    /// [negotiation protocol]: crate::api#negotiating-the-format
+    format: Format,
+    /// Formats this server is willing to negotiate, or `None` to accept every
+    /// format it was built with support for.
+    formats: Option<&'static [Format]>,
+}
+
+impl<S, H, C> Server<S, H, C>
+where
+    S: ServerImpl,
+    H: Handler,
+{
+    /// Get a reference to the handler.
+    #[inline]
+    pub fn handler(&self) -> &H {
+        &self.handler
+    }
+
+    /// The [`Format`] used for messages this server originates, such as
+    /// broadcasts.
+    ///
+    /// This is fixed for the lifetime of the connection and was agreed with the
+    /// client by [`Connect::connect`], which is why it is never in doubt here.
+    #[inline]
+    pub fn format(&self) -> Format {
+        self.format
+    }
+
+    /// Test if this server is willing to negotiate `format`.
+    #[inline]
+    pub fn accepts(&self, format: Format) -> bool {
+        accepts(self.formats, format)
+    }
+}
+
 impl<S, H, C> Server<S, H, C>
 where
     S: ServerImpl,
@@ -741,15 +992,184 @@ where
     H: Handler,
     C: ChannelAllocator,
 {
+    /// Drive the socket until the client has negotiated a [`Format`].
+    ///
+    /// This is the connection step every peer is forced through, see
+    /// [`Connect::connect`]. It deliberately understands nothing but
+    /// [`MessageId::NEGOTIATE`] and the keepalive machinery, so no handler is
+    /// ever invoked and nothing the user could write is in flight yet.
+    ///
+    /// It returns once the format is settled *and* the reply confirming it has
+    /// been flushed, so the very next thing on the wire can safely use it.
+    async fn negotiate(&mut self) -> Result<(), Error> {
+        let mut negotiated = false;
+        // NB: Held rather than returned immediately so that the close frame
+        // explaining the violation makes it onto the wire first.
+        let mut failure = None::<Error>;
+
+        loop {
+            let drained = self.out.is_empty() && !self.socket_flush;
+
+            if failure.is_some() && drained {
+                break;
+            }
+
+            if negotiated && drained && self.outbound.is_empty() {
+                break;
+            }
+
+            self.handle_send()?;
+
+            let result = {
+                let inner = Select::<S::Socket, H> {
+                    pinned: self.pinned.as_mut(),
+                    wants_socket_send: !self.socket_send,
+                    wants_socket_flush: self.socket_flush,
+                    set: &mut self.set,
+                };
+
+                inner.await
+            };
+
+            match result {
+                Output::Close => {
+                    return Err(Error::new(ErrorKind::NotNegotiated));
+                }
+                Output::Ping => {
+                    self.handle_ping()?;
+                }
+                Output::Recv(message) => {
+                    let Some(message) = message else {
+                        return Err(Error::new(ErrorKind::NotNegotiated));
+                    };
+
+                    match message? {
+                        Message::Text => {
+                            self.out.push_back(S::close(
+                                CLOSE_PROTOCOL_ERROR,
+                                "Unsupported text message",
+                            ));
+
+                            failure = Some(Error::new(ErrorKind::NotNegotiated));
+                        }
+                        Message::Binary(bytes) => match self.handle_negotiate(bytes) {
+                            Ok(()) => negotiated = true,
+                            Err(error) => failure = Some(error),
+                        },
+                        Message::Ping(payload) => {
+                            self.out.push_back(S::pong(payload));
+                        }
+                        Message::Pong(data) => {
+                            self.handle_pong(data)?;
+                        }
+                        Message::Close => {
+                            return Err(Error::new(ErrorKind::NotNegotiated));
+                        }
+                    }
+                }
+                Output::Send(result) => {
+                    result?;
+                    self.socket_send = true;
+                }
+                Output::Flushed(result) => {
+                    result?;
+                    self.socket_flush = false;
+                }
+                Output::Handle(..) => {
+                    // NB: No handler can have been spawned yet, since requests
+                    // are only dispatched after negotiation.
+                }
+            }
+        }
+
+        match failure {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
+    }
+
+    /// Process the single message which is legal before a format has been
+    /// negotiated.
+    ///
+    /// Anything else closes the connection, since a peer which skips
+    /// negotiation cannot be sent broadcasts safely.
+    fn handle_negotiate(&mut self, bytes: Bytes) -> Result<(), Error> {
+        let mut at = 0;
+
+        let header: RequestHeader = match format::decode_envelope(&bytes, &mut at) {
+            Ok(header) => header,
+            Err(error) => {
+                self.out
+                    .push_back(S::close(CLOSE_PROTOCOL_ERROR, "Invalid request header"));
+                return Err(Error::new(ErrorKind::NegotiateHeader { error }));
+            }
+        };
+
+        if MessageId::new(header.id) != Some(MessageId::NEGOTIATE) {
+            self.out.push_back(S::close(
+                CLOSE_PROTOCOL_ERROR,
+                "Expected a negotiation as the first message",
+            ));
+
+            return Err(Error::new(ErrorKind::ExpectedNegotiate { id: header.id }));
+        }
+
+        // NB: The connection stays up on a rejected format and settles on the
+        // default instead, which is what the client falls back to. The error
+        // tells it which formats it could have asked for.
+        let Some(format) = Format::from_u8(header.format) else {
+            self.format_error_message(format_args!(
+                "Unknown format id {}, supported: {}",
+                header.format,
+                SupportedFormats(self.formats)
+            ))?;
+
+            self.format = Format::DEFAULT;
+            return self.send_error(&header);
+        };
+
+        if !self.accepts(format) {
+            self.format_error_message(format_args!(
+                "Unsupported format `{format}`, supported: {}",
+                SupportedFormats(self.formats)
+            ))?;
+
+            tracing::debug!(?format, "Rejected format");
+            self.format = Format::DEFAULT;
+            return self.send_error(&header);
+        }
+
+        tracing::debug!(?format, "Negotiated format");
+        self.format = format;
+        self.send_negotiated(&header, format)
+    }
+
+    /// Acknowledge a negotiation by echoing the format that was accepted.
+    fn send_negotiated(&mut self, header: &RequestHeader, format: Format) -> Result<(), Error> {
+        let buf = self.pool.with(|buf| {
+            let mut writer = buf.writer();
+
+            let result = writer.envelope(&ResponseHeader {
+                serial: header.serial,
+                broadcast: 0,
+                error: 0,
+                format: format.to_u8(),
+                channel: header.channel,
+            });
+
+            result.map_err(Error::encode_connect_header)?;
+            writer.flush();
+            Ok::<_, Error>(())
+        })?;
+
+        self.outbound.push_back(buf);
+        Ok(())
+    }
+
     /// Run the server.
     ///
     /// This must be called to handle buffered outgoing and incoming messages.
     pub async fn run(&mut self) -> Result<(), Error> {
-        if !self.started {
-            self.started = true;
-            self.hello()?;
-        }
-
         loop {
             if self.closing && self.out.is_empty() && self.outbound.is_empty() {
                 break;
@@ -1030,54 +1450,17 @@ where
                     break 'err false;
                 }
                 MessageId::NEGOTIATE => {
-                    let Some(format) = Format::from_u8(header.format) else {
-                        self.format_error_message(format_args!(
-                            "Unknown format id {}, supported: {}",
-                            header.format,
-                            SupportedFormats(self.formats)
-                        ))?;
+                    // NB: The format is settled once and for all by the
+                    // connection step, see `Connect::connect`. Letting it move
+                    // afterwards would mean messages already queued for the old
+                    // format go out under the new one.
+                    let format = self.format;
 
-                        break 'err true;
-                    };
+                    self.format_error_message(format_args!(
+                        "Format `{format}` has already been negotiated"
+                    ))?;
 
-                    if !self.accepts(format) {
-                        self.format_error_message(format_args!(
-                            "Unsupported format `{format}`, supported: {}",
-                            SupportedFormats(self.formats)
-                        ))?;
-
-                        break 'err true;
-                    }
-
-                    tracing::debug!(?format, "Negotiated format");
-                    self.format = format;
-
-                    let mut buf = self.pool.get();
-
-                    let result = (|| {
-                        let mut writer = buf.writer();
-
-                        let result = writer.envelope(&ResponseHeader {
-                            serial: header.serial,
-                            broadcast: 0,
-                            error: 0,
-                            format: format.to_u8(),
-                            channel: header.channel,
-                        });
-
-                        result.map_err(Error::encode_connect_header)?;
-                        writer.flush();
-                        Ok::<_, Error>(())
-                    })();
-
-                    if result.is_err() {
-                        self.pool.put(buf);
-                    } else {
-                        self.outbound.push_back(buf);
-                    }
-
-                    result?;
-                    break 'err false;
+                    break 'err true;
                 }
                 _ => {
                     let Some(format) = Format::from_u8(header.format) else {
