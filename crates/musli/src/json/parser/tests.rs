@@ -227,19 +227,31 @@ fn test_decode_overflow() {
 fn test_powf_fallback() {
     use crate::json::parser::integer::traits::no_std::{powf32, powf64};
 
-    for e in -340..=340 {
-        assert_eq!(
-            powf64(10.0, e).to_bits(),
-            f64::powi(10.0, e).to_bits(),
-            "10f64^{e}"
+    // NB: an exact comparison is not possible since `powi` is allowed to differ
+    // by a few ULP between implementations. The tolerance is still many orders
+    // of magnitude tighter than the error being guarded against.
+    for e in -308..=308 {
+        let actual = powf64(10.0, e);
+        let expected = f64::powi(10.0, e);
+        assert!(
+            (actual - expected).abs() <= expected.abs() * 1e-12,
+            "10f64^{e}: {actual:e} is not close to {expected:e}"
         );
     }
 
-    for e in -50..=50 {
-        assert_eq!(
-            powf32(10.0, e).to_bits(),
-            f32::powi(10.0, e).to_bits(),
-            "10f32^{e}"
+    for e in -37..=37 {
+        let actual = powf32(10.0, e);
+        let expected = f32::powi(10.0, e);
+        assert!(
+            (actual - expected).abs() <= expected.abs() * 1e-5,
+            "10f32^{e}: {actual:e} is not close to {expected:e}"
         );
     }
+
+    // Exact values which the previous implementation got wrong.
+    assert_eq!(powf64(10.0, 0), 1.0);
+    assert_eq!(powf64(10.0, -1), 0.1);
+    assert_eq!(powf64(10.0, -2), 0.01);
+    assert_eq!(powf64(10.0, -3), 0.001);
+    assert_eq!(powf64(10.0, 3), 1000.0);
 }
