@@ -521,7 +521,13 @@ where
         return Err(cx.message_at(start, IntegerError::IntegerOverflow));
     };
 
-    Ok(out + T::from_byte(p.read_byte(cx)? - b'0'))
+    let digit = T::from_byte(p.read_byte(cx)? - b'0');
+
+    let Some(out) = out.checked_add(digit) else {
+        return Err(cx.message_at(start, IntegerError::IntegerOverflow));
+    };
+
+    Ok(out)
 }
 
 /// Decode sequence of zeros.

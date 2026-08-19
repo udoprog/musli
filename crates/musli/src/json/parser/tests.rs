@@ -183,3 +183,36 @@ fn test_decode_signed() {
         test!(isize);
     })
 }
+
+/// Numbers which overflow the target type in the *last* digit must be reported
+/// as an error rather than wrapping around.
+#[test]
+fn test_decode_overflow() {
+    crate::alloc::default(|alloc| {
+        let cx = context::new_in(alloc);
+
+        macro_rules! test {
+            ($parse:ident, $ty:ty, $num:expr) => {
+                assert!(
+                    $parse::<$ty, _, _>(&cx, &mut SliceParser::new($num.as_bytes())).is_err(),
+                    "{} should not parse as {}",
+                    $num,
+                    stringify!($ty)
+                );
+            };
+        }
+
+        test!(parse_unsigned_full, u8, "256");
+        test!(parse_unsigned_full, u16, "65536");
+        test!(parse_unsigned_full, u32, "4294967299");
+        test!(parse_unsigned_full, u64, "18446744073709551616");
+        test!(parse_unsigned_full, u128, "340282366920938463463374607431768211456");
+        test!(parse_signed_full, i8, "128");
+        test!(parse_signed_full, i16, "32768");
+        test!(parse_signed_full, i32, "2147483648");
+        test!(parse_signed_full, i64, "9223372036854775808");
+
+        // The exponent is accumulated with the same routine.
+        test!(parse_unsigned_full, u64, "1e4294967299");
+    })
+}
