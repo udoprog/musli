@@ -2,6 +2,8 @@
 
 use core::hash::Hash;
 
+use alloc::vec;
+
 use crate::Ref;
 use crate::ZeroCopy;
 use crate::buf::{StoreBuf, Visit};
@@ -176,17 +178,26 @@ where
         crate::phf::generator::generate_hash(buf, &entries, &displacements, &map, access)?
     };
 
-    for (from, a) in map.iter().enumerate() {
-        loop {
-            let to = *buf.as_buf().load(a)?;
+    // `map[slot]` is the index of the entry which belongs at `slot`. Invert it
+    // into `permutation[entry] = slot`, since the cycle sort below moves each
+    // entry to the position named by the permutation it is given.
+    let mut permutation = vec![0usize; entries.len()];
 
-            if from != to {
-                buf.swap(entries.at(from), entries.at(to))?;
-                buf.swap(map.at(from), map.at(to))?;
-                continue;
+    for (slot, a) in map.iter().enumerate() {
+        let entry = *buf.as_buf().load(a)?;
+        permutation[entry] = slot;
+    }
+
+    for from in 0..permutation.len() {
+        loop {
+            let to = permutation[from];
+
+            if from == to {
+                break;
             }
 
-            break;
+            buf.swap(entries.at(from), entries.at(to))?;
+            permutation.swap(from, to);
         }
     }
 

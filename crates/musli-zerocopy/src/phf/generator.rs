@@ -1,3 +1,4 @@
+use core::cmp::Reverse;
 use core::hash::Hash;
 
 use alloc::vec;
@@ -83,14 +84,21 @@ where
         hashes.push(h);
     }
 
-    let mut buckets = vec![Vec::<usize>::new(); displacements.len()];
+    let mut buckets = (0..displacements.len())
+        .map(|index| (index, Vec::<usize>::new()))
+        .collect::<Vec<_>>();
 
     for (index, hash) in hashes.iter().enumerate() {
         let to = hash.g % buckets.len();
-        buckets[to].push(index);
+        buckets[to].1.push(index);
     }
 
-    buckets.sort_by_key(|a| a.len());
+    // NB: the index of a bucket has to be kept around, since a lookup finds the
+    // displacement of a key through the index of the bucket it hashes into.
+    //
+    // Buckets are placed largest first, since the crowded buckets are the hard
+    // ones to find displacements for and the table is emptiest to begin with.
+    buckets.sort_by_key(|(_, keys)| Reverse(keys.len()));
 
     let table_len = hashes.len();
     // let mut map = vec![usize::MAX; table_len];
@@ -110,7 +118,9 @@ where
     // chosen the right displacements.
     let mut values_to_add = vec![];
 
-    'outer: for (bucket, d_ref) in buckets.iter().zip(displacements.iter()) {
+    'outer: for (bucket_index, bucket) in buckets.iter() {
+        let d_ref = displacements.at(*bucket_index);
+
         for d1 in 0..(table_len as u32) {
             'inner: for d2 in 0..(table_len as u32) {
                 values_to_add.clear();
