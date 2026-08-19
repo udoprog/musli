@@ -21,22 +21,23 @@ fn map_lookup_after_permutation() {
     }
 }
 
+/// Deterministic xorshift so that failures are reproducible.
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u64 {
+        let mut x = self.0;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.0 = x;
+        x
+    }
+}
+
 /// Exhaustively check that every key in a generated map can be looked up again.
 #[test]
 fn map_lookup_is_exhaustive() {
-    struct Rng(u64);
-
-    impl Rng {
-        fn next(&mut self) -> u64 {
-            let mut x = self.0;
-            x ^= x << 13;
-            x ^= x >> 7;
-            x ^= x << 17;
-            self.0 = x;
-            x
-        }
-    }
-
     let mut rng = Rng(0x1234_5678);
 
     for round in 0..500u64 {
@@ -66,6 +67,55 @@ fn map_lookup_is_exhaustive() {
                 Some(&key.wrapping_mul(7)),
                 "round {round}, key {key}"
             );
+        }
+    }
+}
+
+/// The same, with unsized string keys and larger maps.
+#[test]
+fn map_lookup_with_string_keys() {
+    use alloc::string::String;
+
+    let mut rng = Rng(0xFEED_FACE);
+
+    for round in 0..40u64 {
+        let count = (round * 5 + 1) as usize;
+        let mut keys = Vec::new();
+
+        for _ in 0..count {
+            let len = (rng.next() % 10) as usize + 1;
+
+            let key = (0..len)
+                .map(|_| (b'a' + (rng.next() % 26) as u8) as char)
+                .collect::<String>();
+
+            if !keys.contains(&key) {
+                keys.push(key);
+            }
+        }
+
+        let mut buf = OwnedBuf::new();
+        let mut entries = Vec::new();
+
+        for (n, key) in keys.iter().enumerate() {
+            entries.push((buf.store_unsized(key.as_str()).unwrap(), n as u32));
+        }
+
+        let map = phf::store_map(&mut buf, entries).unwrap();
+        let map = buf.bind(map).unwrap();
+
+        for (n, key) in keys.iter().enumerate() {
+            assert_eq!(
+                map.get(key.as_str()).unwrap(),
+                Some(&(n as u32)),
+                "round {round}, key {key}"
+            );
+        }
+
+        // Keys which were never stored must not be found.
+        for key in &keys {
+            let absent = key.to_uppercase();
+            assert_eq!(map.get(absent.as_str()).unwrap(), None, "absent {absent}");
         }
     }
 }
