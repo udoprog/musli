@@ -658,11 +658,18 @@ impl Internal {
     /// The caller msut ensure that there is enough space for the region and
     /// that the end pointer has been aligned to the requirements of `Header`.
     unsafe fn alloc_header(&mut self, end: *mut MaybeUninit<u8>) -> Option<Region> {
-        if let Some(region) = self.free_head.take() {
-            let mut region = self.region(region);
+        if let Some(id) = self.free_head {
+            let mut region = self.region(id);
+
+            // Pop the region off of the free list. Note that the free list is
+            // threaded through `next`, so both links have to be cleared before
+            // the region is linked back into the list of allocated regions.
+            self.free_head = region.next;
 
             region.range.start = self.free.start;
             region.range.end = end;
+            region.prev = None;
+            region.next = None;
 
             return Some(region);
         }

@@ -920,13 +920,13 @@ pub(crate) mod traits {
 
                         while exp > 0 {
                             if exp & 1 == 1 {
-                                acc = acc * base;
+                                acc *= base;
                             }
 
                             exp >>= 1;
 
                             if exp > 0 {
-                                base = base * base;
+                                base *= base;
                             }
                         }
 
