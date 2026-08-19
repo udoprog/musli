@@ -8,17 +8,17 @@ use super::{JsonEncoder, JsonObjectKeyEncoder};
 /// Encoder for a JSON object pair.
 pub(crate) struct JsonObjectPairEncoder<W, C, M> {
     cx: C,
-    empty: bool,
+    first: bool,
     writer: W,
     _marker: PhantomData<M>,
 }
 
 impl<W, C, M> JsonObjectPairEncoder<W, C, M> {
     #[inline]
-    pub(super) const fn new(cx: C, empty: bool, writer: W) -> Self {
+    pub(super) const fn new(cx: C, first: bool, writer: W) -> Self {
         Self {
             cx,
-            empty,
+            first,
             writer,
             _marker: PhantomData,
         }
@@ -50,16 +50,18 @@ where
 
     #[inline]
     fn encode_key(&mut self) -> Result<Self::EncodeKey<'_>, Self::Error> {
-        if !self.empty {
+        if !self.first {
             self.writer.write_byte(self.cx, b',')?;
         }
 
+        self.writer.begin_object_key(self.cx, self.first)?;
         Ok(JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
     fn encode_value(&mut self) -> Result<Self::EncodeValue<'_>, Self::Error> {
         self.writer.write_byte(self.cx, b':')?;
+        self.writer.begin_object_value(self.cx)?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 

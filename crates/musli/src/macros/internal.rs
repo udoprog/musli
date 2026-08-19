@@ -292,10 +292,64 @@ pub(crate) use bare_encoding;
 
 /// Generate all public encoding helpers.
 macro_rules! encoding_impls {
+    // A format which builds its encoder differently per configuration defines
+    // `encode_into` itself and passes `custom` in place of a constructor.
+    (
+        custom,
+        $mode:ident,
+        $what:ident,
+        $decoder_new:path,
+        $reader_trait:ident :: $into_reader:ident,
+        $reader_kind:path,
+        $writer_trait:ident :: $into_writer:ident $(,)?
+    ) => {
+        $crate::macros::encoding_impls!(
+            @body
+            $mode,
+            $what,
+            $decoder_new,
+            $reader_trait::$into_reader,
+            $reader_kind,
+            $writer_trait::$into_writer,
+        );
+    };
+
     (
         $mode:ident,
         $what:ident,
         $encoder_new:path,
+        $decoder_new:path,
+        $reader_trait:ident :: $into_reader:ident,
+        $reader_kind:path,
+        $writer_trait:ident :: $into_writer:ident $(,)?
+    ) => {
+        /// Encode `value` into `writer` using the encoder this encoding is
+        /// configured with.
+        #[inline]
+        fn encode_into<C, W, T>(self, cx: C, writer: W, value: &T) -> Result<(), C::Error>
+        where
+            C: Context,
+            W: $crate::Writer,
+            T: ?Sized + Encode<$mode>,
+        {
+            T::encode(value, $encoder_new(cx, writer))
+        }
+
+        $crate::macros::encoding_impls!(
+            @body
+            $mode,
+            $what,
+            $decoder_new,
+            $reader_trait::$into_reader,
+            $reader_kind,
+            $writer_trait::$into_writer,
+        );
+    };
+
+    (
+        @body
+        $mode:ident,
+        $what:ident,
         $decoder_new:path,
         $reader_trait:ident :: $into_reader:ident,
         $reader_kind:path,
@@ -681,8 +735,7 @@ macro_rules! encoding_impls {
         {
             cx.clear();
             let mut writer = $writer_trait::$into_writer(writer);
-            let encoder = $encoder_new(cx, $crate::writer::Writer::borrow_mut(&mut writer));
-            T::encode(value, encoder)?;
+            self.encode_into(cx, $crate::writer::Writer::borrow_mut(&mut writer), value)?;
             $crate::writer::Writer::finish(&mut writer, cx)
         }
 

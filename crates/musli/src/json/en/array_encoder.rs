@@ -10,7 +10,7 @@ use super::JsonEncoder;
 pub(crate) struct JsonArrayEncoder<W, C, M> {
     cx: C,
     first: bool,
-    end: &'static [u8],
+    variant: bool,
     writer: W,
     _marker: PhantomData<M>,
 }
@@ -23,17 +23,21 @@ where
 {
     #[inline]
     pub(super) fn new(cx: C, writer: W) -> Result<Self, C::Error> {
-        Self::with_end(cx, writer, b"]")
+        Self::with_variant(cx, writer, false)
     }
 
+    /// Construct an array encoder which, if `variant` is set, also closes an
+    /// enclosing object once the array has been written. This is how an
+    /// externally tagged sequence variant is encoded.
     #[inline]
-    pub(super) fn with_end(cx: C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
+    pub(super) fn with_variant(cx: C, mut writer: W, variant: bool) -> Result<Self, C::Error> {
+        writer.begin_array(cx)?;
         writer.write_byte(cx, b'[')?;
 
         Ok(Self {
             cx,
             first: true,
-            end,
+            variant,
             writer,
             _marker: PhantomData,
         })
@@ -61,15 +65,26 @@ where
 
     #[inline]
     fn encode_next(&mut self) -> Result<Self::EncodeNext<'_>, C::Error> {
-        if !take(&mut self.first) {
+        let first = take(&mut self.first);
+
+        if !first {
             self.writer.write_byte(self.cx, b',')?;
         }
 
+        self.writer.begin_array_element(self.cx, first)?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
     fn finish_sequence(mut self) -> Result<(), C::Error> {
-        self.writer.write_bytes(self.cx, self.end)
+        self.writer.end_array(self.cx, self.first)?;
+        self.writer.write_byte(self.cx, b']')?;
+
+        if self.variant {
+            self.writer.end_object(self.cx, false)?;
+            self.writer.write_byte(self.cx, b'}')?;
+        }
+
+        Ok(())
     }
 }
