@@ -210,8 +210,8 @@ where
     }
 
     #[inline]
-    fn encode_isize(self, value: isize) -> Result<(), Self::Error> {
-        self.encode_usize(value as usize)
+    fn encode_isize(mut self, value: isize) -> Result<(), Self::Error> {
+        crate::int::encode_isize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]

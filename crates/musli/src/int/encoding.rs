@@ -122,6 +122,69 @@ where
     }
 }
 
+/// Governs how isize values are encoded into a [`Writer`].
+///
+/// Note that this is separate from [`encode_usize`], since a negative value has
+/// to be narrowed as a signed value rather than reinterpreted as a `usize` at
+/// the width of the host.
+#[inline]
+pub(crate) fn encode_isize<C, W, const OPT: Options>(
+    cx: C,
+    writer: W,
+    value: isize,
+) -> Result<(), C::Error>
+where
+    C: Context,
+    W: Writer,
+{
+    match crate::options::length::<OPT>() {
+        crate::options::Width::Variable => c::encode(cx, writer, zig::encode(value)),
+        width => {
+            let bo = crate::options::byteorder::<OPT>();
+
+            macro_rules! fixed {
+                ($signed:ty, $unsigned:ty) => {{
+                    let Ok(value) = <$signed>::try_from(value) else {
+                        return Err(cx.message("Size type out of bounds for value type"));
+                    };
+
+                    <$unsigned as UnsignedOps>::write_bytes(value as $unsigned, cx, writer, bo)
+                }};
+            }
+
+            crate::options::signed_width_arm!(width, fixed)
+        }
+    }
+}
+
+/// Governs how isize values are decoded from a [`Reader`].
+#[inline]
+pub(crate) fn decode_isize<'de, C, R, const OPT: Options>(
+    cx: C,
+    reader: R,
+) -> Result<isize, C::Error>
+where
+    C: Context,
+    R: Reader<'de>,
+{
+    match crate::options::length::<OPT>() {
+        crate::options::Width::Variable => Ok(zig::decode(c::decode::<_, _, usize>(cx, reader)?)),
+        width => {
+            let bo = crate::options::byteorder::<OPT>();
+
+            macro_rules! fixed {
+                ($signed:ty, $unsigned:ty) => {{
+                    let value = <$unsigned as UnsignedOps>::read_bytes(cx, reader, bo)?;
+                    // NB: sign extended through the signed type of the width.
+                    Ok(value as $signed as isize)
+                }};
+            }
+
+            crate::options::signed_width_arm!(width, fixed)
+        }
+    }
+}
+
 /// Governs how usize lengths are decoded from a [`Reader`].
 #[inline]
 pub(crate) fn decode_usize<'de, C, R, const OPT: Options>(

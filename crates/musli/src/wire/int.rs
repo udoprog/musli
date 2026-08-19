@@ -45,6 +45,104 @@ where
     }
 }
 
+/// Governs how isize values are encoded into a [`Writer`].
+///
+/// Note that this is separate from [`encode_length`], since a negative value
+/// has to be narrowed as a signed value rather than reinterpreted as a `usize`
+/// at the width of the host. The framing is identical, so skipping over the
+/// value does not have to care which of the two wrote it.
+#[inline]
+pub(crate) fn encode_isize<C, W, const OPT: Options>(
+    cx: C,
+    mut writer: W,
+    value: isize,
+) -> Result<(), C::Error>
+where
+    C: Context,
+    W: Writer,
+{
+    match crate::options::length::<OPT>() {
+        crate::options::Width::Variable => {
+            let value = zig::encode(value);
+
+            if value.is_smaller_than(DATA_MASK) {
+                writer.write_byte(cx, Tag::new(Kind::Continuation, value.as_byte()).byte())
+            } else {
+                writer.write_byte(cx, Tag::empty(Kind::Continuation).byte())?;
+                c::encode(cx, writer, value)
+            }
+        }
+        width => {
+            let bo = crate::options::byteorder::<OPT>();
+            let bytes = 1u8 << width as u8;
+            writer.write_byte(cx, Tag::new(Kind::Prefix, bytes).byte())?;
+
+            macro_rules! fixed {
+                ($signed:ty, $unsigned:ty) => {{
+                    let Ok(value) = <$signed>::try_from(value) else {
+                        return Err(cx.message("Numerical value out of bounds for isize"));
+                    };
+
+                    <$unsigned as UnsignedOps>::write_bytes(value as $unsigned, cx, writer, bo)
+                }};
+            }
+
+            crate::options::signed_width_arm!(width, fixed)
+        }
+    }
+}
+
+/// Governs how isize values are decoded from a [`Reader`].
+#[inline]
+pub(crate) fn decode_isize<'de, C, R, const OPT: Options>(
+    cx: C,
+    mut reader: R,
+) -> Result<isize, C::Error>
+where
+    C: Context,
+    R: Reader<'de>,
+{
+    match crate::options::length::<OPT>() {
+        crate::options::Width::Variable => {
+            let tag = Tag::from_byte(reader.read_byte(cx)?);
+
+            if tag.kind() != Kind::Continuation {
+                return Err(cx.message("Expected continuation"));
+            }
+
+            let value = if let Some(data) = tag.data() {
+                usize::from_byte(data)
+            } else {
+                c::decode(cx, reader)?
+            };
+
+            Ok(zig::decode(value))
+        }
+        width => {
+            let bo = crate::options::byteorder::<OPT>();
+
+            let bytes = 1u8 << width as u8;
+            let tag = Tag::from_byte(reader.read_byte(cx)?);
+
+            if tag != Tag::new(Kind::Prefix, bytes) {
+                return Err(cx.message(format_args!(
+                    "Expected fixed {bytes} bytes prefix tag, but got {tag:?}"
+                )));
+            }
+
+            macro_rules! fixed {
+                ($signed:ty, $unsigned:ty) => {{
+                    let value = <$unsigned as UnsignedOps>::read_bytes(cx, reader, bo)?;
+                    // NB: sign extended through the signed type of the width.
+                    Ok(value as $signed as isize)
+                }};
+            }
+
+            crate::options::signed_width_arm!(width, fixed)
+        }
+    }
+}
+
 /// Governs how usize lengths are decoded from a [`Reader`].
 #[inline]
 pub(crate) fn decode_length<'de, C, R, const OPT: Options>(
