@@ -36,6 +36,14 @@ macro_rules! group {
 }
 
 #[cfg(all(feature = "musli-json", feature = "serde_json"))]
+#[derive(Debug, PartialEq, musli::Encode, musli::Decode, serde::Serialize, serde::Deserialize)]
+struct Vector {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+#[cfg(all(feature = "musli-json", feature = "serde_json"))]
 fn array<T>(values: impl IntoIterator<Item = T>) -> String
 where
     T: std::fmt::Display,
@@ -79,6 +87,40 @@ fn criterion_benchmark(c: &mut Criterion) {
     // Floats.
     let floats = array((0..4096).map(|_| rng.random_range(-1.0e6f64..1.0e6f64)));
     group!(c, "f64", Vec<f64>, &floats);
+
+    let floats = array((0..4096).map(|_| rng.random_range(-1.0e6f32..1.0e6f32)));
+    group!(c, "f32", Vec<f32>, &floats);
+
+    // Small objects with float fields, mirroring the mesh model.
+    let objects = array((0..1024).map(|_| {
+        let mut f = || rng.random_range(-1.0e6f32..1.0e6f32);
+        format!(r#"{{"x":{},"y":{},"z":{}}}"#, f(), f(), f())
+    }));
+    group!(c, "objects", Vec<Vector>, &objects);
+
+    // Plain strings which require no unescaping.
+    let strings = array((0..4096).map(|_| {
+        let len = rng.random_range(1usize..24);
+        let s: String = (0..len).map(|_| rng.random_range('a'..='z')).collect();
+        format!("\"{s}\"")
+    }));
+    group!(c, "strings", Vec<String>, &strings);
+
+    // Strings which contain escape sequences.
+    let escaped = array((0..4096).map(|_| {
+        let len = rng.random_range(1usize..24);
+        let s: String = (0..len)
+            .map(|_| {
+                if rng.random_range(0u8..4) == 0 {
+                    "\\n".to_string()
+                } else {
+                    rng.random_range('a'..='z').to_string()
+                }
+            })
+            .collect();
+        format!("\"{s}\"")
+    }));
+    group!(c, "strings-escaped", Vec<String>, &escaped);
 }
 
 #[cfg(not(all(feature = "musli-json", feature = "serde_json")))]
