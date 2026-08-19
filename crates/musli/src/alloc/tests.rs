@@ -124,3 +124,30 @@ const _: () = {
     assert_send_sync::<String<Disabled>>();
     assert_send_sync::<Vec<u8, Disabled>>();
 };
+
+/// The capacity of a vector is expressed in elements, not in bytes.
+#[test]
+fn capacity_is_in_elements() {
+    fn test<A>(alloc: A)
+    where
+        A: Copy + Allocator,
+    {
+        let mut a = Vec::<u32, _>::with_capacity_in(4, alloc).unwrap();
+        let capacity = a.capacity();
+        assert!(capacity >= 4);
+
+        // Filling the vector up to its reported capacity must not require more
+        // memory than has already been handed out.
+        for n in 0..capacity {
+            assert!(a.push(n as u32).is_ok(), "push {n} of {capacity} failed");
+        }
+
+        assert_eq!(a.len(), capacity);
+    }
+
+    test(Global::new());
+
+    let mut buf = ArrayBuffer::<64>::with_size();
+    let alloc = Slice::new(&mut buf);
+    test(&alloc);
+}

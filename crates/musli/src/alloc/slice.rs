@@ -320,10 +320,15 @@ impl<T> Alloc<T> for SliceAlloc<'_, T> {
 
         // SAFETY: Due to invariants in the Buffer trait we know that these
         // cannot be used incorrectly.
-        unsafe {
+        let capacity = unsafe {
             let i = &mut *internal.get();
             i.region(region_id).capacity()
-        }
+        };
+
+        // NB: regions are tracked in bytes, while the capacity of an allocation
+        // is expressed in elements. A zero-sized `T` is handled above, since it
+        // does not have an internal region.
+        capacity / size_of::<T>()
     }
 
     #[inline]
