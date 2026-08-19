@@ -16,7 +16,7 @@ use super::string::SliceAccess;
 /// valid UTF-8. We transmute a `&'a mut &'de str` in order to construct this
 /// efficiently.
 #[repr(transparent)]
-pub struct MutSliceParser<'a, 'de> {
+pub struct MutSliceParser<'a, 'de, const UTF8: bool = false> {
     slice: &'a mut &'de [u8],
 }
 
@@ -28,17 +28,32 @@ impl<'a, 'de> MutSliceParser<'a, 'de> {
     }
 }
 
-impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
+impl<'a, 'de> MutSliceParser<'a, 'de, true> {
+    /// Construct a new instance around a slice which is known to be valid
+    /// UTF-8.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the slice contains valid UTF-8. Parsing
+    /// keeps it valid UTF-8, since the slice is only ever advanced past
+    /// complete tokens.
+    #[inline]
+    pub(crate) unsafe fn new_utf8(slice: &'a mut &'de [u8]) -> Self {
+        Self { slice }
+    }
+}
+
+impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
     type Mut<'this>
-        = MutSliceParser<'this, 'de>
+        = MutSliceParser<'this, 'de, UTF8>
     where
         Self: 'this;
 
-    type TryClone = MutSliceParser<'a, 'de>;
+    type TryClone = MutSliceParser<'a, 'de, UTF8>;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
-        MutSliceParser::new(self.slice)
+        MutSliceParser { slice: self.slice }
     }
 
     #[inline]
@@ -57,7 +72,7 @@ impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
     where
         C: Context,
     {
-        let mut access = SliceAccess::new(cx, self.slice, 0);
+        let mut access = SliceAccess::<_, UTF8>::new(cx, self.slice, 0);
         let out = access.parse_string(validate, start, scratch);
         *self.slice = &self.slice[access.index..];
         out
@@ -68,10 +83,24 @@ impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
     where
         C: Context,
     {
-        let mut access = SliceAccess::new(cx, self.slice, 0);
+        let mut access = SliceAccess::<_, UTF8>::new(cx, self.slice, 0);
         let out = access.skip_string();
         *self.slice = &self.slice[access.index..];
         out
+    }
+
+    #[inline]
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
+    where
+        C: Context,
+    {
+        let Some((&b, tail)) = self.slice.split_first() else {
+            return Err(cx.custom(SliceUnderflow::new(1, 0)));
+        };
+
+        *self.slice = tail;
+        cx.advance(1);
+        Ok(b)
     }
 
     #[inline]
@@ -130,6 +159,11 @@ impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
     #[inline]
     fn peek(&mut self) -> Option<u8> {
         self.slice.first().copied()
+    }
+
+    #[inline]
+    fn remaining(&self) -> &[u8] {
+        self.slice
     }
 
     fn parse_f32<C>(&mut self, cx: C) -> Result<f32, C::Error>

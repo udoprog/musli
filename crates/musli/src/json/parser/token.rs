@@ -7,58 +7,43 @@ use core::fmt;
 #[repr(u8)]
 pub enum Token {
     /// `,`.
-    Comma = CM,
+    Comma = 0b0000_0000 | CTL_BIT,
     /// `:`.
-    Colon = CL,
+    Colon = 0b0001_0000 | CTL_BIT,
     /// Whitespace.
-    Whitespace = WS,
+    Whitespace = 0b0000_0000,
     /// `{`.
-    OpenBrace = OB,
+    OpenBrace = 0b0001_0000 | VAL_BIT,
     /// `}`.
-    CloseBrace = CB,
+    CloseBrace = 0b0010_0000,
     /// `[`.
-    OpenBracket = OA,
+    OpenBracket = 0b0011_0000 | VAL_BIT,
     /// `]`.
-    CloseBracket = CA,
+    CloseBracket = 0b0100_0000,
     /// A string.
-    String = ST,
+    String = 0b0111_0000 | VAL_BIT,
     /// A simple number.
-    Number = NM,
+    Number = 0b0101_0000 | VAL_BIT,
     /// `null` literal.
-    Null = NU,
+    Null = 0b1000_0000 | VAL_BIT,
     /// `true` literal.
-    True = TR,
+    True = 0b1001_0000 | VAL_BIT,
     /// `false` literal.
-    False = FL,
+    False = 0b1010_0000 | VAL_BIT,
     /// Error.
-    Error = __,
+    Error = 0b1111_0000 | CTL_BIT,
     /// End-of-file.
-    Eof = EF,
+    Eof = 0b1110_0000 | CTL_BIT,
 }
 
 impl Token {
     /// Construct a token from a single byte.
     ///
-    /// Note that this should optimize into a no-op beyond the lookup into the
-    /// `MAP` table.
+    /// This is a single lookup into the `MAP` table, which stores tokens
+    /// directly to avoid having to translate a byte into a token afterwards.
     #[inline]
     pub(crate) fn from_byte(b: u8) -> Token {
-        match MAP[b as usize] {
-            WS => Token::Whitespace,
-            OA => Token::OpenBrace,
-            CA => Token::CloseBrace,
-            OB => Token::OpenBracket,
-            CB => Token::CloseBracket,
-            CM => Token::Comma,
-            CL => Token::Colon,
-            ST => Token::String,
-            NM => Token::Number,
-            NU => Token::Null,
-            TR => Token::True,
-            FL => Token::False,
-            __ => Token::Error,
-            _ => unreachable!(),
-        }
+        MAP[b as usize]
     }
 
     #[inline]
@@ -96,22 +81,21 @@ impl fmt::Display for Token {
 const VAL_BIT: u8 = 0b0000_0001;
 const CTL_BIT: u8 = 0b0000_0010;
 
-const WS: u8 = 0b0000_0000;
-const OA: u8 = 0b0001_0000 | VAL_BIT;
-const CA: u8 = 0b0010_0000;
-const OB: u8 = 0b0011_0000 | VAL_BIT;
-const CB: u8 = 0b0100_0000;
-const NM: u8 = 0b0101_0000 | VAL_BIT;
-const ST: u8 = 0b0111_0000 | VAL_BIT;
-const NU: u8 = 0b1000_0000 | VAL_BIT;
-const TR: u8 = 0b1001_0000 | VAL_BIT;
-const FL: u8 = 0b1010_0000 | VAL_BIT;
-const CM: u8 = 0b0000_0000 | CTL_BIT;
-const CL: u8 = 0b0001_0000 | CTL_BIT;
-const EF: u8 = 0b1110_0000 | CTL_BIT;
-const __: u8 = 0b1111_0000 | CTL_BIT;
+const WS: Token = Token::Whitespace;
+const OA: Token = Token::OpenBrace;
+const CA: Token = Token::CloseBrace;
+const OB: Token = Token::OpenBracket;
+const CB: Token = Token::CloseBracket;
+const NM: Token = Token::Number;
+const ST: Token = Token::String;
+const NU: Token = Token::Null;
+const TR: Token = Token::True;
+const FL: Token = Token::False;
+const CM: Token = Token::Comma;
+const CL: Token = Token::Colon;
+const __: Token = Token::Error;
 
-static MAP: [u8; 256] = [
+static MAP: [Token; 256] = [
     //  1   2   3   4   5   6   7   8   9   a   b   c   d   e   f
     __, __, __, __, __, __, __, __, __, WS, WS, __, WS, WS, __, __, // 0
     __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, __, // 1

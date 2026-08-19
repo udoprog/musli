@@ -15,6 +15,7 @@ use self::variant_encoder::JsonVariantEncoder;
 
 use core::fmt;
 use core::marker::PhantomData;
+use core::mem::take;
 
 use crate::en::{Encode, Encoder, SequenceEncoder};
 use crate::hint::{MapHint, SequenceHint};
@@ -202,22 +203,25 @@ where
     #[inline]
     fn encode_bytes(mut self, bytes: &[u8]) -> Result<(), Self::Error> {
         let mut buf = itoa::Buffer::new();
-        let mut it = bytes.iter();
-        let last = it.next_back();
 
+        self.writer.begin_array(self.cx)?;
         self.writer.write_byte(self.cx, b'[')?;
 
-        for b in it {
+        let mut first = true;
+
+        for b in bytes {
+            let first = take(&mut first);
+
+            if !first {
+                self.writer.write_byte(self.cx, b',')?;
+            }
+
+            self.writer.begin_array_element(self.cx, first)?;
             self.writer
                 .write_bytes(self.cx, buf.format(*b).as_bytes())?;
-            self.writer.write_byte(self.cx, b',')?;
         }
 
-        if let Some(b) = last {
-            self.writer
-                .write_bytes(self.cx, buf.format(*b).as_bytes())?;
-        }
-
+        self.writer.end_array(self.cx, bytes.is_empty())?;
         self.writer.write_byte(self.cx, b']')?;
         Ok(())
     }
@@ -287,10 +291,13 @@ where
     where
         T: ?Sized + Encode<Self::Mode>,
     {
+        self.writer.begin_object(self.cx)?;
         self.writer.write_byte(self.cx, b'{')?;
+        self.writer.begin_object_key(self.cx, true)?;
         JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
         self.writer.write_byte(self.cx, b':')?;
-        JsonArrayEncoder::with_end(self.cx, self.writer, b"]}")
+        self.writer.begin_object_value(self.cx)?;
+        JsonArrayEncoder::with_variant(self.cx, self.writer, true)
     }
 
     #[inline]
@@ -302,10 +309,13 @@ where
     where
         T: ?Sized + Encode<Self::Mode>,
     {
+        self.writer.begin_object(self.cx)?;
         self.writer.write_byte(self.cx, b'{')?;
+        self.writer.begin_object_key(self.cx, true)?;
         JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()).encode(tag)?;
         self.writer.write_byte(self.cx, b':')?;
-        JsonObjectEncoder::with_end(self.cx, self.writer, b"}}")
+        self.writer.begin_object_value(self.cx)?;
+        JsonObjectEncoder::with_variant(self.cx, self.writer, true)
     }
 }
 

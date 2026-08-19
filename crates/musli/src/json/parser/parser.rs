@@ -6,8 +6,8 @@ use crate::json::parser::{StringReference, Token};
 
 mod private {
     pub trait Sealed {}
-    impl Sealed for crate::json::parser::SliceParser<'_> {}
-    impl Sealed for crate::json::parser::MutSliceParser<'_, '_> {}
+    impl<const UTF8: bool> Sealed for crate::json::parser::SliceParser<'_, UTF8> {}
+    impl<const UTF8: bool> Sealed for crate::json::parser::MutSliceParser<'_, '_, UTF8> {}
     impl<'de, R> Sealed for &mut R where R: ?Sized + super::Parser<'de> {}
 }
 
@@ -36,6 +36,7 @@ pub trait Parser<'de>: private::Sealed {
     fn try_clone(&self) -> Option<Self::TryClone>;
 
     #[doc(hidden)]
+    #[inline]
     fn parse_string<'scratch, C>(
         &mut self,
         cx: C,
@@ -122,6 +123,14 @@ pub trait Parser<'de>: private::Sealed {
     /// Peek the next byte.
     #[doc(hidden)]
     fn peek(&mut self) -> Option<u8>;
+
+    /// Access the not yet consumed portion of the input.
+    ///
+    /// This permits parsing routines which are hot, such as number parsing, to
+    /// work over a plain slice instead of going through the parser one byte at
+    /// a time.
+    #[doc(hidden)]
+    fn remaining(&self) -> &[u8];
 
     /// Test if the input has been fully consumed, ignoring trailing whitespace
     /// since that is not part of a JSON value.
@@ -307,6 +316,11 @@ where
     #[inline]
     fn peek(&mut self) -> Option<u8> {
         (**self).peek()
+    }
+
+    #[inline]
+    fn remaining(&self) -> &[u8] {
+        (**self).remaining()
     }
 
     #[inline]

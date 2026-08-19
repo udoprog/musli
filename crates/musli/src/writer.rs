@@ -167,6 +167,106 @@ pub trait Writer {
     {
         self.write_bytes(cx, &[b])
     }
+
+    /// Signal that an object is about to be written.
+    ///
+    /// This is called immediately before the structural character which opens
+    /// the object is written by the encoder. Any bytes written here are
+    /// inserted before it.
+    ///
+    /// All structural signals default to doing nothing, which is what binary
+    /// formats want. A writer which pretty prints uses them to decide where to
+    /// insert whitespace.
+    #[inline]
+    fn begin_object<C>(&mut self, cx: C) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        _ = cx;
+        Ok(())
+    }
+
+    /// Signal that an object is about to be closed.
+    ///
+    /// This is called immediately before the structural character which closes
+    /// the object is written by the encoder. The `empty` argument indicates
+    /// that the object being closed did not contain any entries.
+    #[inline]
+    fn end_object<C>(&mut self, cx: C, empty: bool) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        _ = (cx, empty);
+        Ok(())
+    }
+
+    /// Signal that the key of an object entry is about to be written.
+    ///
+    /// This is called after any separator preceding the key has been written.
+    /// The `first` argument indicates that this is the first key in the object,
+    /// which is exactly when no separator was written.
+    #[inline]
+    fn begin_object_key<C>(&mut self, cx: C, first: bool) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        _ = (cx, first);
+        Ok(())
+    }
+
+    /// Signal that the value of an object entry is about to be written.
+    ///
+    /// This is called after the structural character separating the key from
+    /// its value has been written.
+    #[inline]
+    fn begin_object_value<C>(&mut self, cx: C) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        _ = cx;
+        Ok(())
+    }
+
+    /// Signal that an array is about to be written.
+    ///
+    /// This is called immediately before the structural character which opens
+    /// the array is written by the encoder.
+    #[inline]
+    fn begin_array<C>(&mut self, cx: C) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        _ = cx;
+        Ok(())
+    }
+
+    /// Signal that an array is about to be closed.
+    ///
+    /// This is called immediately before the structural character which closes
+    /// the array is written by the encoder. The `empty` argument indicates that
+    /// the array being closed did not contain any elements.
+    #[inline]
+    fn end_array<C>(&mut self, cx: C, empty: bool) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        _ = (cx, empty);
+        Ok(())
+    }
+
+    /// Signal that an element of an array is about to be written.
+    ///
+    /// This is called after any separator preceding the element has been
+    /// written. The `first` argument indicates that this is the first element
+    /// in the array, which is exactly when no separator was written.
+    #[inline]
+    fn begin_array_element<C>(&mut self, cx: C, first: bool) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        _ = (cx, first);
+        Ok(())
+    }
 }
 
 impl<'a, W> IntoWriter for &'a mut W
@@ -227,6 +327,62 @@ where
         C: Context,
     {
         (*self).write_byte(cx, b)
+    }
+
+    #[inline]
+    fn begin_object<C>(&mut self, cx: C) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        (*self).begin_object(cx)
+    }
+
+    #[inline]
+    fn end_object<C>(&mut self, cx: C, empty: bool) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        (*self).end_object(cx, empty)
+    }
+
+    #[inline]
+    fn begin_object_key<C>(&mut self, cx: C, first: bool) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        (*self).begin_object_key(cx, first)
+    }
+
+    #[inline]
+    fn begin_object_value<C>(&mut self, cx: C) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        (*self).begin_object_value(cx)
+    }
+
+    #[inline]
+    fn begin_array<C>(&mut self, cx: C) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        (*self).begin_array(cx)
+    }
+
+    #[inline]
+    fn end_array<C>(&mut self, cx: C, empty: bool) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        (*self).end_array(cx, empty)
+    }
+
+    #[inline]
+    fn begin_array_element<C>(&mut self, cx: C, first: bool) -> Result<(), C::Error>
+    where
+        C: Context,
+    {
+        (*self).begin_array_element(cx, first)
     }
 }
 

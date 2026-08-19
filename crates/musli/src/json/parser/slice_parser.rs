@@ -7,7 +7,10 @@ use crate::reader::SliceUnderflow;
 use super::string::SliceAccess;
 
 /// An efficient [`Parser`] wrapper around a slice.
-pub struct SliceParser<'de> {
+///
+/// If `UTF8` is set the slice is known to be valid UTF-8, allowing string
+/// contents to be used without being validated again.
+pub struct SliceParser<'de, const UTF8: bool = false> {
     pub(crate) slice: &'de [u8],
     pub(crate) index: usize,
 }
@@ -20,13 +23,25 @@ impl<'de> SliceParser<'de> {
     }
 }
 
-impl<'de> Parser<'de> for SliceParser<'de> {
+impl<'de> SliceParser<'de, true> {
+    /// Construct a new instance around a slice which is known to be valid
+    /// UTF-8.
+    #[inline]
+    pub(crate) fn new_utf8(string: &'de str) -> Self {
+        Self {
+            slice: string.as_bytes(),
+            index: 0,
+        }
+    }
+}
+
+impl<'de, const UTF8: bool> Parser<'de> for SliceParser<'de, UTF8> {
     type Mut<'this>
-        = &'this mut SliceParser<'de>
+        = &'this mut SliceParser<'de, UTF8>
     where
         Self: 'this;
 
-    type TryClone = SliceParser<'de>;
+    type TryClone = SliceParser<'de, UTF8>;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -35,7 +50,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
 
     #[inline]
     fn try_clone(&self) -> Option<Self::TryClone> {
-        Some(SliceParser {
+        Some(SliceParser::<UTF8> {
             slice: self.slice,
             index: self.index,
         })
@@ -52,7 +67,7 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: Context,
     {
-        let mut access = SliceAccess::new(cx, self.slice, self.index);
+        let mut access = SliceAccess::<_, UTF8>::new(cx, self.slice, self.index);
         let out = access.parse_string(validate, start, scratch);
         self.index = access.index;
         out
@@ -63,10 +78,24 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     where
         C: Context,
     {
-        let mut access = SliceAccess::new(cx, self.slice, self.index);
+        let mut access = SliceAccess::<_, UTF8>::new(cx, self.slice, self.index);
         let out = access.skip_string();
         self.index = access.index;
         out
+    }
+
+    #[inline]
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
+    where
+        C: Context,
+    {
+        let Some(&b) = self.slice.get(self.index) else {
+            return Err(cx.custom(SliceUnderflow::new(1, 0)));
+        };
+
+        self.index = self.index.wrapping_add(1);
+        cx.advance(1);
+        Ok(b)
     }
 
     #[inline]
@@ -122,6 +151,11 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     #[inline]
     fn peek(&mut self) -> Option<u8> {
         self.slice.get(self.index).copied()
+    }
+
+    #[inline]
+    fn remaining(&self) -> &[u8] {
+        self.slice.get(self.index..).unwrap_or_default()
     }
 
     fn parse_f32<C>(&mut self, cx: C) -> Result<f32, C::Error>

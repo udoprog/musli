@@ -9,7 +9,7 @@ use super::{JsonEncoder, JsonObjectKeyEncoder, JsonObjectPairEncoder};
 pub(crate) struct JsonObjectEncoder<W, C, M> {
     cx: C,
     len: usize,
-    end: &'static [u8],
+    variant: bool,
     writer: W,
     _marker: PhantomData<M>,
 }
@@ -22,20 +22,37 @@ where
 {
     #[inline]
     pub(super) fn new(cx: C, writer: W) -> Result<Self, C::Error> {
-        Self::with_end(cx, writer, b"}")
+        Self::with_variant(cx, writer, false)
     }
 
+    /// Construct an object encoder which, if `variant` is set, also closes an
+    /// enclosing object once this object has been written. This is how an
+    /// externally tagged map variant is encoded.
     #[inline]
-    pub(super) fn with_end(cx: C, mut writer: W, end: &'static [u8]) -> Result<Self, C::Error> {
+    pub(super) fn with_variant(cx: C, mut writer: W, variant: bool) -> Result<Self, C::Error> {
+        writer.begin_object(cx)?;
         writer.write_byte(cx, b'{')?;
 
         Ok(Self {
             cx,
             len: 0,
-            end,
+            variant,
             writer,
             _marker: PhantomData,
         })
+    }
+
+    #[inline]
+    fn finish(mut self) -> Result<(), C::Error> {
+        self.writer.end_object(self.cx, self.len == 0)?;
+        self.writer.write_byte(self.cx, b'}')?;
+
+        if self.variant {
+            self.writer.end_object(self.cx, false)?;
+            self.writer.write_byte(self.cx, b'}')?;
+        }
+
+        Ok(())
     }
 }
 
@@ -70,8 +87,8 @@ where
     }
 
     #[inline]
-    fn finish_map(mut self) -> Result<(), Self::Error> {
-        self.writer.write_bytes(self.cx, self.end)
+    fn finish_map(self) -> Result<(), Self::Error> {
+        self.finish()
     }
 }
 
@@ -100,22 +117,26 @@ where
 
     #[inline]
     fn encode_entry_key(&mut self) -> Result<Self::EncodeEntryKey<'_>, Self::Error> {
-        if self.len > 0 {
+        let first = self.len == 0;
+
+        if !first {
             self.writer.write_byte(self.cx, b',')?;
         }
 
         self.len += 1;
+        self.writer.begin_object_key(self.cx, first)?;
         Ok(JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
     fn encode_entry_value(&mut self) -> Result<Self::EncodeEntryValue<'_>, Self::Error> {
         self.writer.write_byte(self.cx, b':')?;
+        self.writer.begin_object_value(self.cx)?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
-    fn finish_entries(mut self) -> Result<(), Self::Error> {
-        self.writer.write_byte(self.cx, b'}')
+    fn finish_entries(self) -> Result<(), Self::Error> {
+        self.finish()
     }
 }

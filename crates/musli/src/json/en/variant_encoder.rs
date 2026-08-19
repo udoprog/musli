@@ -20,6 +20,7 @@ where
 {
     #[inline]
     pub(super) fn new(cx: C, mut writer: W) -> Result<Self, C::Error> {
+        writer.begin_object(cx)?;
         writer.write_byte(cx, b'{')?;
 
         Ok(Self {
@@ -55,17 +56,20 @@ where
 
     #[inline]
     fn encode_tag(&mut self) -> Result<Self::EncodeTag<'_>, C::Error> {
+        self.writer.begin_object_key(self.cx, true)?;
         Ok(JsonObjectKeyEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
     fn encode_data(&mut self) -> Result<Self::EncodeData<'_>, C::Error> {
         self.writer.write_byte(self.cx, b':')?;
+        self.writer.begin_object_value(self.cx)?;
         Ok(JsonEncoder::new(self.cx, self.writer.borrow_mut()))
     }
 
     #[inline]
     fn finish_variant(mut self) -> Result<(), C::Error> {
+        self.writer.end_object(self.cx, false)?;
         self.writer.write_byte(self.cx, b'}')
     }
 }

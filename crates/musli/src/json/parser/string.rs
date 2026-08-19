@@ -55,13 +55,16 @@ impl StringReference<'_, '_> {
 }
 
 /// Accessor for a slice.
-pub(crate) struct SliceAccess<'de, C> {
+///
+/// If `UTF8` is set the underlying slice is known to be valid UTF-8, which
+/// allows string contents to be used without being validated again.
+pub(crate) struct SliceAccess<'de, C, const UTF8: bool> {
     cx: C,
     slice: &'de [u8],
     pub(crate) index: usize,
 }
 
-impl<'de, C> SliceAccess<'de, C>
+impl<'de, C, const UTF8: bool> SliceAccess<'de, C, UTF8>
 where
     C: Context,
 {
@@ -296,6 +299,8 @@ where
         start: &C::Mark,
         scratch: &'scratch mut Vec<u8, C::Allocator>,
     ) -> Result<StringReference<'de, 'scratch>, C::Error> {
+        // Index of the first byte of the string.
+        let string = self.index;
         // Index of the first byte not yet copied into the scratch space.
         let mut open_mark = self.cx.mark();
         let mut open = self.index;
@@ -327,7 +332,11 @@ where
                         return Ok(StringReference::Borrowed(borrowed));
                     } else {
                         let slice = &self.slice[open..self.index];
-                        self.check_utf8(slice, start)?;
+
+                        // Escape sequences only ever consist of ASCII, so
+                        // validating the raw string in one go is equivalent to
+                        // validating each segment which was copied out of it.
+                        self.check_utf8(&self.slice[string..self.index], start)?;
 
                         if scratch.extend_from_slice(slice).is_err() {
                             return Err(self.cx.message("Scratch buffer overflow"));
@@ -343,7 +352,18 @@ where
                 }
                 b'\\' => {
                     let slice = &self.slice[open..self.index];
-                    self.check_utf8(slice, start)?;
+
+                    // Hitting an escape means the string has to be unescaped
+                    // into the scratch buffer. Reserve room for a typical
+                    // string up front so that it usually only has to be
+                    // allocated once.
+                    if scratch.capacity() == 0 {
+                        const MIN_SCRATCH: usize = 64;
+
+                        if scratch.reserve(slice.len().max(MIN_SCRATCH)).is_err() {
+                            return Err(self.cx.message("Scratch buffer overflow"));
+                        }
+                    }
 
                     if scratch.extend_from_slice(slice).is_err() {
                         return Err(self.cx.message("Scratch buffer overflow"));
@@ -404,6 +424,10 @@ where
     /// Check that the given slice is valid UTF-8.
     #[inline]
     fn check_utf8(&self, bytes: &[u8], start: &C::Mark) -> Result<(), C::Error> {
+        if UTF8 {
+            return Ok(());
+        }
+
         if crate::str::from_utf8(bytes).is_err() {
             Err(self.cx.message_at(start, "Invalid unicode string"))
         } else {
