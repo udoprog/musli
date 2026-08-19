@@ -674,7 +674,7 @@ fn stress() {
         let mut vecs: StdVec<(Vec<u8, &Slice<'_>>, StdVec<u8>)> = StdVec::new();
 
         for _ in 0..300 {
-            match rng.below(4) {
+            match rng.below(5) {
                 0 if vecs.len() < 6 => {
                     vecs.push((Vec::new_in(&alloc), StdVec::new()));
                 }
@@ -692,6 +692,23 @@ fn stress() {
                 2 if !vecs.is_empty() => {
                     let i = rng.below(vecs.len());
                     vecs.remove(i);
+                }
+                // Merge one allocation into another, exercising `try_merge`.
+                _ if vecs.len() >= 2 => {
+                    let i = rng.below(vecs.len());
+                    let mut j = rng.below(vecs.len());
+
+                    if i == j {
+                        j = (j + 1) % vecs.len();
+                    }
+
+                    let (src, src_model) = vecs.remove(j);
+                    let dst = if j < i { i - 1 } else { i };
+                    let (dst, dst_model) = &mut vecs[dst];
+
+                    if dst.extend(src).is_ok() {
+                        dst_model.extend_from_slice(&src_model);
+                    }
                 }
                 _ => {}
             }
@@ -712,4 +729,30 @@ fn stress() {
             run(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15), &mut buf);
         }
     }
+}
+
+/// Empty regions all start at the same address, so an address alone does not
+/// identify which region a buffer owns. Merging must not free a region which
+/// belongs to some other live allocation.
+#[test]
+fn merge_does_not_free_the_wrong_region() {
+    let mut buf = ArrayBuffer::<128>::with_size();
+    let alloc = Slice::new(&mut buf);
+
+    let mut a = Vec::<u8, _>::new_in(&alloc);
+    let mut b = Vec::<u8, _>::new_in(&alloc);
+    let mut c = Vec::<u8, _>::new_in(&alloc);
+    let d = Vec::<u8, _>::new_in(&alloc);
+
+    // `d` is not the region immediately following `a`, even though every empty
+    // region starts at the same address.
+    assert!(a.extend(d).is_ok());
+
+    assert!(b.extend_from_slice(&[1, 2, 3, 4]).is_ok());
+    assert!(c.extend_from_slice(&[5, 6, 7, 8]).is_ok());
+    assert!(a.extend_from_slice(&[9, 10]).is_ok());
+
+    assert_eq!(a.as_slice(), &[9, 10]);
+    assert_eq!(b.as_slice(), &[1, 2, 3, 4]);
+    assert_eq!(c.as_slice(), &[5, 6, 7, 8]);
 }
