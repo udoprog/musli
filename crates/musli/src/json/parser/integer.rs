@@ -259,7 +259,7 @@ where
 
 /// Partially parse an unsigned value.
 #[cfg_attr(feature = "parse-full", allow(unused))]
-#[inline(never)]
+#[inline]
 pub(crate) fn parse_unsigned_base<'de, T, C, P>(cx: C, mut p: P) -> Result<T, C::Error>
 where
     T: Unsigned,
@@ -274,7 +274,7 @@ where
 
 /// Fully parse an unsigned value.
 #[cfg_attr(not(feature = "parse-full"), allow(unused))]
-#[inline(never)]
+#[inline]
 pub(crate) fn parse_unsigned_full<'de, T, C, P>(cx: C, mut p: P) -> Result<T, C::Error>
 where
     T: Unsigned,
@@ -358,7 +358,7 @@ where
 
 /// Fully parse a signed value.
 #[cfg_attr(feature = "parse-full", allow(unused))]
-#[inline(never)]
+#[inline]
 pub(crate) fn parse_signed_base<'de, T, C, P>(cx: C, mut p: P) -> Result<T, C::Error>
 where
     T: Signed,
@@ -377,7 +377,7 @@ where
 
 /// Fully parse a signed value.
 #[cfg_attr(not(feature = "parse-full"), allow(unused))]
-#[inline(never)]
+#[inline]
 pub(crate) fn parse_signed_full<'de, T, C, P>(cx: C, mut p: P) -> Result<T, C::Error>
 where
     T: Signed,
