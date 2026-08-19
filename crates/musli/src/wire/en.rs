@@ -253,11 +253,7 @@ where
 
     #[inline]
     fn encode_isize(mut self, value: isize) -> Result<(), Self::Error> {
-        crate::wire::int::encode_length::<_, _, OPT>(
-            self.cx,
-            self.writer.borrow_mut(),
-            value as usize,
-        )
+        crate::wire::int::encode_isize::<_, _, OPT>(self.cx, self.writer.borrow_mut(), value)
     }
 
     #[inline]

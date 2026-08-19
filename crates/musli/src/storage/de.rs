@@ -283,7 +283,7 @@ where
 
     #[inline]
     fn decode_isize(self) -> Result<isize, Self::Error> {
-        Ok(self.decode_usize()? as isize)
+        crate::int::decode_isize::<_, _, OPT>(self.cx, self.reader)
     }
 
     #[inline]

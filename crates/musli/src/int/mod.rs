@@ -19,7 +19,8 @@ mod traits;
 pub(crate) mod zigzag;
 
 pub(crate) use self::encoding::{
-    decode_signed, decode_unsigned, decode_usize, encode_signed, encode_unsigned, encode_usize,
+    decode_isize, decode_signed, decode_unsigned, decode_usize, encode_isize, encode_signed,
+    encode_unsigned, encode_usize,
 };
 pub(crate) use self::traits::{Signed, Unsigned, UnsignedOps};
 

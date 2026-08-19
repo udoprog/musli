@@ -83,12 +83,12 @@ fn numbers() -> [Numbers; 4] {
     ]
 }
 
-/// Platform sized integers are covered separately, since the pointer width is
-/// itself one of the options being varied.
+/// Platform sized integers, kept within the narrowest configured pointer width
+/// so that every row of the matrix can represent them.
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Sizes {
     a: usize,
-    b: usize,
+    b: isize,
 }
 
 macro_rules! matrix {
@@ -123,13 +123,11 @@ macro_rules! matrix {
                     assert_eq!(&back, value, "descriptive {name}");
                 }
 
-                // NB: only values which fit the narrowest configured pointer
-                // width are used, and only unsigned ones, see TODO.md for the
-                // handling of a negative `isize`.
                 for value in [
                     Sizes { a: 0, b: 0 },
-                    Sizes { a: 1, b: u32::MAX as usize },
-                    Sizes { a: 127, b: 128 },
+                    Sizes { a: u32::MAX as usize, b: i32::MAX as isize },
+                    Sizes { a: 1, b: i32::MIN as isize },
+                    Sizes { a: 127, b: -1 },
                 ] {
                     let bytes = STORAGE.to_vec(&value).expect(name);
                     let back: Sizes = STORAGE.from_slice(&bytes).expect(name);

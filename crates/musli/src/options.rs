@@ -525,6 +525,43 @@ macro_rules! width_arm {
 ))]
 pub(crate) use width_arm;
 
+/// Like [`width_arm`], but hands the macro both the signed and the unsigned
+/// type of the width, so that a signed value can be narrowed and then written
+/// through its two's complement representation.
+#[doc(hidden)]
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "value"
+))]
+macro_rules! signed_width_arm {
+    ($width:expr, $macro:path) => {
+        match $width {
+            $crate::options::Width::U8 => {
+                $macro!(i8, u8)
+            }
+            $crate::options::Width::U16 => {
+                $macro!(i16, u16)
+            }
+            $crate::options::Width::U32 => {
+                $macro!(i32, u32)
+            }
+            _ => {
+                $macro!(i64, u64)
+            }
+        }
+    };
+}
+
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "value"
+))]
+pub(crate) use signed_width_arm;
+
 /// The width of a numerical type.
 ///
 /// # Examples
