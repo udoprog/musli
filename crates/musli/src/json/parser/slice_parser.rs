@@ -70,6 +70,20 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     }
 
     #[inline]
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
+    where
+        C: Context,
+    {
+        let Some(&b) = self.slice.get(self.index) else {
+            return Err(cx.custom(SliceUnderflow::new(1, 0)));
+        };
+
+        self.index = self.index.wrapping_add(1);
+        cx.advance(1);
+        Ok(b)
+    }
+
+    #[inline]
     fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
         C: Context,
@@ -122,6 +136,11 @@ impl<'de> Parser<'de> for SliceParser<'de> {
     #[inline]
     fn peek(&mut self) -> Option<u8> {
         self.slice.get(self.index).copied()
+    }
+
+    #[inline]
+    fn remaining(&self) -> &[u8] {
+        self.slice.get(self.index..).unwrap_or_default()
     }
 
     fn parse_f32<C>(&mut self, cx: C) -> Result<f32, C::Error>

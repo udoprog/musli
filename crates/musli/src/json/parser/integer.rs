@@ -408,10 +408,33 @@ where
         b if is_digit_nonzero(b) => {
             let mut base = T::from_byte(b - b'0');
 
-            while let Some(true) = p.peek().map(is_digit) {
-                base = digit(cx, base, p.borrow_mut(), start)?;
-            }
+            // Consume the remaining digits directly out of the input buffer to
+            // avoid per-digit parser dispatch.
+            let n = {
+                let buf = p.remaining();
+                let mut n = 0;
 
+                while let Some(&b) = buf.get(n) {
+                    if !is_digit(b) {
+                        break;
+                    }
+
+                    let Some(value) = base.checked_mul10() else {
+                        return Err(cx.message_at(start, IntegerError::IntegerOverflow));
+                    };
+
+                    let Some(value) = value.checked_add(T::from_byte(b - b'0')) else {
+                        return Err(cx.message_at(start, IntegerError::IntegerOverflow));
+                    };
+
+                    base = value;
+                    n += 1;
+                }
+
+                n
+            };
+
+            p.skip(cx, n)?;
             base
         }
         _ => {

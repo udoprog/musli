@@ -75,6 +75,20 @@ impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
     }
 
     #[inline]
+    fn read_byte<C>(&mut self, cx: C) -> Result<u8, C::Error>
+    where
+        C: Context,
+    {
+        let Some((&b, tail)) = self.slice.split_first() else {
+            return Err(cx.custom(SliceUnderflow::new(1, 0)));
+        };
+
+        *self.slice = tail;
+        cx.advance(1);
+        Ok(b)
+    }
+
+    #[inline]
     fn skip<C>(&mut self, cx: C, n: usize) -> Result<(), C::Error>
     where
         C: Context,
@@ -130,6 +144,11 @@ impl<'a, 'de> Parser<'de> for MutSliceParser<'a, 'de> {
     #[inline]
     fn peek(&mut self) -> Option<u8> {
         self.slice.first().copied()
+    }
+
+    #[inline]
+    fn remaining(&self) -> &[u8] {
+        self.slice
     }
 
     fn parse_f32<C>(&mut self, cx: C) -> Result<f32, C::Error>

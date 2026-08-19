@@ -123,6 +123,14 @@ pub trait Parser<'de>: private::Sealed {
     #[doc(hidden)]
     fn peek(&mut self) -> Option<u8>;
 
+    /// Access the not yet consumed portion of the input.
+    ///
+    /// This permits parsing routines which are hot, such as number parsing, to
+    /// work over a plain slice instead of going through the parser one byte at
+    /// a time.
+    #[doc(hidden)]
+    fn remaining(&self) -> &[u8];
+
     /// Test if the input has been fully consumed, ignoring trailing whitespace
     /// since that is not part of a JSON value.
     #[doc(hidden)]
@@ -307,6 +315,11 @@ where
     #[inline]
     fn peek(&mut self) -> Option<u8> {
         (**self).peek()
+    }
+
+    #[inline]
+    fn remaining(&self) -> &[u8] {
+        (**self).remaining()
     }
 
     #[inline]
