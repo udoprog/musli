@@ -53,6 +53,32 @@ fn number_coercion() -> Result<()> {
     Ok(())
 }
 
+/// Floats which do not fit in the target integer type are rejected rather than
+/// silently saturating.
+#[test]
+fn float_to_integer_coercion() -> Result<()> {
+    // Truncation towards zero is fine as long as the result is in range.
+    assert_eq!(value::decode::<i32>(&Value::<Global>::from(-3.5f64))?, -3);
+    assert_eq!(value::decode::<u8>(&Value::<Global>::from(255.9f64))?, 255);
+    assert_eq!(
+        value::decode::<u64>(&Value::<Global>::from(9.007199254740992e15f64))?,
+        9007199254740992
+    );
+
+    // Out of range in either direction.
+    assert!(value::decode::<u8>(&Value::<Global>::from(1e30f64)).is_err());
+    assert!(value::decode::<u64>(&Value::<Global>::from(1e30f64)).is_err());
+    assert!(value::decode::<u32>(&Value::<Global>::from(-1.0f64)).is_err());
+    assert!(value::decode::<i8>(&Value::<Global>::from(128.0f64)).is_err());
+    assert!(value::decode::<u64>(&Value::<Global>::from(1.8446744073709552e19f64)).is_err());
+
+    // Non-finite values are never integers.
+    assert!(value::decode::<u8>(&Value::<Global>::from(f64::NAN)).is_err());
+    assert!(value::decode::<i32>(&Value::<Global>::from(f64::INFINITY)).is_err());
+    assert!(value::decode::<i32>(&Value::<Global>::from(f64::NEG_INFINITY)).is_err());
+    Ok(())
+}
+
 /// The exact number representation is preserved.
 #[test]
 fn number_representation() -> Result<()> {
