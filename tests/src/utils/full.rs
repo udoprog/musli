@@ -368,3 +368,36 @@ pub mod facet_json {
         facet_json::from_slice(buf)
     }
 }
+
+#[cfg(feature = "facet-msgpack")]
+#[crate::benchmarker]
+pub mod facet_msgpack {
+    use alloc::vec::Vec;
+    use std::io;
+
+    use facet::Facet;
+    use facet_msgpack::DeserializeError;
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], io::Error>
+    where
+        T: Facet<'static>,
+    {
+        facet_msgpack::to_writer(&mut *buf, value)?;
+        Ok(buf)
+    }
+
+    pub fn decode<T>(buf: &[u8]) -> Result<T, DeserializeError>
+    where
+        T: Facet<'static>,
+    {
+        facet_msgpack::from_slice(buf)
+    }
+}

@@ -453,6 +453,43 @@ expected = [
     "no-wrapping",
 ]
 
+[[reports]]
+id = "facet-msgpack"
+title = "Facet (MessagePack)"
+link = "facet-msgpack"
+description = [
+    "An experimental reflection-based framework, compared against other binary formats.",
+]
+features = [
+    "musli-wire",
+    "musli-descriptive",
+    "musli-storage",
+    "musli-packed",
+    "rmp-serde",
+    "facet-msgpack",
+]
+expected = [
+    "musli",
+    "serde",
+    "facet",
+    "no-alloc-binaryheap",
+    "no-alloc-vecdeque",
+    "no-atomic",
+    "no-cstr",
+    "no-i128",
+    "no-nonzero-i128",
+    "no-nonzero-u128",
+    "no-number-key",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-u128",
+    "no-unsized-cstr",
+    "no-unsized-osstr",
+    "no-unsized-path",
+    "no-wrapping",
+]
+
 [footnotes]
 incomplete = """
 These formats do not support a wide range of Rust types. Exact level of support varies. But from a size perspective it makes size comparisons either unfair or simply an esoteric exercise since they can (or cannot) make stricter assumptions as a result.
