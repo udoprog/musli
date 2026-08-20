@@ -355,6 +355,11 @@ facet-json = [
     "facet",
     "no-u128",
 ]
+facet-msgpack = [
+    "dep:facet-msgpack",
+    "facet",
+    "no-u128",
+]
 
 [dependencies]
 musli = { path = "../crates/musli", version = "0.1.5", default-features = false, optional = true, features = [] }
@@ -382,6 +387,7 @@ epserde = { version = "0.12.6", default-features = false, optional = true, featu
 simd-json = { version = "0.17.0", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
 facet = { version = "0.46.5", default-features = false, optional = true, features = ["alloc", "std", "tuples-12", "nonzero"] }
 facet-json = { version = "0.46.1", optional = true }
+facet-msgpack = { version = "0.46.1", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
