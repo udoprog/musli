@@ -2,8 +2,10 @@
 //!
 //! Every test spins up a real [`axum`] server bound to a random port on
 //! `127.0.0.1` and talks to it over a real websocket connection.
+//!
+//! Miri cannot open sockets under isolation, so these are skipped there.
 
-#![cfg(all(feature = "tungstenite029", feature = "axum08"))]
+#![cfg(all(feature = "tungstenite029", feature = "axum08", not(miri)))]
 
 use std::net::SocketAddr;
 use std::time::Duration;

@@ -7,6 +7,13 @@ use musli::alloc::Global;
 use musli::value::Value;
 use musli::{Decode, Encode};
 
+/// Number of mutations to try per format. Miri is orders of magnitude slower,
+/// so it only gets a token amount to keep the CI job manageable.
+#[cfg(not(miri))]
+const ITER: usize = 50000;
+#[cfg(miri)]
+const ITER: usize = 64;
+
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Inner {
     a: u32,
@@ -106,7 +113,7 @@ macro_rules! fuzz {
         let original = musli::$module::to_vec(&value).unwrap();
         let mut rng = Rng($seed);
 
-        for _ in 0..50000 {
+        for _ in 0..ITER {
             let bytes = mutate(&mut rng, &original);
 
             // Only errors or values are acceptable, never a panic.
@@ -145,7 +152,7 @@ fn fuzz_descriptive_into_value() {
     let original = musli::descriptive::to_vec(&value).unwrap();
     let mut rng = Rng(0x5555);
 
-    for _ in 0..50000 {
+    for _ in 0..ITER {
         let bytes = mutate(&mut rng, &original);
         let _ = musli::descriptive::from_slice::<Value<Global>>(&bytes);
     }
