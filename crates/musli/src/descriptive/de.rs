@@ -314,12 +314,9 @@ where
         let len = self.decode_prefix(Kind::Bytes, &pos)?;
 
         if len != N {
-            return Err(self.cx.message_at(
-                &pos,
-                format_args! {
-                    "Bad length, got {len} but expect {N}"
-                },
-            ));
+            return Err(self
+                .cx
+                .message_at(&pos, format_args!("Bad length, got {len} but expect {N}")));
         }
 
         self.reader.read_array(self.cx)
@@ -458,12 +455,9 @@ where
         match tag {
             FALSE => Ok(false),
             TRUE => Ok(true),
-            tag => Err(self.cx.message_at(
-                &pos,
-                format_args! {
-                    "Bad boolean, got {tag:?}"
-                },
-            )),
+            tag => Err(self
+                .cx
+                .message_at(&pos, format_args!("Bad boolean, got {tag:?}"))),
         }
     }
 
@@ -576,12 +570,9 @@ where
         match tag {
             NONE => Ok(None),
             SOME => Ok(Some(self)),
-            tag => Err(self.cx.message_at(
-                &pos,
-                format_args! {
-                    "Expected option, was {tag:?}"
-                },
-            )),
+            tag => Err(self
+                .cx
+                .message_at(&pos, format_args!("Expected option, was {tag:?}"))),
         }
     }
 

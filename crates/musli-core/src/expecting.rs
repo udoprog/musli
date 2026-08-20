@@ -58,10 +58,10 @@ pub(crate) fn unsupported_type<'a>(
     expected: &'a dyn Expecting,
 ) -> impl fmt::Display + 'a {
     format_fn(move |f| {
-        write! {
+        write!(
             f,
             "Got unsupported type `{actual}`, but expected {expected}"
-        }
+        )
     })
 }
 
@@ -70,12 +70,7 @@ pub(crate) fn bad_visitor_type<'a>(
     actual: &'a dyn fmt::Display,
     expected: &'a dyn Expecting,
 ) -> impl fmt::Display + 'a {
-    format_fn(move |f| {
-        write! {
-            f,
-            "Bad reference type {actual}, expected {expected}",
-        }
-    })
+    format_fn(move |f| write!(f, "Bad reference type {actual}, expected {expected}",))
 }
 
 macro_rules! expect_with {
