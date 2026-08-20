@@ -17,6 +17,7 @@ use crate::generate::Generate;
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 #[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
+#[cfg_attr(feature = "facet", derive(facet::Facet))]
 pub struct Mesh<V: AsRef<[Triangle]> = Vec<Triangle>> {
     pub triangles: V,
 }
@@ -58,6 +59,7 @@ crate::local_deref_sized! {
     epserde(zero_copy)
 )]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "facet", derive(facet::Facet))]
 pub struct Triangle {
     pub v0: Vec3,
     pub v1: Vec3,
@@ -86,6 +88,7 @@ pub struct Triangle {
     epserde(zero_copy)
 )]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "facet", derive(facet::Facet))]
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,

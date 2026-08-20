@@ -10,6 +10,9 @@ license = "MIT OR Apache-2.0"
 publish = false
 autobenches = false
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(disabled)'] }
+
 [[bench]]
 name = "comparison"
 harness = false
@@ -40,6 +43,7 @@ musli-zerocopy = [
     "no-alloc",
     "no-atomic",
     "no-cstr",
+    "no-number-key",
     "no-osstr",
     "no-path",
     "no-saturating",
@@ -187,6 +191,7 @@ epserde = [
     "no-alloc-vecdeque",
     "no-atomic",
     "no-cstr",
+    "no-number-key",
     "no-osstr",
     "no-path",
     "no-saturating",
@@ -332,6 +337,24 @@ zerocopy = [
     "no-unsized-box",
     "no-unsized-rc",
 ]
+facet = [
+    "dep:facet",
+    "std",
+    "no-alloc-binaryheap",
+    "no-alloc-vecdeque",
+    "no-atomic",
+    "no-cstr",
+    "no-number-key",
+    "no-osstr",
+    "no-path",
+    "no-saturating",
+    "no-wrapping",
+]
+facet-json = [
+    "dep:facet-json",
+    "facet",
+    "no-u128",
+]
 
 [dependencies]
 musli = { path = "../crates/musli", version = "0.1.5", default-features = false, optional = true, features = [] }
@@ -357,6 +380,8 @@ miniserde = { version = "0.1.38", default-features = false, optional = true }
 speedy = { version = "0.8.7", optional = true }
 epserde = { version = "0.12.6", default-features = false, optional = true, features = ["derive"] }
 simd-json = { version = "0.17.0", default-features = false, optional = true, features = ["swar-number-parsing", "serde_impl", "runtime-detection", "128bit"] }
+facet = { version = "0.46.5", default-features = false, optional = true, features = ["alloc", "std", "tuples-12", "nonzero"] }
+facet-json = { version = "0.46.1", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.8.1", features = ["html_reports"] }
