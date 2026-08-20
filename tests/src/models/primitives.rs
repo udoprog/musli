@@ -22,6 +22,7 @@ use crate::generate::Generate;
     epserde(zero_copy)
 )]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "facet", derive(facet::Facet))]
 pub struct Primitives {
     boolean: bool,
     #[cfg(not(feature = "no-char"))]

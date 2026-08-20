@@ -22,6 +22,7 @@ use crate::generate::Generate;
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "facet", derive(facet::Facet), repr(C))]
 pub enum FullEnum {
     #[cfg(not(feature = "no-empty"))]
     Empty,

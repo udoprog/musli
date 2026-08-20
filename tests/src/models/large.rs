@@ -28,6 +28,7 @@ use super::FullEnum;
 )]
 #[cfg_attr(feature = "speedy", derive(speedy::Writable, speedy::Readable))]
 #[cfg_attr(feature = "bincode-derive", derive(bincode::Encode, bincode::Decode))]
+#[cfg_attr(feature = "facet", derive(facet::Facet))]
 pub struct Large {
     #[generate(range = super::PRIMITIVES_RANGE.get())]
     primitives: Vec<super::Primitives>,

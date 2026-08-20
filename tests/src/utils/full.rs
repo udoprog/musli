@@ -335,3 +335,36 @@ pub mod derive_bitcode {
         decode_buf.decode(buf)
     }
 }
+
+#[cfg(feature = "facet-json")]
+#[crate::benchmarker]
+pub mod facet_json {
+    use alloc::vec::Vec;
+    use std::io;
+
+    use facet::Facet;
+    use facet_json::DeserializeError;
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
+
+    pub fn reset(buf: &mut Vec<u8>) {
+        buf.clear();
+    }
+
+    pub fn encode<'buf, T>(buf: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], io::Error>
+    where
+        T: Facet<'static>,
+    {
+        facet_json::to_writer_std(&mut *buf, value)?;
+        Ok(buf)
+    }
+
+    pub fn decode<T>(buf: &[u8]) -> Result<T, DeserializeError>
+    where
+        T: Facet<'static>,
+    {
+        facet_json::from_slice(buf)
+    }
+}
