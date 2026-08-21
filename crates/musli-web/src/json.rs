@@ -53,22 +53,16 @@ impl From<rejection05::BytesRejection> for JsonRejection {
 #[cfg_attr(doc_cfg, doc(cfg(feature = "axum-core05")))]
 impl response05::IntoResponse for JsonRejection {
     fn into_response(self) -> response05::Response {
-        let status;
-        let body;
-
-        match self.kind {
-            JsonRejectionKind::ContentType => {
-                status = StatusCode::UNSUPPORTED_MEDIA_TYPE;
-                body = String::from("Expected request with `Content-Type: application/json`");
-            }
-            JsonRejectionKind::Report(report) => {
-                status = StatusCode::BAD_REQUEST;
-                body = report;
-            }
+        let (status, body) = match self.kind {
+            JsonRejectionKind::ContentType => (
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                String::from("Expected request with `Content-Type: application/json`"),
+            ),
+            JsonRejectionKind::Report(report) => (StatusCode::BAD_REQUEST, report),
             JsonRejectionKind::BytesRejection05(rejection) => {
                 return rejection.into_response();
             }
-        }
+        };
 
         (
             status,

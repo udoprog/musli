@@ -13,21 +13,16 @@ help: the trait `ContextError<musli::alloc::Global>` is not implemented for `MyE
    | ^^^^^^^^^^^^^^
    = note: use `musli::context::ErrorMarker` to ignore errors
    = note: use `std::io::Error` and `std::string::String`, if the `std` or `alloc` features are enabled for `musli`
-help: the following other types implement trait `ContextError<A>`
-  --> src/context/context_error.rs
-   |
-   |   impl<A> ContextError<A> for std::io::Error {
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `std::io::Error`
-...
-   |   impl<A> ContextError<A> for String {
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `std::string::String`
-   |
-  ::: src/context/error_marker.rs
-   |
-   | / impl<A> crate::context::ContextError<A> for ErrorMarker
-   | | where
-   | |     A: crate::Allocator,
-   | |________________________^ `ErrorMarker`
+   = help: the following other types implement trait `ContextError<A>`:
+             ErrorMarker
+             musli::descriptive::Error<A>
+             musli::json::Error<A>
+             musli::packed::Error<A>
+             musli::sqlite_jsonb::Error<A>
+             musli::storage::Error<A>
+             musli::value::Error<A>
+             musli::wire::Error<A>
+           and $N others
 note: required by a bound in `DefaultContext::<A, T, C>::with_capture`
   --> src/context/default_context.rs
    |

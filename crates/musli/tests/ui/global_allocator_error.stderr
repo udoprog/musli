@@ -16,22 +16,21 @@ error: #[musli] the allocator parameter cannot be named when the allocator is pi
 48 | #[musli(Binary, global, decode_bound<'de, A> = {})]
    |                                           ^
 
-error[E0432]: unresolved import `musli::value`
-  --> tests/ui/global_allocator_error.rs:14:12
+error[E0277]: the trait bound `Value<musli::alloc::Global>: Decode<'_, musli::mode::Binary, __A>` is not satisfied
+  --> tests/ui/global_allocator_error.rs:17:18
    |
-14 | use musli::value::Value;
-   |            ^^^^^ could not find `value` in `musli`
+17 | #[derive(Encode, Decode)]
+   |                  ^^^^^^ the trait `Decode<'_, musli::mode::Binary, __A>` is not implemented for `Value<musli::alloc::Global>`
    |
-note: found an item that was configured out
-  --> src/lib.rs
+   = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Value<musli::alloc::Global>: Decode<'_, Text, __A>` is not satisfied
+  --> tests/ui/global_allocator_error.rs:17:18
    |
-   | pub mod value;
-   |         ^^^^^
+17 | #[derive(Encode, Decode)]
+   |                  ^^^^^^ the trait `Decode<'_, Text, __A>` is not implemented for `Value<musli::alloc::Global>`
    |
-  ::: src/value/mod.rs
-   |
-   | #![cfg(any(feature = "json", feature = "descriptive", feature = "value"))]
-   |           -------------------------------------------------------------- the item is gated here
+   = note: this error originates in the derive macro `Decode` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0277]: the trait bound `musli::alloc::String<musli::alloc::Global>: Decode<'_, musli::mode::Binary, __A>` is not satisfied
   --> tests/ui/global_allocator_error.rs:22:18
