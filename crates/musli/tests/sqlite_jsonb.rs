@@ -3,8 +3,15 @@
 //! Every document in this file is handed to a real in-memory SQLite database,
 //! either to be rendered as JSON or to be produced by SQLite so that it can be
 //! decoded again.
+//!
+//! Miri cannot call into SQLite's C library, so these are skipped there.
 
-#![cfg(all(feature = "std", feature = "alloc", feature = "sqlite-jsonb"))]
+#![cfg(all(
+    feature = "std",
+    feature = "alloc",
+    feature = "sqlite-jsonb",
+    not(miri)
+))]
 
 use std::collections::BTreeMap;
 
