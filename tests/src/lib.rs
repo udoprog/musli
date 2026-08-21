@@ -154,6 +154,8 @@ macro_rules! feature_matrix {
         $call!(mock $(, $($tt)*)*);
         #[cfg(feature = "musli-json")]
         $call!(musli_json $(, $($tt)*)*);
+        #[cfg(feature = "musli-sqlite-jsonb")]
+        $call!(musli_sqlite_jsonb $(, $($tt)*)*);
         #[cfg(feature = "musli-wire")]
         $call!(musli_wire $(, $($tt)*)*);
         #[cfg(feature = "musli-descriptive")]

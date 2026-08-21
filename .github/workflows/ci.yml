@@ -146,6 +146,7 @@ jobs:
         - descriptive
         - wire
         - json
+        - sqlite-jsonb
         - value
         - serde
     env:

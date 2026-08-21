@@ -147,6 +147,11 @@ fn fuzz_json() {
 }
 
 #[test]
+fn fuzz_sqlite_jsonb() {
+    fuzz!(sqlite_jsonb, 0x6666);
+}
+
+#[test]
 fn fuzz_descriptive_into_value() {
     let value = sample();
     let original = musli::descriptive::to_vec(&value).unwrap();
@@ -155,5 +160,17 @@ fn fuzz_descriptive_into_value() {
     for _ in 0..ITER {
         let bytes = mutate(&mut rng, &original);
         let _ = musli::descriptive::from_slice::<Value<Global>>(&bytes);
+    }
+}
+
+#[test]
+fn fuzz_sqlite_jsonb_into_value() {
+    let value = sample();
+    let original = musli::sqlite_jsonb::to_vec(&value).unwrap();
+    let mut rng = Rng(0x7777);
+
+    for _ in 0..ITER {
+        let bytes = mutate(&mut rng, &original);
+        let _ = musli::sqlite_jsonb::from_slice::<Value<Global>>(&bytes);
     }
 }

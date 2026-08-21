@@ -166,11 +166,12 @@ The available formats and their capabilities are:
 
 | | `reorder` | `missing` | `unknown` | `self` |
 |-|-|-|-|-|
-| [`musli::packed`] (with `#[musli(packed)]`) | ✗ | ✗ | ✗ | ✗ |
-| [`musli::storage`]                          | ✔ | ✔ | ✗ | ✗ |
-| [`musli::wire`]                             | ✔ | ✔ | ✔ | ✗ |
-| [`musli::descriptive`]                      | ✔ | ✔ | ✔ | ✔ |
-| [`musli::json`] [^json]                     | ✔ | ✔ | ✔ | ✔ |
+| [`musli::packed`] (with `#[musli(packed)]`)  | ✗ | ✗ | ✗ | ✗ |
+| [`musli::storage`]                           | ✔ | ✔ | ✗ | ✗ |
+| [`musli::wire`]                              | ✔ | ✔ | ✔ | ✗ |
+| [`musli::descriptive`]                       | ✔ | ✔ | ✔ | ✔ |
+| [`musli::json`] [^json]                      | ✔ | ✔ | ✔ | ✔ |
+| [`musli::sqlite_jsonb`] [^sqlite_jsonb]      | ✔ | ✔ | ✔ | ✔ |
 
 `reorder` determines whether fields must occur in exactly the order in which
 they are specified in their type. Reordering fields in such a type would
@@ -205,6 +206,10 @@ perform [bit packing] if the benefits are obvious.
 [^json]: This is strictly not a binary serialization, but it was implemented
 as a litmus test to ensure that Müsli has the necessary framework features
 to support it. Luckily, the implementation is also quite good!
+
+[^sqlite_jsonb]: The binary representation SQLite uses for JSON. It carries
+the same data model as JSON, and blobs can be handed straight to SQLite and
+read back with its `json` functions.
 
 <br>
 
@@ -460,6 +465,7 @@ safety, extensive testing and fuzzing is performed using `miri`. See
 [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
 [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/>
 [`musli::json`]: <https://docs.rs/musli/latest/musli/json/>
+[`musli::sqlite_jsonb`]: <https://docs.rs/musli/latest/musli/sqlite_jsonb/>
 [`musli::packed`]: <https://docs.rs/musli/latest/musli/packed/>
 [`musli::serde`]: <https://docs.rs/musli/latest/musli/serde/>
 [`musli::storage`]: <https://docs.rs/musli/latest/musli/storage/>

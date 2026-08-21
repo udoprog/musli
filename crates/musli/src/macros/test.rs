@@ -198,9 +198,10 @@ pub(crate) use test_fns;
 ///
 /// The `$support` parameter is one of:
 /// * `full` - All formats are tested.
-/// * `no_json` - All formats except JSON are tested.
+/// * `no_json` - All formats except JSON and JSONB are tested.
 /// * `descriptive` - All fully self-descriptive formats are tested.
 /// * `json` - Only JSON is tested.
+/// * `sqlite_jsonb` - Only SQLite JSONB is tested.
 /// * `upgrade_stable` - Only upgrade-stable formats are tested.
 ///
 /// Extra tests can be specified using the `$extra` parameter:
@@ -270,9 +271,10 @@ pub use assert_roundtrip_eq;
 ///
 /// The `$support` parameter is one of:
 /// * `full` - All formats are tested.
-/// * `no_json` - All formats except JSON are tested.
+/// * `no_json` - All formats except JSON and JSONB are tested.
 /// * `descriptive` - All fully self-descriptive formats are tested.
 /// * `json` - Only JSON is tested.
+/// * `sqlite_jsonb` - Only SQLite JSONB is tested.
 /// * `upgrade_stable` - Only upgrade-stable formats are tested.
 ///
 /// Extra tests can be specified using the `$extra` parameter:
@@ -355,9 +357,10 @@ pub use assert_roundtrip_borrowed_eq;
 ///
 /// The `$support` parameter is one of:
 /// * `full` - All formats are tested.
-/// * `no_json` - All formats except JSON are tested.
+/// * `no_json` - All formats except JSON and JSONB are tested.
 /// * `descriptive` - All fully self-descriptive formats are tested.
 /// * `json` - Only JSON is tested.
+/// * `sqlite_jsonb` - Only SQLite JSONB is tested.
 /// * `upgrade_stable` - Only upgrade-stable formats are tested.
 ///
 /// Extra tests can be specified using the `$extra` parameter:
@@ -471,6 +474,7 @@ macro_rules! __test_matrix {
         $call!(descriptive, Binary);
         $call!(descriptive, Text);
         $call!(json, Text);
+        $call!(sqlite_jsonb, Text);
     };
 
     (not_packed, $call:path) => {
@@ -478,6 +482,7 @@ macro_rules! __test_matrix {
         $call!(wire, Binary);
         $call!(descriptive, Binary);
         $call!(json, Text);
+        $call!(sqlite_jsonb, Text);
     };
 
     (text_mode, $call:path) => {
@@ -485,6 +490,7 @@ macro_rules! __test_matrix {
         $call!(wire, Text);
         $call!(descriptive, Text);
         $call!(json, Text);
+        $call!(sqlite_jsonb, Text);
     };
 
     (storage, $call:path) => {
@@ -501,6 +507,7 @@ macro_rules! __test_matrix {
         $call!(wire, Binary);
         $call!(descriptive, Binary);
         $call!(json, Binary);
+        $call!(sqlite_jsonb, Binary);
     };
 
     (no_json, $call:path) => {
@@ -513,10 +520,15 @@ macro_rules! __test_matrix {
     (descriptive, $call:path) => {
         $call!(descriptive, Binary);
         $call!(json, Text);
+        $call!(sqlite_jsonb, Text);
     };
 
     (json, $call:path) => {
         $call!(json, Text);
+    };
+
+    (sqlite_jsonb, $call:path) => {
+        $call!(sqlite_jsonb, Text);
     };
 
     (packed, $call:path) => {
@@ -527,6 +539,7 @@ macro_rules! __test_matrix {
         $call!(wire, Binary);
         $call!(descriptive, Binary);
         $call!(json, Text);
+        $call!(sqlite_jsonb, Text);
     };
 }
 
