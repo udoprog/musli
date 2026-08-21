@@ -6,6 +6,7 @@
     feature = "wire",
     feature = "descriptive",
     feature = "json",
+    feature = "sqlite-jsonb",
     feature = "value"
 ))]
 

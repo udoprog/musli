@@ -35,6 +35,43 @@ pub mod musli_json {
     }
 }
 
+#[cfg(feature = "musli-sqlite-jsonb")]
+#[crate::benchmarker]
+pub mod musli_sqlite_jsonb {
+    use alloc::vec::Vec;
+
+    use musli::alloc::Global;
+    use musli::mode::Text;
+    use musli::sqlite_jsonb::Encoding;
+    use musli::sqlite_jsonb::Error;
+    use musli::{Decode, Encode};
+
+    const ENCODING: Encoding = Encoding::new();
+
+    pub fn buffer() -> Vec<u8> {
+        Vec::with_capacity(4096)
+    }
+
+    pub fn reset(buffer: &mut Vec<u8>) {
+        buffer.clear();
+    }
+
+    pub fn encode<'buf, T>(buffer: &'buf mut Vec<u8>, value: &T) -> Result<&'buf [u8], Error>
+    where
+        T: Encode<Text>,
+    {
+        ENCODING.encode(&mut *buffer, value)?;
+        Ok(buffer)
+    }
+
+    pub fn decode<'buf, T>(buffer: &'buf [u8]) -> Result<T, Error>
+    where
+        T: Decode<'buf, Text, Global>,
+    {
+        ENCODING.from_slice(buffer)
+    }
+}
+
 #[cfg(feature = "musli-packed")]
 #[crate::benchmarker]
 pub mod musli_packed {

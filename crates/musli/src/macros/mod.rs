@@ -4,6 +4,7 @@
     feature = "storage",
     feature = "wire",
     feature = "descriptive",
+    feature = "sqlite-jsonb",
     feature = "value"
 ))]
 mod internal;
@@ -11,6 +12,7 @@ mod internal;
     feature = "storage",
     feature = "wire",
     feature = "descriptive",
+    feature = "sqlite-jsonb",
     feature = "value"
 ))]
 pub(crate) use self::internal::{bare_encoding, encoding_impls, implement_error};
@@ -21,6 +23,7 @@ pub(crate) use self::internal::{bare_encoding, encoding_impls, implement_error};
         feature = "storage",
         feature = "wire",
         feature = "descriptive",
+        feature = "sqlite-jsonb",
         feature = "value"
     )
 ))]

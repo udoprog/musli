@@ -31,11 +31,12 @@ storage = []
 wire = []
 descriptive = ["value"]
 json = ["value", "dep:itoa", "dep:ryu"]
+sqlite-jsonb = ["value", "dep:itoa", "dep:ryu"]
 parse-full = []
 value = []
 serde = ["dep:serde"]
 
-test = ["storage", "wire", "descriptive", "json", "parse-full", "value", "serde"]
+test = ["storage", "wire", "descriptive", "json", "sqlite-jsonb", "parse-full", "value", "serde"]
 
 [dependencies]
 musli-core = { version = "0.1.4", path = "../musli-core", default-features = false }
@@ -57,4 +58,11 @@ rand = "0.10.0"
 serde = { version = "1.0.198", features = ["derive"] }
 url = { version = "2.5.0", features = ["serde"] }
 trybuild = "1.0.90"
+# Used to check JSONB against a real SQLite. `threadsafe` is required since
+# tests open a connection per test and cargo runs them in parallel.
+sqll = { version = "0.14.3", default-features = false, features = ["std", "bundled", "threadsafe"] }
 bstr = "1.9.1"
+
+[[example]]
+name = "sqlite_jsonb"
+required-features = ["sqlite-jsonb", "std", "alloc"]
