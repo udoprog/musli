@@ -2,10 +2,7 @@
 
 #![allow(clippy::module_inception)]
 
-#[cfg(test)]
-mod tests;
-
-pub(crate) mod integer;
+pub(crate) mod number;
 
 mod into_parser;
 pub use self::into_parser::IntoParser;

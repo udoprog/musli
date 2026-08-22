@@ -23,7 +23,9 @@ use crate::value::{IntoValueDecoder, Value};
 use crate::{Context, Options, options};
 
 use super::cursor::{Cursor, SliceCursor};
-use super::parse::{Float, Integer, is_escaped, parse_float, parse_integer, unescape};
+use crate::number::{Float, Integer};
+
+use super::parse::{is_escaped, parse_any, parse_float, parse_integer, unescape};
 use super::tag::{ARRAY, FALSE, INT, Kind, NULL, OBJECT, TRUE, is_float, is_int, is_text};
 
 // JSONB, like JSON, stores object keys as strings, so buffered values have to
@@ -557,8 +559,8 @@ where
     }
 }
 
-/// Hand a number payload to the visitor, picking the widest type which is
-/// needed to represent it exactly.
+/// Hand a number payload to the visitor, picking the narrowest type which
+/// holds it exactly.
 pub(super) fn visit_number<'de, C, V>(
     cx: C,
     kind: u8,
@@ -574,21 +576,8 @@ where
         return visitor.visit_f64(cx, value);
     }
 
-    if matches!(payload.first(), Some(b'-')) {
-        let value = parse_integer::<i128, _>(cx, kind, payload)?;
-
-        return match i64::try_from(value) {
-            Ok(value) => visitor.visit_i64(cx, value),
-            Err(..) => visitor.visit_i128(cx, value),
-        };
-    }
-
-    let value = parse_integer::<u128, _>(cx, kind, payload)?;
-
-    match u64::try_from(value) {
-        Ok(value) => visitor.visit_u64(cx, value),
-        Err(..) => visitor.visit_u128(cx, value),
-    }
+    let any = parse_any(cx, kind, payload)?;
+    crate::number::visit_any(cx, any, visitor)
 }
 
 /// Decode an integer which has been stored as an object key, and is therefore

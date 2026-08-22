@@ -4,7 +4,7 @@ use core::marker;
 use crate::Context;
 use crate::de::UnsizedVisitor;
 use crate::json::parser::SliceParser;
-use crate::json::parser::integer::Signed;
+use crate::number::Signed;
 
 use super::parse_signed;
 

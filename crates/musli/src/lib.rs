@@ -517,8 +517,10 @@ pub mod macros;
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "json")]
+#[cfg(any(feature = "json", feature = "sqlite-jsonb"))]
 mod dec2flt;
+#[cfg(any(feature = "json", feature = "sqlite-jsonb"))]
+mod number;
 
 pub mod _help {
     //! Detailed documentation for Müsli

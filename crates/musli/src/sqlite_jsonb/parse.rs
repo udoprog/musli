@@ -1,71 +1,21 @@
 //! Parsing of the ASCII text payloads used by JSONB for numbers and of the
 //! escape sequences used by the `TEXTJ` and `TEXT5` string types.
+//!
+//! Numbers are handed to the shared [`number`] parser. The `INT` and `FLOAT`
+//! elements hold canonical JSON, the `INT5` and `FLOAT5` elements hold the
+//! JSON5 forms SQLite additionally understands, so the two only differ in which
+//! syntax they are read with.
+//!
+//! [`number`]: crate::number
 
 use core::fmt;
 use core::str;
 
 use crate::Context;
 use crate::alloc::Vec;
+use crate::number::{self, Float, Integer, Json, Json5};
 
-use super::tag::{FLOAT, FLOAT5, INT, INT5, TEXT5, TEXTJ};
-
-/// An integer which can be decoded from the ASCII payload of an `INT` or
-/// `INT5` element.
-pub(crate) trait Integer: Sized {
-    fn from_str_radix(s: &str, radix: u32) -> Option<Self>;
-
-    fn checked_neg(self) -> Option<Self>;
-}
-
-macro_rules! integer {
-    ($($ty:ty),* $(,)?) => {
-        $(
-            impl Integer for $ty {
-                #[inline]
-                fn from_str_radix(s: &str, radix: u32) -> Option<Self> {
-                    <$ty>::from_str_radix(s, radix).ok()
-                }
-
-                #[inline]
-                fn checked_neg(self) -> Option<Self> {
-                    <$ty>::checked_neg(self)
-                }
-            }
-        )*
-    }
-}
-
-integer!(
-    u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize
-);
-
-/// A float which can be decoded from the ASCII payload of a `FLOAT` or
-/// `FLOAT5` element.
-pub(crate) trait Float: Sized {
-    fn from_str(s: &str) -> Option<Self>;
-
-    fn from_i128(value: i128) -> Self;
-}
-
-macro_rules! float {
-    ($($ty:ty),* $(,)?) => {
-        $(
-            impl Float for $ty {
-                #[inline]
-                fn from_str(s: &str) -> Option<Self> {
-                    <$ty as core::str::FromStr>::from_str(s).ok()
-                }
-
-                #[inline]
-                fn from_i128(value: i128) -> Self {
-                    value as $ty
-                }
-            }
-        )*
-    }
-}
-
-float!(f32, f64);
+use super::tag::{FLOAT, FLOAT5, INT, INT5, Kind, TEXT5, TEXTJ};
 
 /// Decode the payload of an integer element.
 #[inline]
@@ -74,14 +24,13 @@ where
     T: Integer,
     C: Context,
 {
-    let Some(value) = str::from_utf8(bytes)
-        .ok()
-        .and_then(|s| integer_from(kind, s))
-    else {
-        return Err(cx.message(BadNumber { kind, bytes }));
+    let out = match kind {
+        INT => T::parse::<Json>(bytes),
+        INT5 => T::parse::<Json5>(bytes),
+        _ => return Err(cx.message(BadNumber::new(kind, bytes, Cause::Kind))),
     };
 
-    Ok(value)
+    finish(cx, kind, bytes, out)
 }
 
 /// Decode the payload of an integer or float element as a float.
@@ -91,77 +40,48 @@ where
     T: Float,
     C: Context,
 {
-    let Some(value) = str::from_utf8(bytes).ok().and_then(|s| float_from(kind, s)) else {
-        return Err(cx.message(BadNumber { kind, bytes }));
+    let out = match kind {
+        INT | FLOAT => number::parse_float::<Json, T>(bytes),
+        INT5 | FLOAT5 => number::parse_float::<Json5, T>(bytes),
+        _ => return Err(cx.message(BadNumber::new(kind, bytes, Cause::Kind))),
     };
 
-    Ok(value)
+    finish(cx, kind, bytes, out)
 }
 
-fn integer_from<T>(kind: u8, s: &str) -> Option<T>
-where
-    T: Integer,
-{
-    match kind {
-        INT => T::from_str_radix(s, 10),
-        INT5 => {
-            let (negative, rest) = split_sign(s);
-
-            let value = match strip_hex(rest) {
-                Some(hex) => T::from_str_radix(hex, 16)?,
-                None => T::from_str_radix(rest, 10)?,
-            };
-
-            if negative {
-                value.checked_neg()
-            } else {
-                Some(value)
-            }
-        }
-        _ => None,
-    }
-}
-
-fn float_from<T>(kind: u8, s: &str) -> Option<T>
-where
-    T: Float,
-{
-    match kind {
-        INT | FLOAT => T::from_str(s),
-        // The JSON5 forms which Rust's own float parser does not accept are the
-        // hexadecimal integers. Everything else, including `Infinity`, `NaN`,
-        // a leading `+` and a leading or trailing `.`, it handles.
-        INT5 | FLOAT5 => {
-            let (negative, rest) = split_sign(s);
-
-            if let Some(hex) = strip_hex(rest) {
-                let value = i128::from_str_radix(hex, 16).ok()?;
-                let value = if negative {
-                    value.checked_neg()?
-                } else {
-                    value
-                };
-                return Some(T::from_i128(value));
-            }
-
-            T::from_str(s)
-        }
-        _ => None,
-    }
-}
-
+/// Decode the payload of an integer element without being told which type it
+/// is wanted as.
 #[inline]
-fn split_sign(s: &str) -> (bool, &str) {
-    match s.as_bytes().first() {
-        Some(b'-') => (true, &s[1..]),
-        Some(b'+') => (false, &s[1..]),
-        _ => (false, s),
-    }
+pub(crate) fn parse_any<C>(cx: C, kind: u8, bytes: &[u8]) -> Result<number::Any, C::Error>
+where
+    C: Context,
+{
+    let out = match kind {
+        INT => number::parse_any::<Json>(bytes),
+        INT5 => number::parse_any::<Json5>(bytes),
+        _ => return Err(cx.message(BadNumber::new(kind, bytes, Cause::Kind))),
+    };
+
+    finish(cx, kind, bytes, out)
 }
 
+/// Turn the outcome of parsing into an error unless the number took up the
+/// whole payload, since a payload is exactly one number and nothing else.
 #[inline]
-fn strip_hex(s: &str) -> Option<&str> {
-    s.strip_prefix("0x").or_else(|| s.strip_prefix("0X"))
+fn finish<T, C>(
+    cx: C,
+    kind: u8,
+    bytes: &[u8],
+    out: Result<(T, usize), number::Error>,
+) -> Result<T, C::Error>
+where
+    C: Context,
+{
+    match out {
+        Ok((value, len)) if len == bytes.len() => Ok(value),
+        Ok((_, len)) => Err(cx.message(BadNumber::new(kind, bytes, Cause::Trailing(len)))),
+        Err(error) => Err(cx.message(BadNumber::new(kind, bytes, Cause::Parse(error)))),
+    }
 }
 
 /// Test if `bytes` contains anything which has to be escaped in order to be
@@ -340,18 +260,46 @@ where
     }
 }
 
+/// Why the payload of a number element could not be decoded.
 struct BadNumber<'a> {
     kind: u8,
     bytes: &'a [u8],
+    cause: Cause,
+}
+
+impl<'a> BadNumber<'a> {
+    #[inline]
+    fn new(kind: u8, bytes: &'a [u8], cause: Cause) -> Self {
+        Self { kind, bytes, cause }
+    }
+}
+
+enum Cause {
+    /// The payload is not a number in the syntax the element type implies.
+    Parse(number::Error),
+    /// The payload has something after the number it starts with.
+    Trailing(usize),
+    /// The element type does not hold a number at all.
+    Kind,
+}
+
+impl fmt::Display for Cause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Cause::Parse(error) => write!(f, "{error} (at offset {})", error.at()),
+            Cause::Trailing(at) => write!(f, "Trailing bytes after the number (at offset {at})"),
+            Cause::Kind => write!(f, "Element type does not hold a number"),
+        }
+    }
 }
 
 impl fmt::Display for BadNumber<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let BadNumber { kind, bytes } = self;
-        let kind = super::tag::Kind(*kind);
+        let BadNumber { kind, bytes, cause } = self;
+        let kind = Kind(*kind);
 
         match str::from_utf8(bytes) {
-            Ok(string) => write!(f, "Cannot decode {kind} payload {string:?}"),
+            Ok(string) => write!(f, "Cannot decode {kind} payload {string:?}: {cause}"),
             Err(..) => write!(f, "Cannot decode {kind} payload, which is not ASCII"),
         }
     }
