@@ -5,9 +5,9 @@ use crate::Context;
 use crate::de::{Decoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 
 use super::super::cursor::Cursor;
-use super::super::parse::Integer;
 use super::super::tag::is_text;
 use super::{JsonbDecoder, decode_key_integer};
+use crate::number::Integer;
 
 /// A decoder for the key of a JSONB object entry.
 ///

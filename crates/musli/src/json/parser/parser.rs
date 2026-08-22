@@ -1,7 +1,7 @@
 use crate::Context;
 use crate::alloc::Vec;
 use crate::de::Visitor;
-use crate::json::parser::integer::decode_signed_full;
+use crate::json::parser::number::{parse_any, parse_float};
 use crate::json::parser::{StringReference, Token};
 
 mod private {
@@ -158,14 +158,22 @@ pub trait Parser<'de>: private::Sealed {
     }
 
     /// Parse a 32-bit floating point number.
+    #[inline]
     fn parse_f32<C>(&mut self, cx: C) -> Result<f32, C::Error>
     where
-        C: Context;
+        C: Context,
+    {
+        parse_float(cx, self)
+    }
 
     /// Parse a 64-bit floating point number.
+    #[inline]
     fn parse_f64<C>(&mut self, cx: C) -> Result<f64, C::Error>
     where
-        C: Context;
+        C: Context,
+    {
+        parse_float(cx, self)
+    }
 
     #[doc(hidden)]
     fn parse_exact<C>(&mut self, cx: C, exact: &str) -> Result<(), C::Error>
@@ -196,69 +204,8 @@ pub trait Parser<'de>: private::Sealed {
         C: Context,
         V: Visitor<'de, C, Error = C::Error, Allocator = C::Allocator>,
     {
-        let signed = decode_signed_full::<i128, _, _>(cx, self)?;
-
-        if signed.is_negative {
-            let value = match signed.compute() {
-                Ok(value) => value,
-                Err(..) => {
-                    let value = signed.compute_float();
-                    return visitor.visit_f64(cx, value);
-                }
-            };
-
-            if value >= i8::MIN as i128 && value <= i8::MAX as i128 {
-                return visitor.visit_i8(cx, value as i8);
-            }
-
-            if value >= i16::MIN as i128 && value <= i16::MAX as i128 {
-                return visitor.visit_i16(cx, value as i16);
-            }
-
-            if value >= i32::MIN as i128 && value <= i32::MAX as i128 {
-                return visitor.visit_i32(cx, value as i32);
-            }
-
-            if value >= i64::MIN as i128 && value <= i64::MAX as i128 {
-                return visitor.visit_i64(cx, value as i64);
-            }
-
-            if value >= isize::MIN as i128 && value <= isize::MAX as i128 {
-                return visitor.visit_isize(cx, value as isize);
-            }
-
-            visitor.visit_i128(cx, value)
-        } else {
-            let value = match signed.unsigned.compute() {
-                Ok(value) => value,
-                Err(..) => {
-                    let value = signed.unsigned.compute_float();
-                    return visitor.visit_f64(cx, value);
-                }
-            };
-
-            if value <= u8::MAX as u128 {
-                return visitor.visit_u8(cx, value as u8);
-            }
-
-            if value <= u16::MAX as u128 {
-                return visitor.visit_u16(cx, value as u16);
-            }
-
-            if value <= u32::MAX as u128 {
-                return visitor.visit_u32(cx, value as u32);
-            }
-
-            if value <= u64::MAX as u128 {
-                return visitor.visit_u64(cx, value as u64);
-            }
-
-            if value <= usize::MAX as u128 {
-                return visitor.visit_usize(cx, value as usize);
-            }
-
-            visitor.visit_u128(cx, value)
-        }
+        let any = parse_any(cx, self)?;
+        crate::number::visit_any(cx, any, visitor)
     }
 }
 

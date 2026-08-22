@@ -1,6 +1,5 @@
 use crate::Context;
 use crate::alloc::Vec;
-use crate::json::error::ErrorMessage;
 use crate::json::parser::{Parser, StringReference};
 use crate::reader::SliceUnderflow;
 
@@ -164,31 +163,5 @@ impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
     #[inline]
     fn remaining(&self) -> &[u8] {
         self.slice
-    }
-
-    fn parse_f32<C>(&mut self, cx: C) -> Result<f32, C::Error>
-    where
-        C: Context,
-    {
-        let Some((value, read)) = crate::dec2flt::dec2flt(self.slice) else {
-            return Err(cx.message(ErrorMessage::ParseFloat));
-        };
-
-        *self.slice = &self.slice[read..];
-        cx.advance(read);
-        Ok(value)
-    }
-
-    fn parse_f64<C>(&mut self, cx: C) -> Result<f64, C::Error>
-    where
-        C: Context,
-    {
-        let Some((value, read)) = crate::dec2flt::dec2flt(self.slice) else {
-            return Err(cx.message(ErrorMessage::ParseFloat));
-        };
-
-        *self.slice = &self.slice[read..];
-        cx.advance(read);
-        Ok(value)
     }
 }

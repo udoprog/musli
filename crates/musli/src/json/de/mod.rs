@@ -32,14 +32,14 @@ use crate::options;
 use crate::value::{IntoValueDecoder, Value};
 
 #[cfg(not(feature = "parse-full"))]
-use super::parser::integer::{
+use super::parser::number::{
     parse_signed_base as parse_signed, parse_unsigned_base as parse_unsigned,
 };
 #[cfg(feature = "parse-full")]
-use super::parser::integer::{
+use super::parser::number::{
     parse_signed_full as parse_signed, parse_unsigned_full as parse_unsigned,
 };
-use super::parser::{Parser, StringReference, Token, integer};
+use super::parser::{Parser, StringReference, Token, number};
 
 const BUFFER_OPTIONS: Options = options::new().map_keys_as_numbers().build();
 
@@ -77,7 +77,7 @@ where
             Token::Null => self.parse_null(),
             Token::True => self.parse_true(),
             Token::False => self.parse_false(),
-            Token::Number => integer::skip_number(self.cx, self.parser.borrow_mut()),
+            Token::Number => number::skip_number(self.cx, self.parser.borrow_mut()),
             Token::String => {
                 // Skip over opening quote.
                 self.parser.skip(self.cx, 1)?;

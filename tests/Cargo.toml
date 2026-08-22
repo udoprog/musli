@@ -22,6 +22,10 @@ harness = false
 name = "json"
 harness = false
 
+[[bench]]
+name = "number"
+harness = false
+
 [features]
 default = ["std", "alloc"]
 std = ["musli?/std", "serde?/std", "musli-zerocopy?/std", "rand/std", "serde_json?/std", "rkyv?/std", "miniserde?/std", "epserde?/std", "bincode?/std", "wincode?/std", "epserde?/std"]
