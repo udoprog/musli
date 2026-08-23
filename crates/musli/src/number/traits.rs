@@ -23,6 +23,16 @@ pub(crate) trait Unsigned: Sized + Copy + fmt::Debug {
     /// [`max_safe_digits`]: Self::max_safe_digits
     fn wrapping_mul_add<const RADIX: u32>(self, digit: u8) -> Self;
 
+    /// Calculate `self * RADIX ** 8 + digits` without checking for overflow,
+    /// where `digits` is eight digits already folded together.
+    ///
+    /// Only called while the number of digits accumulated so far is known to
+    /// stay within [`max_safe_digits`], and only for a type wide enough to hold
+    /// eight digits at all.
+    ///
+    /// [`max_safe_digits`]: Self::max_safe_digits
+    fn wrapping_mul_add8<const RADIX: u32>(self, digits: u32) -> Self;
+
     /// Calculate `self * RADIX + digit`, checking for overflow.
     fn checked_mul_add<const RADIX: u32>(self, digit: u8) -> Option<Self>;
 
@@ -124,6 +134,17 @@ macro_rules! unsigned {
             fn wrapping_mul_add<const RADIX: u32>(self, digit: u8) -> Self {
                 self.wrapping_mul(RADIX as $unsigned)
                     .wrapping_add(digit as $unsigned)
+            }
+
+            #[inline]
+            fn wrapping_mul_add8<const RADIX: u32>(self, digits: u32) -> Self {
+                // The weight wraps for a type which eight digits fill exactly,
+                // `u32` in base sixteen being the one that does. That is also
+                // the case where eight digits are all there is room for, so
+                // `self` is still zero and what the weight wrapped to does not
+                // matter.
+                self.wrapping_mul((RADIX as $unsigned).wrapping_pow(8))
+                    .wrapping_add(digits as $unsigned)
             }
 
             #[inline]

@@ -40,6 +40,8 @@ pub(crate) use self::parse::{
     parse_unsigned_base, skip,
 };
 
+mod swar;
+
 mod syntax;
 pub(crate) use self::syntax::{Json, Json5};
 

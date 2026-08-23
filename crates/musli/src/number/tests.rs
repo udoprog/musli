@@ -367,3 +367,139 @@ fn decode_digit() {
         assert_eq!(digit::<16>(b), hex, "{:?} in base sixteen", b as char);
     }
 }
+
+/// Long runs of digits, which is where the digits are read a word at a time and
+/// where that has to hand back to reading them one at a time without dropping
+/// or repeating one.
+///
+/// The lengths cover every position a word can end at relative to how many
+/// digits still fit, and the standard library is the answer to agree with.
+#[test]
+fn decode_long_runs() {
+    macro_rules! test {
+        ($ty:ty, $string:expr) => {{
+            let string: &str = &$string;
+            let expected = string.parse::<$ty>();
+
+            match parse_unsigned_base::<Json, $ty>(string.as_bytes()) {
+                Ok((value, len)) => {
+                    assert_eq!(Ok(value), expected, "{string}");
+                    assert_eq!(len, string.len(), "{string}");
+                }
+                Err(..) => {
+                    assert!(expected.is_err(), "{string} parsed as {expected:?}");
+                }
+            }
+
+            // The same digits with something after them, so that the run ends
+            // inside a word rather than at the end of the input.
+            let terminated = format!("{string},");
+            let (value, len) = match parse_unsigned_base::<Json, $ty>(terminated.as_bytes()) {
+                Ok(out) => out,
+                Err(..) => {
+                    assert!(expected.is_err(), "{terminated}");
+                    continue;
+                }
+            };
+
+            assert_eq!(Ok(value), expected, "{terminated}");
+            assert_eq!(len, string.len(), "{terminated}");
+        }};
+    }
+
+    // A digit which is not the same in every position, so that a word read or
+    // folded the wrong way round shows up.
+    for len in 1..44 {
+        let decimal: rust_alloc::string::String =
+            (0..len).map(|n| char::from(b'1' + (n % 9) as u8)).collect();
+
+        test!(u32, decimal);
+        test!(u64, decimal);
+        test!(u128, decimal);
+    }
+
+    // Powers of ten, which are the lengths at which a run stops fitting.
+    for len in 1..44 {
+        let mut decimal = rust_alloc::string::String::from("1");
+        decimal.extend((1..len).map(|_| '0'));
+
+        test!(u32, decimal);
+        test!(u64, decimal);
+        test!(u128, decimal);
+    }
+
+    // The largest value of each width and the one above it, both of which land
+    // on a word boundary for some of the widths.
+    for string in [
+        "4294967295",
+        "4294967296",
+        "18446744073709551615",
+        "18446744073709551616",
+        "340282366920938463463374607431768211455",
+        "340282366920938463463374607431768211456",
+    ] {
+        test!(u32, string);
+        test!(u64, string);
+        test!(u128, string);
+    }
+}
+
+/// The same for hexadecimals, which are read a word at a time as well and where
+/// a word is exactly eight digits.
+#[test]
+fn decode_long_hex_runs() {
+    macro_rules! test {
+        ($ty:ty, $digits:expr) => {{
+            let digits: &str = &$digits;
+            let string = format!("0x{digits}");
+            let expected = <$ty>::from_str_radix(digits, 16);
+
+            match parse_unsigned_base::<Json5, $ty>(string.as_bytes()) {
+                Ok((value, len)) => {
+                    assert_eq!(Ok(value), expected, "{string}");
+                    assert_eq!(len, string.len(), "{string}");
+                }
+                Err(..) => {
+                    assert!(expected.is_err(), "{string} parsed as {expected:?}");
+                }
+            }
+
+            let terminated = format!("{string},");
+
+            if let Ok((value, len)) = parse_unsigned_base::<Json5, $ty>(terminated.as_bytes()) {
+                assert_eq!(Ok(value), expected, "{terminated}");
+                assert_eq!(len, string.len(), "{terminated}");
+            } else {
+                assert!(expected.is_err(), "{terminated}");
+            }
+        }};
+    }
+
+    // Every hexadecimal digit in turn, in both cases, so that a word which
+    // mixes the three ranges is covered at every length.
+    for len in 1..36 {
+        let lower: rust_alloc::string::String = (0..len)
+            .map(|n| char::from_digit((n % 16) as u32, 16).unwrap())
+            .collect();
+        let upper = lower.to_ascii_uppercase();
+
+        for digits in [&lower, &upper] {
+            test!(u32, digits);
+            test!(u64, digits);
+            test!(u128, digits);
+        }
+    }
+
+    for digits in [
+        "ffffffff",
+        "100000000",
+        "ffffffffffffffff",
+        "10000000000000000",
+        "ffffffffffffffffffffffffffffffff",
+        "100000000000000000000000000000000",
+    ] {
+        test!(u32, digits);
+        test!(u64, digits);
+        test!(u128, digits);
+    }
+}
