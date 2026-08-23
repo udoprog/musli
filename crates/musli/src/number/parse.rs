@@ -8,6 +8,7 @@
 use crate::dec2flt::dec2flt;
 
 use super::error::{Error, ErrorKind, Expected};
+use super::swar;
 use super::syntax::Syntax;
 use super::traits::{Float, Signed, Unsigned};
 
@@ -149,7 +150,7 @@ where
         let negative = sign::<S>(&mut s);
 
         if s.eat_hex_prefix() {
-            let out = digits::<u128, 16>(&mut s);
+            let out = digits::<u128, 16, true>(&mut s);
 
             if out.len == 0 {
                 return Err(s.expected(Expected::Hex));
@@ -333,7 +334,7 @@ where
     // A hexadecimal integer carries neither a fraction nor an exponent, so it
     // is complete as soon as its digits are.
     if S::HEX && s.eat_hex_prefix() {
-        let out = digits::<T, 16>(s);
+        let out = digits::<T, 16, true>(s);
 
         if out.len == 0 {
             return Err(s.expected(Expected::Hex));
@@ -349,7 +350,7 @@ where
     }
 
     let zero = matches!(s.peek(), Some(b'0'));
-    let out = digits::<T, 10>(s);
+    let out = digits::<T, 10, true>(s);
 
     if out.len == 0 {
         // Nothing before the point is only a number if something follows it.
@@ -573,7 +574,7 @@ where
         at: start,
     };
 
-    let out = digits::<T, 10>(&mut significant);
+    let out = digits::<T, 10, false>(&mut significant);
 
     let m = Mantissa {
         value: out.value,
@@ -595,7 +596,7 @@ fn exponent(s: &mut Scan<'_>) -> Result<(i32, bool), Error> {
         s.at += 1;
     }
 
-    let out = digits::<u32, 10>(s);
+    let out = digits::<u32, 10, false>(s);
 
     if out.len == 0 {
         return Err(s.expected(Expected::Exponent));
@@ -631,8 +632,14 @@ struct Digits<T> {
 ///
 /// The whole run is consumed even once it stops fitting in `T`, so that the
 /// extent of the number is known whether or not it can be represented.
+///
+/// With `WORDS` set the digits are read a word at a time where there are enough
+/// of them to fill one. That only pays for a run which is long enough to reach
+/// eight digits, so a run which is a fraction or an exponent, and is nearly
+/// always shorter than that, leaves it out and stays small enough to keep being
+/// inlined into its caller.
 #[inline]
-fn digits<T, const RADIX: u32>(s: &mut Scan<'_>) -> Digits<T>
+fn digits<T, const RADIX: u32, const WORDS: bool>(s: &mut Scan<'_>) -> Digits<T>
 where
     T: Unsigned,
 {
@@ -644,6 +651,27 @@ where
     // This many digits always fit, so the overflow check is hoisted out of the
     // loop which decodes them.
     let unchecked = buf.len().min(at + T::max_safe_digits::<RADIX>());
+
+    // Eight digits at a time out of a word for as long as that many are still
+    // known to fit, which is where a long number spends nearly all of its time.
+    // The condition is on the width of `T`, so a type too narrow to ever hold
+    // eight digits does not carry this at all.
+    if const { WORDS && size_of::<T>() >= 4 } {
+        while at + 8 <= unchecked {
+            let word = swar::word(buf, at);
+
+            let Some(digits) = (if RADIX == 16 {
+                swar::hex8(word)
+            } else {
+                swar::dec8(word)
+            }) else {
+                break;
+            };
+
+            value = value.wrapping_mul_add8::<RADIX>(digits);
+            at += 8;
+        }
+    }
 
     while at < unchecked {
         let Some(digit) = digit::<RADIX>(buf[at]) else {
