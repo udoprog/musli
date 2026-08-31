@@ -1183,16 +1183,23 @@ where
 
             match result {
                 Output::Close => {
+                    // The deadline re-armed by `begin_closing` elapsed, so the
+                    // peer never picked up the close frame which was queued for
+                    // it. Drop the connection rather than queue another one.
+                    if self.closing {
+                        break;
+                    }
+
                     self.out
                         .push_back(S::close(CLOSE_NORMAL, "connection timed out"));
-                    self.closing = true;
+                    self.begin_closing();
                 }
                 Output::Ping => {
                     self.handle_ping()?;
                 }
                 Output::Recv(message) => {
                     let Some(message) = message else {
-                        self.closing = true;
+                        self.begin_closing();
                         continue;
                     };
 
@@ -1202,7 +1209,7 @@ where
                                 CLOSE_PROTOCOL_ERROR,
                                 "Unsupported text message",
                             ));
-                            self.closing = true;
+                            self.begin_closing();
                         }
                         Message::Binary(bytes) => {
                             self.handle_message(bytes).await?;
@@ -1214,7 +1221,7 @@ where
                             self.handle_pong(data)?;
                         }
                         Message::Close => {
-                            self.closing = true;
+                            self.begin_closing();
                         }
                     }
                 }
@@ -1387,7 +1394,7 @@ where
                 tracing::debug!(?error, "Invalid request header");
                 self.out
                     .push_back(S::close(CLOSE_PROTOCOL_ERROR, "Invalid request header"));
-                self.closing = true;
+                self.begin_closing();
                 return Ok(());
             }
         };
@@ -1523,6 +1530,24 @@ where
 
         self.outbound.push_back(buf);
         Ok(())
+    }
+
+    /// Begin winding the connection down.
+    ///
+    /// This re-arms the close deadline so that draining whatever is left to
+    /// send is bounded too. Re-arming is also what keeps [`Server::run`] from
+    /// spinning: an elapsed [`Sleep`] reports `Ready` every time it is polled,
+    /// so leaving it elapsed would make [`Select`] hand back [`Output::Close`]
+    /// over and over without the loop ever making progress.
+    fn begin_closing(&mut self) {
+        if self.closing {
+            return;
+        }
+
+        self.closing = true;
+
+        let (close_sleep, _, _) = self.pinned.as_mut().project();
+        close_sleep.reset(Instant::now() + CLOSE_TIMEOUT);
     }
 
     #[tracing::instrument(skip(self))]
@@ -1957,5 +1982,218 @@ impl fmt::Display for SupportedFormats {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::cell::Cell;
+
+    use std::thread_local;
+
+    use super::*;
+
+    /// How many close frames the loop is allowed to manufacture before the test
+    /// concludes that it is spinning.
+    ///
+    /// A close frame is the only observable thing the wind-down path produces,
+    /// so this is what bounds the test. Without it a regression makes
+    /// [`Server::run`] loop forever inside a single poll and the test hangs
+    /// rather than fails.
+    const CLOSE_BUDGET: usize = 4;
+
+    thread_local! {
+        /// The number of close frames [`TestServerImpl::close`] has handed out
+        /// on this thread, which is one test.
+        static CLOSE_FRAMES: Cell<usize> = const { Cell::new(0) };
+    }
+
+    #[derive(Debug)]
+    enum TestError {}
+
+    impl From<TestError> for Error {
+        #[inline]
+        fn from(error: TestError) -> Self {
+            match error {}
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum TestMessage {
+        Ping(Bytes),
+        Pong(Bytes),
+        Binary(Vec<u8>),
+        Close(u16),
+    }
+
+    /// A socket which never hears anything from its peer but always accepts
+    /// what the server writes, which is the state a connection is in when its
+    /// close deadline elapses.
+    #[derive(Default)]
+    struct TestSocket {
+        sent: Vec<TestMessage>,
+    }
+
+    impl socket_sealed::Sealed for TestSocket {}
+
+    impl SocketImpl for TestSocket {
+        type Message = TestMessage;
+        type Error = TestError;
+
+        fn poll_next(
+            self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+        ) -> Poll<Option<Result<Message, Self::Error>>> {
+            Poll::Pending
+        }
+
+        fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn start_send(self: Pin<&mut Self>, item: Self::Message) -> Result<(), Self::Error> {
+            // SAFETY: Nothing in this socket is structurally pinned.
+            unsafe { Pin::get_unchecked_mut(self).sent.push(item) };
+            Ok(())
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    struct TestServerImpl;
+
+    impl server_sealed::Sealed for TestServerImpl {}
+
+    impl ServerImpl for TestServerImpl {
+        type Error = TestError;
+        type Message = TestMessage;
+        type Socket = TestSocket;
+
+        fn ping(data: Bytes) -> Self::Message {
+            TestMessage::Ping(data)
+        }
+
+        fn pong(data: Bytes) -> Self::Message {
+            TestMessage::Pong(data)
+        }
+
+        fn binary(data: &[u8]) -> Self::Message {
+            TestMessage::Binary(data.to_vec())
+        }
+
+        fn close(code: u16, _: &str) -> Self::Message {
+            let frames = CLOSE_FRAMES.with(|frames| {
+                let count = frames.get() + 1;
+                frames.set(count);
+                count
+            });
+
+            assert!(
+                frames <= CLOSE_BUDGET,
+                "`Server::run` is spinning: {frames} close frames without any progress"
+            );
+
+            TestMessage::Close(code)
+        }
+    }
+
+    #[derive(Debug)]
+    struct TestId;
+
+    impl Id for TestId {
+        fn id(&self) -> MessageId {
+            MessageId::NEGOTIATE
+        }
+
+        fn from_id(_: MessageId) -> Self {
+            Self
+        }
+
+        fn __do_not_implement_id() {}
+    }
+
+    #[derive(Clone)]
+    struct TestHandler;
+
+    impl Handler for TestHandler {
+        type Id = TestId;
+        type Response = bool;
+
+        async fn handle(&self, _: Self::Id, _: &mut Incoming<'_>, _: &mut Outgoing<'_>) -> bool {
+            false
+        }
+    }
+
+    /// Build a negotiated server whose close deadline elapsed `elapsed` ago.
+    fn timed_out_server(elapsed: Duration) -> Server<TestServerImpl, TestHandler, Channels> {
+        let now = Instant::now();
+
+        Server {
+            handler: TestHandler,
+            pinned: Box::pin(Pinned {
+                socket: TestSocket::default(),
+                close_sleep: tokio::time::sleep_until(now - elapsed),
+                ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
+            }),
+            channels: Channels::default(),
+            closing: false,
+            pool: BufPool::new(MAX_CAPACITY),
+            outbound: VecDeque::new(),
+            error: String::new(),
+            last_ping: None,
+            rng: SmallRng::seed_from_u64(DEFAULT_SEED),
+            out: VecDeque::new(),
+            socket_send: false,
+            socket_flush: false,
+            set: JoinSet::new(),
+            format: Format::DEFAULT,
+            formats: None,
+        }
+    }
+
+    /// An elapsed close deadline must wind the connection down once, rather
+    /// than being reported by [`Select`] over and over.
+    ///
+    /// A [`Sleep`] which has elapsed is `Ready` on every poll, so a close
+    /// deadline which is left elapsed turns [`Server::run`] into a busy loop
+    /// which queues an unbounded number of close frames and never returns.
+    #[tokio::test]
+    async fn close_deadline_winds_down_once() {
+        let mut server = timed_out_server(Duration::from_secs(1));
+
+        server.run().await.unwrap();
+
+        let (_, _, socket) = server.pinned.as_mut().project();
+
+        // SAFETY: Nothing in this socket is structurally pinned.
+        let socket = unsafe { Pin::get_unchecked_mut(socket) };
+
+        assert_eq!(socket.sent, [TestMessage::Close(CLOSE_NORMAL)]);
+        assert!(server.out.is_empty());
+        assert!(server.closing);
+    }
+
+    /// The close deadline elapsing while the connection is already winding
+    /// down must tear it down instead of queueing yet another close frame.
+    #[tokio::test]
+    async fn close_deadline_while_closing_gives_up() {
+        let mut server = timed_out_server(Duration::from_secs(1));
+
+        // The state left behind by a close frame which the socket has not been
+        // able to take yet, with the wind-down deadline elapsed on top of it.
+        server.closing = true;
+        server.out.push_back(TestMessage::Close(CLOSE_NORMAL));
+
+        server.run().await.unwrap();
+
+        let (_, _, socket) = server.pinned.as_mut().project();
+
+        // SAFETY: Nothing in this socket is structurally pinned.
+        let socket = unsafe { Pin::get_unchecked_mut(socket) };
+
+        assert!(socket.sent.is_empty());
+        assert_eq!(server.out.len(), 1);
     }
 }
