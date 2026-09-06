@@ -894,6 +894,7 @@ where
             out: VecDeque::new(),
             socket_send: false,
             socket_flush: false,
+            socket_recv: true,
             set: JoinSet::new(),
             format: Format::DEFAULT,
             formats: self.formats,
@@ -939,6 +940,12 @@ where
     out: VecDeque<S::Message>,
     socket_send: bool,
     socket_flush: bool,
+    /// Whether the peer's stream might still produce a message.
+    ///
+    /// A stream which has ended reports `Ready(None)` on every poll and
+    /// registers no waker, so it has to stop being polled once it has ended or
+    /// it masks every arm of [`Select`] behind it.
+    socket_recv: bool,
     set: JoinSet<HandlerOutput<H>>,
     /// The format used for messages the server originates on this connection,
     /// as agreed by the [negotiation protocol].
@@ -1016,6 +1023,7 @@ where
             let result = {
                 let inner = Select::<S::Socket, H> {
                     pinned: self.pinned.as_mut(),
+                    wants_socket_recv: self.socket_recv,
                     wants_socket_send: !self.socket_send,
                     wants_socket_flush: self.socket_flush,
                     set: &mut self.set,
@@ -1164,7 +1172,12 @@ where
     /// This must be called to handle buffered outgoing and incoming messages.
     pub async fn run(&mut self) -> Result<(), Error> {
         loop {
-            if self.closing && self.out.is_empty() && self.outbound.is_empty() {
+            // NB: `socket_flush` is part of this because `start_send` only
+            // hands a message to the sink. Breaking as soon as the queues are
+            // empty leaves the close frame in the sink's buffer, never on the
+            // wire. Waiting is bounded by the deadline `begin_closing` arms.
+            if self.closing && self.out.is_empty() && self.outbound.is_empty() && !self.socket_flush
+            {
                 break;
             }
 
@@ -1173,6 +1186,7 @@ where
             let result = {
                 let inner = Select::<S::Socket, H> {
                     pinned: self.pinned.as_mut(),
+                    wants_socket_recv: self.socket_recv,
                     wants_socket_send: !self.socket_send,
                     wants_socket_flush: self.socket_flush,
                     set: &mut self.set,
@@ -1199,6 +1213,10 @@ where
                 }
                 Output::Recv(message) => {
                     let Some(message) = message else {
+                        // NB: An ended stream is `Ready(None)` on every poll,
+                        // so it has to be fused here or it masks the send and
+                        // flush arms and nothing can ever drain.
+                        self.socket_recv = false;
                         self.begin_closing();
                         continue;
                     };
@@ -1700,6 +1718,7 @@ where
     H: Handler,
 {
     pinned: Pin<&'a mut Pinned<S>>,
+    wants_socket_recv: bool,
     wants_socket_send: bool,
     wants_socket_flush: bool,
     set: &'a mut JoinSet<HandlerOutput<H>>,
@@ -1717,6 +1736,7 @@ where
         let close;
         let ping;
         let mut socket;
+        let wants_socket_recv;
         let wants_socket_send;
         let wants_socket_flush;
         let set;
@@ -1725,6 +1745,7 @@ where
         unsafe {
             let this = Pin::get_unchecked_mut(self);
             (close, ping, socket) = this.pinned.as_mut().project();
+            wants_socket_recv = this.wants_socket_recv;
             wants_socket_send = this.wants_socket_send;
             wants_socket_flush = this.wants_socket_flush;
             set = &mut this.set;
@@ -1738,7 +1759,7 @@ where
             return Poll::Ready(Output::Ping);
         }
 
-        if let Poll::Ready(output) = socket.as_mut().poll_next(cx) {
+        if wants_socket_recv && let Poll::Ready(output) = socket.as_mut().poll_next(cx) {
             return Poll::Ready(Output::Recv(output));
         }
 
@@ -1750,6 +1771,10 @@ where
             return Poll::Ready(Output::Flushed(result));
         }
 
+        // NB: An empty `JoinSet` is `Ready(None)` and registers no waker, so
+        // this drops through to `Pending` having registered nothing of its
+        // own. That is only safe because the two deadlines above are polled
+        // unconditionally and have registered theirs.
         if let Poll::Ready(output) = set.poll_join_next(cx)
             && let Some(output) = output
         {
@@ -2002,6 +2027,14 @@ mod tests {
     /// rather than fails.
     const CLOSE_BUDGET: usize = 4;
 
+    /// How many times a stream which has ended is allowed to be polled before
+    /// the test concludes that [`Server::run`] is spinning on it.
+    ///
+    /// Such a stream reports `Ready(None)` on every poll, so a regression makes
+    /// the loop poll it forever inside a single task poll and the test hangs
+    /// rather than fails.
+    const RECV_BUDGET: usize = 4;
+
     thread_local! {
         /// The number of close frames [`TestServerImpl::close`] has handed out
         /// on this thread, which is one test.
@@ -2026,12 +2059,18 @@ mod tests {
         Close(u16),
     }
 
-    /// A socket which never hears anything from its peer but always accepts
-    /// what the server writes, which is the state a connection is in when its
-    /// close deadline elapses.
+    /// A socket which never hears anything from its peer, which is the state a
+    /// connection is in when its close deadline elapses.
     #[derive(Default)]
     struct TestSocket {
         sent: Vec<TestMessage>,
+        /// Whether the peer has gone away, which makes the stream report
+        /// `Ready(None)` on every poll for the rest of its life.
+        ended: bool,
+        polls_after_end: usize,
+        /// Whether the write side has backpressure, which is what a real sink
+        /// does while the socket buffer it is writing into has not drained.
+        write_blocked: bool,
     }
 
     impl socket_sealed::Sealed for TestSocket {}
@@ -2044,10 +2083,30 @@ mod tests {
             self: Pin<&mut Self>,
             _: &mut Context<'_>,
         ) -> Poll<Option<Result<Message, Self::Error>>> {
-            Poll::Pending
+            // SAFETY: Nothing in this socket is structurally pinned.
+            let this = unsafe { Pin::get_unchecked_mut(self) };
+
+            if !this.ended {
+                return Poll::Pending;
+            }
+
+            this.polls_after_end += 1;
+
+            assert!(
+                this.polls_after_end <= RECV_BUDGET,
+                "`Server::run` is spinning: an ended stream was polled {} times without any progress",
+                this.polls_after_end
+            );
+
+            Poll::Ready(None)
         }
 
         fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            // SAFETY: Nothing in this socket is structurally pinned.
+            if unsafe { Pin::get_unchecked_mut(self) }.write_blocked {
+                return Poll::Pending;
+            }
+
             Poll::Ready(Ok(()))
         }
 
@@ -2058,6 +2117,11 @@ mod tests {
         }
 
         fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            // SAFETY: Nothing in this socket is structurally pinned.
+            if unsafe { Pin::get_unchecked_mut(self) }.write_blocked {
+                return Poll::Pending;
+            }
+
             Poll::Ready(Ok(()))
         }
     }
@@ -2128,13 +2192,48 @@ mod tests {
 
     /// Build a negotiated server whose close deadline elapsed `elapsed` ago.
     fn timed_out_server(elapsed: Duration) -> Server<TestServerImpl, TestHandler, Channels> {
+        server_with(Instant::now() - elapsed)
+    }
+
+    /// The test socket behind the server's pinned state.
+    fn socket(server: &mut Server<TestServerImpl, TestHandler, Channels>) -> &mut TestSocket {
+        let (_, _, socket) = server.pinned.as_mut().project();
+        // SAFETY: Nothing in this socket is structurally pinned.
+        unsafe { Pin::get_unchecked_mut(socket) }
+    }
+
+    /// A response buffer of the shape a handler leaves behind in `outbound`.
+    fn response(server: &Server<TestServerImpl, TestHandler, Channels>) -> Buf {
+        server
+            .pool
+            .with(|buf| {
+                let mut writer = buf.writer();
+
+                writer
+                    .envelope(&ResponseHeader {
+                        serial: 1,
+                        broadcast: 0,
+                        error: 0,
+                        format: Format::DEFAULT.to_u8(),
+                        channel: ChannelId::NONE,
+                    })
+                    .map_err(Error::encode_connect_header)?;
+
+                writer.flush();
+                Ok::<_, Error>(())
+            })
+            .unwrap()
+    }
+
+    /// Build a negotiated server which winds down at `close_deadline`.
+    fn server_with(close_deadline: Instant) -> Server<TestServerImpl, TestHandler, Channels> {
         let now = Instant::now();
 
         Server {
             handler: TestHandler,
             pinned: Box::pin(Pinned {
                 socket: TestSocket::default(),
-                close_sleep: tokio::time::sleep_until(now - elapsed),
+                close_sleep: tokio::time::sleep_until(close_deadline),
                 ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
             }),
             channels: Channels::default(),
@@ -2147,6 +2246,7 @@ mod tests {
             out: VecDeque::new(),
             socket_send: false,
             socket_flush: false,
+            socket_recv: true,
             set: JoinSet::new(),
             format: Format::DEFAULT,
             formats: None,
@@ -2165,14 +2265,11 @@ mod tests {
 
         server.run().await.unwrap();
 
-        let (_, _, socket) = server.pinned.as_mut().project();
-
-        // SAFETY: Nothing in this socket is structurally pinned.
-        let socket = unsafe { Pin::get_unchecked_mut(socket) };
-
-        assert_eq!(socket.sent, [TestMessage::Close(CLOSE_NORMAL)]);
+        assert_eq!(socket(&mut server).sent, [TestMessage::Close(CLOSE_NORMAL)]);
         assert!(server.out.is_empty());
         assert!(server.closing);
+        // The close frame has to reach the wire, not just the sink's buffer.
+        assert!(!server.socket_flush);
     }
 
     /// The close deadline elapsing while the connection is already winding
@@ -2188,12 +2285,75 @@ mod tests {
 
         server.run().await.unwrap();
 
-        let (_, _, socket) = server.pinned.as_mut().project();
-
-        // SAFETY: Nothing in this socket is structurally pinned.
-        let socket = unsafe { Pin::get_unchecked_mut(socket) };
-
-        assert!(socket.sent.is_empty());
+        assert!(socket(&mut server).sent.is_empty());
         assert_eq!(server.out.len(), 1);
+    }
+
+    /// A peer which disconnects with a response still queued must not pin the
+    /// connection task forever.
+    ///
+    /// A stream which has ended reports `Ready(None)` on every poll, which sits
+    /// ahead of the send and flush arms in [`Select`] and used to mask them, so
+    /// `outbound` could never drain and [`Server::run`] could never reach its
+    /// break.
+    ///
+    /// Nothing here may lean on the close deadline: a loop which never yields
+    /// is exactly the condition under which the runtime cannot deliver a timer,
+    /// so the deadline is left a full [`CLOSE_TIMEOUT`] out and this test would
+    /// hang rather than pass if the wind-down needed it.
+    #[tokio::test]
+    async fn ended_stream_drains_outbound() {
+        let mut server = server_with(Instant::now() + CLOSE_TIMEOUT);
+
+        // The state a connection is left in when the peer goes away after its
+        // request has been handled but before the response reached the socket.
+        server.closing = true;
+        server.socket_flush = true;
+        server.outbound.push_back(response(&server));
+        socket(&mut server).ended = true;
+
+        server.run().await.unwrap();
+
+        let sent = socket(&mut server).sent.as_slice();
+        assert!(matches!(sent, [TestMessage::Binary(..)]));
+        assert!(server.outbound.is_empty());
+        assert!(!server.socket_flush);
+        assert!(!server.socket_recv);
+    }
+
+    /// A peer which is gone while the write side still has backpressure must
+    /// wind down on the close deadline rather than spin.
+    ///
+    /// This is the case which separates fusing the stream from merely polling
+    /// the send and flush arms ahead of it. Reordering the arms would rescue
+    /// [`ended_stream_drains_outbound`], where the sink takes the write
+    /// immediately, but not this: with the write side `Pending` there is no arm
+    /// left to reach, so a stream which is still polled after it ended hands
+    /// back `Ready(None)` forever and [`Server::run`] never yields.
+    ///
+    /// Fused, [`Select`] returns `Pending`, the task parks, and the deadline
+    /// gets the chance to fire which the spin used to deny it. Leaning on it
+    /// here is the point, so the deadline is short.
+    #[tokio::test]
+    async fn blocked_write_winds_down_on_deadline() {
+        let mut server = server_with(Instant::now() + Duration::from_millis(50));
+
+        server.closing = true;
+        server.socket_flush = true;
+        server.outbound.push_back(response(&server));
+
+        {
+            let socket = socket(&mut server);
+            socket.ended = true;
+            socket.write_blocked = true;
+        }
+
+        server.run().await.unwrap();
+
+        // Nothing could be delivered, which is the honest outcome against a
+        // socket which never took the write. Ending at all is what matters.
+        assert!(socket(&mut server).sent.is_empty());
+        assert_eq!(server.outbound.len(), 1);
+        assert!(!server.socket_recv);
     }
 }
