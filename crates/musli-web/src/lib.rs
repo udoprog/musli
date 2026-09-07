@@ -42,6 +42,10 @@
 //!   frames to text ones whose envelope is a block of `<key>: <value>` lines.
 //!   Together with [`Format::Json`] this makes the whole conversation readable
 //!   in a proxy or a browser inspector, which is what it is for.
+//! * An [explicitly versioned] protocol. Every message states the [`VERSION`]
+//!   it was written against and a header which is not recognized is refused
+//!   rather than skipped, so peers which do not speak the same protocol part
+//!   ways before either has acted on what the other said.
 //!
 //! The available formats, from most compact to most capable, are
 //! [`Format::Packed`], [`Format::Storage`], [`Format::Wire`] (the default, and
@@ -51,6 +55,7 @@
 //! [Channel support]: https://docs.rs/musli-web/latest/musli_web/web/struct.Handle.html#method.channel
 //! [negotiable body format]: https://docs.rs/musli-web/latest/musli_web/api/index.html#wire-format
 //! [selectable socket mode]: https://docs.rs/musli-web/latest/musli_web/api/index.html#the-text-envelope
+//! [explicitly versioned]: https://docs.rs/musli-web/latest/musli_web/api/index.html#the-protocol-version
 //!
 //! <br>
 //!
@@ -111,7 +116,7 @@ pub mod api;
 #[doc(inline)]
 #[cfg(feature = "api")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]
-pub use self::api::{AtomicChannelId, ChannelId, Format, Mode};
+pub use self::api::{AtomicChannelId, ChannelId, Format, Mode, VERSION};
 
 #[cfg(feature = "api")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]

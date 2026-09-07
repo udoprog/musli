@@ -1306,7 +1306,7 @@ mod raw {
     use bytes::Bytes;
     use futures_core03::Stream;
     use futures_sink03::Sink;
-    use musli_web::api::{ChannelId, Format, MessageId, RequestHeader, ResponseHeader};
+    use musli_web::api::{ChannelId, Format, MessageId, RequestHeader, ResponseHeader, VERSION};
     use tokio::net::TcpStream;
 
     use crate::TIMEOUT;
@@ -1318,14 +1318,16 @@ mod raw {
 
     /// The header ids the envelopes use, which the protocol pins.
     pub(crate) mod ids {
-        pub(crate) const SERIAL: u8 = 1;
-        pub(crate) const ID: u8 = 2;
-        pub(crate) const FORMAT: u8 = 3;
+        pub(crate) const VERSION: u8 = 1;
+        pub(crate) const SERIAL: u8 = 2;
+        pub(crate) const ID: u8 = 3;
+        pub(crate) const FORMAT: u8 = 4;
 
-        pub(crate) const RESPONSE_BROADCAST: u8 = 2;
-        pub(crate) const RESPONSE_ERROR: u8 = 3;
-        pub(crate) const RESPONSE_FORMAT: u8 = 4;
-        pub(crate) const RESPONSE_CHANNEL: u8 = 5;
+        pub(crate) const RESPONSE_SERIAL: u8 = 2;
+        pub(crate) const RESPONSE_BROADCAST: u8 = 3;
+        pub(crate) const RESPONSE_ERROR: u8 = 4;
+        pub(crate) const RESPONSE_FORMAT: u8 = 5;
+        pub(crate) const RESPONSE_CHANNEL: u8 = 6;
     }
 
     /// Write one header of a binary envelope by hand.
@@ -1352,6 +1354,7 @@ mod raw {
     /// Read a response envelope by hand, returning it and where the body starts.
     fn read_envelope(bytes: &[u8]) -> (ResponseHeader, usize) {
         let mut header = ResponseHeader {
+            version: 0,
             serial: 0,
             broadcast: 0,
             error: 0,
@@ -1382,7 +1385,8 @@ mod raw {
             at += width;
 
             match tag & 0b0011_1111 {
-                ids::SERIAL => header.serial = value,
+                ids::VERSION => header.version = value,
+                ids::RESPONSE_SERIAL => header.serial = value,
                 ids::RESPONSE_BROADCAST => header.broadcast = value as u16,
                 ids::RESPONSE_ERROR => header.error = value as u16,
                 ids::RESPONSE_FORMAT => header.format = value as u8,
@@ -1430,6 +1434,7 @@ mod raw {
         pub(crate) async fn send(&mut self, header: RequestHeader) {
             let mut data = Vec::new();
 
+            write_header(&mut data, ids::VERSION, header.version);
             write_header(&mut data, ids::SERIAL, header.serial);
             write_header(&mut data, ids::ID, u32::from(header.id));
             write_header(&mut data, ids::FORMAT, u32::from(header.format));
@@ -1449,6 +1454,7 @@ mod raw {
         /// Ask the server to use `format` for the rest of the connection.
         pub(crate) async fn negotiate(&mut self, serial: u32, format: Format) {
             self.send(RequestHeader {
+                version: VERSION,
                 serial,
                 id: MessageId::NEGOTIATE.get(),
                 format: format.to_u8(),
@@ -1464,7 +1470,7 @@ mod raw {
         /// produce.
         pub(crate) async fn negotiate_text(&mut self, serial: u32, format: Format) {
             self.send_text(&format!(
-                "serial: {serial}\nid: {}\nformat: {}\nchannel: 0\n\n",
+                "version: {VERSION}\nserial: {serial}\nid: {}\nformat: {}\nchannel: 0\n\n",
                 MessageId::NEGOTIATE.get(),
                 format.to_u8()
             ))
@@ -1642,6 +1648,7 @@ async fn first_message_is_rejected(id: MessageId) {
     assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
 
     raw.send(musli_web::api::RequestHeader {
+        version: musli_web::api::VERSION,
         serial: 1,
         id: id.get(),
         format: Format::DEFAULT.to_u8(),
@@ -1735,7 +1742,8 @@ async fn text_frames_are_readable_by_hand() {
     assert_eq!(
         text,
         format!(
-            "serial: 1\nbroadcast: 0\nerror: 0\nformat: {}\nchannel: 0\n\n",
+            "version: {}\nserial: 1\nbroadcast: 0\nerror: 0\nformat: {}\nchannel: 0\n\n",
+            musli_web::api::VERSION,
             Format::Json.to_u8()
         )
     );
@@ -1787,6 +1795,7 @@ async fn a_frame_of_the_wrong_type_is_refused() {
 
     // Binary is what this connection is not speaking any more.
     raw.send(musli_web::api::RequestHeader {
+        version: musli_web::api::VERSION,
         serial: 2,
         id: MessageId::CONNECT.get(),
         format: 0,
@@ -1814,6 +1823,7 @@ async fn an_unknown_header_is_refused_during_negotiation() {
     // does not have. Everything else about it is something the server would
     // otherwise be happy to act on.
     let mut headers = Vec::new();
+    raw::write_header(&mut headers, raw::ids::VERSION, musli_web::api::VERSION);
     raw::write_header(&mut headers, raw::ids::SERIAL, 1);
     raw::write_header(
         &mut headers,
@@ -1858,6 +1868,7 @@ async fn an_unknown_header_is_refused_after_negotiation() {
     assert_eq!(frame.header.serial, 1);
 
     let mut headers = Vec::new();
+    raw::write_header(&mut headers, raw::ids::VERSION, musli_web::api::VERSION);
     raw::write_header(&mut headers, raw::ids::SERIAL, 2);
     raw::write_header(
         &mut headers,
@@ -1895,6 +1906,7 @@ async fn an_unknown_header_is_skipped_before_it_is_reported() {
 
     let mut headers = Vec::new();
     // A four byte value, which is the widest class a reader has to skip.
+    raw::write_header(&mut headers, raw::ids::VERSION, musli_web::api::VERSION);
     raw::write_header(&mut headers, 63, u32::MAX);
     raw::write_header(&mut headers, raw::ids::SERIAL, 1);
     raw::write_header(
@@ -1930,7 +1942,8 @@ async fn an_unknown_text_header_is_refused() {
     assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
 
     raw.send_text(&format!(
-        "serial: 1\nid: {}\nformat: {}\nfuture: 1\n\n",
+        "version: {}\nserial: 1\nid: {}\nformat: {}\nfuture: 1\n\n",
+        musli_web::api::VERSION,
         MessageId::NEGOTIATE.get(),
         Format::Json.to_u8()
     ))
@@ -1944,6 +1957,156 @@ async fn an_unknown_text_header_is_refused() {
         error.contains("`future`"),
         "The server has to name the header it does not know: {error}"
     );
+
+    server.shutdown().await;
+}
+
+/// A peer which states a protocol version this build does not have is refused
+/// before it has been acted on at all.
+///
+/// The negotiation is the first thing the server hears, so this is as early as
+/// a session can be rejected.
+#[tokio::test]
+async fn an_unsupported_version_is_refused() {
+    let mut server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    // The version the server states is the one it speaks, which is what a
+    // client checks before it says anything.
+    assert_eq!(frame.header.version, musli_web::api::VERSION);
+
+    // An otherwise perfectly good negotiation from a protocol this server does
+    // not have.
+    let mut headers = Vec::new();
+    raw::write_header(&mut headers, raw::ids::VERSION, musli_web::api::VERSION + 1);
+    raw::write_header(&mut headers, raw::ids::SERIAL, 1);
+    raw::write_header(
+        &mut headers,
+        raw::ids::ID,
+        u32::from(MessageId::NEGOTIATE.get()),
+    );
+    raw::write_header(
+        &mut headers,
+        raw::ids::FORMAT,
+        u32::from(Format::Wire.to_u8()),
+    );
+
+    raw.send_headers(&headers).await;
+
+    assert_eq!(raw.expect_close().await, Some(CLOSE_PROTOCOL_ERROR));
+
+    let error = server.error().await;
+
+    assert!(
+        error.contains("different protocol") && error.contains("2"),
+        "The server has to say which version it was offered: {error}"
+    );
+
+    server.shutdown().await;
+}
+
+/// An envelope which states no version at all is refused for the same reason,
+/// since a peer which does not say what it speaks has not been understood.
+#[tokio::test]
+async fn an_unstated_version_is_refused() {
+    let mut server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    let mut headers = Vec::new();
+    raw::write_header(&mut headers, raw::ids::SERIAL, 1);
+    raw::write_header(
+        &mut headers,
+        raw::ids::ID,
+        u32::from(MessageId::NEGOTIATE.get()),
+    );
+    raw::write_header(
+        &mut headers,
+        raw::ids::FORMAT,
+        u32::from(Format::Wire.to_u8()),
+    );
+
+    raw.send_headers(&headers).await;
+
+    assert_eq!(raw.expect_close().await, Some(CLOSE_PROTOCOL_ERROR));
+
+    let error = server.error().await;
+
+    assert!(
+        error.contains("different protocol"),
+        "Unexpected error: {error}"
+    );
+
+    server.shutdown().await;
+}
+
+/// The version has to be checked once the session is up as well, not only
+/// during the handshake.
+#[tokio::test]
+async fn an_unsupported_version_is_refused_after_negotiation() {
+    let mut server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    raw.negotiate(1, Format::Wire).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.serial, 1);
+    assert_eq!(frame.header.version, musli_web::api::VERSION);
+
+    let mut headers = Vec::new();
+    raw::write_header(&mut headers, raw::ids::VERSION, musli_web::api::VERSION + 1);
+    raw::write_header(&mut headers, raw::ids::SERIAL, 2);
+    raw::write_header(
+        &mut headers,
+        raw::ids::ID,
+        u32::from(MessageId::CONNECT.get()),
+    );
+
+    raw.send_headers(&headers).await;
+
+    assert_eq!(raw.expect_close().await, Some(CLOSE_PROTOCOL_ERROR));
+
+    let error = server.error().await;
+
+    assert!(
+        error.contains("different protocol"),
+        "Unexpected error: {error}"
+    );
+
+    server.shutdown().await;
+}
+
+/// Every frame states the version, so a client can tell what it is talking to
+/// from the very first thing it hears.
+#[tokio::test]
+async fn every_frame_states_the_version() {
+    use musli_web::api::Broadcast;
+
+    let server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    // The hello, which precedes everything.
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.version, musli_web::api::VERSION);
+
+    // The negotiation acknowledgement.
+    raw.negotiate(1, Format::Wire).await;
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.version, musli_web::api::VERSION);
+
+    // A broadcast, which the server originates on its own.
+    server.tick(3);
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, <api::Tick as Broadcast>::ID.get());
+    assert_eq!(frame.header.version, musli_web::api::VERSION);
 
     server.shutdown().await;
 }

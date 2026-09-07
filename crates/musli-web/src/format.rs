@@ -15,7 +15,9 @@ use alloc::vec::Vec;
 
 use musli::reader::SliceReader;
 
-use crate::api::{ChannelId, DecodeBody, EncodeBody, Format, Mode, RequestHeader, ResponseHeader};
+use crate::api::{
+    ChannelId, DecodeBody, EncodeBody, Format, Mode, RequestHeader, ResponseHeader, VERSION,
+};
 
 /// The tag byte which terminates a binary header block.
 ///
@@ -182,24 +184,32 @@ macro_rules! envelope {
     };
 }
 
+// NB: `version` is first in both, and its id is fixed forever. It is the one
+// header which has to keep meaning what it means across every version of the
+// protocol, since it is what says which version the rest is written against.
 envelope! {
     RequestHeader {
-        1 => serial,
-        2 => id,
-        3 => format,
-        4 => channel,
+        1 => version,
+        2 => serial,
+        3 => id,
+        4 => format,
+        5 => channel,
     }
 }
 
 envelope! {
     ResponseHeader {
-        1 => serial,
-        2 => broadcast,
-        3 => error,
-        4 => format,
-        5 => channel,
+        1 => version,
+        2 => serial,
+        3 => broadcast,
+        4 => error,
+        5 => format,
+        6 => channel,
     }
 }
+
+/// The id of the `version` header, which is the same in every envelope.
+const VERSION_ID: u8 = 1;
 
 /// Look up a header by its binary id.
 #[inline]
@@ -439,6 +449,17 @@ where
         }
     };
 
+    // NB: Ahead of the unknown header, since the version is what explains it.
+    // A peer which states a version we do not have is refused outright: there
+    // is no way to know which parts of what it said still mean what they used
+    // to, so acting on the parts we recognize would be acting on a message we
+    // have not understood.
+    let version = header.get(VERSION_ID);
+
+    if version != VERSION {
+        return Err(Error::new(ErrorKind::UnsupportedVersion { version }));
+    }
+
     if let Some(kind) = unknown {
         return Err(Error::new(kind));
     }
@@ -615,6 +636,22 @@ impl Error {
         }
     }
 
+    /// Test if the error is caused by a peer speaking a different version of
+    /// the protocol, and if so return the version it stated.
+    ///
+    /// A session between peers which do not agree on this is refused before
+    /// either of them has acted on anything the other said, see [the protocol
+    /// version].
+    ///
+    /// [the protocol version]: crate::api#the-protocol-version
+    #[inline]
+    pub fn unsupported_version(&self) -> Option<u32> {
+        match self.kind {
+            ErrorKind::UnsupportedVersion { version } => Some(version),
+            _ => None,
+        }
+    }
+
     /// Test if the error is caused by a header this build does not know about.
     ///
     /// A peer which writes one is speaking a protocol this build has never
@@ -640,6 +677,7 @@ macro_rules! error_kinds {
             HeaderTruncated { id: u8, width: usize },
             HeaderRange { name: &'static str, value: u32 },
             UnknownHeader { id: u8, name: Option<String> },
+            UnsupportedVersion { version: u32 },
             $($(#[$meta])* $variant($ty),)*
         }
 
@@ -693,6 +731,12 @@ macro_rules! error_kinds {
                     ErrorKind::UnknownHeader { id, name: None } => {
                         write!(f, "Unknown header with id {id}")
                     }
+                    ErrorKind::UnsupportedVersion { version } => {
+                        write!(
+                            f,
+                            "Peer speaks protocol version {version}, this build speaks {VERSION}"
+                        )
+                    }
                     $($(#[$meta])* ErrorKind::$variant(..) => {
                         write!(f, concat!("Error in the `", stringify!($ctor), "` format"))
                     })*
@@ -733,7 +777,7 @@ mod tests {
 
     use musli::{Decode, Encode};
 
-    use crate::api::{ChannelId, Format, Mode, RequestHeader, ResponseHeader};
+    use crate::api::{ChannelId, Format, Mode, RequestHeader, ResponseHeader, VERSION};
 
     #[derive(Debug, PartialEq, Encode, Decode)]
     struct Message<'de> {
@@ -799,6 +843,7 @@ mod tests {
     fn envelope_then_body() {
         for format in Format::supported() {
             let header = RequestHeader {
+                version: VERSION,
                 serial: 7,
                 id: 11,
                 format: format.to_u8(),
@@ -857,6 +902,7 @@ mod tests {
         let mut buf = Vec::new();
 
         let header = RequestHeader {
+            version: VERSION,
             serial: 7,
             id: 11,
             format: Format::Json.to_u8(),
@@ -867,12 +913,13 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "serial: 7\nid: 11\nformat: 5\nchannel: 3\n\n"
+            "version: 1\nserial: 7\nid: 11\nformat: 5\nchannel: 3\n\n"
         );
 
         let mut buf = Vec::new();
 
         let header = ResponseHeader {
+            version: VERSION,
             serial: 0,
             broadcast: 13,
             error: 0,
@@ -884,7 +931,7 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "serial: 0\nbroadcast: 13\nerror: 0\nformat: 5\nchannel: 0\n\n"
+            "version: 1\nserial: 0\nbroadcast: 13\nerror: 0\nformat: 5\nchannel: 0\n\n"
         );
     }
 
@@ -896,6 +943,7 @@ mod tests {
             let mut buf = Vec::new();
 
             let request = RequestHeader {
+                version: VERSION,
                 serial: 4294967295,
                 id: 65535,
                 format: Format::Json.to_u8(),
@@ -919,6 +967,7 @@ mod tests {
             let mut buf = Vec::new();
 
             let response = ResponseHeader {
+                version: VERSION,
                 serial: 9,
                 broadcast: 13,
                 error: 17,
@@ -954,6 +1003,7 @@ mod tests {
         let mut buf = Vec::new();
 
         let header = RequestHeader {
+            version: VERSION,
             serial: 1,
             id: 2,
             format: Format::Json.to_u8(),
@@ -971,7 +1021,7 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "serial: 1\nid: 2\nformat: 5\nchannel: 0\n\n{\"message\":\"hello\",\"tick\":42}"
+            "version: 1\nserial: 1\nid: 2\nformat: 5\nchannel: 0\n\n{\"message\":\"hello\",\"tick\":42}"
         );
 
         let mut at = 0;
@@ -989,7 +1039,7 @@ mod tests {
     fn text_envelope_is_order_independent() {
         // Headers in a different order, one which is absent, and CRLF line
         // endings throughout.
-        let buf = b"channel: 3\r\nid: 11\r\n\r\n";
+        let buf = b"channel: 3\r\nid: 11\r\nversion: 1\r\n\r\n";
 
         let mut at = 0;
         let header: RequestHeader = decode_envelope(Mode::Text, buf, &mut at).unwrap();
@@ -1008,6 +1058,7 @@ mod tests {
         let mut buf = Vec::new();
 
         let header = RequestHeader {
+            version: VERSION,
             serial: 7,
             id: 300,
             format: Format::Json.to_u8(),
@@ -1019,12 +1070,14 @@ mod tests {
         assert_eq!(
             buf,
             [
+                // `version` comes first and fits a byte.
+                0x01, 1, //
                 // `serial` fits a byte, so it is written as one.
-                0x01, 7, //
+                0x02, 7, //
                 // `id` needs two, which the tag says.
-                0x42, 0x2c, 0x01, //
+                0x43, 0x2c, 0x01, //
                 // `format` fits a byte.
-                0x03, 5, //
+                0x04, 5, //
                 // `channel` is zero, so it is not written at all.
                 0x00,
             ]
@@ -1048,7 +1101,7 @@ mod tests {
     #[test]
     fn unknown_headers_are_rejected() {
         // A two byte header with id 63, which nothing is ever assigned.
-        let buf = [0x01, 7, 0x7f, 0xff, 0xff, 0x03, 5, 0x00];
+        let buf = [0x01, 1, 0x02, 7, 0x7f, 0xff, 0xff, 0x04, 5, 0x00];
 
         let mut at = 0;
         let error = decode_envelope::<RequestHeader>(Mode::Binary, &buf, &mut at).unwrap_err();
@@ -1060,11 +1113,7 @@ mod tests {
         );
         assert_eq!(at, 0, "a refused envelope must not advance the cursor");
 
-        let buf = b"serial: 7
-future: whatever
-id: 11
-
-";
+        let buf = b"version: 1\nserial: 7\nfuture: whatever\nid: 11\n\n";
 
         let mut at = 0;
         let error = decode_envelope::<RequestHeader>(Mode::Text, buf, &mut at).unwrap_err();
@@ -1085,21 +1134,26 @@ id: 11
     fn binary_envelope_rejects_malformed_input() {
         // No end of headers marker.
         let mut at = 0;
-        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0x01, 7], &mut at).is_err());
+        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0x01, 1], &mut at).is_err());
 
         // A header whose value is cut short.
         let mut at = 0;
-        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0x42, 1], &mut at).is_err());
+        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0x43, 1], &mut at).is_err());
 
         // A width class which is reserved, so the header cannot be skipped.
         let mut at = 0;
-        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0xc1, 1, 0x00], &mut at).is_err());
+        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0xc2, 1, 0x00], &mut at).is_err());
 
-        // A value which does not fit the header it is written to.
+        // A value which does not fit the header it is written to: `id` holds a
+        // `u16`, and this writes 65536 into it.
         let mut at = 0;
         assert!(
-            decode_envelope::<RequestHeader>(Mode::Binary, &[0x82, 0, 0, 1, 0, 0x00], &mut at)
-                .is_err()
+            decode_envelope::<RequestHeader>(
+                Mode::Binary,
+                &[0x01, 1, 0x83, 0, 0, 1, 0, 0x00],
+                &mut at
+            )
+            .is_err()
         );
     }
 
@@ -1109,11 +1163,14 @@ id: 11
     fn text_envelope_rejects_malformed_input() {
         // No empty line, so the envelope never ends.
         let mut at = 0;
-        assert!(decode_envelope::<RequestHeader>(Mode::Text, b"id: 11\n", &mut at).is_err());
+        assert!(decode_envelope::<RequestHeader>(Mode::Text, b"version: 1\n", &mut at).is_err());
 
         // A value which does not fit the header it is written to.
         let mut at = 0;
-        assert!(decode_envelope::<RequestHeader>(Mode::Text, b"id: 65536\n\n", &mut at).is_err());
+        assert!(
+            decode_envelope::<RequestHeader>(Mode::Text, b"version: 1\nid: 65536\n\n", &mut at)
+                .is_err()
+        );
 
         // A line which is not a field.
         let mut at = 0;
@@ -1121,11 +1178,73 @@ id: 11
 
         // A field whose value is not a number.
         let mut at = 0;
-        assert!(decode_envelope::<RequestHeader>(Mode::Text, b"id: none\n\n", &mut at).is_err());
+        assert!(
+            decode_envelope::<RequestHeader>(Mode::Text, b"version: 1\nid: none\n\n", &mut at)
+                .is_err()
+        );
 
         // Not text at all.
         let mut at = 0;
         assert!(decode_envelope::<RequestHeader>(Mode::Text, &[0xff, 0xfe], &mut at).is_err());
+    }
+
+    /// A peer speaking a version this build does not have is refused, which is
+    /// what keeps a session between mismatched peers from getting started.
+    #[test]
+    fn an_unsupported_version_is_refused() {
+        // A well formed envelope which states a version from the future.
+        let buf = [0x01, VERSION as u8 + 1, 0x02, 7, 0x00];
+
+        let mut at = 0;
+        let error = decode_envelope::<RequestHeader>(Mode::Binary, &buf, &mut at).unwrap_err();
+
+        assert_eq!(error.unsupported_version(), Some(VERSION + 1));
+        assert_eq!(at, 0, "a refused envelope must not advance the cursor");
+
+        let buf = b"version: 2\nserial: 7\n\n";
+
+        let mut at = 0;
+        let error = decode_envelope::<RequestHeader>(Mode::Text, buf, &mut at).unwrap_err();
+
+        assert_eq!(error.unsupported_version(), Some(2));
+        assert_eq!(at, 0, "a refused envelope must not advance the cursor");
+    }
+
+    /// An envelope which states no version at all is refused too, since a peer
+    /// which does not say what it speaks has not been understood either.
+    #[test]
+    fn an_unstated_version_is_refused() {
+        for (mode, buf) in [
+            (Mode::Binary, &[0x02, 7, 0x00][..]),
+            (Mode::Text, &b"serial: 7\n\n"[..]),
+        ] {
+            let mut at = 0;
+            let error = decode_envelope::<RequestHeader>(mode, buf, &mut at).unwrap_err();
+
+            assert_eq!(
+                error.unsupported_version(),
+                Some(0),
+                "`{mode}` accepted an envelope which states no version"
+            );
+        }
+    }
+
+    /// The version is what explains which headers may appear, so a version
+    /// which does not match is reported ahead of a header we do not know.
+    #[test]
+    fn the_version_is_reported_before_an_unknown_header() {
+        // Both wrong at once: a version from the future, and a header from it.
+        let buf = [0x01, VERSION as u8 + 1, 0x7f, 0xff, 0xff, 0x00];
+
+        let mut at = 0;
+        let error = decode_envelope::<RequestHeader>(Mode::Binary, &buf, &mut at).unwrap_err();
+
+        assert_eq!(error.unsupported_version(), Some(VERSION + 1));
+
+        assert!(
+            !error.is_unknown_header(),
+            "The version explains the header, so it is the more useful error"
+        );
     }
 
     /// Only a human readable format can be carried in a text frame, since the

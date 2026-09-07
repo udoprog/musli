@@ -22,6 +22,22 @@
 //! the envelope, so every message is self-describing in this respect. A `format`
 //! of zero means the message carries no body.
 //!
+//! # The protocol version
+//!
+//! Every envelope states the version of the wire protocol it was written
+//! against in its `version` header, and a peer refuses an envelope which states
+//! anything other than [`VERSION`]. The very first message each side sees
+//! carries it — [`MessageId::SERVER_HELLO`] for the client and
+//! [`MessageId::NEGOTIATE`] for the server — so a session between peers which
+//! do not speak the same protocol is rejected before either of them has acted
+//! on anything the other said.
+//!
+//! This is what a header being unknown is measured against. A version bump is
+//! the deliberate way to change what the envelope may contain, so an unknown
+//! header arriving under a version we do accept means something has gone wrong
+//! that neither peer planned for, which is why it is refused outright rather
+//! than skipped.
+//!
 //! # Headers
 //!
 //! Every header carries an unsigned integer and is addressed by a name. A
@@ -37,10 +53,10 @@
 //! then reported as an error which tears the connection down. A peer writing a
 //! header we have never seen is a peer speaking a protocol we do not have, and
 //! acting on the part of the message we happen to recognize would mean acting
-//! on a message we have not actually understood. See [the protocol version] for
-//! how peers avoid getting into that situation in the first place.
+//! on a message we have not actually understood.
 //!
-//! [the protocol version]: crate::api#the-protocol-version
+//! A version which does not match is reported ahead of an unknown header, since
+//! the version is what explains the header.
 //!
 //! # The binary envelope
 //!
@@ -66,6 +82,7 @@
 //! terminated by an empty line, carried in a text frame:
 //!
 //! ```text
+//! version: 1
 //! serial: 1
 //! id: 1
 //! format: 5
@@ -151,6 +168,23 @@ use musli::{Decode, Encode};
 
 #[doc(inline)]
 pub use musli_web_macros::define;
+
+/// The version of the wire protocol this build speaks.
+///
+/// It is stated by every envelope and checked by every peer, see [the protocol
+/// version]. A peer which states anything else is refused, since there is no
+/// way to know which parts of what it said still mean what they used to.
+///
+/// [the protocol version]: crate::api#the-protocol-version
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::api::VERSION;
+///
+/// assert_eq!(VERSION, 1);
+/// ```
+pub const VERSION: u32 = 1;
 
 /// The serialization format used for message bodies.
 ///
@@ -1083,6 +1117,9 @@ pub struct Connect;
 #[derive(Debug, Clone)]
 #[doc(hidden)]
 pub struct ResponseHeader {
+    /// The version of the protocol this envelope was written against, which is
+    /// always [`VERSION`].
+    pub version: u32,
     /// The serial request this is a response to.
     pub serial: u32,
     /// This is a broadcast over the specified type. If this is non-empty the
@@ -1115,6 +1152,9 @@ pub struct ErrorMessage<'de> {
 #[derive(Debug, Clone, Copy)]
 #[doc(hidden)]
 pub struct RequestHeader {
+    /// The version of the protocol this envelope was written against, which is
+    /// always [`VERSION`].
+    pub version: u32,
     /// The serial of the request.
     pub serial: u32,
     /// The kind of the request.
