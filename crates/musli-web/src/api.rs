@@ -11,22 +11,56 @@
 //! +--------------------------+--------------------------------+
 //! ```
 //!
-//! The envelope is a [`RequestHeader`] for messages sent by the client and a
-//! [`ResponseHeader`] for messages sent by the server. Its encoding is decided
-//! by the [`Mode`] the socket runs in and never changes with the negotiated
-//! format. This is what makes the format negotiable at all, since both peers
-//! can always read the envelope regardless of what they have agreed on for
-//! bodies.
+//! The envelope is a block of *headers*: a [`RequestHeader`] for messages sent
+//! by the client and a [`ResponseHeader`] for messages sent by the server. How
+//! it is spelled is decided by the [`Mode`] the socket runs in and never
+//! changes with the negotiated format. This is what makes the format negotiable
+//! at all, since both peers can always read the envelope regardless of what
+//! they have agreed on for bodies.
 //!
-//! The body is encoded with the [`Format`] identified by the `format` field of
+//! The body is encoded with the [`Format`] identified by the `format` header of
 //! the envelope, so every message is self-describing in this respect. A `format`
 //! of zero means the message carries no body.
 //!
-//! # The text envelope
+//! # Headers
 //!
-//! In [`Mode::Binary`] the envelope is encoded with [`musli::packed`] and is
-//! carried in a binary frame. This is the compact representation and the
-//! default.
+//! Every header carries an unsigned integer and is addressed by a name. A
+//! header which is absent reads as zero, and headers may arrive in any order,
+//! so a message which has no use for a header simply does not write one.
+//!
+//! Both spellings are *self-delimiting*: a reader can find the end of a header
+//! it has never seen without understanding what it means. That is deliberate,
+//! and it is what makes the next rule possible.
+//!
+//! **A header which this build does not know about is refused.** It is read,
+//! stepped over so that the position of everything after it is still known, and
+//! then reported as an error which tears the connection down. A peer writing a
+//! header we have never seen is a peer speaking a protocol we do not have, and
+//! acting on the part of the message we happen to recognize would mean acting
+//! on a message we have not actually understood. See [the protocol version] for
+//! how peers avoid getting into that situation in the first place.
+//!
+//! [the protocol version]: crate::api#the-protocol-version
+//!
+//! # The binary envelope
+//!
+//! In [`Mode::Binary`] each header is a tag byte followed by its value, and a
+//! tag byte of zero ends the block:
+//!
+//! ```text
+//! +-----+---------------+     +-----+
+//! | tag | value (1/2/4) | ... |  0  |
+//! +-----+---------------+     +-----+
+//! ```
+//!
+//! The low six bits of the tag are the header's id, which is never zero. The
+//! top two bits say how wide the value is — `0` for one byte, `1` for two and
+//! `2` for four, little endian — which is what lets an unknown header be
+//! stepped over. A value is written in the narrowest of those which holds it,
+//! so a small value costs no more than it has to. The remaining class is
+//! reserved, and a header which uses it cannot be skipped, so it is refused.
+//!
+//! # The text envelope
 //!
 //! In [`Mode::Text`] the envelope is instead a block of `<key>: <value>` lines
 //! terminated by an empty line, carried in a text frame:
@@ -40,11 +74,9 @@
 //! {"message":"Hello!"}
 //! ```
 //!
-//! Every field of the envelope is written, in the order it is declared, with
-//! its value in decimal. When reading, fields may appear in any order and a
-//! field which is absent reads as zero. Fields which are not recognized are
-//! ignored, so a peer built against a newer version of the protocol can still
-//! be understood.
+//! Every header is written, in the order it is declared, with its value in
+//! decimal. Being explicit is worth more than being terse in a spelling meant
+//! to be read by people, so a header which is zero is written out too.
 //!
 //! Nothing about the message is otherwise different, which means the mode only
 //! decides how the frame is *spelled*. Since a text frame has to be valid UTF-8
@@ -1044,10 +1076,12 @@ pub struct Connect;
 
 /// The header of a response.
 ///
-/// This is part of the fixed envelope, see the [negotiation protocol].
-#[derive(Debug, Clone, Encode, Decode)]
+/// This is the envelope of every message the server sends, see the [wire
+/// format].
+///
+/// [wire format]: crate::api#wire-format
+#[derive(Debug, Clone)]
 #[doc(hidden)]
-#[musli(packed)]
 pub struct ResponseHeader {
     /// The serial request this is a response to.
     pub serial: u32,
@@ -1074,10 +1108,12 @@ pub struct ErrorMessage<'de> {
 
 /// A request header.
 ///
-/// This is part of the fixed envelope, see the [negotiation protocol].
-#[derive(Debug, Clone, Copy, Encode, Decode)]
+/// This is the envelope of every message the client sends, see the [wire
+/// format].
+///
+/// [wire format]: crate::api#wire-format
+#[derive(Debug, Clone, Copy)]
 #[doc(hidden)]
-#[musli(packed)]
 pub struct RequestHeader {
     /// The serial of the request.
     pub serial: u32,

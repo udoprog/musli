@@ -263,6 +263,11 @@ enum ErrorKind {
     NegotiateHeader {
         error: format::Error,
     },
+    /// The client wrote a header this build does not know about, which means it
+    /// is speaking a protocol this server does not have.
+    UnknownHeader {
+        error: format::Error,
+    },
 }
 
 /// The error produced by the server side of the websocket protocol
@@ -354,6 +359,9 @@ impl fmt::Display for Error {
             ErrorKind::NegotiateHeader { .. } => {
                 write!(f, "Encoding error when decoding negotiation header")
             }
+            ErrorKind::UnknownHeader { error } => {
+                write!(f, "Client sent a header this server does not know: {error}")
+            }
         }
     }
 }
@@ -372,6 +380,7 @@ impl core::error::Error for Error {
             ErrorKind::ErrorMessageHeader { error } => Some(error),
             ErrorKind::ErrorMessage { error } => Some(error),
             ErrorKind::NegotiateHeader { error } => Some(error),
+            ErrorKind::UnknownHeader { error } => Some(error),
             _ => None,
         }
     }
@@ -901,6 +910,7 @@ where
             set: JoinSet::new(),
             format: Format::DEFAULT,
             mode: Mode::DEFAULT,
+            failure: None,
             formats: self.formats,
         };
 
@@ -961,6 +971,9 @@ where
     ///
     /// [negotiation protocol]: crate::api#negotiating-the-format
     mode: Mode,
+    /// An error which tore the connection down, held until the close frame
+    /// explaining it has been flushed.
+    failure: Option<Error>,
     /// Formats this server is willing to negotiate, or `None` to accept every
     /// format it was built with support for.
     formats: Option<&'static [Format]>,
@@ -1120,6 +1133,11 @@ where
 
         let header: RequestHeader = match format::decode_envelope(mode, &bytes, &mut at) {
             Ok(header) => header,
+            Err(error) if error.is_unknown_header() => {
+                self.out
+                    .push_back(S::close(CLOSE_PROTOCOL_ERROR, "Unknown header"));
+                return Err(Error::new(ErrorKind::UnknownHeader { error }));
+            }
             Err(error) => {
                 self.out
                     .push_back(S::close(CLOSE_PROTOCOL_ERROR, "Invalid request header"));
@@ -1350,7 +1368,12 @@ where
             }
         }
 
-        Ok(())
+        // NB: Reported only now, so that the close frame explaining it made it
+        // onto the wire first.
+        match self.failure.take() {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
     }
 
     /// Write a broadcast message.
@@ -1473,6 +1496,19 @@ where
 
         let header: RequestHeader = match format::decode_envelope(self.mode, &bytes, &mut at) {
             Ok(header) => header,
+            // NB: A header this build does not know about means the peer is
+            // speaking a protocol this one does not have, so the rest of the
+            // message cannot be acted on even though it parsed. The failure is
+            // held so the close frame explaining it still reaches the peer.
+            Err(error) if error.is_unknown_header() => {
+                tracing::debug!(?error, "Unknown header");
+                self.out
+                    .push_back(S::close(CLOSE_PROTOCOL_ERROR, "Unknown header"));
+                self.begin_closing();
+                self.failure
+                    .get_or_insert_with(|| Error::new(ErrorKind::UnknownHeader { error }));
+                return Ok(());
+            }
             Err(error) => {
                 tracing::debug!(?error, "Invalid request header");
                 self.out
@@ -2362,6 +2398,7 @@ mod tests {
             set: JoinSet::new(),
             format: Format::DEFAULT,
             mode: Mode::DEFAULT,
+            failure: None,
             formats: None,
         }
     }

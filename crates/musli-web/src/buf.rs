@@ -6,11 +6,9 @@ use core::mem::ManuallyDrop;
 use core::ops::Range;
 
 use alloc::vec::Vec;
-use musli::Encode;
-use musli::mode::Binary;
 
 use crate::api::{EncodeBody, Format, Mode};
-use crate::format::{self, TextEnvelope};
+use crate::format::{self, Envelope};
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -74,7 +72,7 @@ impl Writer<'_> {
     #[inline]
     pub(crate) fn envelope<T>(&mut self, mode: Mode, value: &T) -> Result<(), format::Error>
     where
-        T: Encode<Binary> + TextEnvelope,
+        T: Envelope,
     {
         format::encode_envelope(mode, &mut self.buf.buffer, value)
     }
