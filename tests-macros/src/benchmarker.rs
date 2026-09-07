@@ -463,6 +463,7 @@ fn generics_to_path_arguments(encode_generics: &syn::Generics) -> syn::PathArgum
             syn::GenericParam::Lifetime(..) => continue,
             syn::GenericParam::Type(p) => {
                 syn::GenericArgument::Type(syn::Type::Path(syn::TypePath {
+                    attrs: Vec::new(),
                     qself: None,
                     path: p.ident.clone().into(),
                 }))

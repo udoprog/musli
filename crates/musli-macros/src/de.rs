@@ -1,4 +1,4 @@
-use proc_macro2::{Ident, Literal, Span, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{ToTokens, quote, quote_spanned};
 use syn::Token;
 use syn::punctuated::Punctuated;
@@ -121,8 +121,10 @@ pub(crate) fn expand_decode_entry(b: &Build<'_>) -> Result<TokenStream> {
             .make_where_clause()
             .predicates
             .push(syn::WherePredicate::Type(syn::PredicateType {
+                attrs: Vec::new(),
                 lifetimes: None,
                 bounded_ty: syn::Type::Path(syn::TypePath {
+                    attrs: Vec::new(),
                     qself: None,
                     path: syn::Path::from(syn::PathSegment::from(t.ident.clone())),
                 }),
@@ -1131,7 +1133,10 @@ fn decode_tagged(
                             Ident::new("enter_named_field", Span::call_site()),
                         ),
                         syn::Member::Unnamed(index) => (
-                            syn::Lit::Int(syn::LitInt::from(Literal::u32_suffixed(index.index))),
+                            syn::Lit::Int(syn::LitInt::new(
+                                &format!("{}u32", index.index),
+                                index.span,
+                            )),
                             Ident::new("enter_unnamed_field", Span::call_site()),
                         ),
                     };
