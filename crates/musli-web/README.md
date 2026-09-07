@@ -15,8 +15,9 @@ It includes support for:
   of the websocket protocol this crate implements.
 - [`yew`] integration, allowing you to use Müsli for communicating with
   websocket clients using a well-defined API.
-- [`tokio-tungstenite`] integration through [`tungstenite029`], allowing
-  non-browser clients to talk to the same websocket API.
+- [`tokio-tungstenite`] integration through [`tungstenite029`] and
+  [`tungstenite030`], allowing non-browser clients to talk to the same
+  websocket API.
 
 Note that the organization of the modules include the version of the corresponding
 crate. Unstable versions are prefixed with `0`, such as [`yew023`].
@@ -24,6 +25,7 @@ crate. Unstable versions are prefixed with `0`, such as [`yew023`].
 See the following modules for how to use:
 * [`axum08`] for [`axum`] `0.8.x` integration.
 * [`tungstenite029`] for [`tokio-tungstenite`] `0.29.x` integration.
+* [`tungstenite030`] for [`tokio-tungstenite`] `0.30.x` integration.
 * [`yew022`] for [`yew`] `0.22.x` integration.
 * [`yew023`] for [`yew`] `0.23.x` integration.
 * [`web03`] for [`web-sys`] `0.3.x` integration.

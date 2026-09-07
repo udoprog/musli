@@ -7,8 +7,10 @@
 //! This is specialized over the `T` parameter through modules such as:
 //!
 //! * [`tungstenite029`] for `tokio-tungstenite` `0.29.x`.
+//! * [`tungstenite030`] for `tokio-tungstenite` `0.30.x`.
 //!
 //! [`tungstenite029`]: crate::tungstenite029
+//! [`tungstenite030`]: crate::tungstenite030
 //! [`web`]: <https://docs.rs/musli-web/latest/musli_web/web/>
 //!
 //! # Overview
@@ -71,7 +73,10 @@ pub struct EmptyCallback;
 /// on its own.
 ///
 /// [`tungstenite029`]: crate::tungstenite029
-#[cfg_attr(not(feature = "tungstenite029"), allow(dead_code))]
+#[cfg_attr(
+    not(any(feature = "tungstenite029", feature = "tungstenite030")),
+    allow(dead_code)
+)]
 pub(crate) enum Message {
     /// A text message was received. The protocol is binary only, so receiving
     /// one is a protocol error.
@@ -127,8 +132,10 @@ pub(crate) mod sealed_client {
 /// The corresponding modules provide integrations:
 ///
 /// * [`tungstenite029`] for `tokio-tungstenite` `0.29.x`.
+/// * [`tungstenite030`] for `tokio-tungstenite` `0.30.x`.
 ///
 /// [`tungstenite029`]: crate::tungstenite029
+/// [`tungstenite030`]: crate::tungstenite030
 pub trait ClientImpl
 where
     Self: 'static + Copy + Sized + self::sealed_client::Sealed,

@@ -181,6 +181,9 @@ jobs:
         - tungstenite029
         - tungstenite029-rustls
         - tungstenite029,axum08
+        - tungstenite030
+        - tungstenite030-rustls
+        - tungstenite030,axum08
         - formats
         - api,format-packed
         - api,format-storage
@@ -190,6 +193,7 @@ jobs:
         - ws,formats
         - web03,formats
         - tungstenite029,axum08,formats
+        - tungstenite030,axum08,formats
     env:
       RUSTFLAGS: -D warnings
     steps:
