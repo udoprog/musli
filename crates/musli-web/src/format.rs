@@ -10,131 +10,213 @@
 use core::fmt::{self, Write};
 use core::str;
 
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use musli::alloc::Global;
-use musli::mode::Binary;
 use musli::reader::SliceReader;
-use musli::{Decode, Encode};
 
 use crate::api::{ChannelId, DecodeBody, EncodeBody, Format, Mode, RequestHeader, ResponseHeader};
 
-/// An envelope which can also be spelled out as an http-like block of
-/// `<key>: <value>` lines, which is what [`Mode::Text`] uses.
+/// The tag byte which terminates a binary header block.
 ///
-/// See the [text envelope] for the shape this produces.
+/// A header id is never zero, so this can never be confused for one.
+const END_OF_HEADERS: u8 = 0;
+
+/// The mask which recovers the header id out of a binary tag byte.
+const ID_MASK: u8 = 0b0011_1111;
+
+/// The shift which recovers the width class out of a binary tag byte.
+const WIDTH_SHIFT: u32 = 6;
+
+/// One header of a message envelope.
 ///
-/// [text envelope]: crate::api#the-text-envelope
+/// Each header is addressed by a small `id` in the binary envelope and by
+/// `name` in the text one, so the two spellings carry exactly the same model.
+#[derive(Clone, Copy)]
+pub(crate) struct Header {
+    /// The identifier used in the binary envelope, which is never zero and
+    /// never wider than [`ID_MASK`].
+    pub(crate) id: u8,
+    /// The name used in the text envelope.
+    pub(crate) name: &'static str,
+}
+
+/// A value which can be carried by a header.
+///
+/// Every header value is an unsigned integer, so `u32` is the common
+/// representation they are read and written through. This is what lets an
+/// unknown header be skipped: the tag says how wide the value is without
+/// saying anything about what it means.
+pub(crate) trait HeaderValue
+where
+    Self: Copy,
+{
+    /// Widen the value so it can be written.
+    fn to_u32(self) -> u32;
+
+    /// Narrow a value which was read, failing if it does not fit.
+    fn from_u32(value: u32) -> Option<Self>;
+}
+
+macro_rules! header_value {
+    ($($ty:ty),* $(,)?) => {
+        $(
+            impl HeaderValue for $ty {
+                #[inline]
+                fn to_u32(self) -> u32 {
+                    u32::from(self)
+                }
+
+                #[inline]
+                fn from_u32(value: u32) -> Option<Self> {
+                    Self::try_from(value).ok()
+                }
+            }
+        )*
+    };
+}
+
+header_value!(u8, u16);
+
+impl HeaderValue for u32 {
+    #[inline]
+    fn to_u32(self) -> u32 {
+        self
+    }
+
+    #[inline]
+    fn from_u32(value: u32) -> Option<Self> {
+        Some(value)
+    }
+}
+
+impl HeaderValue for ChannelId {
+    #[inline]
+    fn to_u32(self) -> u32 {
+        u32::from(self.raw())
+    }
+
+    #[inline]
+    fn from_u32(value: u32) -> Option<Self> {
+        Some(ChannelId::from_u16(u16::try_from(value).ok()?))
+    }
+}
+
+/// A message envelope, which is a block of headers in either spelling.
+///
+/// See the [wire format] for the shape this produces.
+///
+/// [wire format]: crate::api#wire-format
 // NB: Only the modules which speak the protocol have any use for envelopes.
 #[cfg_attr(
     not(any(feature = "ws", feature = "client", feature = "web03")),
     allow(dead_code)
 )]
-pub(crate) trait TextEnvelope
+pub(crate) trait Envelope
 where
     Self: Sized,
 {
-    /// The envelope with every field left at zero, which is what an absent
-    /// field reads back as.
+    /// Every header this envelope knows about, in the order they are written.
+    const HEADERS: &'static [Header];
+
+    /// The envelope with every header left at zero, which is what an absent
+    /// header reads back as.
     fn empty() -> Self;
 
-    /// Write every field of the envelope as a `<key>: <value>` line.
-    fn write_text(&self, out: &mut dyn Write) -> fmt::Result;
+    /// Read the value of one of [`Envelope::HEADERS`].
+    fn get(&self, id: u8) -> u32;
 
-    /// Apply a single field read out of a text envelope.
+    /// Apply a value to one of [`Envelope::HEADERS`].
     ///
-    /// A key which is not recognized is ignored so that a peer built against a
-    /// newer version of the protocol can still be understood.
-    fn set_text(&mut self, key: &str, value: &str) -> Result<(), Error>;
+    /// Fails if the value does not fit the header, which is how a peer which
+    /// writes a wider value than the header can hold is caught.
+    fn set(&mut self, id: u8, value: u32) -> Result<(), Error>;
 }
 
-/// Write a single `<key>: <value>` line.
-#[inline]
-fn write_field(out: &mut dyn Write, key: &str, value: impl fmt::Display) -> fmt::Result {
-    writeln!(out, "{key}: {value}")
+macro_rules! envelope {
+    ($ty:ident { $($id:literal => $field:ident,)* }) => {
+        impl Envelope for $ty {
+            const HEADERS: &'static [Header] = &[
+                $(Header { id: $id, name: stringify!($field) },)*
+            ];
+
+            #[inline]
+            fn empty() -> Self {
+                Self {
+                    $($field: HeaderValue::from_u32(0).expect("Zero fits every header"),)*
+                }
+            }
+
+            #[inline]
+            fn get(&self, id: u8) -> u32 {
+                match id {
+                    $($id => self.$field.to_u32(),)*
+                    _ => 0,
+                }
+            }
+
+            #[inline]
+            fn set(&mut self, id: u8, value: u32) -> Result<(), Error> {
+                match id {
+                    $(
+                        $id => {
+                            let Some(value) = HeaderValue::from_u32(value) else {
+                                return Err(Error::new(ErrorKind::HeaderRange {
+                                    name: stringify!($field),
+                                    value,
+                                }));
+                            };
+
+                            self.$field = value;
+                        }
+                    )*
+                    // NB: Callers only ever pass an id which came out of
+                    // `HEADERS`, an unknown one is reported before it gets
+                    // here.
+                    _ => return Err(Error::new(ErrorKind::UnknownHeader { id, name: None })),
+                }
+
+                Ok(())
+            }
+        }
+    };
 }
 
-/// Parse the value of a text envelope field.
+envelope! {
+    RequestHeader {
+        1 => serial,
+        2 => id,
+        3 => format,
+        4 => channel,
+    }
+}
+
+envelope! {
+    ResponseHeader {
+        1 => serial,
+        2 => broadcast,
+        3 => error,
+        4 => format,
+        5 => channel,
+    }
+}
+
+/// Look up a header by its binary id.
 #[inline]
-fn parse_field<T>(key: &'static str, value: &str) -> Result<T, Error>
+fn header_by_id<T>(id: u8) -> Option<&'static Header>
 where
-    T: core::str::FromStr,
+    T: Envelope,
 {
-    match value.parse() {
-        Ok(value) => Ok(value),
-        Err(..) => Err(Error::new(ErrorKind::TextField { key })),
-    }
+    T::HEADERS.iter().find(|h| h.id == id)
 }
 
-impl TextEnvelope for RequestHeader {
-    #[inline]
-    fn empty() -> Self {
-        Self {
-            serial: 0,
-            id: 0,
-            format: 0,
-            channel: ChannelId::NONE,
-        }
-    }
-
-    #[inline]
-    fn write_text(&self, out: &mut dyn Write) -> fmt::Result {
-        write_field(out, "serial", self.serial)?;
-        write_field(out, "id", self.id)?;
-        write_field(out, "format", self.format)?;
-        write_field(out, "channel", self.channel.raw())?;
-        Ok(())
-    }
-
-    #[inline]
-    fn set_text(&mut self, key: &str, value: &str) -> Result<(), Error> {
-        match key {
-            "serial" => self.serial = parse_field("serial", value)?,
-            "id" => self.id = parse_field("id", value)?,
-            "format" => self.format = parse_field("format", value)?,
-            "channel" => self.channel = ChannelId::from_u16(parse_field("channel", value)?),
-            _ => {}
-        }
-
-        Ok(())
-    }
-}
-
-impl TextEnvelope for ResponseHeader {
-    #[inline]
-    fn empty() -> Self {
-        Self {
-            serial: 0,
-            broadcast: 0,
-            error: 0,
-            format: 0,
-            channel: ChannelId::NONE,
-        }
-    }
-
-    #[inline]
-    fn write_text(&self, out: &mut dyn Write) -> fmt::Result {
-        write_field(out, "serial", self.serial)?;
-        write_field(out, "broadcast", self.broadcast)?;
-        write_field(out, "error", self.error)?;
-        write_field(out, "format", self.format)?;
-        write_field(out, "channel", self.channel.raw())?;
-        Ok(())
-    }
-
-    #[inline]
-    fn set_text(&mut self, key: &str, value: &str) -> Result<(), Error> {
-        match key {
-            "serial" => self.serial = parse_field("serial", value)?,
-            "broadcast" => self.broadcast = parse_field("broadcast", value)?,
-            "error" => self.error = parse_field("error", value)?,
-            "format" => self.format = parse_field("format", value)?,
-            "channel" => self.channel = ChannelId::from_u16(parse_field("channel", value)?),
-            _ => {}
-        }
-
-        Ok(())
-    }
+/// Look up a header by its text name.
+#[inline]
+fn header_by_name<T>(name: &str) -> Option<&'static Header>
+where
+    T: Envelope,
+{
+    T::HEADERS.iter().find(|h| h.name == name)
 }
 
 /// Adapter which lets the text envelope be written straight into the outgoing
@@ -153,6 +235,28 @@ impl Write for Utf8Writer<'_> {
     }
 }
 
+/// Write one header of a binary envelope.
+///
+/// The tag byte carries both the header id and how wide the value is, so a
+/// reader can step over a header it does not know rather than losing its place.
+#[inline]
+fn write_binary_header(out: &mut Vec<u8>, id: u8, value: u32) {
+    debug_assert!(id != END_OF_HEADERS && id & ID_MASK == id);
+
+    // NB: The narrowest class which holds the value, so a small value costs no
+    // more than it has to.
+    if let Ok(value) = u8::try_from(value) {
+        out.push(id);
+        out.push(value);
+    } else if let Ok(value) = u16::try_from(value) {
+        out.push(id | (1 << WIDTH_SHIFT));
+        out.extend_from_slice(&value.to_le_bytes());
+    } else {
+        out.push(id | (2 << WIDTH_SHIFT));
+        out.extend_from_slice(&value.to_le_bytes());
+    }
+}
+
 /// Encode the fixed envelope of a message.
 ///
 /// The envelope never depends on which format has been negotiated for bodies,
@@ -168,17 +272,35 @@ impl Write for Utf8Writer<'_> {
 #[inline]
 pub(crate) fn encode_envelope<T>(mode: Mode, out: &mut Vec<u8>, value: &T) -> Result<(), Error>
 where
-    T: Encode<Binary> + TextEnvelope,
+    T: Envelope,
 {
     match mode {
         Mode::Binary => {
-            musli::packed::encode(out, value).map_err(Error::packed)?;
+            for header in T::HEADERS {
+                let field = value.get(header.id);
+
+                // NB: An absent header reads back as zero, so writing one would
+                // say nothing.
+                if field == 0 {
+                    continue;
+                }
+
+                write_binary_header(out, header.id, field);
+            }
+
+            out.push(END_OF_HEADERS);
         }
         Mode::Text => {
             let mut writer = Utf8Writer { out };
 
-            if value.write_text(&mut writer).is_err() {
-                return Err(Error::new(ErrorKind::TextWrite));
+            // NB: Every header is written, zero or not. This spelling is for
+            // people to read, so being explicit beats being terse.
+            for header in T::HEADERS {
+                let field = value.get(header.id);
+
+                if writeln!(writer, "{}: {field}", header.name).is_err() {
+                    return Err(Error::new(ErrorKind::TextWrite));
+                }
             }
 
             // NB: The empty line is what separates the envelope from the body.
@@ -190,18 +312,17 @@ where
 }
 
 /// Decode the fixed envelope of a message, advancing `at` past it.
+///
+/// A header which this build does not know about is stepped over and then
+/// reported, since a peer which speaks headers we do not is a peer we cannot
+/// safely act on.
 #[cfg_attr(
     not(any(feature = "ws", feature = "client", feature = "web03")),
     allow(dead_code)
 )]
-#[inline]
-pub(crate) fn decode_envelope<'de, T>(
-    mode: Mode,
-    buf: &'de [u8],
-    at: &mut usize,
-) -> Result<T, Error>
+pub(crate) fn decode_envelope<T>(mode: Mode, buf: &[u8], at: &mut usize) -> Result<T, Error>
 where
-    T: Decode<'de, Binary, Global> + TextEnvelope,
+    T: Envelope,
 {
     let Some(tail) = buf.get(*at..) else {
         return Err(Error::new(ErrorKind::Overflow {
@@ -210,27 +331,76 @@ where
         }));
     };
 
-    match mode {
+    let mut header = T::empty();
+    // NB: Held rather than returned immediately so that the whole block is
+    // stepped over first, which is what makes the error precise rather than a
+    // desync somewhere further along.
+    let mut unknown = None;
+
+    let consumed = match mode {
         Mode::Binary => {
-            let mut reader = SliceReader::new(tail);
-            let value = musli::packed::decode(&mut reader).map_err(Error::packed)?;
-            *at += tail.len() - reader.remaining();
-            Ok(value)
+            let mut rest = tail;
+
+            loop {
+                let Some((&tag, next)) = rest.split_first() else {
+                    return Err(Error::new(ErrorKind::HeadersUnterminated));
+                };
+
+                rest = next;
+
+                if tag == END_OF_HEADERS {
+                    break;
+                }
+
+                let id = tag & ID_MASK;
+
+                let width = match tag >> WIDTH_SHIFT {
+                    0 => 1,
+                    1 => 2,
+                    2 => 4,
+                    // NB: Reserved for a future width, which cannot be stepped
+                    // over since nothing says how wide it is.
+                    _ => return Err(Error::new(ErrorKind::HeaderWidth { id })),
+                };
+
+                let Some((value, next)) = rest.split_at_checked(width) else {
+                    return Err(Error::new(ErrorKind::HeaderTruncated { id, width }));
+                };
+
+                rest = next;
+
+                let mut bytes = [0; 4];
+                bytes[..width].copy_from_slice(value);
+                let value = u32::from_le_bytes(bytes);
+
+                // NB: The tag said how wide this is, so an unknown header has
+                // already been stepped over by the time we get here.
+                if header_by_id::<T>(id).is_none() {
+                    if unknown.is_none() {
+                        unknown = Some(ErrorKind::UnknownHeader { id, name: None });
+                    }
+
+                    continue;
+                }
+
+                header.set(id, value)?;
+            }
+
+            tail.len() - rest.len()
         }
         Mode::Text => {
             let Ok(text) = str::from_utf8(tail) else {
                 return Err(Error::new(ErrorKind::TextNotUtf8));
             };
 
-            let mut header = T::empty();
             let mut rest = text;
 
             loop {
-                let Some((line, tail)) = rest.split_once('\n') else {
-                    return Err(Error::new(ErrorKind::TextUnterminated));
+                let Some((line, next)) = rest.split_once('\n') else {
+                    return Err(Error::new(ErrorKind::HeadersUnterminated));
                 };
 
-                rest = tail;
+                rest = next;
 
                 // NB: Tolerated so that an envelope which has been through
                 // something that insists on CRLF still reads.
@@ -240,17 +410,41 @@ where
                     break;
                 }
 
-                let Some((key, value)) = line.split_once(':') else {
+                let Some((name, value)) = line.split_once(':') else {
                     return Err(Error::new(ErrorKind::TextSeparator));
                 };
 
-                header.set_text(key.trim(), value.trim())?;
+                let name = name.trim();
+                let value = value.trim();
+
+                let Some(found) = header_by_name::<T>(name) else {
+                    if unknown.is_none() {
+                        unknown = Some(ErrorKind::UnknownHeader {
+                            id: 0,
+                            name: Some(name.to_string()),
+                        });
+                    }
+
+                    continue;
+                };
+
+                let Ok(value) = value.parse::<u32>() else {
+                    return Err(Error::new(ErrorKind::TextField { key: found.name }));
+                };
+
+                header.set(found.id, value)?;
             }
 
-            *at += tail.len() - rest.len();
-            Ok(header)
+            tail.len() - rest.len()
         }
+    };
+
+    if let Some(kind) = unknown {
+        return Err(Error::new(kind));
     }
+
+    *at += consumed;
+    Ok(header)
 }
 
 /// Encode `value` with the given format, appending it to `out`.
@@ -420,6 +614,15 @@ impl Error {
             _ => None,
         }
     }
+
+    /// Test if the error is caused by a header this build does not know about.
+    ///
+    /// A peer which writes one is speaking a protocol this build has never
+    /// seen, which is never something to carry on through.
+    #[inline]
+    pub fn is_unknown_header(&self) -> bool {
+        matches!(self.kind, ErrorKind::UnknownHeader { .. })
+    }
 }
 
 macro_rules! error_kinds {
@@ -430,9 +633,13 @@ macro_rules! error_kinds {
             Overflow { at: usize, len: usize },
             TextWrite,
             TextNotUtf8,
-            TextUnterminated,
             TextSeparator,
             TextField { key: &'static str },
+            HeadersUnterminated,
+            HeaderWidth { id: u8 },
+            HeaderTruncated { id: u8, width: usize },
+            HeaderRange { name: &'static str, value: u32 },
+            UnknownHeader { id: u8, name: Option<String> },
             $($(#[$meta])* $variant($ty),)*
         }
 
@@ -462,14 +669,29 @@ macro_rules! error_kinds {
                     ErrorKind::TextNotUtf8 => {
                         write!(f, "Text envelope is not valid UTF-8")
                     }
-                    ErrorKind::TextUnterminated => {
-                        write!(f, "Text envelope is missing its terminating empty line")
-                    }
                     ErrorKind::TextSeparator => {
                         write!(f, "Text envelope has a line without a `:` separator")
                     }
                     ErrorKind::TextField { key } => {
-                        write!(f, "Text envelope field `{key}` is not a valid number")
+                        write!(f, "Text envelope header `{key}` is not a valid number")
+                    }
+                    ErrorKind::HeadersUnterminated => {
+                        write!(f, "Envelope is missing its end of headers marker")
+                    }
+                    ErrorKind::HeaderWidth { id } => {
+                        write!(f, "Header {id} uses a width this build cannot skip over")
+                    }
+                    ErrorKind::HeaderTruncated { id, width } => {
+                        write!(f, "Header {id} is missing its {width} byte value")
+                    }
+                    ErrorKind::HeaderRange { name, value } => {
+                        write!(f, "Header `{name}` cannot hold the value {value}")
+                    }
+                    ErrorKind::UnknownHeader { name: Some(name), .. } => {
+                        write!(f, "Unknown header `{name}`")
+                    }
+                    ErrorKind::UnknownHeader { id, name: None } => {
+                        write!(f, "Unknown header with id {id}")
                     }
                     $($(#[$meta])* ErrorKind::$variant(..) => {
                         write!(f, concat!("Error in the `", stringify!($ctor), "` format"))
@@ -491,7 +713,7 @@ macro_rules! error_kinds {
 }
 
 error_kinds! {
-    // NB: Always available, since it is what the envelope is encoded with.
+    #[cfg(feature = "format-packed")]
     Packed, packed, musli::packed::Error;
     #[cfg(feature = "format-storage")]
     Storage, storage, musli::storage::Error;
@@ -761,22 +983,124 @@ mod tests {
         assert_eq!(at, buf.len());
     }
 
-    /// Reading has to be lenient about what it accepts, so that a peer built
-    /// against a different version of the protocol is still understood.
+    /// Headers may arrive in any order and an absent one reads as zero, which
+    /// is what lets a header be dropped from a message that has no use for it.
     #[test]
-    fn text_envelope_is_lenient() {
-        // Fields in a different order, a field which is not known, a field
-        // which is absent, and CRLF line endings throughout.
-        let buf = b"channel: 3\r\nfuture: whatever\r\nid: 11\r\n\r\n";
+    fn text_envelope_is_order_independent() {
+        // Headers in a different order, one which is absent, and CRLF line
+        // endings throughout.
+        let buf = b"channel: 3\r\nid: 11\r\n\r\n";
 
         let mut at = 0;
         let header: RequestHeader = decode_envelope(Mode::Text, buf, &mut at).unwrap();
 
         assert_eq!(header.id, 11);
         assert_eq!(header.channel, ChannelId::from_u16(3));
-        assert_eq!(header.serial, 0, "an absent field reads as zero");
-        assert_eq!(header.format, 0, "an absent field reads as zero");
+        assert_eq!(header.serial, 0, "an absent header reads as zero");
+        assert_eq!(header.format, 0, "an absent header reads as zero");
         assert_eq!(at, buf.len());
+    }
+
+    /// The binary envelope is a block of tagged headers so that an unknown one
+    /// can be stepped over, and a header which is zero is simply not written.
+    #[test]
+    fn binary_envelope_is_tagged() {
+        let mut buf = Vec::new();
+
+        let header = RequestHeader {
+            serial: 7,
+            id: 300,
+            format: Format::Json.to_u8(),
+            channel: ChannelId::NONE,
+        };
+
+        encode_envelope(Mode::Binary, &mut buf, &header).unwrap();
+
+        assert_eq!(
+            buf,
+            [
+                // `serial` fits a byte, so it is written as one.
+                0x01, 7, //
+                // `id` needs two, which the tag says.
+                0x42, 0x2c, 0x01, //
+                // `format` fits a byte.
+                0x03, 5, //
+                // `channel` is zero, so it is not written at all.
+                0x00,
+            ]
+        );
+
+        let mut at = 0;
+        let decoded: RequestHeader = decode_envelope(Mode::Binary, &buf, &mut at).unwrap();
+
+        assert_eq!(decoded.serial, 7);
+        assert_eq!(decoded.id, 300);
+        assert_eq!(decoded.format, Format::Json.to_u8());
+        assert_eq!(decoded.channel, ChannelId::NONE);
+        assert_eq!(at, buf.len());
+    }
+
+    /// A header this build does not know about has to be stepped over and then
+    /// reported, in both spellings.
+    ///
+    /// Carrying on would mean acting on a message from a peer which speaks a
+    /// protocol we have never seen, so it is refused outright.
+    #[test]
+    fn unknown_headers_are_rejected() {
+        // A two byte header with id 63, which nothing is ever assigned.
+        let buf = [0x01, 7, 0x7f, 0xff, 0xff, 0x03, 5, 0x00];
+
+        let mut at = 0;
+        let error = decode_envelope::<RequestHeader>(Mode::Binary, &buf, &mut at).unwrap_err();
+
+        assert!(error.is_unknown_header(), "Unexpected error: {error}");
+        assert!(
+            error.to_string().contains("63"),
+            "Unexpected error: {error}"
+        );
+        assert_eq!(at, 0, "a refused envelope must not advance the cursor");
+
+        let buf = b"serial: 7
+future: whatever
+id: 11
+
+";
+
+        let mut at = 0;
+        let error = decode_envelope::<RequestHeader>(Mode::Text, buf, &mut at).unwrap_err();
+
+        assert!(error.is_unknown_header(), "Unexpected error: {error}");
+
+        assert!(
+            error.to_string().contains("future"),
+            "The error has to name the header: {error}"
+        );
+
+        assert_eq!(at, 0, "a refused envelope must not advance the cursor");
+    }
+
+    /// A malformed binary envelope has to be reported rather than read as
+    /// something else.
+    #[test]
+    fn binary_envelope_rejects_malformed_input() {
+        // No end of headers marker.
+        let mut at = 0;
+        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0x01, 7], &mut at).is_err());
+
+        // A header whose value is cut short.
+        let mut at = 0;
+        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0x42, 1], &mut at).is_err());
+
+        // A width class which is reserved, so the header cannot be skipped.
+        let mut at = 0;
+        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0xc1, 1, 0x00], &mut at).is_err());
+
+        // A value which does not fit the header it is written to.
+        let mut at = 0;
+        assert!(
+            decode_envelope::<RequestHeader>(Mode::Binary, &[0x82, 0, 0, 1, 0, 0x00], &mut at)
+                .is_err()
+        );
     }
 
     /// A malformed text envelope has to be reported rather than silently read
@@ -786,6 +1110,10 @@ mod tests {
         // No empty line, so the envelope never ends.
         let mut at = 0;
         assert!(decode_envelope::<RequestHeader>(Mode::Text, b"id: 11\n", &mut at).is_err());
+
+        // A value which does not fit the header it is written to.
+        let mut at = 0;
+        assert!(decode_envelope::<RequestHeader>(Mode::Text, b"id: 65536\n\n", &mut at).is_err());
 
         // A line which is not a field.
         let mut at = 0;

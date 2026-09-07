@@ -195,6 +195,7 @@ struct AppState {
     shutdown: watch::Receiver<bool>,
     handler: TestHandler,
     formats: Option<&'static [Format]>,
+    errors: mpsc::UnboundedSender<String>,
 }
 
 async fn upgrade(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
@@ -219,6 +220,7 @@ async fn connection(socket: WebSocket, mut state: AppState) {
         Ok(server) => server,
         Err(error) => {
             tracing::debug!("Failed to negotiate connection: {error}");
+            _ = state.errors.send(error.to_string());
             return;
         }
     };
@@ -246,6 +248,7 @@ async fn connection(socket: WebSocket, mut state: AppState) {
             result = server.run() => {
                 if let Err(error) = result {
                     tracing::error!("Server error: {error}");
+                    _ = state.errors.send(error.to_string());
                 }
 
                 break;
@@ -259,6 +262,7 @@ struct TestServer {
     addr: SocketAddr,
     ticks: broadcast::Sender<Tick>,
     events: mpsc::UnboundedReceiver<Event>,
+    errors: mpsc::UnboundedReceiver<String>,
     shutdown: watch::Sender<bool>,
     task: JoinHandle<()>,
 }
@@ -285,6 +289,7 @@ impl TestServer {
 
         let (ticks, _) = broadcast::channel(64);
         let (events_tx, events) = mpsc::unbounded_channel();
+        let (errors_tx, errors) = mpsc::unbounded_channel();
         let (shutdown, shutdown_rx) = watch::channel(false);
 
         let state = AppState {
@@ -292,6 +297,7 @@ impl TestServer {
             shutdown: shutdown_rx.clone(),
             handler: TestHandler { events: events_tx },
             formats,
+            errors: errors_tx,
         };
 
         let app = Router::new().route("/ws", any(upgrade).with_state(state));
@@ -318,6 +324,7 @@ impl TestServer {
             addr,
             ticks,
             events,
+            errors,
             shutdown,
             task,
         }
@@ -346,6 +353,11 @@ impl TestServer {
     /// Receive the next handler event.
     async fn event(&mut self) -> Event {
         timeout!(self.events.recv()).expect("Server handler is gone")
+    }
+
+    /// Receive the next error a connection tore itself down with.
+    async fn error(&mut self) -> String {
+        timeout!(self.errors.recv()).expect("Server is gone")
     }
 
     /// Shut the server down, releasing the port it is bound to.
@@ -1294,13 +1306,93 @@ mod raw {
     use bytes::Bytes;
     use futures_core03::Stream;
     use futures_sink03::Sink;
-    use musli::reader::SliceReader;
     use musli_web::api::{ChannelId, Format, MessageId, RequestHeader, ResponseHeader};
     use tokio::net::TcpStream;
 
     use crate::TIMEOUT;
     use tokio_tungstenite030::tungstenite::{Message as WsMessage, Utf8Bytes};
     use tokio_tungstenite030::{MaybeTlsStream, WebSocketStream, connect_async};
+
+    /// The tag byte which ends a block of binary headers.
+    pub(crate) const END_OF_HEADERS: u8 = 0;
+
+    /// The header ids the envelopes use, which the protocol pins.
+    pub(crate) mod ids {
+        pub(crate) const SERIAL: u8 = 1;
+        pub(crate) const ID: u8 = 2;
+        pub(crate) const FORMAT: u8 = 3;
+
+        pub(crate) const RESPONSE_BROADCAST: u8 = 2;
+        pub(crate) const RESPONSE_ERROR: u8 = 3;
+        pub(crate) const RESPONSE_FORMAT: u8 = 4;
+        pub(crate) const RESPONSE_CHANNEL: u8 = 5;
+    }
+
+    /// Write one header of a binary envelope by hand.
+    ///
+    /// Doing this here rather than through the crate is the point: it is what
+    /// pins the shape a peer written against the protocol has to produce.
+    pub(crate) fn write_header(out: &mut Vec<u8>, id: u8, value: u32) {
+        if value == 0 {
+            return;
+        }
+
+        if let Ok(value) = u8::try_from(value) {
+            out.push(id);
+            out.push(value);
+        } else if let Ok(value) = u16::try_from(value) {
+            out.push(id | (1 << 6));
+            out.extend_from_slice(&value.to_le_bytes());
+        } else {
+            out.push(id | (2 << 6));
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+
+    /// Read a response envelope by hand, returning it and where the body starts.
+    fn read_envelope(bytes: &[u8]) -> (ResponseHeader, usize) {
+        let mut header = ResponseHeader {
+            serial: 0,
+            broadcast: 0,
+            error: 0,
+            format: 0,
+            channel: ChannelId::NONE,
+        };
+
+        let mut at = 0;
+
+        loop {
+            let tag = bytes[at];
+            at += 1;
+
+            if tag == END_OF_HEADERS {
+                break;
+            }
+
+            let width = match tag >> 6 {
+                0 => 1,
+                1 => 2,
+                2 => 4,
+                class => panic!("Reserved width class {class}"),
+            };
+
+            let mut value = [0; 4];
+            value[..width].copy_from_slice(&bytes[at..at + width]);
+            let value = u32::from_le_bytes(value);
+            at += width;
+
+            match tag & 0b0011_1111 {
+                ids::SERIAL => header.serial = value,
+                ids::RESPONSE_BROADCAST => header.broadcast = value as u16,
+                ids::RESPONSE_ERROR => header.error = value as u16,
+                ids::RESPONSE_FORMAT => header.format = value as u8,
+                ids::RESPONSE_CHANNEL => header.channel = ChannelId::from_u16(value as u16),
+                id => panic!("Unknown response header {id}"),
+            }
+        }
+
+        (header, at)
+    }
 
     /// One binary frame received from the server, split into its fixed envelope
     /// and whatever body followed it.
@@ -1337,7 +1429,20 @@ mod raw {
         /// Send an envelope with no body.
         pub(crate) async fn send(&mut self, header: RequestHeader) {
             let mut data = Vec::new();
-            musli::packed::encode(&mut data, &header).expect("Failed to encode envelope");
+
+            write_header(&mut data, ids::SERIAL, header.serial);
+            write_header(&mut data, ids::ID, u32::from(header.id));
+            write_header(&mut data, ids::FORMAT, u32::from(header.format));
+
+            data.push(END_OF_HEADERS);
+            self.send_raw(data).await;
+        }
+
+        /// Send an envelope built out of raw header bytes, so a test can write
+        /// something the crate never would.
+        pub(crate) async fn send_headers(&mut self, headers: &[u8]) {
+            let mut data = headers.to_vec();
+            data.push(END_OF_HEADERS);
             self.send_raw(data).await;
         }
 
@@ -1358,13 +1463,17 @@ mod raw {
         /// is the point: it is what pins the shape a hand-written client has to
         /// produce.
         pub(crate) async fn negotiate_text(&mut self, serial: u32, format: Format) {
-            let text = format!(
+            self.send_text(&format!(
                 "serial: {serial}\nid: {}\nformat: {}\nchannel: 0\n\n",
                 MessageId::NEGOTIATE.get(),
                 format.to_u8()
-            );
+            ))
+            .await;
+        }
 
-            let message = WsMessage::Text(Utf8Bytes::from(&*text));
+        /// Send a text frame verbatim.
+        pub(crate) async fn send_text(&mut self, text: &str) {
+            let message = WsMessage::Text(Utf8Bytes::from(text));
 
             poll_fn(|cx| Pin::new(&mut self.socket).poll_ready(cx))
                 .await
@@ -1425,12 +1534,7 @@ mod raw {
                     message => panic!("Unexpected message: {message:?}"),
                 };
 
-                let mut reader = SliceReader::new(&bytes[..]);
-
-                let header: ResponseHeader =
-                    musli::packed::decode(&mut reader).expect("Failed to decode envelope");
-
-                let at = bytes.len() - reader.remaining();
+                let (header, at) = read_envelope(&bytes);
                 return Frame { header, bytes, at };
             }
         }
@@ -1691,6 +1795,155 @@ async fn a_frame_of_the_wrong_type_is_refused() {
     .await;
 
     assert_eq!(raw.expect_close().await, Some(CLOSE_PROTOCOL_ERROR));
+
+    server.shutdown().await;
+}
+
+/// A header this build does not know about means the peer is speaking a
+/// protocol this one does not have, so the server refuses the session outright
+/// rather than acting on the part of the message it happens to recognize.
+#[tokio::test]
+async fn an_unknown_header_is_refused_during_negotiation() {
+    let mut server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    // A well formed negotiation with one header from a protocol this server
+    // does not have. Everything else about it is something the server would
+    // otherwise be happy to act on.
+    let mut headers = Vec::new();
+    raw::write_header(&mut headers, raw::ids::SERIAL, 1);
+    raw::write_header(
+        &mut headers,
+        raw::ids::ID,
+        u32::from(MessageId::NEGOTIATE.get()),
+    );
+    raw::write_header(
+        &mut headers,
+        raw::ids::FORMAT,
+        u32::from(Format::Wire.to_u8()),
+    );
+    // Id 63 is never assigned, so no build ever knows it.
+    raw::write_header(&mut headers, 63, 1);
+
+    raw.send_headers(&headers).await;
+
+    assert_eq!(raw.expect_close().await, Some(CLOSE_PROTOCOL_ERROR));
+
+    let error = server.error().await;
+
+    assert!(
+        error.contains("does not know") && error.contains("63"),
+        "The server has to say which header it does not know: {error}"
+    );
+
+    server.shutdown().await;
+}
+
+/// The same has to hold once the connection is up, not just during the
+/// handshake.
+#[tokio::test]
+async fn an_unknown_header_is_refused_after_negotiation() {
+    let mut server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    raw.negotiate(1, Format::Wire).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.serial, 1);
+
+    let mut headers = Vec::new();
+    raw::write_header(&mut headers, raw::ids::SERIAL, 2);
+    raw::write_header(
+        &mut headers,
+        raw::ids::ID,
+        u32::from(MessageId::CONNECT.get()),
+    );
+    raw::write_header(&mut headers, 63, 1);
+
+    raw.send_headers(&headers).await;
+
+    assert_eq!(raw.expect_close().await, Some(CLOSE_PROTOCOL_ERROR));
+
+    let error = server.error().await;
+
+    assert!(
+        error.contains("does not know") && error.contains("63"),
+        "The server has to say which header it does not know: {error}"
+    );
+
+    server.shutdown().await;
+}
+
+/// An unknown header still has to be stepped over, or the reader would lose its
+/// place and report something other than what is actually wrong.
+///
+/// A four byte header is the widest thing that has to be skipped, and putting a
+/// header the server does know after it is what shows the position survived.
+#[tokio::test]
+async fn an_unknown_header_is_skipped_before_it_is_reported() {
+    let mut server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    let mut headers = Vec::new();
+    // A four byte value, which is the widest class a reader has to skip.
+    raw::write_header(&mut headers, 63, u32::MAX);
+    raw::write_header(&mut headers, raw::ids::SERIAL, 1);
+    raw::write_header(
+        &mut headers,
+        raw::ids::ID,
+        u32::from(MessageId::NEGOTIATE.get()),
+    );
+
+    raw.send_headers(&headers).await;
+
+    // Reporting the unknown header rather than a malformed envelope is what
+    // shows the block was walked to its end.
+    assert_eq!(raw.expect_close().await, Some(CLOSE_PROTOCOL_ERROR));
+
+    let error = server.error().await;
+
+    assert!(
+        error.contains("does not know") && error.contains("63"),
+        "The server lost its place instead of skipping the header: {error}"
+    );
+
+    server.shutdown().await;
+}
+
+/// The text spelling has to refuse an unknown header for the same reason the
+/// binary one does.
+#[tokio::test]
+async fn an_unknown_text_header_is_refused() {
+    let mut server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    raw.send_text(&format!(
+        "serial: 1\nid: {}\nformat: {}\nfuture: 1\n\n",
+        MessageId::NEGOTIATE.get(),
+        Format::Json.to_u8()
+    ))
+    .await;
+
+    assert_eq!(raw.expect_close().await, Some(CLOSE_PROTOCOL_ERROR));
+
+    let error = server.error().await;
+
+    assert!(
+        error.contains("`future`"),
+        "The server has to name the header it does not know: {error}"
+    );
 
     server.shutdown().await;
 }
