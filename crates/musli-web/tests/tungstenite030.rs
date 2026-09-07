@@ -17,7 +17,7 @@ use axum::extract::State;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::response::Response;
 use axum::routing::any;
-use musli_web::api::{ChannelId, Format, MessageId};
+use musli_web::api::{ChannelId, Format, MessageId, Mode};
 use musli_web::client::{self, Handle, State as ClientState};
 use musli_web::{tungstenite030, ws};
 use tokio::net::TcpListener;
@@ -365,20 +365,26 @@ struct TestClient {
 impl TestClient {
     /// Connect a client to the specified url and drive it in the background.
     fn new(url: &str) -> Self {
-        Self::builder(url, true, Format::DEFAULT)
+        Self::builder(url, true, Format::DEFAULT, Mode::DEFAULT)
     }
 
     /// Connect a client which asks for the specified format.
     fn with_format(url: &str, format: Format) -> Self {
-        Self::builder(url, true, format)
+        Self::builder(url, true, format, Mode::DEFAULT)
     }
 
-    fn builder(url: &str, reconnect: bool, format: Format) -> Self {
+    /// Connect a client which asks for the specified format and mode.
+    fn with_mode(url: &str, format: Format, mode: Mode) -> Self {
+        Self::builder(url, true, format, mode)
+    }
+
+    fn builder(url: &str, reconnect: bool, format: Format, mode: Mode) -> Self {
         let (errors_tx, errors) = mpsc::unbounded_channel();
 
         let mut service = tungstenite030::connect(url)
             .reconnect(reconnect)
             .format(format)
+            .mode(mode)
             .on_error(move |error: client::Error| {
                 tracing::debug!("Client error: {error}");
                 _ = errors_tx.send(error.to_string());
@@ -599,7 +605,7 @@ async fn request_while_not_connected() {
 #[tokio::test]
 async fn state_transitions() {
     let server = TestServer::new().await;
-    let client = TestClient::builder(&server.url(), false, Format::DEFAULT);
+    let client = TestClient::builder(&server.url(), false, Format::DEFAULT, Mode::DEFAULT);
 
     let mut states = client.handle.on_state_change();
     assert_eq!(states.state(), ClientState::Closed);
@@ -833,7 +839,7 @@ async fn keepalive_survives_the_server_close_timeout() {
 
     // NB: Reconnecting is disabled so that a dropped connection is observable
     // rather than being silently repaired.
-    let client = TestClient::builder(&server.url(), false, Format::DEFAULT);
+    let client = TestClient::builder(&server.url(), false, Format::DEFAULT, Mode::DEFAULT);
     let handle = client.open().await;
 
     tokio::time::sleep(Duration::from_secs(35)).await;
@@ -944,17 +950,19 @@ async fn multiple_clients() {
 ///
 /// This covers requests, responses, server errors and broadcasts, each of which
 /// encodes a body and therefore depends on the negotiated format.
-async fn exercise(format: Format) {
+async fn exercise(format: Format, mode: Mode) {
     let mut server = TestServer::new().await;
-    let client = TestClient::with_format(&server.url(), format);
+    let client = TestClient::with_mode(&server.url(), format, mode);
     let handle = client.open().await;
 
-    // The client reports the format the server agreed to.
+    // The client reports the format and mode the server agreed to.
     assert_eq!(
         handle.format(),
         format,
         "client did not settle on `{format}`"
     );
+
+    assert_eq!(handle.mode(), mode, "client did not settle on `{mode}`");
 
     // Requests and responses round-trip, and the server decoded the request
     // with the format the client asked for.
@@ -1031,7 +1039,7 @@ macro_rules! format_tests {
                     "`{format}` must be built in for this test",
                 );
 
-                exercise(format).await;
+                exercise(format, Mode::DEFAULT).await;
             }
         )*
     };
@@ -1043,6 +1051,99 @@ format_tests! {
     format_wire => Format::Wire,
     format_descriptive => Format::Descriptive,
     format_json => Format::Json,
+}
+
+/// Text mode has to carry everything binary mode does, since the only thing it
+/// changes is how a frame is spelled.
+#[tokio::test]
+async fn text_mode_round_trip() {
+    exercise(Format::Json, Mode::Text).await;
+}
+
+/// A text frame has to be valid UTF-8 in its entirety, so a format which is not
+/// human readable cannot be carried in one and the connection settles on the
+/// defaults instead.
+#[tokio::test]
+async fn text_mode_requires_a_human_readable_format() {
+    let server = TestServer::new().await;
+    let mut client = TestClient::with_mode(&server.url(), Format::Wire, Mode::Text);
+
+    let error = client.error().await;
+
+    assert!(
+        error.contains("rejected format `wire` in `text` mode"),
+        "Unexpected error: {error}"
+    );
+
+    // Falling back leaves the connection fully usable, in binary mode.
+    let handle = client.open().await;
+    assert_eq!(handle.mode(), Mode::Binary);
+    assert_eq!(handle.format(), Format::Wire);
+
+    let (message, _, server_format) = hello_full(handle, "after fallback").await;
+    assert_eq!(message, "after fallback");
+    assert_eq!(server_format, Format::Wire);
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+/// The mode is settled per connection, so a reconnect has to ask for it again
+/// rather than assume the replacement server speaks it.
+#[tokio::test]
+async fn text_mode_survives_a_reconnect() {
+    let server = TestServer::new().await;
+    let addr = server.addr();
+
+    let client = TestClient::with_mode(&server.url(), Format::Json, Mode::Text);
+    let handle = client.open().await;
+
+    assert_eq!(handle.mode(), Mode::Text);
+    let (message, ..) = hello_full(handle, "before").await;
+    assert_eq!(message, "before");
+
+    let mut states = handle.on_state_change();
+
+    server.shutdown().await;
+    assert!(timeout!(states.wait_until(ClientState::Closed)));
+
+    let server = TestServer::bind(addr).await;
+    assert!(timeout!(states.wait_until(ClientState::Open)));
+
+    assert_eq!(handle.mode(), Mode::Text);
+    assert_eq!(handle.format(), Format::Json);
+
+    let (message, ..) = hello_full(handle, "after").await;
+    assert_eq!(message, "after");
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+/// Two clients on one server may run in different modes, since the mode is a
+/// property of the connection rather than of the server.
+#[tokio::test]
+async fn clients_may_use_different_modes_on_one_server() {
+    let server = TestServer::new().await;
+
+    let binary = TestClient::with_format(&server.url(), Format::Json);
+    let text = TestClient::with_mode(&server.url(), Format::Json, Mode::Text);
+
+    let binary_handle = binary.open().await;
+    let text_handle = text.open().await;
+
+    assert_eq!(binary_handle.mode(), Mode::Binary);
+    assert_eq!(text_handle.mode(), Mode::Text);
+
+    let (message, ..) = hello_full(binary_handle, "binary").await;
+    assert_eq!(message, "binary");
+
+    let (message, ..) = hello_full(text_handle, "text").await;
+    assert_eq!(message, "text");
+
+    binary.close().await;
+    text.close().await;
+    server.shutdown().await;
 }
 
 #[tokio::test]
@@ -1198,7 +1299,7 @@ mod raw {
     use tokio::net::TcpStream;
 
     use crate::TIMEOUT;
-    use tokio_tungstenite030::tungstenite::Message as WsMessage;
+    use tokio_tungstenite030::tungstenite::{Message as WsMessage, Utf8Bytes};
     use tokio_tungstenite030::{MaybeTlsStream, WebSocketStream, connect_async};
 
     /// One binary frame received from the server, split into its fixed envelope
@@ -1249,6 +1350,46 @@ mod raw {
                 channel: ChannelId::NONE,
             })
             .await;
+        }
+
+        /// Ask the server to use `format` in text mode, by hand.
+        ///
+        /// Spelling the envelope out here rather than going through the crate
+        /// is the point: it is what pins the shape a hand-written client has to
+        /// produce.
+        pub(crate) async fn negotiate_text(&mut self, serial: u32, format: Format) {
+            let text = format!(
+                "serial: {serial}\nid: {}\nformat: {}\nchannel: 0\n\n",
+                MessageId::NEGOTIATE.get(),
+                format.to_u8()
+            );
+
+            let message = WsMessage::Text(Utf8Bytes::from(&*text));
+
+            poll_fn(|cx| Pin::new(&mut self.socket).poll_ready(cx))
+                .await
+                .expect("Socket is not ready");
+
+            Pin::new(&mut self.socket)
+                .start_send(message)
+                .expect("Failed to send");
+
+            poll_fn(|cx| Pin::new(&mut self.socket).poll_flush(cx))
+                .await
+                .expect("Failed to flush");
+        }
+
+        /// Receive the next text frame verbatim, ignoring keepalive traffic.
+        pub(crate) async fn text_frame(&mut self) -> String {
+            loop {
+                let message = timeout!(self.next()).expect("Connection closed unexpectedly");
+
+                match message {
+                    WsMessage::Text(text) => return text.as_str().to_owned(),
+                    WsMessage::Ping(..) | WsMessage::Pong(..) => continue,
+                    message => panic!("Expected a text frame, got {message:?}"),
+                }
+            }
         }
 
         async fn send_raw(&mut self, data: Vec<u8>) {
@@ -1464,6 +1605,92 @@ async fn the_format_cannot_be_renegotiated() {
     let frame = raw.frame().await;
     assert_eq!(frame.header.broadcast, <api::Tick as Broadcast>::ID.get());
     assert_eq!(frame.format(), Some(Format::Wire));
+
+    server.shutdown().await;
+}
+
+/// A text mode connection has to be readable by hand from end to end, which is
+/// the whole reason the mode exists.
+#[tokio::test]
+async fn text_frames_are_readable_by_hand() {
+    use musli_web::api::Broadcast;
+
+    let server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    // The hello precedes the negotiation, so it is still a binary frame.
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    raw.negotiate_text(1, Format::Json).await;
+
+    // The acknowledgement comes back as text, which is what tells a client the
+    // server settled on the mode it asked for.
+    let text = raw.text_frame().await;
+
+    assert_eq!(
+        text,
+        format!(
+            "serial: 1\nbroadcast: 0\nerror: 0\nformat: {}\nchannel: 0\n\n",
+            Format::Json.to_u8()
+        )
+    );
+
+    // A broadcast carries its body in the same frame, after the empty line.
+    server.tick(7);
+
+    let text = raw.text_frame().await;
+
+    let (envelope, body) = text
+        .split_once("\n\n")
+        .expect("The envelope must be terminated by an empty line");
+
+    let fields = envelope
+        .lines()
+        .map(|line| {
+            line.split_once(": ")
+                .expect("Every line is `<key>: <value>`")
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+
+    assert_eq!(
+        fields.get("broadcast").copied(),
+        Some(<api::Tick as Broadcast>::ID.get().to_string()).as_deref()
+    );
+
+    assert_eq!(
+        fields.get("format").copied(),
+        Some(Format::Json.to_u8().to_string()).as_deref()
+    );
+
+    assert_eq!(body, r#"{"message":"tick","tick":7,"channel":0}"#);
+
+    server.shutdown().await;
+}
+
+/// Once a mode is settled, a frame of the other type carries an envelope the
+/// connection has no way to read, so it is a protocol violation.
+#[tokio::test]
+async fn a_frame_of_the_wrong_type_is_refused() {
+    let server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    raw.negotiate_text(1, Format::Json).await;
+    _ = raw.text_frame().await;
+
+    // Binary is what this connection is not speaking any more.
+    raw.send(musli_web::api::RequestHeader {
+        serial: 2,
+        id: MessageId::CONNECT.get(),
+        format: 0,
+        channel: ChannelId::NONE,
+    })
+    .await;
+
+    assert_eq!(raw.expect_close().await, Some(CLOSE_PROTOCOL_ERROR));
 
     server.shutdown().await;
 }

@@ -66,12 +66,14 @@
 
 use alloc::rc::Rc;
 use alloc::rc::Weak;
+use alloc::string::String;
 
 use wasm_bindgen02::JsCast;
 use wasm_bindgen02::closure::Closure;
 use web_sys03::js_sys::{ArrayBuffer, Math, Uint8Array};
 use web_sys03::{BinaryType, CloseEvent, ErrorEvent, MessageEvent, WebSocket, Window, window};
 
+use crate::api::Mode;
 use crate::web::{
     Connect, EmptyCallback, Error, Location, ServiceBuilder, Shared, SocketImpl, WebImpl,
     WindowImpl,
@@ -156,8 +158,19 @@ impl SocketImpl for WebSocket {
     }
 
     #[inline]
-    fn send(&self, data: &[u8]) -> Result<(), Error> {
-        self.send_with_u8_array(data)?;
+    fn send(&self, mode: Mode, data: &[u8]) -> Result<(), Error> {
+        match mode {
+            Mode::Binary => {
+                self.send_with_u8_array(data)?;
+            }
+            Mode::Text => {
+                // NB: A text frame is only ever written in a mode which
+                // guarantees that everything in it is valid UTF-8, so the lossy
+                // path is never taken.
+                self.send_with_str(&String::from_utf8_lossy(data))?;
+            }
+        }
+
         Ok(())
     }
 
@@ -323,24 +336,37 @@ impl Shared<Web03Impl> {
     fn web03_message(self: &Rc<Shared<Web03Impl>>, e: MessageEvent) {
         tracing::debug!("Message event");
 
-        let Ok(array_buffer) = e.data().dyn_into::<ArrayBuffer>() else {
-            self.on_error
-                .call(Error::message("Expected message as ArrayBuffer"));
-            return;
+        let data = e.data();
+
+        // NB: The browser hands a text frame over as a string and a binary one
+        // as an `ArrayBuffer`, which is what tells the two modes apart.
+        let (mode, buf) = if let Some(text) = data.as_string() {
+            let bytes = text.as_bytes();
+            let mut buf = self.next_buffer(bytes.len());
+            buf.data.extend_from_slice(bytes);
+            (Mode::Text, buf)
+        } else {
+            let Ok(array_buffer) = data.dyn_into::<ArrayBuffer>() else {
+                self.on_error
+                    .call(Error::message("Expected message as ArrayBuffer or string"));
+                return;
+            };
+
+            let array = Uint8Array::new(&array_buffer);
+            let needed = array.length() as usize;
+
+            let mut buf = self.next_buffer(needed);
+
+            // SAFETY: We've sized the buffer appropriately above.
+            unsafe {
+                array.raw_copy_to_ptr(buf.data.as_mut_ptr());
+                buf.data.set_len(needed);
+            }
+
+            (Mode::Binary, buf)
         };
 
-        let array = Uint8Array::new(&array_buffer);
-        let needed = array.length() as usize;
-
-        let mut buf = self.next_buffer(needed);
-
-        // SAFETY: We've sized the buffer appropriately above.
-        unsafe {
-            array.raw_copy_to_ptr(buf.data.as_mut_ptr());
-            buf.data.set_len(needed);
-        }
-
-        if let Err(e) = self.message(buf) {
+        if let Err(e) = self.message(mode, buf) {
             self.on_error.call(e);
         }
     }

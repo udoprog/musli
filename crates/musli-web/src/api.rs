@@ -2,25 +2,72 @@
 //!
 //! # Wire format
 //!
-//! Every websocket message is a binary frame consisting of a fixed *envelope*
-//! followed by an optional *body*:
+//! Every websocket message consists of a fixed *envelope* followed by an
+//! optional *body*:
 //!
 //! ```text
 //! +--------------------------+--------------------------------+
-//! | envelope (musli::packed) | body (negotiated api::Format)  |
+//! | envelope (api::Mode)     | body (negotiated api::Format)  |
 //! +--------------------------+--------------------------------+
 //! ```
 //!
 //! The envelope is a [`RequestHeader`] for messages sent by the client and a
-//! [`ResponseHeader`] for messages sent by the server. It is *always* encoded
-//! with [`musli::packed`], is a fixed size, and never changes with the
-//! negotiated format. This is what makes the format negotiable at all, since
-//! both peers can always read the envelope regardless of what they have agreed
-//! on for bodies.
+//! [`ResponseHeader`] for messages sent by the server. Its encoding is decided
+//! by the [`Mode`] the socket runs in and never changes with the negotiated
+//! format. This is what makes the format negotiable at all, since both peers
+//! can always read the envelope regardless of what they have agreed on for
+//! bodies.
 //!
 //! The body is encoded with the [`Format`] identified by the `format` field of
 //! the envelope, so every message is self-describing in this respect. A `format`
 //! of zero means the message carries no body.
+//!
+//! # The text envelope
+//!
+//! In [`Mode::Binary`] the envelope is encoded with [`musli::packed`] and is
+//! carried in a binary frame. This is the compact representation and the
+//! default.
+//!
+//! In [`Mode::Text`] the envelope is instead a block of `<key>: <value>` lines
+//! terminated by an empty line, carried in a text frame:
+//!
+//! ```text
+//! serial: 1
+//! id: 1
+//! format: 5
+//! channel: 0
+//!
+//! {"message":"Hello!"}
+//! ```
+//!
+//! Every field of the envelope is written, in the order it is declared, with
+//! its value in decimal. When reading, fields may appear in any order and a
+//! field which is absent reads as zero. Fields which are not recognized are
+//! ignored, so a peer built against a newer version of the protocol can still
+//! be understood.
+//!
+//! Nothing about the message is otherwise different, which means the mode only
+//! decides how the frame is *spelled*. Since a text frame has to be valid UTF-8
+//! in its entirety the body has to be human readable too, so [`Mode::Text`]
+//! requires a [`Format`] for which [`Format::is_human_readable`] holds. This is
+//! what [`Mode::accepts`] tests.
+//!
+//! # Negotiating the mode
+//!
+//! Unlike the format, the mode is never carried in a field. The frame type
+//! *is* the mode, so a peer can always tell which envelope it is looking at,
+//! and a message can be read before anything has been agreed on.
+//!
+//! A client sends its [`MessageId::NEGOTIATE`] request in the mode it wants,
+//! and the server replies in the mode it settled on. A server which is asked
+//! for [`Mode::Text`] together with a format it cannot carry that way settles
+//! on [`Mode::DEFAULT`], exactly like it does for a format it does not support.
+//! The client adopts whichever mode the reply arrived in, and the mode is then
+//! fixed for the lifetime of the connection.
+//!
+//! The one message which precedes all of this is
+//! [`MessageId::SERVER_HELLO`], which is always sent in [`Mode::DEFAULT`] since
+//! the server has not heard from the client yet.
 //!
 //! # Negotiating the format
 //!
@@ -323,6 +370,168 @@ impl fmt::Display for Format {
     }
 }
 
+/// How a socket frames the messages it carries.
+///
+/// This picks between the two shapes a message can have on the wire. It is
+/// orthogonal to the [`Format`] which bodies are encoded with, except that
+/// [`Mode::Text`] requires a human readable one, see the [text envelope].
+///
+/// [text envelope]: crate::api#the-text-envelope
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::api::Mode;
+///
+/// assert_eq!(Mode::default(), Mode::Binary);
+/// assert!(Mode::Text.is_text());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum Mode {
+    /// Messages are binary frames whose envelope is encoded with
+    /// [`musli::packed`].
+    ///
+    /// This is the compact representation and the default.
+    Binary,
+    /// Messages are text frames whose envelope is a block of
+    /// `<key>: <value>` lines.
+    ///
+    /// The whole frame is human readable, which is what makes it possible to
+    /// read the traffic in a browser inspector or a proxy. Since the body is
+    /// part of that frame it has to be human readable too, so this requires a
+    /// [`Format`] for which [`Format::is_human_readable`] holds.
+    Text,
+}
+
+impl Mode {
+    /// The default mode, which is [`Mode::Binary`].
+    ///
+    /// This is used by a client which has not picked a mode, and by a server
+    /// for a connection which has not negotiated one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Mode;
+    ///
+    /// assert_eq!(Mode::DEFAULT, Mode::Binary);
+    /// ```
+    pub const DEFAULT: Self = Self::Binary;
+
+    /// Every mode a socket can run in.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Mode;
+    ///
+    /// assert!(Mode::ALL.contains(&Mode::Text));
+    /// ```
+    pub const ALL: &'static [Mode] = &[Mode::Binary, Mode::Text];
+
+    /// The name of the mode.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Mode;
+    ///
+    /// assert_eq!(Mode::Text.name(), "text");
+    /// ```
+    #[inline]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Mode::Binary => "binary",
+            Mode::Text => "text",
+        }
+    }
+
+    /// Test if the mode uses text frames.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Mode;
+    ///
+    /// assert!(Mode::Text.is_text());
+    /// assert!(!Mode::Binary.is_text());
+    /// ```
+    #[inline]
+    pub const fn is_text(self) -> bool {
+        matches!(self, Mode::Text)
+    }
+
+    /// Test if `format` can be used for message bodies in this mode.
+    ///
+    /// A text frame has to be valid UTF-8 in its entirety, so a mode which
+    /// uses them can only carry bodies which are human readable.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::{Format, Mode};
+    ///
+    /// assert!(Mode::Binary.accepts(Format::Wire));
+    /// assert!(Mode::Text.accepts(Format::Json));
+    /// assert!(!Mode::Text.accepts(Format::Wire));
+    /// ```
+    #[inline]
+    pub const fn accepts(self, format: Format) -> bool {
+        match self {
+            Mode::Binary => true,
+            Mode::Text => format.is_human_readable(),
+        }
+    }
+
+    /// A dense index for the mode, so that it can be kept in an atomic.
+    ///
+    /// This is not a wire representation, the frame type is what carries the
+    /// mode between peers.
+    #[inline]
+    #[cfg_attr(not(feature = "client"), allow(dead_code))]
+    pub(crate) const fn to_index(self) -> u8 {
+        match self {
+            Mode::Binary => 0,
+            Mode::Text => 1,
+        }
+    }
+
+    /// Recover a mode from [`Mode::to_index`].
+    #[inline]
+    #[cfg_attr(not(feature = "client"), allow(dead_code))]
+    pub(crate) const fn from_index(index: u8) -> Option<Self> {
+        match index {
+            0 => Some(Mode::Binary),
+            1 => Some(Mode::Text),
+            _ => None,
+        }
+    }
+}
+
+impl Default for Mode {
+    /// Construct the default mode, which is [`Mode::DEFAULT`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Mode;
+    ///
+    /// assert_eq!(Mode::default(), Mode::Binary);
+    /// ```
+    #[inline]
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl fmt::Display for Mode {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
 /// Types which can be encoded in every mode that this crate supports.
 ///
 /// This is a blanket trait covering [`Encode`] in both the [`Binary`] and
@@ -407,7 +616,10 @@ impl ChannelId {
 
     /// Get the raw channel identifier.
     #[inline]
-    #[cfg(feature = "ws")]
+    #[cfg_attr(
+        not(any(feature = "ws", feature = "client", feature = "web03")),
+        allow(dead_code)
+    )]
     pub(crate) const fn raw(&self) -> u16 {
         self.repr
     }
