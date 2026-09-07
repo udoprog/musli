@@ -46,7 +46,7 @@ use slab::Slab;
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::{Duration, Instant};
 
-use crate::api::{self, ChannelId, DecodeBody, Event, Format, MessageId};
+use crate::api::{self, ChannelId, DecodeBody, Event, Format, MessageId, Mode};
 use crate::format;
 
 /// The initial reconnect timeout.
@@ -68,6 +68,11 @@ pub struct EmptyCallback;
 
 /// A message received over the underlying socket.
 ///
+/// The variant is what tells the client which [`Mode`] the envelope of the
+/// message is spelled in, see the [wire format].
+///
+/// [wire format]: crate::api#wire-format
+///
 /// NB: The variants are constructed by the transport bindings, such as
 /// [`tungstenite029`], so none are constructed when the generic core is built
 /// on its own.
@@ -78,9 +83,8 @@ pub struct EmptyCallback;
     allow(dead_code)
 )]
 pub(crate) enum Message {
-    /// A text message was received. The protocol is binary only, so receiving
-    /// one is a protocol error.
-    Text,
+    /// A text message was received, which is what [`Mode::Text`] uses.
+    Text(Bytes),
     /// A binary message was received.
     Binary(Bytes),
     /// A ping message was received.
@@ -91,6 +95,9 @@ pub(crate) enum Message {
     Pong,
     /// A close message was received.
     Close,
+    /// A message the protocol has no meaning for was received, which tears the
+    /// connection down.
+    Unsupported,
 }
 
 pub(crate) mod sealed_socket {
@@ -111,9 +118,16 @@ where
     #[doc(hidden)]
     fn recv(&mut self) -> impl Future<Output = Option<Result<Message, Self::Error>>> + Send + '_;
 
-    /// Send a binary message and flush it.
+    /// Send a message in the given [`Mode`] and flush it.
+    ///
+    /// [`Mode::Binary`] writes a binary frame and [`Mode::Text`] a text frame,
+    /// which is what carries the mode between peers.
     #[doc(hidden)]
-    fn send(&mut self, data: &[u8]) -> impl Future<Output = Result<(), Self::Error>> + Send + '_;
+    fn send(
+        &mut self,
+        mode: Mode,
+        data: &[u8],
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send + '_;
 
     /// Close the socket.
     #[doc(hidden)]
@@ -162,6 +176,7 @@ where
         reconnect: true,
         seed: DEFAULT_SEED,
         format: Format::DEFAULT,
+        mode: Mode::DEFAULT,
         _marker: PhantomData,
     }
 }
@@ -379,6 +394,7 @@ enum Command {
     /// Send an already encoded message and register a pending response.
     Send {
         serial: u32,
+        mode: Mode,
         data: Vec<u8>,
         pending: Pending,
     },
@@ -391,7 +407,7 @@ enum Command {
 /// A pending response being waited for.
 enum Pending {
     /// A format negotiation issued by the service itself.
-    Negotiate { format: Format },
+    Negotiate { format: Format, mode: Mode },
     /// A regular request, tagged with the endpoint it belongs to.
     Request {
         id: MessageId,
@@ -435,6 +451,9 @@ struct Shared {
     ///
     /// [negotiation protocol]: crate::api#negotiating-the-format
     format: AtomicU8,
+    /// The mode which is actually in effect. This can differ from the requested
+    /// mode if the server could not carry the format that way.
+    mode: AtomicU8,
 }
 
 impl Shared {
@@ -457,6 +476,17 @@ impl Shared {
     #[inline]
     fn set_format(&self, format: Format) {
         self.format.store(format.to_u8(), Ordering::Release);
+    }
+
+    /// The mode currently in effect.
+    #[inline]
+    fn mode(&self) -> Mode {
+        Mode::from_index(self.mode.load(Ordering::Acquire)).unwrap_or(Mode::DEFAULT)
+    }
+
+    #[inline]
+    fn set_mode(&self, mode: Mode) {
+        self.mode.store(mode.to_index(), Ordering::Release);
     }
 
     /// Test if the service driving this state is gone.
@@ -492,6 +522,7 @@ pub struct ServiceBuilder<T, E> {
     reconnect: bool,
     seed: u64,
     format: Format,
+    mode: Mode,
     _marker: PhantomData<T>,
 }
 
@@ -516,6 +547,7 @@ where
             reconnect: self.reconnect,
             seed: self.seed,
             format: self.format,
+            mode: self.mode,
             _marker: self._marker,
         }
     }
@@ -534,6 +566,34 @@ where
     #[inline]
     pub fn format(mut self, format: Format) -> Self {
         self.format = format;
+        self
+    }
+
+    /// Set the [`Mode`] the socket should run in.
+    ///
+    /// [`Mode::Text`] makes every frame human readable, which is what makes it
+    /// possible to read the traffic in a proxy or an inspector. It requires a
+    /// [`Format`] which is human readable too, so it is normally combined with
+    /// [`Format::Json`]:
+    ///
+    /// ```
+    /// use musli_web::api::{Format, Mode};
+    ///
+    /// assert!(Mode::Text.accepts(Format::Json));
+    /// ```
+    ///
+    /// Like the format, the mode is settled with the server once the connection
+    /// is established, see the [negotiation protocol]. A server which cannot
+    /// carry the requested format in the requested mode reports the error
+    /// through [`ServiceBuilder::on_error`] and the connection falls back to
+    /// [`Mode::DEFAULT`], which can be observed through [`Handle::mode`].
+    ///
+    /// Defaults to [`Mode::DEFAULT`].
+    ///
+    /// [negotiation protocol]: crate::api#negotiating-the-format
+    #[inline]
+    pub fn mode(mut self, mode: Mode) -> Self {
+        self.mode = mode;
         self
     }
 
@@ -573,6 +633,7 @@ where
             broadcasts: Mutex::new(Broadcasts::new()),
             gone: AtomicBool::new(false),
             format: AtomicU8::new(self.format.to_u8()),
+            mode: AtomicU8::new(self.mode.to_index()),
         });
 
         Service {
@@ -591,6 +652,7 @@ where
             rng: SmallRng::seed_from_u64(self.seed),
             closed: false,
             requested: self.format,
+            requested_mode: self.mode,
         }
     }
 }
@@ -618,6 +680,9 @@ where
     /// The format the user asked for, which is re-negotiated on every
     /// reconnect.
     requested: Format,
+    /// The mode which was asked for, which the connection falls back from if
+    /// the server cannot carry the negotiated format that way.
+    requested_mode: Mode,
 }
 
 /// The event produced by one iteration of the [`Service::run`] loop.
@@ -708,14 +773,20 @@ where
                     };
 
                     match message {
-                        Message::Binary(bytes) => match self.message(bytes) {
+                        // NB: The frame type is the mode, so a message can
+                        // always be read regardless of what has been agreed on.
+                        Message::Binary(bytes) => match self.message(Mode::Binary, bytes) {
                             Ok(Post::Negotiate) => self.send_negotiate().await,
                             Ok(Post::None) => {}
                             Err(error) => self.on_error.call(error),
                         },
-                        Message::Text => {
-                            self.on_error
-                                .call(Error::message("Unsupported text message"));
+                        Message::Text(bytes) => match self.message(Mode::Text, bytes) {
+                            Ok(Post::Negotiate) => self.send_negotiate().await,
+                            Ok(Post::None) => {}
+                            Err(error) => self.on_error.call(error),
+                        },
+                        Message::Unsupported => {
+                            self.on_error.call(Error::message("Unsupported message"));
                             self.disconnect().await;
                         }
                         Message::Ping | Message::Pong => {}
@@ -814,6 +885,7 @@ where
         match command {
             Command::Send {
                 serial,
+                mode,
                 data,
                 pending,
             } => {
@@ -822,7 +894,7 @@ where
                     return;
                 };
 
-                if let Err(error) = socket.send(&data).await {
+                if let Err(error) = socket.send(mode, &data).await {
                     pending.error(Error::transport(error));
                     self.disconnect().await;
                     return;
@@ -849,6 +921,7 @@ where
         };
 
         let mut data = Vec::new();
+        let mode = self.shared.mode();
 
         let header = api::RequestHeader {
             serial: 0,
@@ -858,11 +931,11 @@ where
             channel,
         };
 
-        format::encode_envelope(&mut data, &header).map_err(Error::encoding_header)?;
+        format::encode_envelope(mode, &mut data, &header).map_err(Error::encoding_header)?;
 
         tracing::debug!(?channel, "Sending disconnect");
 
-        if let Err(error) = socket.send(&data).await {
+        if let Err(error) = socket.send(mode, &data).await {
             let error = Error::transport(error);
             self.disconnect().await;
             return Err(error);
@@ -904,12 +977,12 @@ where
         Ok(format)
     }
 
-    /// Process an incoming binary message.
-    fn message(&mut self, bytes: Bytes) -> Result<Post> {
+    /// Process an incoming message which arrived in the given mode.
+    fn message(&mut self, mode: Mode, bytes: Bytes) -> Result<Post> {
         let mut at = 0;
 
-        let header: api::ResponseHeader =
-            format::decode_envelope(&bytes, &mut at).map_err(Error::decode_response_header)?;
+        let header: api::ResponseHeader = format::decode_envelope(mode, &bytes, &mut at)
+            .map_err(Error::decode_response_header)?;
 
         if let Some(broadcast) = MessageId::new(header.broadcast) {
             tracing::debug!(?header, "Got broadcast");
@@ -970,18 +1043,25 @@ where
             };
 
             match pending {
-                Pending::Negotiate { format } => {
-                    // NB: The server cannot speak the requested format, so fall
-                    // back to the default rather than leaving the connection
-                    // unusable. The effective format is observable through
-                    // `Handle::format`.
+                Pending::Negotiate {
+                    format,
+                    mode: requested,
+                } => {
+                    // NB: The server cannot speak the requested format, or
+                    // cannot carry it in the requested mode, so fall back to the
+                    // defaults rather than leaving the connection unusable. What
+                    // is actually in effect is observable through
+                    // `Handle::format` and `Handle::mode`.
                     self.on_error.call(Error::message(format_args!(
-                        "Server rejected format `{format}` ({}), falling back to `{}`",
+                        "Server rejected format `{format}` in `{requested}` mode ({}), falling back to `{}`",
                         error.message,
                         Format::DEFAULT
                     )));
 
                     self.shared.set_format(Format::DEFAULT);
+                    // NB: The frame this arrived in is the mode the server
+                    // settled on, so there is nothing to guess at.
+                    self.shared.set_mode(mode);
                     self.emit_state(State::Open);
                 }
                 pending => {
@@ -993,12 +1073,14 @@ where
         }
 
         match pending {
-            Pending::Negotiate { format } => {
+            Pending::Negotiate { format, .. } => {
                 // NB: Trust the format the server echoed back over the one that
                 // was asked for, so that a server which downgrades is honored.
+                // The mode is read off the frame for the same reason.
                 let accepted = Format::from_u8(header.format).unwrap_or(format);
-                tracing::debug!(?accepted, "Format negotiated");
+                tracing::debug!(?accepted, ?mode, "Format negotiated");
                 self.shared.set_format(accepted);
+                self.shared.set_mode(mode);
                 self.emit_state(State::Open);
             }
             Pending::Channel { reply } => {
@@ -1026,6 +1108,7 @@ where
     /// connection.
     async fn send_negotiate(&mut self) {
         let format = self.requested;
+        let mode = self.requested_mode;
         let serial = self.shared.next_serial();
 
         let header = api::RequestHeader {
@@ -1038,7 +1121,9 @@ where
 
         let mut data = Vec::new();
 
-        if let Err(error) = format::encode_envelope(&mut data, &header) {
+        // NB: The frame this goes out in is what asks for the mode, so the
+        // envelope has to be spelled the same way.
+        if let Err(error) = format::encode_envelope(mode, &mut data, &header) {
             self.on_error.call(Error::encoding_header(error));
             return;
         }
@@ -1047,15 +1132,16 @@ where
             return;
         };
 
-        tracing::debug!(?format, "Requesting format");
+        tracing::debug!(?format, ?mode, "Requesting format");
 
-        if let Err(error) = socket.send(&data).await {
+        if let Err(error) = socket.send(mode, &data).await {
             self.on_error.call(Error::transport(error));
             self.disconnect().await;
             return;
         }
 
-        self.pending.insert(serial, Pending::Negotiate { format });
+        self.pending
+            .insert(serial, Pending::Negotiate { format, mode });
     }
 }
 
@@ -1132,6 +1218,18 @@ impl Handle {
         self.shared.format()
     }
 
+    /// The [`Mode`] the socket is currently running in.
+    ///
+    /// Before the connection is open this is the mode which was requested
+    /// through [`ServiceBuilder::mode`]. Once the connection is open it is the
+    /// mode which was settled on, see the [negotiation protocol].
+    ///
+    /// [negotiation protocol]: crate::api#negotiating-the-format
+    #[inline]
+    pub fn mode(&self) -> Mode {
+        self.shared.mode()
+    }
+
     /// Listen for state changes to the underlying connection.
     ///
     /// This indicates when the connection is open and ready to receive requests
@@ -1194,13 +1292,15 @@ impl Handle {
             channel: ChannelId::NONE,
         };
 
+        let mode = self.shared.mode();
         let mut data = Vec::new();
-        format::encode_envelope(&mut data, &header).map_err(Error::encoding_header)?;
+        format::encode_envelope(mode, &mut data, &header).map_err(Error::encoding_header)?;
 
         let (reply, rx) = oneshot::channel();
 
         self.shared.send(Command::Send {
             serial,
+            mode,
             data,
             pending: Pending::Channel { reply },
         })?;
@@ -1394,6 +1494,7 @@ where
 
         let serial = self.shared.next_serial();
         let format = self.shared.format();
+        let mode = self.shared.mode();
 
         let header = api::RequestHeader {
             serial,
@@ -1403,17 +1504,25 @@ where
         };
 
         let mut data = Vec::new();
-        format::encode_envelope(&mut data, &header).map_err(Error::encoding_header)?;
+        format::encode_envelope(mode, &mut data, &header).map_err(Error::encoding_header)?;
         format
             .encode(&mut data, &self.body)
             .map_err(Error::encoding_body)?;
 
-        tracing::debug!(serial, ?id, ?format, len = data.len(), "Sending request");
+        tracing::debug!(
+            serial,
+            ?id,
+            ?format,
+            ?mode,
+            len = data.len(),
+            "Sending request"
+        );
 
         let (reply, rx) = oneshot::channel();
 
         self.shared.send(Command::Send {
             serial,
+            mode,
             data,
             pending: Pending::Request { id, reply },
         })?;

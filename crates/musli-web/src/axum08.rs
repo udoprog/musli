@@ -4,6 +4,8 @@
 //!
 //! [axum]: <https://docs.rs/axum>
 
+use alloc::string::String;
+
 use core::pin::Pin;
 use core::task::Poll;
 use core::task::{Context, ready};
@@ -11,7 +13,7 @@ use core::task::{Context, ready};
 use bytes::Bytes;
 
 use axum_core05::Error;
-use axum08::extract::ws::{CloseFrame, Message, WebSocket};
+use axum08::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket};
 use futures_core03::Stream;
 use futures_sink03::Sink;
 
@@ -217,6 +219,14 @@ impl ServerImpl for AxumServer {
     }
 
     #[inline]
+    fn text(data: &[u8]) -> Self::Message {
+        // NB: A text frame is only ever produced in a mode which guarantees
+        // that everything written into it is valid UTF-8, so the lossy path is
+        // never taken.
+        Message::Text(Utf8Bytes::from(&*String::from_utf8_lossy(data)))
+    }
+
+    #[inline]
     fn close(code: u16, reason: &str) -> Self::Message {
         Message::Close(Some(CloseFrame {
             code,
@@ -247,7 +257,7 @@ impl SocketImpl for WebSocket {
         };
 
         let message = match message {
-            Message::Text(..) => ws::Message::Text,
+            Message::Text(data) => ws::Message::Text(Bytes::from(data)),
             Message::Binary(data) => ws::Message::Binary(data),
             Message::Ping(data) => ws::Message::Ping(data),
             Message::Pong(data) => ws::Message::Pong(data),

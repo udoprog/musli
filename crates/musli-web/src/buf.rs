@@ -9,8 +9,8 @@ use alloc::vec::Vec;
 use musli::Encode;
 use musli::mode::Binary;
 
-use crate::api::{EncodeBody, Format};
-use crate::format;
+use crate::api::{EncodeBody, Format, Mode};
+use crate::format::{self, TextEnvelope};
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -67,16 +67,16 @@ pub(crate) struct Writer<'a> {
 impl Writer<'_> {
     /// Write the fixed envelope of a message to the current frame.
     ///
-    /// The envelope never depends on the negotiated format, see the [wire
-    /// format].
+    /// The envelope never depends on the negotiated format, only on the [`Mode`]
+    /// the socket runs in, see the [wire format].
     ///
     /// [wire format]: crate::api#wire-format
     #[inline]
-    pub(crate) fn envelope<T>(&mut self, value: &T) -> Result<(), format::Error>
+    pub(crate) fn envelope<T>(&mut self, mode: Mode, value: &T) -> Result<(), format::Error>
     where
-        T: ?Sized + Encode<Binary>,
+        T: Encode<Binary> + TextEnvelope,
     {
-        format::encode_envelope(&mut self.buf.buffer, value)
+        format::encode_envelope(mode, &mut self.buf.buffer, value)
     }
 
     /// Write the body of a message to the current frame using `format`.

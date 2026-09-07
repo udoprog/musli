@@ -121,7 +121,7 @@ use tokio::time::{Duration, Instant, Sleep};
 
 use crate::Buf;
 use crate::api::{
-    Broadcast, ChannelId, DecodeBody, EncodeBody, ErrorMessage, Event, Format, Id, MessageId,
+    Broadcast, ChannelId, DecodeBody, EncodeBody, ErrorMessage, Event, Format, Id, MessageId, Mode,
     RequestHeader, ResponseHeader,
 };
 use crate::buf::{BufPool, InvalidFrame};
@@ -138,7 +138,7 @@ const DEFAULT_SEED: u64 = 0xdeadbeef;
 #[derive(Debug)]
 pub(crate) enum Message {
     /// A text message.
-    Text,
+    Text(Bytes),
     /// A binary message.
     Binary(Bytes),
     /// A ping message.
@@ -210,6 +210,9 @@ where
 
     #[doc(hidden)]
     fn binary(data: &[u8]) -> Self::Message;
+
+    #[doc(hidden)]
+    fn text(data: &[u8]) -> Self::Message;
 
     #[doc(hidden)]
     fn close(code: u16, reason: &str) -> Self::Message;
@@ -897,6 +900,7 @@ where
             socket_recv: true,
             set: JoinSet::new(),
             format: Format::DEFAULT,
+            mode: Mode::DEFAULT,
             formats: self.formats,
         };
 
@@ -952,6 +956,11 @@ where
     ///
     /// [negotiation protocol]: crate::api#negotiating-the-format
     format: Format,
+    /// The mode every frame on this connection is spelled in, as decided by the
+    /// frame the client negotiated with.
+    ///
+    /// [negotiation protocol]: crate::api#negotiating-the-format
+    mode: Mode,
     /// Formats this server is willing to negotiate, or `None` to accept every
     /// format it was built with support for.
     formats: Option<&'static [Format]>,
@@ -976,6 +985,17 @@ where
     #[inline]
     pub fn format(&self) -> Format {
         self.format
+    }
+
+    /// The [`Mode`] every frame on this connection is spelled in.
+    ///
+    /// This is decided by the frame the client negotiated with and is fixed for
+    /// the lifetime of the connection, see the [wire format].
+    ///
+    /// [wire format]: crate::api#wire-format
+    #[inline]
+    pub fn mode(&self) -> Mode {
+        self.mode
     }
 
     /// Test if this server is willing to negotiate `format`.
@@ -1045,18 +1065,19 @@ where
                     };
 
                     match message? {
-                        Message::Text => {
-                            self.out.push_back(S::close(
-                                CLOSE_PROTOCOL_ERROR,
-                                "Unsupported text message",
-                            ));
-
-                            failure = Some(Error::new(ErrorKind::NotNegotiated));
-                        }
-                        Message::Binary(bytes) => match self.handle_negotiate(bytes) {
+                        // NB: The frame type is the mode, so the negotiation is
+                        // what tells the server which envelope the rest of the
+                        // connection is spelled in.
+                        Message::Text(bytes) => match self.handle_negotiate(Mode::Text, bytes) {
                             Ok(()) => negotiated = true,
                             Err(error) => failure = Some(error),
                         },
+                        Message::Binary(bytes) => {
+                            match self.handle_negotiate(Mode::Binary, bytes) {
+                                Ok(()) => negotiated = true,
+                                Err(error) => failure = Some(error),
+                            }
+                        }
                         Message::Ping(payload) => {
                             self.out.push_back(S::pong(payload));
                         }
@@ -1094,10 +1115,10 @@ where
     ///
     /// Anything else closes the connection, since a peer which skips
     /// negotiation cannot be sent broadcasts safely.
-    fn handle_negotiate(&mut self, bytes: Bytes) -> Result<(), Error> {
+    fn handle_negotiate(&mut self, mode: Mode, bytes: Bytes) -> Result<(), Error> {
         let mut at = 0;
 
-        let header: RequestHeader = match format::decode_envelope(&bytes, &mut at) {
+        let header: RequestHeader = match format::decode_envelope(mode, &bytes, &mut at) {
             Ok(header) => header,
             Err(error) => {
                 self.out
@@ -1140,23 +1161,43 @@ where
             return self.send_error(&header);
         }
 
-        tracing::debug!(?format, "Negotiated format");
+        // NB: A text frame has to be valid UTF-8 in its entirety, so a format
+        // which is not human readable cannot be carried in one. The connection
+        // settles on the defaults for both, and the reply which says so goes
+        // out in the default mode, which is what tells the client.
+        if !mode.accepts(format) {
+            self.format_error_message(format_args!(
+                "Mode `{mode}` cannot carry the `{format}` format"
+            ))?;
+
+            tracing::debug!(?mode, ?format, "Rejected mode");
+            self.format = Format::DEFAULT;
+            return self.send_error(&header);
+        }
+
+        tracing::debug!(?mode, ?format, "Negotiated format");
         self.format = format;
+        self.mode = mode;
         self.send_negotiated(&header, format)
     }
 
     /// Acknowledge a negotiation by echoing the format that was accepted.
     fn send_negotiated(&mut self, header: &RequestHeader, format: Format) -> Result<(), Error> {
+        let mode = self.mode;
+
         let buf = self.pool.with(|buf| {
             let mut writer = buf.writer();
 
-            let result = writer.envelope(&ResponseHeader {
-                serial: header.serial,
-                broadcast: 0,
-                error: 0,
-                format: format.to_u8(),
-                channel: header.channel,
-            });
+            let result = writer.envelope(
+                mode,
+                &ResponseHeader {
+                    serial: header.serial,
+                    broadcast: 0,
+                    error: 0,
+                    format: format.to_u8(),
+                    channel: header.channel,
+                },
+            );
 
             result.map_err(Error::encode_connect_header)?;
             writer.flush();
@@ -1222,15 +1263,30 @@ where
                     };
 
                     match message? {
-                        Message::Text => {
-                            self.out.push_back(S::close(
-                                CLOSE_PROTOCOL_ERROR,
-                                "Unsupported text message",
-                            ));
-                            self.begin_closing();
+                        // NB: The mode is fixed by the negotiation, so a frame
+                        // of the other type carries an envelope this connection
+                        // has no way to read.
+                        Message::Text(bytes) => {
+                            if self.mode.is_text() {
+                                self.handle_message(bytes).await?;
+                            } else {
+                                self.out.push_back(S::close(
+                                    CLOSE_PROTOCOL_ERROR,
+                                    "Unexpected text message",
+                                ));
+                                self.begin_closing();
+                            }
                         }
                         Message::Binary(bytes) => {
-                            self.handle_message(bytes).await?;
+                            if self.mode.is_text() {
+                                self.out.push_back(S::close(
+                                    CLOSE_PROTOCOL_ERROR,
+                                    "Unexpected binary message",
+                                ));
+                                self.begin_closing();
+                            } else {
+                                self.handle_message(bytes).await?;
+                            }
                         }
                         Message::Ping(payload) => {
                             self.out.push_back(S::pong(payload));
@@ -1319,18 +1375,22 @@ where
         tracing::debug!(id = ?<T::Broadcast as Broadcast>::ID, "Broadcast");
 
         let format = self.format;
+        let mode = self.mode;
 
         let buf = self.pool.with(|buf| {
             let mut writer = buf.writer();
 
             writer
-                .envelope(&ResponseHeader {
-                    serial: 0,
-                    broadcast: <T::Broadcast as Broadcast>::ID.get(),
-                    error: 0,
-                    format: format.to_u8(),
-                    channel,
-                })
+                .envelope(
+                    mode,
+                    &ResponseHeader {
+                        serial: 0,
+                        broadcast: <T::Broadcast as Broadcast>::ID.get(),
+                        error: 0,
+                        format: format.to_u8(),
+                        channel,
+                    },
+                )
                 .map_err(Error::encode_broadcast_header)?;
 
             writer
@@ -1357,14 +1417,19 @@ where
             let mut writer = buf.writer();
 
             writer
-                .envelope(&ResponseHeader {
-                    serial: 0,
-                    broadcast: MessageId::SERVER_HELLO.get(),
-                    error: 0,
-                    // NB: Carries no body, so no format applies.
-                    format: 0,
-                    channel: ChannelId::NONE,
-                })
+                // NB: Nothing has been heard from the client yet, so this is
+                // the one message which cannot be spelled in a negotiated mode.
+                .envelope(
+                    Mode::DEFAULT,
+                    &ResponseHeader {
+                        serial: 0,
+                        broadcast: MessageId::SERVER_HELLO.get(),
+                        error: 0,
+                        // NB: Carries no body, so no format applies.
+                        format: 0,
+                        channel: ChannelId::NONE,
+                    },
+                )
                 .map_err(Error::encode_broadcast_header)?;
 
             writer.flush();
@@ -1406,7 +1471,7 @@ where
     async fn handle_message(&mut self, bytes: Bytes) -> Result<(), Error> {
         let mut at = 0;
 
-        let header: RequestHeader = match format::decode_envelope(&bytes, &mut at) {
+        let header: RequestHeader = match format::decode_envelope(self.mode, &bytes, &mut at) {
             Ok(header) => header,
             Err(error) => {
                 tracing::debug!(?error, "Invalid request header");
@@ -1436,17 +1501,21 @@ where
                     self.handler.open_channel(channel).await;
 
                     let mut buf = self.pool.get();
+                    let mode = self.mode;
 
                     let result = (|| {
                         let mut writer = buf.writer();
 
-                        let result = writer.envelope(&ResponseHeader {
-                            serial: header.serial,
-                            broadcast: 0,
-                            error: 0,
-                            format: 0,
-                            channel,
-                        });
+                        let result = writer.envelope(
+                            mode,
+                            &ResponseHeader {
+                                serial: header.serial,
+                                broadcast: 0,
+                                error: 0,
+                                format: 0,
+                                channel,
+                            },
+                        );
 
                         result.map_err(Error::encode_connect_header)?;
                         writer.flush();
@@ -1499,6 +1568,19 @@ where
                         break 'err true;
                     }
 
+                    // NB: The response goes back in the same frame type the
+                    // request arrived in, so a format which cannot be spelled
+                    // that way has nowhere to go.
+                    if !self.mode.accepts(format) {
+                        let mode = self.mode;
+
+                        self.format_error_message(format_args!(
+                            "Mode `{mode}` cannot carry the `{format}` format"
+                        ))?;
+
+                        break 'err true;
+                    }
+
                     let id = <H::Id as Id>::from_id(id);
                     self.handle_request(bytes, at, header, id, format);
                     return Ok(());
@@ -1519,18 +1601,22 @@ where
         // precisely because that format is not supported. The client reads the
         // format back out of the response envelope either way.
         let format = self.format;
+        let mode = self.mode;
 
         let buf = self.pool.with(|buf| {
             // Reset the buffer to the previous start point.
             let mut writer = buf.writer();
 
-            let result = writer.envelope(&ResponseHeader {
-                serial: header.serial,
-                broadcast: 0,
-                error: MessageId::ERROR_MESSAGE.get(),
-                format: format.to_u8(),
-                channel: header.channel,
-            });
+            let result = writer.envelope(
+                mode,
+                &ResponseHeader {
+                    serial: header.serial,
+                    broadcast: 0,
+                    error: MessageId::ERROR_MESSAGE.get(),
+                    format: format.to_u8(),
+                    channel: header.channel,
+                },
+            );
 
             result.map_err(Error::encode_error_message_header)?;
 
@@ -1634,7 +1720,12 @@ where
                 continue;
             };
 
-            socket.as_mut().start_send(S::binary(frame))?;
+            let message = match self.mode {
+                Mode::Binary => S::binary(frame),
+                Mode::Text => S::text(frame),
+            };
+
+            socket.as_mut().start_send(message)?;
 
             self.socket_flush = true;
             self.socket_send = false;
@@ -1656,6 +1747,7 @@ where
 
         let mut buf = self.pool.get();
         let handler = self.handler.clone();
+        let mode = self.mode;
 
         self.set.spawn(async move {
             if offset > bytes.len() {
@@ -1680,6 +1772,7 @@ where
                 error: None,
                 buf: &mut buf,
                 format,
+                mode,
                 channel: header.channel,
             };
 
@@ -1859,6 +1952,7 @@ pub struct Outgoing<'a> {
     error: Option<format::Error>,
     buf: &'a mut Buf,
     format: Format,
+    mode: Mode,
     channel: ChannelId,
 }
 
@@ -1868,6 +1962,13 @@ impl Outgoing<'_> {
     #[inline]
     pub fn format(&self) -> Format {
         self.format
+    }
+
+    /// The [`Mode`] the response will be spelled in, which is the mode the
+    /// corresponding request arrived in.
+    #[inline]
+    pub fn mode(&self) -> Mode {
+        self.mode
     }
 
     /// Write a response.
@@ -1887,13 +1988,16 @@ impl Outgoing<'_> {
 
         let mut writer = self.buf.writer();
 
-        let result = writer.envelope(&ResponseHeader {
-            serial,
-            broadcast: 0,
-            error: 0,
-            format: self.format.to_u8(),
-            channel: self.channel,
-        });
+        let result = writer.envelope(
+            self.mode,
+            &ResponseHeader {
+                serial,
+                broadcast: 0,
+                error: 0,
+                format: self.format.to_u8(),
+                channel: self.channel,
+            },
+        );
 
         if let Err(error) = result {
             self.error = Some(error);
@@ -2056,6 +2160,7 @@ mod tests {
         Ping(Bytes),
         Pong(Bytes),
         Binary(Vec<u8>),
+        Text(Vec<u8>),
         Close(u16),
     }
 
@@ -2147,6 +2252,10 @@ mod tests {
             TestMessage::Binary(data.to_vec())
         }
 
+        fn text(data: &[u8]) -> Self::Message {
+            TestMessage::Text(data.to_vec())
+        }
+
         fn close(code: u16, _: &str) -> Self::Message {
             let frames = CLOSE_FRAMES.with(|frames| {
                 let count = frames.get() + 1;
@@ -2210,13 +2319,16 @@ mod tests {
                 let mut writer = buf.writer();
 
                 writer
-                    .envelope(&ResponseHeader {
-                        serial: 1,
-                        broadcast: 0,
-                        error: 0,
-                        format: Format::DEFAULT.to_u8(),
-                        channel: ChannelId::NONE,
-                    })
+                    .envelope(
+                        Mode::DEFAULT,
+                        &ResponseHeader {
+                            serial: 1,
+                            broadcast: 0,
+                            error: 0,
+                            format: Format::DEFAULT.to_u8(),
+                            channel: ChannelId::NONE,
+                        },
+                    )
                     .map_err(Error::encode_connect_header)?;
 
                 writer.flush();
@@ -2249,6 +2361,7 @@ mod tests {
             socket_recv: true,
             set: JoinSet::new(),
             format: Format::DEFAULT,
+            mode: Mode::DEFAULT,
             formats: None,
         }
     }

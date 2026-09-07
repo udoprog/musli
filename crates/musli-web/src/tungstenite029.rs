@@ -65,6 +65,8 @@
 //! # }
 //! ```
 
+use alloc::string::String;
+
 use core::future::{Future, poll_fn};
 use core::pin::Pin;
 
@@ -72,10 +74,11 @@ use bytes::Bytes;
 use futures_core03::Stream;
 use futures_sink03::Sink;
 use tokio::net::TcpStream;
-use tokio_tungstenite029::tungstenite::Error;
 use tokio_tungstenite029::tungstenite::protocol::Message as WsMessage;
+use tokio_tungstenite029::tungstenite::{Error, Utf8Bytes};
 use tokio_tungstenite029::{MaybeTlsStream, WebSocketStream, connect_async};
 
+use crate::api::Mode;
 use crate::client::{ClientImpl, EmptyCallback, Message, ServiceBuilder, SocketImpl};
 
 /// The socket type used by this implementation.
@@ -161,8 +164,18 @@ impl SocketImpl for Socket {
     }
 
     #[inline]
-    fn send(&mut self, data: &[u8]) -> impl Future<Output = Result<(), Self::Error>> + Send + '_ {
-        let message = WsMessage::Binary(Bytes::copy_from_slice(data));
+    fn send(
+        &mut self,
+        mode: Mode,
+        data: &[u8],
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send + '_ {
+        let message = match mode {
+            Mode::Binary => WsMessage::Binary(Bytes::copy_from_slice(data)),
+            // NB: A text frame is only ever written in a mode which guarantees
+            // that everything in it is valid UTF-8, so the lossy path is never
+            // taken.
+            Mode::Text => WsMessage::Text(Utf8Bytes::from(&*String::from_utf8_lossy(data))),
+        };
 
         async move {
             poll_fn(|cx| Pin::new(&mut *self).poll_ready(cx)).await?;
@@ -182,12 +195,12 @@ impl SocketImpl for Socket {
 fn convert(message: WsMessage) -> Message {
     match message {
         WsMessage::Binary(data) => Message::Binary(data),
+        WsMessage::Text(data) => Message::Text(Bytes::from(data)),
         WsMessage::Ping(..) => Message::Ping,
         WsMessage::Pong(..) => Message::Pong,
         WsMessage::Close(..) => Message::Close,
-        // NB: Raw frames are never produced while reading, and text messages
-        // are not part of the protocol. Both are treated as a protocol
-        // violation which tears the connection down.
-        WsMessage::Text(..) | WsMessage::Frame(..) => Message::Text,
+        // NB: Raw frames are never produced while reading, so this is a
+        // protocol violation which tears the connection down.
+        WsMessage::Frame(..) => Message::Unsupported,
     }
 }

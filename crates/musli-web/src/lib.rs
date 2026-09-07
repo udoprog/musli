@@ -36,8 +36,12 @@
 //! * [Channel support] allowing the server to identify the source of a message
 //!   and clients to correlate messages.
 //! * A [negotiable body format], so a client can pick how much schema evolution
-//!   it needs and the server adapts to it. Message envelopes use a fixed
-//!   encoding so negotiation itself never depends on the outcome.
+//!   it needs and the server adapts to it. Message envelopes never depend on
+//!   the outcome, so negotiation itself is always readable.
+//! * A [selectable socket mode], so a connection can be switched from binary
+//!   frames to text ones whose envelope is a block of `<key>: <value>` lines.
+//!   Together with [`Format::Json`] this makes the whole conversation readable
+//!   in a proxy or a browser inspector, which is what it is for.
 //!
 //! The available formats, from most compact to most capable, are
 //! [`Format::Packed`], [`Format::Storage`], [`Format::Wire`] (the default, and
@@ -46,6 +50,7 @@
 //!
 //! [Channel support]: https://docs.rs/musli-web/latest/musli_web/web/struct.Handle.html#method.channel
 //! [negotiable body format]: https://docs.rs/musli-web/latest/musli_web/api/index.html#wire-format
+//! [selectable socket mode]: https://docs.rs/musli-web/latest/musli_web/api/index.html#the-text-envelope
 //!
 //! <br>
 //!
@@ -106,7 +111,7 @@ pub mod api;
 #[doc(inline)]
 #[cfg(feature = "api")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]
-pub use self::api::{AtomicChannelId, ChannelId, Format};
+pub use self::api::{AtomicChannelId, ChannelId, Format, Mode};
 
 #[cfg(feature = "api")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]
