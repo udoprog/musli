@@ -813,14 +813,18 @@ fn determine_type_inner(expr: &syn::Expr, neg: bool) -> Option<syn::Type> {
 
 fn determine_name_method(ty: &syn::Type) -> (NameMethod, Option<NameAll>) {
     match ty {
-        syn::Type::Path(syn::TypePath { qself: None, path }) if path.is_ident("str") => {
+        syn::Type::Path(syn::TypePath {
+            qself: None, path, ..
+        }) if path.is_ident("str") => {
             return (
                 NameMethod::Unsized(UnsizedMethod::Default),
                 Some(NameAll::Name),
             );
         }
         syn::Type::Slice(syn::TypeSlice { elem, .. }) => match &**elem {
-            syn::Type::Path(syn::TypePath { qself: None, path }) if path.is_ident("u8") => {
+            syn::Type::Path(syn::TypePath {
+                qself: None, path, ..
+            }) if path.is_ident("u8") => {
                 return (
                     NameMethod::Unsized(UnsizedMethod::Bytes),
                     Some(NameAll::Name),

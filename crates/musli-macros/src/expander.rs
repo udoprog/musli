@@ -458,11 +458,11 @@ pub(crate) fn expand_name(
             let ident = ident.trim_start_matches("r#");
 
             if let Some(name) = name_all.apply(ident) {
-                break 'out syn::LitStr::new(&name, ident.span()).into();
+                break 'out syn::Lit::Str(syn::LitStr::new(&name, ident.span()));
             }
         }
 
-        usize_suffixed(taggable.index(), taggable.span()).into()
+        syn::Lit::Int(usize_suffixed(taggable.index(), taggable.span()))
     };
 
     let expr = syn::Expr::Lit(syn::ExprLit {

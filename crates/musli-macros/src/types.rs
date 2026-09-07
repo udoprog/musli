@@ -289,12 +289,13 @@ pub(super) fn parse(input: ParseStream<'_>, attr: Attr, default_crate: &str) -> 
                 let impl_type = syn::ImplItemType {
                     attrs: impl_type.attrs.clone(),
                     vis: impl_type.vis.clone(),
-                    defaultness: impl_type.defaultness,
+                    modifiers: impl_type.modifiers.clone(),
                     type_token: impl_type.type_token,
                     ident: impl_type.ident.clone(),
                     generics: impl_type.generics.clone(),
                     eq_token: impl_type.eq_token,
                     ty: syn::Type::Path(syn::TypePath {
+                        attrs: Vec::new(),
                         qself: None,
                         path: never_type(&crate_path, extra)?,
                     }),

@@ -92,8 +92,10 @@ pub(crate) fn expand_encode_entry(b: &Build<'_>) -> Result<TokenStream> {
             .make_where_clause()
             .predicates
             .push(syn::WherePredicate::Type(syn::PredicateType {
+                attrs: Vec::new(),
                 lifetimes: None,
                 bounded_ty: syn::Type::Path(syn::TypePath {
+                    attrs: Vec::new(),
                     qself: None,
                     path: syn::Path::from(syn::PathSegment::from(t.ident.clone())),
                 }),
