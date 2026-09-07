@@ -41,7 +41,7 @@ to use:
 
 ```toml
 [dependencies]
-musli = { version = "0.1.5", features = ["storage"] }
+musli = { version = "0.1.6", features = ["storage"] }
 ```
 
 <br>

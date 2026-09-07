@@ -362,7 +362,7 @@ facet-msgpack = [
 ]
 
 [dependencies]
-musli = { path = "../crates/musli", version = "0.1.5", default-features = false, optional = true, features = [] }
+musli = { path = "../crates/musli", version = "0.1.6", default-features = false, optional = true, features = [] }
 musli-zerocopy = { path = "../crates/musli-zerocopy", version = "0.1.1", default-features = false, features = [], optional = true }
 tests-macros = { path = "../tests-macros" }
 
