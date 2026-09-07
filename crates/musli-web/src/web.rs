@@ -695,6 +695,7 @@ where
         let mode = self.mode.get();
 
         let header = api::RequestHeader {
+            version: api::VERSION,
             serial,
             id: <T::Endpoint as api::Endpoint>::ID.get(),
             format: format.to_u8(),
@@ -731,6 +732,7 @@ where
         let mode = self.mode.get();
 
         let header = api::RequestHeader {
+            version: api::VERSION,
             serial,
             id: MessageId::CONNECT.get(),
             // NB: Carries no body.
@@ -770,6 +772,7 @@ where
             };
 
             let header = api::RequestHeader {
+                version: api::VERSION,
                 serial,
                 id: MessageId::NEGOTIATE.get(),
                 format: format.to_u8(),
@@ -825,6 +828,7 @@ where
         let mode = self.mode.get();
 
         let header = api::RequestHeader {
+            version: api::VERSION,
             serial: 0,
             id: MessageId::DISCONNECT.get(),
             // NB: Carries no body.
@@ -882,8 +886,17 @@ where
 
         // NB: The frame type is the mode, so a message can always be read
         // regardless of what has been agreed on.
-        let header: api::ResponseHeader =
-            format::decode_envelope(mode, &buf, &mut at).map_err(Error::decode_response_header)?;
+        let header: api::ResponseHeader = match format::decode_envelope(mode, &buf, &mut at) {
+            Ok(header) => header,
+            // NB: The server speaks a protocol this build does not have, so
+            // there is nothing to be gained by carrying on with the session.
+            // The connection is dropped rather than negotiated.
+            Err(error) if error.unsupported_version().is_some() => {
+                self.on_error.call(Error::decode_response_header(error));
+                return self.close_and_reconnect();
+            }
+            Err(error) => return Err(Error::decode_response_header(error)),
+        };
 
         if let Some(broadcast) = MessageId::new(header.broadcast) {
             tracing::debug!(?header, "Got broadcast");

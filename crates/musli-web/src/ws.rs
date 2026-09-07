@@ -122,7 +122,7 @@ use tokio::time::{Duration, Instant, Sleep};
 use crate::Buf;
 use crate::api::{
     Broadcast, ChannelId, DecodeBody, EncodeBody, ErrorMessage, Event, Format, Id, MessageId, Mode,
-    RequestHeader, ResponseHeader,
+    RequestHeader, ResponseHeader, VERSION,
 };
 use crate::buf::{BufPool, InvalidFrame};
 use crate::format;
@@ -268,6 +268,10 @@ enum ErrorKind {
     UnknownHeader {
         error: format::Error,
     },
+    /// The client stated a protocol version this server does not speak.
+    UnsupportedVersion {
+        error: format::Error,
+    },
 }
 
 /// The error produced by the server side of the websocket protocol
@@ -362,6 +366,9 @@ impl fmt::Display for Error {
             ErrorKind::UnknownHeader { error } => {
                 write!(f, "Client sent a header this server does not know: {error}")
             }
+            ErrorKind::UnsupportedVersion { error } => {
+                write!(f, "Client speaks a different protocol: {error}")
+            }
         }
     }
 }
@@ -381,6 +388,7 @@ impl core::error::Error for Error {
             ErrorKind::ErrorMessage { error } => Some(error),
             ErrorKind::NegotiateHeader { error } => Some(error),
             ErrorKind::UnknownHeader { error } => Some(error),
+            ErrorKind::UnsupportedVersion { error } => Some(error),
             _ => None,
         }
     }
@@ -1133,6 +1141,16 @@ where
 
         let header: RequestHeader = match format::decode_envelope(mode, &bytes, &mut at) {
             Ok(header) => header,
+            // NB: The version is what says which headers may appear, so a peer
+            // which does not agree on it is refused before anything else about
+            // the message is looked at.
+            Err(error) if error.unsupported_version().is_some() => {
+                self.out.push_back(S::close(
+                    CLOSE_PROTOCOL_ERROR,
+                    "Unsupported protocol version",
+                ));
+                return Err(Error::new(ErrorKind::UnsupportedVersion { error }));
+            }
             Err(error) if error.is_unknown_header() => {
                 self.out
                     .push_back(S::close(CLOSE_PROTOCOL_ERROR, "Unknown header"));
@@ -1209,6 +1227,7 @@ where
             let result = writer.envelope(
                 mode,
                 &ResponseHeader {
+                    version: VERSION,
                     serial: header.serial,
                     broadcast: 0,
                     error: 0,
@@ -1407,6 +1426,7 @@ where
                 .envelope(
                     mode,
                     &ResponseHeader {
+                        version: VERSION,
                         serial: 0,
                         broadcast: <T::Broadcast as Broadcast>::ID.get(),
                         error: 0,
@@ -1445,6 +1465,7 @@ where
                 .envelope(
                     Mode::DEFAULT,
                     &ResponseHeader {
+                        version: VERSION,
                         serial: 0,
                         broadcast: MessageId::SERVER_HELLO.get(),
                         error: 0,
@@ -1500,6 +1521,17 @@ where
             // speaking a protocol this one does not have, so the rest of the
             // message cannot be acted on even though it parsed. The failure is
             // held so the close frame explaining it still reaches the peer.
+            Err(error) if error.unsupported_version().is_some() => {
+                tracing::debug!(?error, "Unsupported protocol version");
+                self.out.push_back(S::close(
+                    CLOSE_PROTOCOL_ERROR,
+                    "Unsupported protocol version",
+                ));
+                self.begin_closing();
+                self.failure
+                    .get_or_insert_with(|| Error::new(ErrorKind::UnsupportedVersion { error }));
+                return Ok(());
+            }
             Err(error) if error.is_unknown_header() => {
                 tracing::debug!(?error, "Unknown header");
                 self.out
@@ -1545,6 +1577,7 @@ where
                         let result = writer.envelope(
                             mode,
                             &ResponseHeader {
+                                version: VERSION,
                                 serial: header.serial,
                                 broadcast: 0,
                                 error: 0,
@@ -1646,6 +1679,7 @@ where
             let result = writer.envelope(
                 mode,
                 &ResponseHeader {
+                    version: VERSION,
                     serial: header.serial,
                     broadcast: 0,
                     error: MessageId::ERROR_MESSAGE.get(),
@@ -2027,6 +2061,7 @@ impl Outgoing<'_> {
         let result = writer.envelope(
             self.mode,
             &ResponseHeader {
+                version: VERSION,
                 serial,
                 broadcast: 0,
                 error: 0,
@@ -2358,6 +2393,7 @@ mod tests {
                     .envelope(
                         Mode::DEFAULT,
                         &ResponseHeader {
+                            version: VERSION,
                             serial: 1,
                             broadcast: 0,
                             error: 0,

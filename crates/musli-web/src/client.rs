@@ -778,11 +778,13 @@ where
                         Message::Binary(bytes) => match self.message(Mode::Binary, bytes) {
                             Ok(Post::Negotiate) => self.send_negotiate().await,
                             Ok(Post::None) => {}
+                            Ok(Post::Reject) => self.disconnect().await,
                             Err(error) => self.on_error.call(error),
                         },
                         Message::Text(bytes) => match self.message(Mode::Text, bytes) {
                             Ok(Post::Negotiate) => self.send_negotiate().await,
                             Ok(Post::None) => {}
+                            Ok(Post::Reject) => self.disconnect().await,
                             Err(error) => self.on_error.call(error),
                         },
                         Message::Unsupported => {
@@ -924,6 +926,7 @@ where
         let mode = self.shared.mode();
 
         let header = api::RequestHeader {
+            version: api::VERSION,
             serial: 0,
             id: MessageId::DISCONNECT.get(),
             // NB: Carries no body.
@@ -981,8 +984,17 @@ where
     fn message(&mut self, mode: Mode, bytes: Bytes) -> Result<Post> {
         let mut at = 0;
 
-        let header: api::ResponseHeader = format::decode_envelope(mode, &bytes, &mut at)
-            .map_err(Error::decode_response_header)?;
+        let header: api::ResponseHeader = match format::decode_envelope(mode, &bytes, &mut at) {
+            Ok(header) => header,
+            // NB: The server speaks a protocol this build does not have, so
+            // there is nothing to be gained by carrying on with the session.
+            // The connection is dropped rather than negotiated.
+            Err(error) if error.unsupported_version().is_some() => {
+                self.on_error.call(Error::decode_response_header(error));
+                return Ok(Post::Reject);
+            }
+            Err(error) => return Err(Error::decode_response_header(error)),
+        };
 
         if let Some(broadcast) = MessageId::new(header.broadcast) {
             tracing::debug!(?header, "Got broadcast");
@@ -1112,6 +1124,7 @@ where
         let serial = self.shared.next_serial();
 
         let header = api::RequestHeader {
+            version: api::VERSION,
             serial,
             id: MessageId::NEGOTIATE.get(),
             format: format.to_u8(),
@@ -1152,6 +1165,8 @@ enum Post {
     None,
     /// The format has to be negotiated with the server.
     Negotiate,
+    /// The server cannot be talked to, so the connection has to be dropped.
+    Reject,
 }
 
 impl<T> Drop for Service<T>
@@ -1285,6 +1300,7 @@ impl Handle {
         let serial = self.shared.next_serial();
 
         let header = api::RequestHeader {
+            version: api::VERSION,
             serial,
             id: MessageId::CONNECT.get(),
             // NB: Carries no body.
@@ -1497,6 +1513,7 @@ where
         let mode = self.shared.mode();
 
         let header = api::RequestHeader {
+            version: api::VERSION,
             serial,
             id: id.get(),
             format: format.to_u8(),
