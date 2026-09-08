@@ -54,7 +54,7 @@ test = ["api", "json", "ws", "yew022", "yew023", "axum08", "tungstenite029", "tu
 [dependencies]
 musli-web-macros = { path = "../musli-web-macros", version = "0.4.9" }
 
-musli = { path = "../musli", version = "0.1.6", default-features = false, optional = true }
+musli = { path = "../musli", version = "0.1.7", default-features = false, optional = true }
 http = { version = "1.3.1", default-features = false, optional = true }
 bytes = { version = "1.10.0", default-features = false, optional = true }
 mime = { version = "0.3.17", default-features = false, optional = true }
@@ -96,7 +96,7 @@ optional = true
 [dev-dependencies]
 anyhow = "1.0.99"
 axum08 = { package = "axum", version = "0.8.0", features = ["ws"] }
-musli = { path = "../musli", version = "0.1.6" }
+musli = { path = "../musli", version = "0.1.7" }
 tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
 tracing = "0.1.40"
 
