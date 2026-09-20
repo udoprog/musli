@@ -197,6 +197,9 @@ fn json_internally_tagged_enums_decode_from_immutable_input() {
     );
 }
 
+// NB: the mutable reference is load-bearing: `&[u8]` is `Copy`, so decoding a
+// copied cursor would not exercise advancing the caller's cursor.
+#[allow(clippy::needless_borrows_for_generic_args)]
 #[test]
 fn json_mutable_byte_cursor_decodes_tag_first_data_and_advances() {
     let mut bytes = &br#"{"type":"port","id":1}{"type":"port","id":2} suffix"#[..];
@@ -208,6 +211,8 @@ fn json_mutable_byte_cursor_decodes_tag_first_data_and_advances() {
     assert_eq!(bytes, b" suffix");
 }
 
+// NB: the mutable reference is load-bearing; see the byte-cursor test above.
+#[allow(clippy::needless_borrows_for_generic_args)]
 #[test]
 fn json_mutable_byte_cursor_decodes_tag_last_data() {
     let mut bytes = &br#"{"id":1,"type":"port"} suffix"#[..];
@@ -216,6 +221,8 @@ fn json_mutable_byte_cursor_decodes_tag_last_data() {
     assert_eq!(bytes, b" suffix");
 }
 
+// NB: the mutable reference is load-bearing; see the byte-cursor test above.
+#[allow(clippy::needless_borrows_for_generic_args)]
 #[test]
 fn json_mutable_byte_cursor_decodes_unit() {
     let mut bytes = &br#"{"type":"rtkit"} suffix"#[..];
@@ -224,6 +231,9 @@ fn json_mutable_byte_cursor_decodes_unit() {
     assert_eq!(bytes, b" suffix");
 }
 
+// NB: the mutable reference is load-bearing: `&str` is `Copy`, so decoding a
+// copied cursor would not exercise advancing the caller's cursor.
+#[allow(clippy::needless_borrows_for_generic_args)]
 #[test]
 fn json_mutable_string_cursor_decodes_tag_first_data_and_advances() {
     let mut string = r#"{"type":"port","id":1}{"type":"port","id":2} suffix"#;
@@ -235,6 +245,8 @@ fn json_mutable_string_cursor_decodes_tag_first_data_and_advances() {
     assert_eq!(string, " suffix");
 }
 
+// NB: the mutable reference is load-bearing; see the string-cursor test above.
+#[allow(clippy::needless_borrows_for_generic_args)]
 #[test]
 fn json_mutable_string_cursor_decodes_tag_last_data() {
     let mut string = r#"{"id":1,"type":"port"} suffix"#;
@@ -243,6 +255,8 @@ fn json_mutable_string_cursor_decodes_tag_last_data() {
     assert_eq!(string, " suffix");
 }
 
+// NB: the mutable reference is load-bearing; see the string-cursor test above.
+#[allow(clippy::needless_borrows_for_generic_args)]
 #[test]
 fn json_mutable_string_cursor_decodes_unit() {
     let mut string = r#"{"type":"rtkit"} suffix"#;
