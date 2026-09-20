@@ -152,3 +152,101 @@ fn indexed() {
     test_case!(usize);
     test_case!(isize);
 }
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(Text, tag = "type")]
+enum JsonTarget {
+    #[musli(Text, name = "port")]
+    Port { id: u32 },
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(Text, tag = "type")]
+enum JsonRealtime {
+    #[musli(Text, name = "rtkit")]
+    Rtkit,
+}
+
+#[test]
+fn json_internally_tagged_enums_decode_from_immutable_input() {
+    let target = JsonTarget::Port { id: 1 };
+
+    assert_eq!(
+        musli::json::from_slice::<JsonTarget>(br#"{"type":"port","id":1}"#).unwrap(),
+        target
+    );
+    assert_eq!(
+        musli::json::from_str::<JsonTarget>(r#"{"type":"port","id":1}"#).unwrap(),
+        target
+    );
+    assert_eq!(
+        musli::json::from_slice::<JsonTarget>(br#"{"id":1,"type":"port"}"#).unwrap(),
+        target
+    );
+    assert_eq!(
+        musli::json::from_str::<JsonTarget>(r#"{"id":1,"type":"port"}"#).unwrap(),
+        target
+    );
+    assert_eq!(
+        musli::json::from_slice::<JsonRealtime>(br#"{"type":"rtkit"}"#).unwrap(),
+        JsonRealtime::Rtkit
+    );
+    assert_eq!(
+        musli::json::from_str::<JsonRealtime>(r#"{"type":"rtkit"}"#).unwrap(),
+        JsonRealtime::Rtkit
+    );
+}
+
+#[test]
+fn json_mutable_byte_cursor_decodes_tag_first_data_and_advances() {
+    let mut bytes = &br#"{"type":"port","id":1}{"type":"port","id":2} suffix"#[..];
+    let first: JsonTarget = musli::json::decode(&mut bytes).unwrap();
+    assert_eq!(bytes, br#"{"type":"port","id":2} suffix"#);
+    let second: JsonTarget = musli::json::decode(&mut bytes).unwrap();
+    assert_eq!(first, JsonTarget::Port { id: 1 });
+    assert_eq!(second, JsonTarget::Port { id: 2 });
+    assert_eq!(bytes, b" suffix");
+}
+
+#[test]
+fn json_mutable_byte_cursor_decodes_tag_last_data() {
+    let mut bytes = &br#"{"id":1,"type":"port"} suffix"#[..];
+    let target: JsonTarget = musli::json::decode(&mut bytes).unwrap();
+    assert_eq!(target, JsonTarget::Port { id: 1 });
+    assert_eq!(bytes, b" suffix");
+}
+
+#[test]
+fn json_mutable_byte_cursor_decodes_unit() {
+    let mut bytes = &br#"{"type":"rtkit"} suffix"#[..];
+    let realtime: JsonRealtime = musli::json::decode(&mut bytes).unwrap();
+    assert_eq!(realtime, JsonRealtime::Rtkit);
+    assert_eq!(bytes, b" suffix");
+}
+
+#[test]
+fn json_mutable_string_cursor_decodes_tag_first_data_and_advances() {
+    let mut string = r#"{"type":"port","id":1}{"type":"port","id":2} suffix"#;
+    let first: JsonTarget = musli::json::decode(&mut string).unwrap();
+    assert_eq!(string, r#"{"type":"port","id":2} suffix"#);
+    let second: JsonTarget = musli::json::decode(&mut string).unwrap();
+    assert_eq!(first, JsonTarget::Port { id: 1 });
+    assert_eq!(second, JsonTarget::Port { id: 2 });
+    assert_eq!(string, " suffix");
+}
+
+#[test]
+fn json_mutable_string_cursor_decodes_tag_last_data() {
+    let mut string = r#"{"id":1,"type":"port"} suffix"#;
+    let target: JsonTarget = musli::json::decode(&mut string).unwrap();
+    assert_eq!(target, JsonTarget::Port { id: 1 });
+    assert_eq!(string, " suffix");
+}
+
+#[test]
+fn json_mutable_string_cursor_decodes_unit() {
+    let mut string = r#"{"type":"rtkit"} suffix"#;
+    let realtime: JsonRealtime = musli::json::decode(&mut string).unwrap();
+    assert_eq!(realtime, JsonRealtime::Rtkit);
+    assert_eq!(string, " suffix");
+}

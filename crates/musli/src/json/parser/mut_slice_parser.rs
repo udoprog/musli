@@ -1,6 +1,6 @@
 use crate::Context;
 use crate::alloc::Vec;
-use crate::json::parser::{Parser, StringReference};
+use crate::json::parser::{Parser, SliceParser, StringReference};
 use crate::reader::SliceUnderflow;
 
 use super::string::SliceAccess;
@@ -48,7 +48,7 @@ impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
     where
         Self: 'this;
 
-    type TryClone = MutSliceParser<'a, 'de, UTF8>;
+    type TryClone = SliceParser<'de, UTF8>;
 
     #[inline]
     fn borrow_mut(&mut self) -> Self::Mut<'_> {
@@ -57,7 +57,10 @@ impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
 
     #[inline]
     fn try_clone(&self) -> Option<Self::TryClone> {
-        None
+        Some(SliceParser {
+            slice: self.slice,
+            index: 0,
+        })
     }
 
     #[inline]
