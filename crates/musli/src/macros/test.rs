@@ -34,10 +34,26 @@ impl fmt::Display for FormatBytes {
 
 macro_rules! test_include_if {
     (#[musli_value] => $($rest:tt)*) => { $($rest)* };
+    (#[json] => $($_:tt)*) => {};
     (=> $($_:tt)*) => {};
 }
 
 pub(crate) use test_include_if;
+
+macro_rules! test_include_if_json {
+    (#[json] => $($rest:tt)*) => { $($rest)* };
+    (#[musli_value] => $($_:tt)*) => {};
+    (=> $($_:tt)*) => {};
+}
+
+pub(crate) use test_include_if_json;
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __test_include_if_json_format {
+    (json => $($rest:tt)*) => { $($rest)* };
+    ($_:ident => $($_rest:tt)*) => {};
+}
 
 /// Generate test functions which provides rich diagnostics when they fail.
 macro_rules! test_fns {
@@ -67,7 +83,7 @@ macro_rules! test_fns {
                 }
             };
 
-            let decoded: T = match encoding.from_slice_with(&cx, out.as_slice()) {
+            let immutable_decoded: T = match encoding.from_slice_with(&cx, out.as_slice()) {
                 Ok(decoded) => decoded,
                 Err(..) => {
                     let out = $crate::macros::FormatBytes::new(&out);
@@ -76,7 +92,50 @@ macro_rules! test_fns {
                 }
             };
 
-            assert_eq!(decoded, value, "{what}: {}: roundtrip does not match\nValue: {value:?}", type_name::<T>());
+            assert_eq!(immutable_decoded, value, "{what}: {}: roundtrip does not match\nValue: {value:?}", type_name::<T>());
+
+            let mut cursor = out.as_slice();
+
+            // NB: the mutable reference is load-bearing: `&[u8]` is `Copy`,
+            // so passing the cursor by value would not test its advancement.
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            let decoded: T = match encoding.decode_with(&cx, &mut cursor) {
+                Ok(decoded) => decoded,
+                Err(..) => {
+                    let out = $crate::macros::FormatBytes::new(&out);
+                    let remainder = $crate::macros::FormatBytes::new(cursor);
+                    let error = cx.report();
+                    panic!("{what}: {}: failed to decode mutable byte cursor:\nValue: {value:?}\nBytes: {out}\nRemainder: {remainder}\n{error}", type_name::<T>())
+                }
+            };
+
+            assert_eq!(decoded, value, "{what}: {}: mutable byte cursor roundtrip does not match\nValue: {value:?}\nBytes: {}", type_name::<T>(), $crate::macros::FormatBytes::new(&out));
+            assert!(cursor.is_empty(), "{what}: {}: mutable byte cursor was not exhausted\nValue: {value:?}\nBytes: {}\nRemainder: {}", type_name::<T>(), $crate::macros::FormatBytes::new(&out), $crate::macros::FormatBytes::new(cursor));
+
+            $crate::macros::test_include_if_json! {
+                $($(#[$option])*)* =>
+                let string = match ::core::str::from_utf8(&out) {
+                    Ok(string) => string,
+                    Err(error) => panic!("{what}: {}: encoded JSON is not valid utf-8:\nValue: {value:?}\nBytes: {}\n{error}", type_name::<T>(), $crate::macros::FormatBytes::new(&out)),
+                };
+
+                let mut cursor = string;
+
+                // NB: the mutable reference is load-bearing: `&str` is `Copy`,
+                // so passing the cursor by value would not test its advancement.
+                #[allow(clippy::needless_borrows_for_generic_args)]
+                let decoded: T = match encoding.decode_with(&cx, &mut cursor) {
+                    Ok(decoded) => decoded,
+                    Err(..) => {
+                        let out = $crate::macros::FormatBytes::new(&out);
+                        let error = cx.report();
+                        panic!("{what}: {}: failed to decode mutable string cursor:\nValue: {value:?}\nBytes: {out}\nRemainder: {cursor:?}\n{error}", type_name::<T>())
+                    }
+                };
+
+                assert_eq!(decoded, value, "{what}: {}: mutable string cursor roundtrip does not match\nValue: {value:?}\nBytes: {}", type_name::<T>(), $crate::macros::FormatBytes::new(&out));
+                assert!(cursor.is_empty(), "{what}: {}: mutable string cursor was not exhausted\nValue: {value:?}\nBytes: {}\nRemainder: {cursor:?}", type_name::<T>(), $crate::macros::FormatBytes::new(&out));
+            }
 
             $crate::macros::test_include_if! {
                 $($(#[$option])*)* =>
@@ -103,7 +162,7 @@ macro_rules! test_fns {
                 assert_eq!(value_decoded, value, "{what}: {}: musli-value roundtrip does not match\nValue: {value:?}", type_name::<T>());
             }
 
-            decoded
+            immutable_decoded
         }
 
         /// Encode and then decode the given value once.
@@ -136,7 +195,7 @@ macro_rules! test_fns {
                 }
             };
 
-            let actual = match encoding.from_slice_with(&cx, &*out) {
+            let immutable_actual: U = match encoding.from_slice_with(&cx, &*out) {
                 Ok(decoded) => decoded,
                 Err(..) => {
                     let out = $crate::macros::FormatBytes::new(&*out);
@@ -146,13 +205,66 @@ macro_rules! test_fns {
             };
 
             assert_eq!(
-                actual,
+                immutable_actual,
                 *expected,
                 "{what}: decoded value does not match expected\nBytes: {}",
                 $crate::macros::FormatBytes::new(&*out),
             );
 
-            actual
+            let mut cursor = out.as_slice();
+
+            // NB: the mutable reference is load-bearing: `&[u8]` is `Copy`,
+            // so passing the cursor by value would not test its advancement.
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            let actual: U = match encoding.decode_with(&cx, &mut cursor) {
+                Ok(decoded) => decoded,
+                Err(..) => {
+                    let out = $crate::macros::FormatBytes::new(&*out);
+                    let remainder = $crate::macros::FormatBytes::new(cursor);
+                    let error = cx.report();
+                    panic!("{what}: {}: failed to decode mutable byte cursor:\nValue: {value:?}\nBytes: {out}\nRemainder: {remainder}\n{error}", type_name::<U>())
+                }
+            };
+
+            assert_eq!(
+                actual,
+                *expected,
+                "{what}: mutable byte cursor decoded value does not match expected\nBytes: {}",
+                $crate::macros::FormatBytes::new(&*out),
+            );
+            assert!(cursor.is_empty(), "{what}: {}: mutable byte cursor was not exhausted\nBytes: {}\nRemainder: {}", type_name::<U>(), $crate::macros::FormatBytes::new(&*out), $crate::macros::FormatBytes::new(cursor));
+
+            $crate::macros::test_include_if_json! {
+                $($(#[$option])*)* =>
+                let string = match ::core::str::from_utf8(&*out) {
+                    Ok(string) => string,
+                    Err(error) => panic!("{what}: {}: encoded JSON is not valid utf-8:\nValue: {value:?}\nBytes: {}\n{error}", type_name::<U>(), $crate::macros::FormatBytes::new(&*out)),
+                };
+
+                let mut cursor = string;
+
+                // NB: the mutable reference is load-bearing: `&str` is `Copy`,
+                // so passing the cursor by value would not test its advancement.
+                #[allow(clippy::needless_borrows_for_generic_args)]
+                let actual: U = match encoding.decode_with(&cx, &mut cursor) {
+                    Ok(decoded) => decoded,
+                    Err(..) => {
+                        let out = $crate::macros::FormatBytes::new(&*out);
+                        let error = cx.report();
+                        panic!("{what}: {}: failed to decode mutable string cursor:\nValue: {value:?}\nBytes: {out}\nRemainder: {cursor:?}\n{error}", type_name::<U>())
+                    }
+                };
+
+                assert_eq!(
+                    actual,
+                    *expected,
+                    "{what}: mutable string cursor decoded value does not match expected\nBytes: {}",
+                    $crate::macros::FormatBytes::new(&*out),
+                );
+                assert!(cursor.is_empty(), "{what}: {}: mutable string cursor was not exhausted\nBytes: {}\nRemainder: {cursor:?}", type_name::<U>(), $crate::macros::FormatBytes::new(&*out));
+            }
+
+            immutable_actual
         }
 
         /// Encode a value to bytes.
@@ -327,7 +439,7 @@ macro_rules! assert_roundtrip_borrowed_eq {
                     }
                 };
 
-                let decoded: $name<'_> = match encoding.from_slice_with(&cx, &bytes) {
+                let immutable_decoded: $name<'_> = match encoding.from_slice_with(&cx, &bytes) {
                     Ok(out) => out,
                     Err(..) => {
                         let out = $crate::macros::FormatBytes::new(&bytes);
@@ -338,9 +450,52 @@ macro_rules! assert_roundtrip_borrowed_eq {
 
                 assert_eq!(
                     value,
-                    decoded,
+                    immutable_decoded,
                     "{what}: roundtripped value does not match expected",
                 );
+
+                let mut cursor = bytes.as_slice();
+
+                // NB: the mutable reference is load-bearing: `&[u8]` is `Copy`,
+                // so passing the cursor by value would not test its advancement.
+                #[allow(clippy::needless_borrows_for_generic_args)]
+                let decoded: $name<'_> = match encoding.decode_with(&cx, &mut cursor) {
+                    Ok(out) => out,
+                    Err(..) => {
+                        let out = $crate::macros::FormatBytes::new(&bytes);
+                        let remainder = $crate::macros::FormatBytes::new(cursor);
+                        let error = cx.report();
+                        ::std::panic!("{what}: failed to decode mutable byte cursor:\nValue: {value:?}\nBytes: {out}\nRemainder: {remainder}\n{error}")
+                    }
+                };
+
+                assert_eq!(value, decoded, "{what}: mutable byte cursor roundtripped value does not match expected\nBytes: {}", $crate::macros::FormatBytes::new(&bytes));
+                assert!(cursor.is_empty(), "{what}: mutable byte cursor was not exhausted\nValue: {value:?}\nBytes: {}\nRemainder: {}", $crate::macros::FormatBytes::new(&bytes), $crate::macros::FormatBytes::new(cursor));
+
+                $crate::__test_include_if_json_format! {
+                    $framework =>
+                    let string = match ::core::str::from_utf8(&bytes) {
+                        Ok(string) => string,
+                        Err(error) => ::std::panic!("{what}: encoded JSON is not valid utf-8:\nValue: {value:?}\nBytes: {}\n{error}", $crate::macros::FormatBytes::new(&bytes)),
+                    };
+
+                    let mut cursor = string;
+
+                    // NB: the mutable reference is load-bearing: `&str` is `Copy`,
+                    // so passing the cursor by value would not test its advancement.
+                    #[allow(clippy::needless_borrows_for_generic_args)]
+                    let decoded: $name<'_> = match encoding.decode_with(&cx, &mut cursor) {
+                        Ok(out) => out,
+                        Err(..) => {
+                            let out = $crate::macros::FormatBytes::new(&bytes);
+                            let error = cx.report();
+                            ::std::panic!("{what}: failed to decode mutable string cursor:\nValue: {value:?}\nBytes: {out}\nRemainder: {cursor:?}\n{error}")
+                        }
+                    };
+
+                    assert_eq!(value, decoded, "{what}: mutable string cursor roundtripped value does not match expected\nBytes: {}", $crate::macros::FormatBytes::new(&bytes));
+                    assert!(cursor.is_empty(), "{what}: mutable string cursor was not exhausted\nValue: {value:?}\nBytes: {}\nRemainder: {cursor:?}", $crate::macros::FormatBytes::new(&bytes));
+                }
             }}
         }
 
