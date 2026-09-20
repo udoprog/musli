@@ -36,4 +36,4 @@ pub use self::test::{
     assert_roundtrip_eq,
 };
 #[cfg(feature = "test")]
-pub(crate) use self::test::{test_fns, test_include_if};
+pub(crate) use self::test::{test_fns, test_include_if, test_include_if_json};
