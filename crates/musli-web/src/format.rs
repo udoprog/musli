@@ -785,6 +785,20 @@ mod tests {
         tick: u32,
     }
 
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    #[musli(Text, tag = "type")]
+    enum JsonTarget {
+        #[musli(Text, name = "port")]
+        Port { id: u32 },
+    }
+
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    #[musli(Text, tag = "type")]
+    enum JsonRealtime {
+        #[musli(Text, name = "rtkit")]
+        Rtkit,
+    }
+
     /// Every supported format must round-trip a value.
     #[test]
     fn round_trip() {
@@ -870,6 +884,59 @@ mod tests {
             let body: Message<'_> = format.decode(&buf, &mut at).unwrap();
             assert_eq!(body, expected, "body failed for `{format}`");
             assert_eq!(at, buf.len());
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "format-json")]
+    fn json_tagged_payloads_are_sequential() {
+        let first = JsonTarget::Port { id: 1 };
+        let second = JsonRealtime::Rtkit;
+        let mut buf = Vec::new();
+
+        Format::Json.encode(&mut buf, &first).unwrap();
+        let boundary = buf.len();
+        Format::Json.encode(&mut buf, &second).unwrap();
+
+        let mut at = 0;
+        let decoded: JsonTarget = Format::Json.decode(&buf, &mut at).unwrap();
+        assert_eq!(decoded, first);
+        assert_eq!(at, boundary);
+
+        let decoded: JsonRealtime = Format::Json.decode(&buf, &mut at).unwrap();
+        assert_eq!(decoded, second);
+        assert_eq!(at, buf.len());
+    }
+
+    #[test]
+    #[cfg(feature = "format-json")]
+    fn json_envelope_then_tagged_body() {
+        for mode in Mode::ALL.iter().copied() {
+            let header = RequestHeader {
+                version: VERSION,
+                serial: 7,
+                id: 11,
+                format: Format::Json.to_u8(),
+                channel: ChannelId::from_u16(3),
+            };
+
+            let expected = JsonTarget::Port { id: 1 };
+            let mut buf = Vec::new();
+
+            encode_envelope(mode, &mut buf, &header).unwrap();
+            let boundary = buf.len();
+            Format::Json.encode(&mut buf, &expected).unwrap();
+
+            let mut at = 0;
+            let decoded: RequestHeader = decode_envelope(mode, &buf, &mut at).unwrap();
+            assert_eq!(decoded.serial, header.serial, "`{mode}` lost the serial");
+            assert_eq!(decoded.id, header.id, "`{mode}` lost the id");
+            assert_eq!(decoded.format, header.format, "`{mode}` lost the format");
+            assert_eq!(at, boundary, "`{mode}` misreported the envelope boundary");
+
+            let decoded: JsonTarget = Format::Json.decode(&buf, &mut at).unwrap();
+            assert_eq!(decoded, expected, "`{mode}` body failed");
+            assert_eq!(at, buf.len(), "`{mode}` did not consume the whole frame");
         }
     }
 
