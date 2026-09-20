@@ -785,6 +785,7 @@ mod tests {
         tick: u32,
     }
 
+    #[cfg(feature = "format-json")]
     #[derive(Debug, PartialEq, Encode, Decode)]
     #[musli(Text, tag = "type")]
     enum JsonTarget {
@@ -792,6 +793,7 @@ mod tests {
         Port { id: u32 },
     }
 
+    #[cfg(feature = "format-json")]
     #[derive(Debug, PartialEq, Encode, Decode)]
     #[musli(Text, tag = "type")]
     enum JsonRealtime {
@@ -908,36 +910,45 @@ mod tests {
         assert_eq!(at, buf.len());
     }
 
+    #[cfg(feature = "format-json")]
+    fn json_envelope_then_tagged_body(mode: Mode) {
+        let header = RequestHeader {
+            version: VERSION,
+            serial: 7,
+            id: 11,
+            format: Format::Json.to_u8(),
+            channel: ChannelId::from_u16(3),
+        };
+
+        let expected = JsonTarget::Port { id: 1 };
+        let mut buf = Vec::new();
+
+        encode_envelope(mode, &mut buf, &header).unwrap();
+        let boundary = buf.len();
+        Format::Json.encode(&mut buf, &expected).unwrap();
+
+        let mut at = 0;
+        let decoded: RequestHeader = decode_envelope(mode, &buf, &mut at).unwrap();
+        assert_eq!(decoded.serial, header.serial, "`{mode}` lost the serial");
+        assert_eq!(decoded.id, header.id, "`{mode}` lost the id");
+        assert_eq!(decoded.format, header.format, "`{mode}` lost the format");
+        assert_eq!(at, boundary, "`{mode}` misreported the envelope boundary");
+
+        let decoded: JsonTarget = Format::Json.decode(&buf, &mut at).unwrap();
+        assert_eq!(decoded, expected, "`{mode}` body failed");
+        assert_eq!(at, buf.len(), "`{mode}` did not consume the whole frame");
+    }
+
     #[test]
     #[cfg(feature = "format-json")]
-    fn json_envelope_then_tagged_body() {
-        for mode in Mode::ALL.iter().copied() {
-            let header = RequestHeader {
-                version: VERSION,
-                serial: 7,
-                id: 11,
-                format: Format::Json.to_u8(),
-                channel: ChannelId::from_u16(3),
-            };
+    fn json_binary_envelope_then_tagged_body() {
+        json_envelope_then_tagged_body(Mode::Binary);
+    }
 
-            let expected = JsonTarget::Port { id: 1 };
-            let mut buf = Vec::new();
-
-            encode_envelope(mode, &mut buf, &header).unwrap();
-            let boundary = buf.len();
-            Format::Json.encode(&mut buf, &expected).unwrap();
-
-            let mut at = 0;
-            let decoded: RequestHeader = decode_envelope(mode, &buf, &mut at).unwrap();
-            assert_eq!(decoded.serial, header.serial, "`{mode}` lost the serial");
-            assert_eq!(decoded.id, header.id, "`{mode}` lost the id");
-            assert_eq!(decoded.format, header.format, "`{mode}` lost the format");
-            assert_eq!(at, boundary, "`{mode}` misreported the envelope boundary");
-
-            let decoded: JsonTarget = Format::Json.decode(&buf, &mut at).unwrap();
-            assert_eq!(decoded, expected, "`{mode}` body failed");
-            assert_eq!(at, buf.len(), "`{mode}` did not consume the whole frame");
-        }
+    #[test]
+    #[cfg(feature = "format-json")]
+    fn json_text_envelope_then_tagged_body() {
+        json_envelope_then_tagged_body(Mode::Text);
     }
 
     /// JSON must be keyed by field name, which is the point of offering it.
