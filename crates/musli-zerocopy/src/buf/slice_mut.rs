@@ -315,7 +315,10 @@ where
     /// ```
     #[inline]
     pub fn reserve(&mut self, capacity: usize) -> Result<(), AllocError> {
-        let new_capacity = self.len + capacity;
+        let new_capacity = self
+            .len
+            .checked_add(capacity)
+            .ok_or_else(|| AllocError::capacity(self.capacity, usize::MAX))?;
         self.ensure_capacity(new_capacity)
     }
 
@@ -955,6 +958,9 @@ where
         align: usize,
         reserve: usize,
     ) -> Result<(), AllocError> {
+        if !align.is_power_of_two() {
+            return Err(AllocError::capacity(0, align));
+        }
         self.requested = self.requested.max(align);
         self.ensure_aligned_and_reserve(align, reserve)?;
         Ok(())
