@@ -1,6 +1,9 @@
 use anyhow::Result;
+use musli::alloc::Allocator;
 use musli::alloc::Global;
+use musli::de::{AsDecoder, Decoder};
 use musli::json;
+use musli::mode::Text;
 use musli::value::{self, Value};
 use musli::{Decode, Encode};
 
@@ -143,5 +146,90 @@ fn platform_sized_integers() -> Result<()> {
     assert_eq!(value, Value::from(-42i32));
     #[cfg(target_pointer_width = "64")]
     assert_eq!(value, Value::from(-42i64));
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Decode, Encode)]
+enum Enum {
+    Unit,
+    Tuple(u32, String),
+    Struct { a: u32, b: String },
+}
+
+/// A value decoded from JSON stores an externally tagged variant as a map with
+/// a single entry, which must still decode as a variant.
+#[test]
+fn json_enum() -> Result<()> {
+    for expected in [
+        Enum::Unit,
+        Enum::Tuple(42, String::from("hello")),
+        Enum::Struct {
+            a: 42,
+            b: String::from("hello"),
+        },
+    ] {
+        let json = json::to_string(&expected)?;
+        let value: Value<Global> = json::from_str(&json)?;
+        let actual: Enum = value::decode_text(&value)?;
+        assert_eq!(actual, expected, "{json}");
+    }
+
+    Ok(())
+}
+
+/// Maps which do not have exactly one entry are not variants.
+#[test]
+fn json_enum_malformed() -> Result<()> {
+    for json in [
+        r#"{}"#,
+        r#"{"Unit":{},"Unit":{}}"#,
+        r#"{"Unit":{},"Struct":{"a":42,"b":"hello"}}"#,
+        r#"[]"#,
+        r#"42"#,
+    ] {
+        let value: Value<Global> = json::from_str(json)?;
+        assert!(value::decode_text::<Enum>(&value).is_err(), "{json}");
+    }
+
+    let value: Value<Global> = json::from_str(r#"{"Missing":{}}"#)?;
+    assert!(value::decode_text::<Enum>(&value).is_err());
+
+    let value: Value<Global> = json::from_str(r#"{"Struct":{"a":"wrong"}}"#)?;
+    assert!(value::decode_text::<Enum>(&value).is_err());
+    Ok(())
+}
+
+/// Decodes an [`Enum`] by buffering it first, which for JSON goes through a
+/// value.
+#[derive(Debug, PartialEq)]
+struct Buffered(Enum);
+
+impl<'de, A> Decode<'de, Text, A> for Buffered
+where
+    A: Allocator,
+{
+    const IS_BITWISE_DECODE: bool = false;
+
+    #[inline]
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Mode = Text, Allocator = A>,
+    {
+        let buffer = decoder.decode_buffer()?;
+        Ok(Buffered(buffer.as_decoder()?.decode()?))
+    }
+}
+
+/// A buffered JSON enum is decoded through a value.
+#[test]
+fn json_enum_buffered() -> Result<()> {
+    let expected = Enum::Struct {
+        a: 42,
+        b: String::from("hello"),
+    };
+
+    let json = json::to_string(&expected)?;
+    let Buffered(actual) = json::from_str(&json)?;
+    assert_eq!(actual, expected);
     Ok(())
 }
