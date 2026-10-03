@@ -371,7 +371,8 @@ where
     ///     a.extend_from_slice(b"abc")?;
     ///     let (buf, len) = a.into_raw_parts();
     ///
-    ///     let b = Vec::<_, A>::from_raw_parts(buf, len);
+    ///     // SAFETY: The parts come from `into_raw_parts`.
+    ///     let b = unsafe { Vec::<_, A>::from_raw_parts(buf, len) };
     ///     assert_eq!(b.as_slice(), b"abc");
     ///     Ok::<_, AllocError>(())
     /// }
@@ -392,6 +393,15 @@ where
 
     /// Construct a vector from raw parts.
     ///
+    /// # Safety
+    ///
+    /// - `len` must be less than or equal to the capacity of `buf`.
+    /// - The first `len` elements of `buf` must be initialized values of `T`.
+    ///
+    /// The vector takes ownership of these elements, so they will be dropped
+    /// when the vector is dropped. The raw parts returned by
+    /// [`Vec::into_raw_parts`] satisfy these requirements.
+    ///
     /// ## Examples
     ///
     /// ```
@@ -405,7 +415,8 @@ where
     ///     a.extend_from_slice(b"abc")?;
     ///     let (buf, len) = a.into_raw_parts();
     ///
-    ///     let b = Vec::<_, A>::from_raw_parts(buf, len);
+    ///     // SAFETY: The parts come from `into_raw_parts`.
+    ///     let b = unsafe { Vec::<_, A>::from_raw_parts(buf, len) };
     ///     assert_eq!(b.as_slice(), b"abc");
     ///     Ok::<_, AllocError>(())
     /// }
@@ -413,8 +424,22 @@ where
     /// musli::alloc::default(|alloc| operate(alloc))?;
     /// # Ok::<_, musli::alloc::AllocError>(())
     /// ```
+    ///
+    /// Since the length is trusted, constructing a vector from raw parts
+    /// requires `unsafe`:
+    ///
+    /// ```compile_fail,E0133
+    /// use musli::alloc::{Allocator, Global, Vec};
+    ///
+    /// let mut a = Vec::<String, Global>::new_in(Global::new());
+    /// a.reserve(10)?;
+    /// let (buf, _) = a.into_raw_parts();
+    /// let b = Vec::<String, Global>::from_raw_parts(buf, 10);
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
     #[inline]
-    pub fn from_raw_parts(buf: A::Alloc<T>, len: usize) -> Self {
+    pub unsafe fn from_raw_parts(buf: A::Alloc<T>, len: usize) -> Self {
+        debug_assert!(len <= buf.capacity());
         Self { buf, len }
     }
 
@@ -544,7 +569,9 @@ where
 
         // Try to merge one buffer with another.
         if let Err(buf) = self.buf.try_merge(self.len, other, other_len) {
-            let other = Vec::<T, A>::from_raw_parts(buf, other_len);
+            // SAFETY: The buffer and length come from `into_raw_parts` above
+            // and were handed back unmodified by `try_merge`.
+            let other = unsafe { Vec::<T, A>::from_raw_parts(buf, other_len) };
             return self.extend_from_slice(other.as_slice());
         }
 
@@ -805,8 +832,9 @@ where
     fn from(value: rust_alloc::vec::Vec<T>) -> Self {
         use core::ptr::NonNull;
 
-        // SAFETY: We know that the vector was allocated as expected using the
-        // global allocator.
+        // SAFETY: The standard vector was allocated by the global allocator
+        // with a layout of `cap` elements, and its first `len` elements are
+        // initialized. Ownership is transferred since it is never dropped.
         unsafe {
             let mut value = ManuallyDrop::new(value);
             let ptr = NonNull::new_unchecked(value.as_mut_ptr());

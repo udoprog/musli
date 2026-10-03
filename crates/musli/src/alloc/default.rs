@@ -85,9 +85,10 @@ unsafe impl<const BUF: usize> GlobalAllocator for &DefaultAllocator<'_, BUF> {
     }
 
     #[inline]
-    fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T> {
+    unsafe fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T> {
         DefaultAlloc {
-            inner: Global::slice_from_raw_parts(ptr, len),
+            // SAFETY: The caller upholds the same requirements.
+            inner: unsafe { Global::slice_from_raw_parts(ptr, len) },
             _marker: PhantomData,
         }
     }
