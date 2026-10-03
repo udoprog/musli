@@ -34,7 +34,7 @@ use super::{Alloc, AllocError, Allocator, GlobalAllocator};
 /// But a box allocated from a [`Slice`] refers to allocator state which is not
 /// synchronized, so it cannot be sent to another thread:
 ///
-/// ```compile_fail
+/// ```compile_fail,E0277
 /// use musli::alloc::{ArrayBuffer, Box, Slice};
 ///
 /// fn assert_send<T: Send>(_: &T) {}
@@ -48,7 +48,7 @@ use super::{Alloc, AllocError, Allocator, GlobalAllocator};
 ///
 /// Nor can it be shared between threads:
 ///
-/// ```compile_fail
+/// ```compile_fail,E0277
 /// use musli::alloc::{ArrayBuffer, Box, Slice};
 ///
 /// fn assert_sync<T: Sync>(_: &T) {}
