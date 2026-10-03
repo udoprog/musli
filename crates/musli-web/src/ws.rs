@@ -102,6 +102,7 @@
 use core::convert::Infallible;
 use core::fmt::{self, Write};
 use core::future::Future;
+use core::mem;
 use core::num::NonZeroU16;
 use core::pin::Pin;
 use core::task::{Context, Poll};
@@ -128,6 +129,8 @@ use crate::buf::{BufPool, InvalidFrame};
 use crate::format;
 
 const MAX_CAPACITY: usize = 1048576;
+const DEFAULT_MAX_IN_FLIGHT: usize = 128;
+const DEFAULT_MAX_OUTBOUND: usize = 8 * 1048576;
 const CLOSE_NORMAL: u16 = 1000;
 const CLOSE_PROTOCOL_ERROR: u16 = 1002;
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -760,6 +763,8 @@ where
     channels: C,
     seed: u64,
     max_capacity: usize,
+    max_in_flight: usize,
+    max_outbound: usize,
     /// Formats this server is willing to negotiate, or `None` to accept every
     /// format it was built with support for.
     formats: Option<&'static [Format]>,
@@ -779,6 +784,8 @@ where
             channels: Channels::default(),
             seed: DEFAULT_SEED,
             max_capacity: MAX_CAPACITY,
+            max_in_flight: DEFAULT_MAX_IN_FLIGHT,
+            max_outbound: DEFAULT_MAX_OUTBOUND,
             formats: None,
         }
     }
@@ -812,6 +819,8 @@ where
             channels,
             seed: self.seed,
             max_capacity: self.max_capacity,
+            max_in_flight: self.max_in_flight,
+            max_outbound: self.max_outbound,
             formats: self.formats,
         }
     }
@@ -867,6 +876,47 @@ where
     pub fn with_max_capacity(self, max_capacity: usize) -> Self {
         self.max_capacity(max_capacity)
     }
+
+    /// Limit the number of requests which are handled concurrently.
+    ///
+    /// Once this many handlers are running, the server stops reading from the
+    /// socket until one of them has completed. The peer is slowed down rather
+    /// than disconnected, and nothing it sent is lost.
+    ///
+    /// A handler which waits for another request on the same connection to
+    /// arrive needs this to be large enough for that request to be read.
+    ///
+    /// By default, the limit is 128.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `max_in_flight` is zero, since no request could then ever be
+    /// handled.
+    #[inline]
+    pub fn max_in_flight(mut self, max_in_flight: usize) -> Self {
+        assert!(max_in_flight > 0, "max_in_flight must be non-zero");
+        self.max_in_flight = max_in_flight;
+        self
+    }
+
+    /// Limit the number of bytes queued for the peer before the server stops
+    /// reading from it.
+    ///
+    /// A peer which keeps sending requests but never reads the responses would
+    /// otherwise make the server buffer an unbounded amount of data. Once this
+    /// many bytes of responses, errors and broadcasts are waiting to be
+    /// written, the server stops reading from the socket until the peer has
+    /// caught up. The peer is slowed down rather than disconnected.
+    ///
+    /// This is not a hard limit on memory use. Requests already being handled
+    /// still queue their responses, and [`Server::broadcast`] is never refused.
+    ///
+    /// By default, the limit is 8 MiB.
+    #[inline]
+    pub fn max_outbound(mut self, max_outbound: usize) -> Self {
+        self.max_outbound = max_outbound;
+        self
+    }
 }
 
 impl<S, H, C> Connect<S, H, C>
@@ -908,6 +958,9 @@ where
             closing: false,
             pool: BufPool::new(self.max_capacity),
             outbound: VecDeque::new(),
+            outbound_bytes: 0,
+            max_in_flight: self.max_in_flight,
+            max_outbound: self.max_outbound,
             error: String::new(),
             last_ping: None,
             rng: SmallRng::seed_from_u64(self.seed),
@@ -956,6 +1009,12 @@ where
     closing: bool,
     pool: BufPool,
     outbound: VecDeque<Buf>,
+    /// The number of bytes in `outbound` which are yet to be written.
+    outbound_bytes: usize,
+    /// Reading stops while this many handlers are running.
+    max_in_flight: usize,
+    /// Reading stops while this many bytes are queued in `outbound`.
+    max_outbound: usize,
     error: String,
     last_ping: Option<[u8; 4]>,
     rng: SmallRng,
@@ -1241,7 +1300,7 @@ where
             Ok::<_, Error>(())
         })?;
 
-        self.outbound.push_back(buf);
+        self.push_outbound(buf);
         Ok(())
     }
 
@@ -1261,10 +1320,16 @@ where
 
             self.handle_send()?;
 
+            // NB: Not reading is what pushes back on a peer which sends faster
+            // than it is answered, or which never reads what it is sent. The
+            // deadlines, the handlers and the write side are still driven, so
+            // the connection keeps making progress towards reading again.
+            let wants_socket_recv = self.socket_recv && !self.is_saturated();
+
             let result = {
                 let inner = Select::<S::Socket, H> {
                     pinned: self.pinned.as_mut(),
-                    wants_socket_recv: self.socket_recv,
+                    wants_socket_recv,
                     wants_socket_send: !self.socket_send,
                     wants_socket_flush: self.socket_flush,
                     set: &mut self.set,
@@ -1376,7 +1441,7 @@ where
                             break 'err true;
                         }
 
-                        self.outbound.push_back(buf);
+                        self.push_outbound(buf);
                         false
                     };
 
@@ -1443,7 +1508,7 @@ where
             Ok::<_, Error>(())
         })?;
 
-        self.outbound.push_back(buf);
+        self.push_outbound(buf);
         Ok(())
     }
 
@@ -1483,7 +1548,7 @@ where
         if result.is_err() {
             self.pool.put(buf);
         } else {
-            self.outbound.push_back(buf);
+            self.push_outbound(buf);
         }
 
         Ok(())
@@ -1594,7 +1659,7 @@ where
                     if result.is_err() {
                         self.pool.put(buf);
                     } else {
-                        self.outbound.push_back(buf);
+                        self.push_outbound(buf);
                     }
 
                     result?;
@@ -1702,8 +1767,20 @@ where
             Ok::<_, Error>(())
         })?;
 
-        self.outbound.push_back(buf);
+        self.push_outbound(buf);
         Ok(())
+    }
+
+    /// Queue a buffer to be written to the peer.
+    fn push_outbound(&mut self, buf: Buf) {
+        self.outbound_bytes = self.outbound_bytes.saturating_add(buf.remaining());
+        self.outbound.push_back(buf);
+    }
+
+    /// Test if the connection has as much work queued as it is allowed, in
+    /// which case nothing more is read from the peer until it has drained.
+    fn is_saturated(&self) -> bool {
+        self.set.len() >= self.max_in_flight || self.outbound_bytes >= self.max_outbound
     }
 
     /// Begin winding the connection down.
@@ -1787,8 +1864,18 @@ where
                     self.pool.put(buf);
                 }
 
+                // NB: Keeps the count from drifting if anything ever bypasses
+                // `push_outbound`.
+                if self.outbound.is_empty() {
+                    self.outbound_bytes = 0;
+                }
+
                 continue;
             };
+
+            self.outbound_bytes = self
+                .outbound_bytes
+                .saturating_sub(frame.len().saturating_add(mem::size_of::<u32>()));
 
             let message = match self.mode {
                 Mode::Binary => S::binary(frame),
@@ -2247,6 +2334,8 @@ mod tests {
         /// Whether the write side has backpressure, which is what a real sink
         /// does while the socket buffer it is writing into has not drained.
         write_blocked: bool,
+        /// Messages the peer has sent which are yet to be read.
+        incoming: VecDeque<Message>,
     }
 
     impl socket_sealed::Sealed for TestSocket {}
@@ -2261,6 +2350,10 @@ mod tests {
         ) -> Poll<Option<Result<Message, Self::Error>>> {
             // SAFETY: Nothing in this socket is structurally pinned.
             let this = unsafe { Pin::get_unchecked_mut(self) };
+
+            if let Some(message) = this.incoming.pop_front() {
+                return Poll::Ready(Some(Ok(message)));
+            }
 
             if !this.ended {
                 return Poll::Pending;
@@ -2358,14 +2451,22 @@ mod tests {
         fn __do_not_implement_id() {}
     }
 
-    #[derive(Clone)]
-    struct TestHandler;
+    #[derive(Clone, Default)]
+    struct TestHandler {
+        /// Whether requests are never answered, which keeps every handler
+        /// in flight.
+        block: bool,
+    }
 
     impl Handler for TestHandler {
         type Id = TestId;
         type Response = bool;
 
         async fn handle(&self, _: Self::Id, _: &mut Incoming<'_>, _: &mut Outgoing<'_>) -> bool {
+            if self.block {
+                core::future::pending::<()>().await;
+            }
+
             false
         }
     }
@@ -2414,7 +2515,7 @@ mod tests {
         let now = Instant::now();
 
         Server {
-            handler: TestHandler,
+            handler: TestHandler::default(),
             pinned: Box::pin(Pinned {
                 socket: TestSocket::default(),
                 close_sleep: tokio::time::sleep_until(close_deadline),
@@ -2424,6 +2525,9 @@ mod tests {
             closing: false,
             pool: BufPool::new(MAX_CAPACITY),
             outbound: VecDeque::new(),
+            outbound_bytes: 0,
+            max_in_flight: DEFAULT_MAX_IN_FLIGHT,
+            max_outbound: DEFAULT_MAX_OUTBOUND,
             error: String::new(),
             last_ping: None,
             rng: SmallRng::seed_from_u64(DEFAULT_SEED),
@@ -2541,5 +2645,102 @@ mod tests {
         assert!(socket(&mut server).sent.is_empty());
         assert_eq!(server.outbound.len(), 1);
         assert!(!server.socket_recv);
+    }
+
+    /// A request as a peer would send it.
+    fn request(mode: Mode, serial: u32) -> Message {
+        let mut out = Vec::new();
+
+        let header = RequestHeader {
+            version: VERSION,
+            serial,
+            id: 1,
+            format: Format::DEFAULT.to_u8(),
+            channel: ChannelId::NONE,
+        };
+
+        format::encode_envelope(mode, &mut out, &header).unwrap();
+
+        match mode {
+            Mode::Binary => Message::Binary(Bytes::from(out)),
+            Mode::Text => Message::Text(Bytes::from(out)),
+        }
+    }
+
+    /// A server with `count` requests waiting to be read.
+    fn flooded_server(count: u32) -> Server<TestServerImpl, TestHandler, Channels> {
+        let mut server = server_with(Instant::now() + CLOSE_TIMEOUT);
+        let mode = server.mode;
+
+        socket(&mut server)
+            .incoming
+            .extend((1..=count).map(|serial| request(mode, serial)));
+
+        server
+    }
+
+    /// Run the server until it has nothing left to do short of a deadline.
+    async fn run_until_idle(server: &mut Server<TestServerImpl, TestHandler, Channels>) {
+        let result = tokio::time::timeout(Duration::from_millis(100), server.run()).await;
+        assert!(result.is_err(), "The connection should still be up");
+    }
+
+    /// Requests which are never answered must stop the server from reading
+    /// more of them, or a peer can make it spawn handlers without bound.
+    #[tokio::test]
+    async fn in_flight_handlers_stop_reading() {
+        let mut server = flooded_server(10);
+        server.handler = TestHandler { block: true };
+        server.max_in_flight = 3;
+
+        run_until_idle(&mut server).await;
+
+        assert_eq!(server.set.len(), 3);
+        assert_eq!(socket(&mut server).incoming.len(), 7);
+    }
+
+    /// A peer which sends requests but never reads the responses must stop
+    /// being read from once enough output is queued for it, or it grows the
+    /// server's memory without bound.
+    #[tokio::test]
+    async fn queued_output_stops_reading() {
+        let mut server = flooded_server(10);
+        // NB: One request at a time, so that it is the queued output and not
+        // the number of handlers which holds the rest back.
+        server.max_in_flight = 1;
+        server.max_outbound = 1;
+        socket(&mut server).write_blocked = true;
+
+        run_until_idle(&mut server).await;
+
+        assert!(server.set.is_empty());
+        assert_eq!(server.outbound.len(), 1);
+        assert!(server.outbound_bytes > 0);
+        assert_eq!(socket(&mut server).incoming.len(), 9);
+        assert!(socket(&mut server).sent.is_empty());
+    }
+
+    /// Reading resumes once the queued output has been written, so a peer
+    /// which keeps up is never stalled by the limits.
+    #[tokio::test]
+    async fn reading_resumes_once_drained() {
+        let mut server = flooded_server(10);
+        server.max_in_flight = 1;
+        server.max_outbound = 1;
+
+        run_until_idle(&mut server).await;
+
+        assert!(server.set.is_empty());
+        assert!(server.outbound.is_empty());
+        assert_eq!(server.outbound_bytes, 0);
+        assert!(socket(&mut server).incoming.is_empty());
+
+        let sent = &socket(&mut server).sent;
+        assert_eq!(sent.len(), 10);
+
+        assert!(
+            sent.iter()
+                .all(|m| matches!(m, TestMessage::Binary(..) | TestMessage::Text(..)))
+        );
     }
 }

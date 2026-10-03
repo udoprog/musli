@@ -131,6 +131,13 @@ impl Buf {
         self.read.get() >= self.buffer.len()
     }
 
+    /// The number of bytes which are yet to be read, including the length
+    /// prefix of every frame.
+    #[inline]
+    pub(crate) fn remaining(&self) -> usize {
+        self.buffer.len().saturating_sub(self.read.get())
+    }
+
     fn len_at_mut(&mut self, at: usize) -> Option<&mut [u8; 4]> {
         let bytes = self.buffer.get_mut(at..at + mem::size_of::<u32>())?;
         Some(unsafe { &mut *bytes.as_mut_ptr().cast() })
