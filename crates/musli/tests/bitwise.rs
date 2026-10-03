@@ -72,3 +72,36 @@ struct BitwiseNonZero {
 
 const _: () = assert!(musli::is_bitwise_encode::<BitwiseNonZero>());
 const _: () = assert!(!musli::is_bitwise_decode::<BitwiseNonZero>());
+
+#[cfg(target_has_atomic = "8")]
+#[derive(Debug, Decode)]
+#[musli(packed)]
+#[repr(C)]
+struct WithAtomicBool {
+    a: core::sync::atomic::AtomicBool,
+}
+
+// An atomic boolean must not be bitwise decoded, since not every byte is a
+// valid bool.
+#[test]
+#[cfg(target_has_atomic = "8")]
+fn atomic_bool_is_not_bitwise_decode() {
+    assert!(!musli::is_bitwise_decode::<core::sync::atomic::AtomicBool>());
+    assert!(!musli::is_bitwise_decode::<WithAtomicBool>());
+}
+
+#[test]
+#[cfg(target_has_atomic = "8")]
+fn atomic_bool_rejects_invalid_byte() {
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    assert!(musli::packed::from_slice::<AtomicBool>(&[2]).is_err());
+    assert!(musli::storage::from_slice::<AtomicBool>(&[2]).is_err());
+    assert!(musli::packed::from_slice::<[AtomicBool; 2]>(&[1, 2]).is_err());
+    assert!(musli::packed::from_slice::<WithAtomicBool>(&[2]).is_err());
+
+    let value = musli::packed::from_slice::<AtomicBool>(&[1]).unwrap();
+    assert!(value.load(Ordering::Relaxed));
+    let value = musli::packed::from_slice::<AtomicBool>(&[0]).unwrap();
+    assert!(!value.load(Ordering::Relaxed));
+}
