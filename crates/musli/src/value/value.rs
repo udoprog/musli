@@ -25,6 +25,12 @@ use super::type_hint::{FloatKind, IntegerKind, NumberHint, TypeHint};
 ///
 /// [Müsli]: https://github.com/udoprog/musli
 ///
+/// # Nesting limit
+///
+/// Decoding a value accepts at most 128 levels of nested containers, where
+/// sequences, maps, variants and optional values each count as one level.
+/// Deeper input is rejected with an error instead of overflowing the stack.
+///
 /// # Examples
 ///
 /// ```
@@ -599,7 +605,34 @@ impl Number {
     }
 }
 
-struct AnyVisitor;
+/// The maximum number of nested containers accepted when decoding a [`Value`].
+///
+/// Decoding a value recurses once per level of nesting, so without a limit
+/// deeply nested input would overflow the stack.
+const MAX_DEPTH: usize = 128;
+
+#[derive(Clone, Copy)]
+struct AnyVisitor {
+    /// The number of containers which may still be entered.
+    remaining: usize,
+}
+
+impl AnyVisitor {
+    /// Enter a container, returning the visitor used for its contents.
+    #[inline]
+    fn enter<C>(self, cx: C) -> Result<Self, C::Error>
+    where
+        C: Context,
+    {
+        let Some(remaining) = self.remaining.checked_sub(1) else {
+            return Err(cx.message(format_args!(
+                "Recursion limit exceeded, values may be nested at most {MAX_DEPTH} levels deep"
+            )));
+        };
+
+        Ok(Self { remaining })
+    }
+}
 
 #[crate::trait_defaults(crate)]
 impl<'de, C> Visitor<'de, C> for AnyVisitor
@@ -753,7 +786,8 @@ where
         D: Decoder<'de, Cx = C, Error = C::Error, Allocator = C::Allocator>,
     {
         let cx = decoder.cx();
-        let value = decoder.decode::<Value<C::Allocator>>()?;
+        let visitor = self.enter(cx)?;
+        let value = decoder.decode_any(visitor)?;
         let value = Box::new_in(value, cx.alloc()).map_err(cx.map())?;
         Ok(Value::new(ValueKind::Option(Some(value))))
     }
@@ -764,11 +798,13 @@ where
         D: ?Sized + SequenceDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = seq.cx();
+        let visitor = self.enter(cx)?;
 
         let size = cautious::<Value<C::Allocator>>(seq.size_hint());
         let mut out = Vec::with_capacity_in(size, cx.alloc()).map_err(cx.map())?;
 
-        while let Some(item) = seq.try_next()? {
+        while let Some(item) = seq.try_decode_next()? {
+            let item = item.decode_any(visitor)?;
             out.push(item).map_err(cx.map())?;
         }
 
@@ -781,13 +817,14 @@ where
         D: ?Sized + MapDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = map.cx();
+        let visitor = self.enter(cx)?;
 
         let size = cautious::<(Value<C::Allocator>, Value<C::Allocator>)>(map.size_hint());
         let mut out = Vec::with_capacity_in(size, cx.alloc()).map_err(cx.map())?;
 
         while let Some(mut entry) = map.decode_entry()? {
-            let first = entry.decode_key()?.decode()?;
-            let second = entry.decode_value()?.decode()?;
+            let first = entry.decode_key()?.decode_any(visitor)?;
+            let second = entry.decode_value()?.decode_any(visitor)?;
             out.push((first, second)).map_err(cx.map())?;
         }
 
@@ -809,8 +846,9 @@ where
     where
         D: ?Sized + VariantDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
-        let first = variant.decode_tag()?.decode()?;
-        let second = variant.decode_value()?.decode()?;
+        let visitor = self.enter(variant.cx())?;
+        let first = variant.decode_tag()?.decode_any(visitor)?;
+        let second = variant.decode_value()?.decode_any(visitor)?;
         let value =
             Box::new_in((first, second), variant.cx().alloc()).map_err(variant.cx().map())?;
         Ok(Value::new(ValueKind::Variant(value)))
@@ -828,7 +866,9 @@ where
     where
         D: Decoder<'de, Mode = M, Allocator = A>,
     {
-        decoder.decode_any(AnyVisitor)
+        decoder.decode_any(AnyVisitor {
+            remaining: MAX_DEPTH,
+        })
     }
 }
 
