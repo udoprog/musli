@@ -1218,15 +1218,23 @@ where
     fn connect_once(self: &Rc<Self>) {
         self.connecting.set(true);
 
+        // NB: A failed attempt leaves no socket behind whose events could ever
+        // reset `connecting`, so it has to be reset here or `open` would never
+        // try again.
+        if let Err(error) = self.try_connect() {
+            self.on_error.call(error);
+            self.should_be.set(State::Closed);
+            self.connecting.set(false);
+        }
+    }
+
+    fn try_connect(self: &Rc<Self>) -> Result<()> {
         let url = match &self.connect.kind {
             ConnectKind::Location { path } => {
                 let location = match WindowImpl::location(&self.window) {
                     Ok(location) => location,
                     Err(e) => {
-                        self.on_error
-                            .call(Error::message(format_args!("Could not get location: {e}")));
-                        self.should_be.set(State::Closed);
-                        return;
+                        return Err(Error::message(format_args!("Could not get location: {e}")));
                     }
                 };
 
@@ -1240,12 +1248,9 @@ where
                     "https:" => "wss:",
                     "http:" => "ws:",
                     other => {
-                        self.on_error.call(Error::message(format_args!(
+                        return Err(Error::message(format_args!(
                             "Unsupported protocol `{other}` for same host connection"
                         )));
-
-                        self.should_be.set(State::Closed);
-                        return;
                     }
                 };
 
@@ -1264,16 +1269,9 @@ where
             }
         }
 
-        let ws = match SocketImpl::new(&url, &self.handles) {
-            Ok(ws) => ws,
-            Err(error) => {
-                self.on_error.call(error);
-                self.should_be.set(State::Closed);
-                return;
-            }
-        };
-
+        let ws = SocketImpl::new(&url, &self.handles)?;
         *self.socket.borrow_mut() = Some(ws);
+        Ok(())
     }
 }
 
