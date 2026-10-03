@@ -118,6 +118,9 @@ pub mod api;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]
 pub use self::api::{AtomicChannelId, ChannelId, Format, Mode, VERSION};
 
+#[macro_use]
+mod macros;
+
 #[cfg(feature = "api")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "api")))]
 pub mod format;

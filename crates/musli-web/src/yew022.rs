@@ -168,14 +168,4 @@
 //! }
 //! ```
 
-use yew022::Callback;
-
-impl<I> crate::web::Callback<I> for Callback<I>
-where
-    I: 'static,
-{
-    #[inline]
-    fn call(&self, result: I) {
-        self.emit(result);
-    }
-}
+yew_impl!(yew022);
