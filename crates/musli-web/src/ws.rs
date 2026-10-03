@@ -1848,17 +1848,19 @@ where
     fn handle_send(&mut self) -> Result<(), Error> {
         let (_, _, mut socket) = self.pinned.as_mut().project();
 
-        if self.socket_send
-            && let Some(message) = self.out.pop_front()
-        {
-            socket.as_mut().start_send(message)?;
-            self.socket_flush = true;
-            self.socket_send = false;
+        if self.socket_send {
+            if let Some(message) = self.out.pop_front() {
+                socket.as_mut().start_send(message)?;
+                self.socket_flush = true;
+                self.socket_send = false;
+            }
         }
 
-        while self.socket_send
-            && let Some(buf) = self.outbound.front_mut()
-        {
+        while self.socket_send {
+            let Some(buf) = self.outbound.front_mut() else {
+                break;
+            };
+
             let Some(frame) = buf.read()? else {
                 if let Some(buf) = self.outbound.pop_front() {
                     self.pool.put(buf);
@@ -2000,25 +2002,29 @@ where
             return Poll::Ready(Output::Ping);
         }
 
-        if wants_socket_recv && let Poll::Ready(output) = socket.as_mut().poll_next(cx) {
-            return Poll::Ready(Output::Recv(output));
+        if wants_socket_recv {
+            if let Poll::Ready(output) = socket.as_mut().poll_next(cx) {
+                return Poll::Ready(Output::Recv(output));
+            }
         }
 
-        if wants_socket_send && let Poll::Ready(result) = socket.as_mut().poll_ready(cx) {
-            return Poll::Ready(Output::Send(result));
+        if wants_socket_send {
+            if let Poll::Ready(result) = socket.as_mut().poll_ready(cx) {
+                return Poll::Ready(Output::Send(result));
+            }
         }
 
-        if wants_socket_flush && let Poll::Ready(result) = socket.as_mut().poll_flush(cx) {
-            return Poll::Ready(Output::Flushed(result));
+        if wants_socket_flush {
+            if let Poll::Ready(result) = socket.as_mut().poll_flush(cx) {
+                return Poll::Ready(Output::Flushed(result));
+            }
         }
 
         // NB: An empty `JoinSet` is `Ready(None)` and registers no waker, so
         // this drops through to `Pending` having registered nothing of its
         // own. That is only safe because the two deadlines above are polled
         // unconditionally and have registered theirs.
-        if let Poll::Ready(output) = set.poll_join_next(cx)
-            && let Some(output) = output
-        {
+        if let Poll::Ready(Some(output)) = set.poll_join_next(cx) {
             let output = match output {
                 Ok(output) => output,
                 Err(error) => {
@@ -2241,9 +2247,7 @@ impl fmt::Display for SupportedFormats {
         let mut first = true;
 
         for format in Format::supported() {
-            if let Some(formats) = self.0
-                && !formats.contains(&format)
-            {
+            if self.0.is_some_and(|formats| !formats.contains(&format)) {
                 continue;
             }
 
