@@ -92,7 +92,7 @@ unsafe impl GlobalAllocator for Global {
     }
 
     #[inline]
-    fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T> {
+    unsafe fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T> {
         GlobalAlloc {
             data: ptr,
             size: len,

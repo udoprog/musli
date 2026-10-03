@@ -28,9 +28,27 @@ where
     /// Construct an allocation from the given raw parts assuming they are
     /// allocated using the [`Global`] allocator.
     ///
+    /// # Safety
+    ///
+    /// - `ptr` must have been allocated by the [`Global`] allocator with the
+    ///   layout of an array of `len` elements of `T`, or be dangling and
+    ///   suitably aligned if that layout has a size of zero.
+    /// - The returned allocation takes ownership of that memory, so it must not
+    ///   be freed or used through any other means afterwards.
+    ///
+    /// Since the pointer is trusted, calling this requires `unsafe`:
+    ///
+    /// ```compile_fail,E0133
+    /// use core::ptr::NonNull;
+    ///
+    /// use musli::alloc::{Global, GlobalAllocator};
+    ///
+    /// let alloc = Global::slice_from_raw_parts(NonNull::<u32>::dangling(), 4);
+    /// ```
+    ///
     /// [`Global`]: super::Global
     #[doc(hidden)]
-    fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T>;
+    unsafe fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T>;
 }
 
 /// An allocator that can be used in combination with a context.
