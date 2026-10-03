@@ -371,6 +371,9 @@ fn enum_ignored_aligned_pad_preserves_fields() -> Result<()> {
     Ok(())
 }
 
+// `usize::MAX` is out of range for `isize`, which was previously used for the
+// discriminant. It is portable, since it is the maximum on every target.
+#[allow(clippy::enum_clike_unportable_variant)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, ZeroCopy)]
 #[repr(usize)]
 #[zero_copy(crate)]
