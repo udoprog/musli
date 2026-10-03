@@ -370,3 +370,25 @@ fn enum_ignored_aligned_pad_preserves_fields() -> Result<()> {
     );
     Ok(())
 }
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, ZeroCopy)]
+#[repr(usize)]
+#[zero_copy(crate)]
+enum EnumUsize {
+    A = 1,
+    B = usize::MAX,
+}
+
+#[test]
+fn repr_usize_enum() -> Result<()> {
+    const _: () = assert!(size_of::<EnumUsize>() == size_of::<usize>());
+
+    let mut buf = OwnedBuf::new();
+    let a = buf.store(&EnumUsize::A)?;
+    let b = buf.store(&EnumUsize::B)?;
+    assert_eq!(buf.load(a)?, &EnumUsize::A);
+    assert_eq!(buf.load(b)?, &EnumUsize::B);
+
+    assert!(load_bytes::<EnumUsize>(&2usize.to_ne_bytes()).is_err());
+    Ok(())
+}

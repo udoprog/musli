@@ -53,7 +53,7 @@ impl NumericalRepr {
             NumericalRepr::I64 => "i64",
             NumericalRepr::I128 => "i128",
             NumericalRepr::Isize => "isize",
-            NumericalRepr::Usize => "isize",
+            NumericalRepr::Usize => "usize",
         }
     }
 }

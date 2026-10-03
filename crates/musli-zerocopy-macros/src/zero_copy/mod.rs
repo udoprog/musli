@@ -890,7 +890,7 @@ impl ReprAttr {
             repr!(i64, Repr::Num(meta.path.span(), NumericalRepr::I64));
             repr!(i128, Repr::Num(meta.path.span(), NumericalRepr::I128));
             repr!(isize, Repr::Num(meta.path.span(), NumericalRepr::Isize));
-            repr!(Usize, Repr::Num(meta.path.span(), NumericalRepr::Usize));
+            repr!(usize, Repr::Num(meta.path.span(), NumericalRepr::Usize));
 
             // #[repr(align(N))]
             if meta.path.is_ident("align") {
