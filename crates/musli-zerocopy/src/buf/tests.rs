@@ -7,7 +7,7 @@ use anyhow::Result;
 use crate::mem::PackedMaybeUninit;
 use crate::{Ref, ZeroCopy};
 
-use super::OwnedBuf;
+use super::{OwnedBuf, SliceMut};
 
 #[derive(Debug, PartialEq, ZeroCopy)]
 #[zero_copy(crate)]
@@ -187,4 +187,51 @@ fn test_packing() {
     }
 
     const _: () = assert!(!Packed1::PADDED);
+}
+
+/// A reference whose start is in bounds but whose end is not must be rejected,
+/// since writing through it would store past the end of the slice.
+#[test]
+fn slice_mut_load_uninit_mut_rejects_value_past_end() {
+    let mut bytes = [0u8; 4];
+    let mut buf = SliceMut::new(&mut bytes);
+
+    let reference = Ref::<PackedMaybeUninit<u64>>::new(0u32);
+    assert!(buf.load_uninit_mut(reference).is_err());
+}
+
+/// A reference taken from a larger, foreign buffer must not allow writing past
+/// the end of a smaller one.
+#[test]
+fn slice_mut_load_uninit_mut_rejects_foreign_ref() -> Result<()> {
+    let mut large = [0u8; 64];
+    let mut large = SliceMut::new(&mut large);
+    large.store(&0u32)?;
+    let foreign = large.store_uninit::<[u32; 2]>()?;
+    assert_eq!(foreign.offset(), 4);
+
+    // The start of the foreign reference is in bounds of the smaller buffer,
+    // but its end is past the end of the underlying slice.
+    let mut small = [0u8; 8];
+    let mut small = SliceMut::new(&mut small);
+    small.store(&0u32)?;
+
+    assert!(small.load_uninit_mut(foreign).is_err());
+    Ok(())
+}
+
+/// A value which exactly fits the initialized region is still accepted.
+#[test]
+fn slice_mut_load_uninit_mut_exact_fit() -> Result<()> {
+    let mut bytes = [0u8; 8];
+
+    {
+        let mut buf = SliceMut::new(&mut bytes);
+        let reference = buf.store_uninit::<u64>()?;
+        buf.load_uninit_mut(reference)?
+            .write(&0x0102030405060708u64);
+    }
+
+    assert_eq!(bytes, 0x0102030405060708u64.to_ne_bytes());
+    Ok(())
 }
