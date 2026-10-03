@@ -15,6 +15,52 @@ use super::{Alloc, AllocError, Allocator, GlobalAllocator};
 ///
 /// [std-box]: std::boxed::Box
 /// [`Context`]: crate::Context
+///
+/// # Thread safety
+///
+/// A box is [`Send`] or [`Sync`] only if the allocation it holds is. Boxes
+/// backed by the global allocator are thread safe as long as `T` is:
+///
+/// ```
+/// use musli::alloc::{Box, Global};
+///
+/// fn assert_send_sync<T: Send + Sync>(_: &T) {}
+///
+/// let boxed = Box::<u32, Global>::new_in(42, Global::new())?;
+/// assert_send_sync(&boxed);
+/// # Ok::<_, musli::alloc::AllocError>(())
+/// ```
+///
+/// But a box allocated from a [`Slice`] refers to allocator state which is not
+/// synchronized, so it cannot be sent to another thread:
+///
+/// ```compile_fail
+/// use musli::alloc::{ArrayBuffer, Box, Slice};
+///
+/// fn assert_send<T: Send>(_: &T) {}
+///
+/// let mut buf = ArrayBuffer::new();
+/// let alloc = Slice::new(&mut buf);
+/// let boxed = Box::new_in(42u32, &alloc)?;
+/// assert_send(&boxed);
+/// # Ok::<_, musli::alloc::AllocError>(())
+/// ```
+///
+/// Nor can it be shared between threads:
+///
+/// ```compile_fail
+/// use musli::alloc::{ArrayBuffer, Box, Slice};
+///
+/// fn assert_sync<T: Sync>(_: &T) {}
+///
+/// let mut buf = ArrayBuffer::new();
+/// let alloc = Slice::new(&mut buf);
+/// let boxed = Box::new_in(42u32, &alloc)?;
+/// assert_sync(&boxed);
+/// # Ok::<_, musli::alloc::AllocError>(())
+/// ```
+///
+/// [`Slice`]: https://docs.rs/musli/latest/musli/alloc/struct.Slice.html
 pub struct Box<T, A>
 where
     A: Allocator,
@@ -79,19 +125,6 @@ where
 
         Self { buf }
     }
-}
-
-unsafe impl<T, A> Send for Box<T, A>
-where
-    T: Send,
-    A: Allocator,
-{
-}
-unsafe impl<T, A> Sync for Box<T, A>
-where
-    T: Sync,
-    A: Allocator,
-{
 }
 
 impl<T, A> Deref for Box<T, A>
