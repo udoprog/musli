@@ -756,3 +756,20 @@ fn merge_does_not_free_the_wrong_region() {
     assert_eq!(b.as_slice(), &[1, 2, 3, 4]);
     assert_eq!(c.as_slice(), &[5, 6, 7, 8]);
 }
+
+/// Reserving an amount which overflows the requested length must fail, rather
+/// than wrapping around and reporting success without growing.
+#[test]
+fn reserve_overflow_fails() {
+    let mut buf = ArrayBuffer::<128>::with_size();
+    let alloc = Slice::new(&mut buf);
+
+    let mut a = Vec::<u8, _>::new_in(&alloc);
+    assert!(a.extend_from_slice(&[1, 2, 3, 4]).is_ok());
+    let capacity = a.capacity();
+
+    assert!(a.reserve(usize::MAX).is_err());
+    assert!(a.reserve(usize::MAX - 1).is_err());
+    assert_eq!(a.capacity(), capacity);
+    assert_eq!(a.as_slice(), &[1, 2, 3, 4]);
+}

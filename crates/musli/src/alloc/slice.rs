@@ -336,8 +336,12 @@ impl<T> Alloc<T> for SliceAlloc<'_, T> {
         // Cheaply check the locally known capacity.
         //
         // This capacity is in units of `T`, and is only ever at risk of being
-        // too small if the allocation has been grown.
-        if len + additional <= self.cap {
+        // too small if the allocation has been grown. An overflowing request
+        // falls through and is rejected below.
+        if len
+            .checked_add(additional)
+            .is_some_and(|requested| requested <= self.cap)
+        {
             return Ok(());
         }
 
