@@ -28,6 +28,9 @@ use slab::Slab;
 use crate::api::{self, ChannelId, DecodeBody, Event, Format, MessageId, Mode};
 use crate::format;
 
+#[cfg(test)]
+mod tests;
+
 const MAX_CAPACITY: usize = 1048576;
 
 /// An empty request body.
@@ -857,14 +860,22 @@ where
     pub(crate) fn next_buffer(self: &Rc<Self>, needed: usize) -> Box<BufData> {
         match self.g.buffers.borrow_mut().pop_front() {
             Some(mut buf) => {
-                if buf.data.capacity() < needed {
-                    buf.data.reserve(needed - buf.data.len());
-                }
-
+                // NB: Recycled buffers are cleared when they are returned, so
+                // every message starts writing from the beginning.
+                debug_assert!(buf.data.is_empty());
+                buf.data.reserve(needed);
                 buf
             }
             None => Box::new(BufData::with_capacity(Rc::downgrade(&self.g), needed)),
         }
+    }
+
+    /// Handle a text frame.
+    pub(crate) fn text_message(self: &Rc<Self>, text: &str) -> Result<()> {
+        let bytes = text.as_bytes();
+        let mut buf = self.next_buffer(bytes.len());
+        buf.data.extend_from_slice(bytes);
+        self.message(Mode::Text, buf)
     }
 
     /// Resolve the format a message body is encoded with from its envelope.
@@ -2090,8 +2101,9 @@ impl BufData {
 
             let mut buffers = g.buffers.borrow_mut();
 
-            // Set the length of the recycled buffer.
-            buf.data.set_len(buf.data.len().min(MAX_CAPACITY));
+            // NB: The next message is written from the start of the buffer, so
+            // the contents of this one must not linger.
+            buf.data.clear();
 
             // We size our buffers to some max capacity to avod overuse in case
             // we infrequently need to handle some massive message. If we don't

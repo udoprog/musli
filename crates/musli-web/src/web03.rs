@@ -340,11 +340,8 @@ impl Shared<Web03Impl> {
 
         // NB: The browser hands a text frame over as a string and a binary one
         // as an `ArrayBuffer`, which is what tells the two modes apart.
-        let (mode, buf) = if let Some(text) = data.as_string() {
-            let bytes = text.as_bytes();
-            let mut buf = self.next_buffer(bytes.len());
-            buf.data.extend_from_slice(bytes);
-            (Mode::Text, buf)
+        let result = if let Some(text) = data.as_string() {
+            self.text_message(&text)
         } else {
             let Ok(array_buffer) = data.dyn_into::<ArrayBuffer>() else {
                 self.on_error
@@ -357,16 +354,17 @@ impl Shared<Web03Impl> {
 
             let mut buf = self.next_buffer(needed);
 
-            // SAFETY: We've sized the buffer appropriately above.
+            // SAFETY: We've sized the buffer appropriately above, and recycled
+            // buffers are empty so nothing is left uninitialized.
             unsafe {
                 array.raw_copy_to_ptr(buf.data.as_mut_ptr());
                 buf.data.set_len(needed);
             }
 
-            (Mode::Binary, buf)
+            self.message(Mode::Binary, buf)
         };
 
-        if let Err(e) = self.message(mode, buf) {
+        if let Err(e) = result {
             self.on_error.call(e);
         }
     }
