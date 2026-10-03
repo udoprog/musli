@@ -90,8 +90,10 @@ where
     #[inline]
     unsafe fn validate(validator: &mut Validator<'_, Self>) -> Result<(), Error> {
         unsafe {
-            let offset = *validator.field::<O>()?;
-            let metadata = *validator.field::<T::Stored<O>>()?;
+            // NB: The `Ref` might be stored unaligned, such as inside of a
+            // packed struct, so its fields have to be read unaligned.
+            let offset = validator.read_field::<O>()?;
+            let metadata = validator.read_field::<T::Stored<O>>()?;
             Self::try_from_parts(offset, metadata)?;
             Ok(())
         }

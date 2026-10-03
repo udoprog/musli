@@ -556,7 +556,10 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
 
                 // SAFETY: We've systematically ensured that we're only
                 // validating over fields within the size of this type.
-                match *#validator::field::<#ty>(validator)? {
+                // NB: The discriminant is always at offset zero, and the enum
+                // might be stored unaligned inside of a packed struct, so it
+                // is read without constructing a reference to it.
+                match #validator::load_unaligned::<#ty>(validator)? {
                     #(#validate_variants,)*
                     value => return #result::Err(#error::__invalid_enum_discriminant::<Self>(value)),
                 }

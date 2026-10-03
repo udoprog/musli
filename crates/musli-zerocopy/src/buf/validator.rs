@@ -1,19 +1,30 @@
 use core::marker::PhantomData;
-use core::mem::{align_of, size_of, transmute};
+use core::mem::{align_of, size_of};
 use core::ops::Range;
 use core::ptr::{self, NonNull};
 
-use crate::error::Error;
+use crate::buf::padding_to;
+use crate::error::{Error, ErrorKind};
 use crate::traits::ZeroCopy;
 
 /// Validator over a [`Buf`] constructed using [`Buf::validate_struct`].
 ///
+/// Fields are aligned relative to the start of the value being validated,
+/// which matches how the compiler lays out fields. The value itself is not
+/// required to be aligned, since it might for example be stored inside of a
+/// `#[repr(packed)]` struct or be loaded through an unaligned load.
+///
 /// [`Buf`]: crate::buf::Buf
 /// [`Buf::validate_struct`]: crate::buf::Buf::validate_struct
 #[must_use = "Must call `Validator::end` when validation is completed"]
-#[repr(transparent)]
+// NB: `repr(C)` ensures that `Validator<T>` and `Validator<U>` have the same
+// layout, which `transparent` relies on.
+#[repr(C)]
 pub struct Validator<'a, T: ?Sized> {
+    /// The start of the value being validated.
     data: NonNull<u8>,
+    /// The offset of the next field relative to `data`.
+    offset: usize,
     _marker: PhantomData<&'a T>,
 }
 
@@ -36,8 +47,17 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     pub(crate) unsafe fn new(data: NonNull<u8>) -> Self {
         Self {
             data,
+            offset: 0,
             _marker: PhantomData,
         }
+    }
+
+    /// Pointer to the current field.
+    #[inline]
+    fn current(&self) -> NonNull<u8> {
+        // SAFETY: The caller of the methods which advance the offset ensure
+        // that it stays within the value being validated.
+        unsafe { self.data.add(self.offset) }
     }
 
     /// Indicate that this validate is transparent over `U`.
@@ -47,7 +67,9 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// This is only allowed if `T` is `#[repr(transparent)]` over `U`.
     #[inline]
     pub unsafe fn transparent<U>(&mut self) -> &mut Validator<'a, U> {
-        unsafe { transmute(self) }
+        // SAFETY: `Validator` is `repr(C)` and its layout does not depend on
+        // `T`.
+        unsafe { &mut *(self as *mut Self).cast::<Validator<'a, U>>() }
     }
 
     /// Validate an additional field in the struct and return a reference to it.
@@ -87,18 +109,59 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     /// allowed to call `field` at all and must instead solely rely on
     /// [`validate_with()`].
     ///
+    /// # Errors
+    ///
+    /// Since fields are aligned relative to the start of the value being
+    /// validated, this errors if the field is not aligned in memory. This can
+    /// happen if the value is not itself aligned, such as when it is stored
+    /// inside of a packed struct.
+    ///
     /// [`validate_with()`]: Validator::validate_with
     #[inline]
     pub unsafe fn field<F>(&mut self) -> Result<&F, Error>
     where
         F: ZeroCopy,
     {
-        // SAFETY: We've ensured that the provided buffer is aligned and sized
-        // appropriately above.
         unsafe {
             self.align_with(align_of::<F>());
-            F::validate(&mut Validator::new(self.data))?;
-            let output = self.data.cast::<F>().as_ref();
+            let ptr = self.current();
+
+            if !ptr.cast::<F>().is_aligned() {
+                let addr = ptr.as_ptr() as usize;
+
+                return Err(Error::new(ErrorKind::AlignmentRangeMismatch {
+                    addr,
+                    range: addr..addr.wrapping_add(size_of::<F>()),
+                    align: align_of::<F>(),
+                }));
+            }
+
+            F::validate(&mut Validator::new(ptr))?;
+            // SAFETY: We've checked that the pointer is aligned above, and
+            // the caller ensures that it is in bounds.
+            let output = ptr.cast::<F>().as_ref();
+            self.advance::<F>();
+            Ok(output)
+        }
+    }
+
+    /// Align, validate and perform an unaligned load of an additional field.
+    ///
+    /// # Safety
+    ///
+    /// The current validator only guarantees that validation up to the size of
+    /// `T` can be performed. Advancing beyond that size causes the validator to
+    /// walk out of bounds.
+    #[inline]
+    pub(crate) unsafe fn read_field<F>(&mut self) -> Result<F, Error>
+    where
+        F: ZeroCopy + Copy,
+    {
+        unsafe {
+            self.align_with(align_of::<F>());
+            let ptr = self.current();
+            F::validate(&mut Validator::new(ptr))?;
+            let output = ptr::read_unaligned(ptr.cast::<F>().as_ptr());
             self.advance::<F>();
             Ok(output)
         }
@@ -114,8 +177,8 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     #[inline]
     pub unsafe fn byte(&mut self) -> u8 {
         unsafe {
-            let b = ptr::read(self.data.as_ptr());
-            self.data = NonNull::new_unchecked(self.data.as_ptr().add(1));
+            let b = ptr::read(self.current().as_ptr());
+            self.offset += 1;
             b
         }
     }
@@ -132,11 +195,9 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     where
         F: Copy,
     {
-        // SAFETY: We've ensured that the provided buffer is aligned and
-        // sized
-        // appropriately above.
+        // SAFETY: The caller ensures that the field is in bounds.
         unsafe {
-            let output = ptr::read_unaligned(self.data.cast::<F>().as_ptr());
+            let output = ptr::read_unaligned(self.current().cast::<F>().as_ptr());
             self.advance::<F>();
             Ok(output)
         }
@@ -241,7 +302,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     {
         unsafe {
             self.align_with(align.min(align_of::<F>()));
-            F::validate(&mut Validator::new(self.data))?;
+            F::validate(&mut Validator::new(self.current()))?;
             self.advance::<F>();
             Ok(())
         }
@@ -261,33 +322,31 @@ impl<'a, T: ?Sized> Validator<'a, T> {
         F: ZeroCopy,
     {
         unsafe {
-            F::validate(&mut Validator::new(self.data))?;
+            F::validate(&mut Validator::new(self.current()))?;
             self.advance::<F>();
             Ok(())
         }
     }
 
-    /// Align the current pointer by `F`.
+    /// Align the current offset to `align` relative to the start of the value
+    /// being validated.
+    ///
+    /// `align` must be a power of two.
     #[inline]
     pub(crate) unsafe fn align_with(&mut self, align: usize) {
-        unsafe {
-            let offset = self.data.as_ptr().align_offset(align);
-            self.data = NonNull::new_unchecked(self.data.as_ptr().add(offset));
-        }
+        self.offset += padding_to(self.offset, align);
     }
 
-    /// Advance the current pointer by `F`.
+    /// Advance the current offset by the size of `F`.
     #[inline]
     pub(crate) unsafe fn advance<F>(&mut self) {
-        unsafe {
-            self.data = NonNull::new_unchecked(self.data.as_ptr().add(size_of::<F>()));
-        }
+        self.offset += size_of::<F>();
     }
 
     /// Return the address range associated with a just read `F` for diagnostics.
     #[inline]
     pub(crate) fn range<F>(&self) -> Range<usize> {
-        let end = self.data.as_ptr() as usize;
+        let end = (self.data.as_ptr() as usize).wrapping_add(self.offset);
         let start = end.wrapping_sub(size_of::<F>());
         start..end
     }
