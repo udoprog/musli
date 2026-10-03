@@ -703,9 +703,11 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
     let mut alloc = Ids::new();
 
     for ty in &builders {
-        if let Some((id, span)) = ty.id
-            && let Err(e) = alloc.insert(id)
-        {
+        let Some((id, span)) = ty.id else {
+            continue;
+        };
+
+        if let Err(e) = alloc.insert(id) {
             cx.errors.borrow_mut().push(syn::Error::new(span, e));
         }
     }
