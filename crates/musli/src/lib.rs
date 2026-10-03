@@ -456,9 +456,12 @@
 //!   stack-based serialization can be performed which is useful in no-std
 //!   environments.
 //!
-//! * Some `unsafe` is used for owned `String` decoding in all binary formats to
-//!   support faster string processing through [`simdutf8`]. Disabling the
-//!   `simdutf8` feature (enabled by default) removes the use of this unsafe.
+//! * Some `unsafe` is used for owned `String` decoding in the `storage`, `wire`,
+//!   and `descriptive` formats when the optional `simdutf8` feature is enabled
+//!   (it is not enabled by default). The string is validated with [`simdutf8`]
+//!   and then converted with `String::from_utf8_unchecked`. Without the feature
+//!   this decoding uses the standard library's checked conversion and none of
+//!   this unsafe is compiled.
 //!
 //! To ensure this library is correctly implemented with regards to memory
 //! safety, extensive testing and fuzzing is performed using `miri`. See
