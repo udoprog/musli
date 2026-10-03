@@ -22,6 +22,7 @@ enum Op {
 thread_local! {
     static OPS: RefCell<Vec<Op>> = const { RefCell::new(Vec::new()) };
     static TIMERS: RefCell<Vec<Option<Rc<dyn Fn()>>>> = const { RefCell::new(Vec::new()) };
+    static UNLOAD: RefCell<Option<Rc<dyn Fn()>>> = const { RefCell::new(None) };
 }
 
 fn push_op(op: Op) {
@@ -49,6 +50,18 @@ fn fire_timers() -> usize {
     }
 
     timers.len()
+}
+
+/// The number of timers which have been set and not cancelled.
+fn pending_timers() -> usize {
+    TIMERS.with(|timers| timers.borrow().iter().filter(|t| t.is_some()).count())
+}
+
+/// Fire the `beforeunload` handler, as a browser would on navigation.
+fn fire_unload() {
+    let callback = UNLOAD.with(|unload| unload.borrow().clone());
+    let callback = callback.expect("No beforeunload handler installed");
+    callback();
 }
 
 #[derive(Clone, Copy)]
@@ -120,7 +133,8 @@ impl WindowImpl for MockWindow {
         Ok(MockTimeout(id))
     }
 
-    fn onbeforeunload(&self, _: impl Fn() + 'static) -> Result<Self::OnBeforeUnload, Error> {
+    fn onbeforeunload(&self, callback: impl Fn() + 'static) -> Result<Self::OnBeforeUnload, Error> {
+        UNLOAD.with(|unload| *unload.borrow_mut() = Some(Rc::new(callback)));
         Ok(())
     }
 }
@@ -247,4 +261,104 @@ fn build_connects() {
     let _service = builder.build();
     assert_eq!(take_ops(), vec![Op::Connect(String::from(URL))]);
     assert_eq!(fire_timers(), 0);
+}
+
+/// The state of the connection as seen by the service.
+fn state(service: &Service<MockImpl>) -> State {
+    service.handle().on_state_change(|_: State| {}).0
+}
+
+/// Take the connection through the server hello and format negotiation.
+fn open_session(service: &Service<MockImpl>) {
+    deliver(
+        service,
+        Mode::Binary,
+        &broadcast_header(MessageId::SERVER_HELLO),
+        b"",
+    );
+
+    let Some(Op::Send(mode, bytes)) = take_ops().pop() else {
+        panic!("Expected a negotiation request");
+    };
+
+    let mut at = 0;
+    let request: api::RequestHeader = format::decode_envelope(mode, &bytes, &mut at).unwrap();
+    assert_eq!(request.id, MessageId::NEGOTIATE.get());
+
+    let response = api::ResponseHeader {
+        version: api::VERSION,
+        serial: request.serial,
+        broadcast: 0,
+        error: 0,
+        format: Format::DEFAULT.to_u8(),
+        channel: ChannelId::NONE,
+    };
+
+    deliver(service, mode, &response, b"");
+    assert_eq!(state(service), State::Open);
+}
+
+/// Closing an open connection closes its socket and reports it as closed.
+#[test]
+fn close_closes_the_socket() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+    take_ops();
+
+    service.close();
+
+    assert_eq!(take_ops(), vec![Op::Close]);
+    assert_eq!(state(&service), State::Closed);
+
+    // Nothing brings it back on its own.
+    assert_eq!(fire_timers(), 0);
+    assert!(take_ops().is_empty());
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// Closing while a reconnect is scheduled cancels the reconnect.
+#[test]
+fn close_cancels_pending_reconnect() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    // What a socket error or close event does.
+    service.shared.close_and_reconnect().unwrap();
+    assert_eq!(take_ops(), vec![Op::Close]);
+    assert_eq!(pending_timers(), 1);
+
+    service.close();
+
+    assert_eq!(pending_timers(), 0);
+    assert!(take_ops().is_empty());
+}
+
+/// A service which has been closed can be opened again.
+#[test]
+fn open_after_close_reconnects() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    assert_eq!(take_ops(), vec![Op::Connect(String::from(URL))]);
+
+    service.close();
+    assert_eq!(take_ops(), vec![Op::Close]);
+
+    service.open();
+    assert_eq!(take_ops(), vec![Op::Connect(String::from(URL))]);
+}
+
+/// `close_before_unload` closes the socket when the page unloads.
+#[test]
+fn close_before_unload_closes_the_socket() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.close_before_unload().build();
+    open_session(&service);
+    take_ops();
+
+    fire_unload();
+
+    assert_eq!(take_ops(), vec![Op::Close]);
+    assert_eq!(state(&service), State::Closed);
 }
