@@ -548,15 +548,21 @@ where
     {
         let at = reference.offset();
 
-        if at > self.len {
+        // The whole value must fit in the initialized region, since the
+        // returned reference can be used to write `size_of::<T>()` bytes.
+        if at
+            .checked_add(size_of::<T>())
+            .is_none_or(|end| end > self.len)
+        {
             return Err(Error::new(ErrorKind::OutOfRangeBounds {
-                range: (at..at + size_of::<T>()),
+                range: at..at.saturating_add(size_of::<T>()),
                 len: self.len,
             }));
         }
 
-        // SAFETY: `MaybeUninit<T>` has no representation requirements and is
-        // unaligned.
+        // SAFETY: We've checked that `at..at + size_of::<T>()` is within the
+        // initialized region of the buffer above. `MaybeUninit<T>` has no
+        // representation requirements and is unaligned.
         Ok(unsafe { &mut *(self.data.as_ptr().add(at) as *mut PackedMaybeUninit<T>) })
     }
 
