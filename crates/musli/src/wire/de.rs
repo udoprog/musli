@@ -134,7 +134,16 @@ where
     fn shared_decode_pair_sequence(
         mut self,
     ) -> Result<RemainingWireDecoder<OPT, R, C, M>, C::Error> {
+        let mark = self.cx.mark();
         let len = self.decode_sequence_len()?;
+
+        if len % 2 != 0 {
+            return Err(self.cx.message_at(
+                &mark,
+                format_args!("Expected even length for pair sequence, but got {len}"),
+            ));
+        }
+
         Ok(RemainingWireDecoder::new(self.cx, self.reader, len / 2))
     }
 
