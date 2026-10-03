@@ -1983,23 +1983,14 @@ where
 
     #[inline]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let close;
-        let ping;
-        let mut socket;
-        let wants_socket_recv;
-        let wants_socket_send;
-        let wants_socket_flush;
-        let set;
-
-        // SAFETY: This type is not Unpin.
-        unsafe {
-            let this = Pin::get_unchecked_mut(self);
-            (close, ping, socket) = this.pinned.as_mut().project();
-            wants_socket_recv = this.wants_socket_recv;
-            wants_socket_send = this.wants_socket_send;
-            wants_socket_flush = this.wants_socket_flush;
-            set = &mut this.set;
-        };
+        // NB: Every field is `Unpin`, the pinned state is behind a `Pin` of
+        // its own.
+        let this = Pin::get_mut(self);
+        let (close, ping, mut socket) = this.pinned.as_mut().project();
+        let wants_socket_recv = this.wants_socket_recv;
+        let wants_socket_send = this.wants_socket_send;
+        let wants_socket_flush = this.wants_socket_flush;
+        let set = &mut this.set;
 
         if close.poll(cx).is_ready() {
             return Poll::Ready(Output::Close);
