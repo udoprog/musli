@@ -34,12 +34,57 @@ impl<'a, 'de> MutSliceParser<'a, 'de, true> {
     /// # Safety
     ///
     /// The caller must ensure that the slice contains valid UTF-8. Parsing
-    /// keeps it valid UTF-8, since the slice is only ever advanced past
-    /// complete tokens.
+    /// keeps it valid UTF-8, since every update to the slice goes through
+    /// [`MutSliceParser::set_tail`], which never leaves it starting in the
+    /// middle of a character.
     #[inline]
     pub(crate) unsafe fn new_utf8(slice: &'a mut &'de [u8]) -> Self {
         Self { slice }
     }
+}
+
+impl<'a, 'de, const UTF8: bool> MutSliceParser<'a, 'de, UTF8> {
+    /// Update the slice to `tail`, which must be a suffix of the current
+    /// slice.
+    ///
+    /// When the slice is UTF-8, error paths can stop in the middle of a
+    /// multibyte character, such as when a literal like `true` is compared
+    /// against the next four bytes. Since the slice might have been
+    /// transmuted from a `&mut &str`, it is then advanced to the next
+    /// character boundary so that it stays valid UTF-8.
+    #[inline(always)]
+    fn set_tail<C>(&mut self, cx: C, tail: &'de [u8])
+    where
+        C: Context,
+    {
+        if UTF8 && matches!(tail.first(), Some(&b) if is_continuation(b)) {
+            self.set_tail_realign(cx, tail);
+        } else {
+            *self.slice = tail;
+        }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn set_tail_realign<C>(&mut self, cx: C, tail: &'de [u8])
+    where
+        C: Context,
+    {
+        let n = tail
+            .iter()
+            .position(|&b| !is_continuation(b))
+            .unwrap_or(tail.len());
+
+        *self.slice = &tail[n..];
+        cx.advance(n);
+    }
+}
+
+/// Test if `b` is a UTF-8 continuation byte, which is never at a character
+/// boundary.
+#[inline(always)]
+fn is_continuation(b: u8) -> bool {
+    (b as i8) < -0x40
 }
 
 impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
@@ -74,9 +119,19 @@ impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
     where
         C: Context,
     {
-        let mut access = SliceAccess::<_, UTF8>::new(cx, self.slice, 0);
+        let slice: &'de [u8] = self.slice;
+        let mut access = SliceAccess::<_, UTF8>::new(cx, slice, 0);
         let out = access.parse_string(validate, start, scratch);
-        *self.slice = &self.slice[access.index..];
+        let tail = &slice[access.index..];
+
+        // A successfully parsed string ends after its closing quote, so only
+        // errors can stop inside of a character.
+        if out.is_ok() {
+            *self.slice = tail;
+        } else {
+            self.set_tail(cx, tail);
+        }
+
         out
     }
 
@@ -85,9 +140,19 @@ impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
     where
         C: Context,
     {
-        let mut access = SliceAccess::<_, UTF8>::new(cx, self.slice, 0);
+        let slice: &'de [u8] = self.slice;
+        let mut access = SliceAccess::<_, UTF8>::new(cx, slice, 0);
         let out = access.skip_string();
-        *self.slice = &self.slice[access.index..];
+        let tail = &slice[access.index..];
+
+        // A successfully skipped string ends after its closing quote, so only
+        // errors can stop inside of a character.
+        if out.is_ok() {
+            *self.slice = tail;
+        } else {
+            self.set_tail(cx, tail);
+        }
+
         out
     }
 
@@ -96,12 +161,14 @@ impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
     where
         C: Context,
     {
-        let Some((&b, tail)) = self.slice.split_first() else {
+        let slice: &'de [u8] = self.slice;
+
+        let Some((&b, tail)) = slice.split_first() else {
             return Err(cx.custom(SliceUnderflow::new(1, 0)));
         };
 
-        *self.slice = tail;
         cx.advance(1);
+        self.set_tail(cx, tail);
         Ok(b)
     }
 
@@ -114,8 +181,9 @@ impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
             return Err(cx.custom(SliceUnderflow::new(n, self.slice.len())));
         }
 
-        *self.slice = &self.slice[n..];
+        let slice: &'de [u8] = self.slice;
         cx.advance(n);
+        self.set_tail(cx, &slice[n..]);
         Ok(())
     }
 
@@ -128,10 +196,11 @@ impl<'a, 'de, const UTF8: bool> Parser<'de> for MutSliceParser<'a, 'de, UTF8> {
             return Err(cx.custom(SliceUnderflow::new(buf.len(), self.slice.len())));
         }
 
-        let (head, tail) = self.slice.split_at(buf.len());
-        *self.slice = tail;
+        let slice: &'de [u8] = self.slice;
+        let (head, tail) = slice.split_at(buf.len());
         buf.copy_from_slice(head);
         cx.advance(buf.len());
+        self.set_tail(cx, tail);
         Ok(())
     }
 
