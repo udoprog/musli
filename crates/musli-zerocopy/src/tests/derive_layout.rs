@@ -9,12 +9,15 @@ use anyhow::Result;
 
 use crate::{OwnedBuf, Ref, ZeroCopy};
 
-/// Load a `T` from `bytes` placed at offset 0 of a buffer aligned for `T`.
+/// Load a `T` from `bytes` placed at offset 0 of a buffer aligned to 8 bytes.
+///
+/// The buffer is aligned beyond what `T` requires so that the address of any
+/// nested field is aligned the same way as its offset into `T`.
 fn load_bytes<T>(bytes: &[u8]) -> Result<T, crate::Error>
 where
     T: ZeroCopy + Copy,
 {
-    let mut buf = OwnedBuf::with_alignment::<T>();
+    let mut buf = OwnedBuf::with_alignment::<u64>();
     buf.extend_from_slice(bytes).unwrap();
     buf.load(Ref::<T>::new(0u32)).copied()
 }
@@ -84,5 +87,159 @@ fn packed_n_pad_preserves_fields() -> Result<()> {
     })?;
 
     assert_eq!(buf.as_slice(), &[1, 2, 0, 0, 3, 4, 5, 6]);
+    Ok(())
+}
+
+#[derive(Clone, Copy, ZeroCopy)]
+#[repr(C)]
+#[zero_copy(crate)]
+struct Inner {
+    x: u16,
+    y: bool,
+}
+
+/// `Inner` is stored at offset 1, so its fields are only aligned relative to
+/// the start of `Inner`.
+#[derive(Clone, Copy, ZeroCopy)]
+#[repr(C, packed)]
+#[zero_copy(crate)]
+struct PackedInner {
+    a: u8,
+    inner: Inner,
+}
+
+#[test]
+fn nested_in_packed_layout() {
+    assert_eq!(offset_of!(Inner, x), 0);
+    assert_eq!(offset_of!(Inner, y), 2);
+    assert_eq!(size_of::<Inner>(), 4);
+    assert_eq!(offset_of!(PackedInner, inner), 1);
+    assert_eq!(size_of::<PackedInner>(), 5);
+
+    assert_eq!(offset_of!(PackedEnum, e), 1);
+    assert_eq!(size_of::<Enum>(), 6);
+    assert_eq!(size_of::<PackedEnum>(), 7);
+
+    assert_eq!(offset_of!(PackedEnum16, e), 1);
+    assert_eq!(size_of::<PackedEnum16>(), 4);
+}
+
+#[test]
+fn nested_struct_in_packed_rejects_invalid_field() {
+    // `inner.y` sits at offset 1 + 2 and holds 2.
+    let Err(error) = load_bytes::<PackedInner>(&[0, 0, 0, 2, 0]) else {
+        panic!("expected an invalid bool error");
+    };
+    assert_eq!(error.to_string(), "Invalid bool representation 2");
+}
+
+#[test]
+fn nested_struct_in_packed_accepts_valid_field() {
+    // The last byte is trailing padding of `Inner` and is not validated.
+    let value = load_bytes::<PackedInner>(&[0, 0, 0, 1, 2]).unwrap();
+    let inner = value.inner;
+    assert!(inner.y);
+}
+
+#[derive(Clone, Copy, ZeroCopy)]
+#[repr(u8)]
+#[zero_copy(crate)]
+enum Enum {
+    A(u16, bool),
+}
+
+#[derive(Clone, Copy, ZeroCopy)]
+#[repr(C, packed)]
+#[zero_copy(crate)]
+struct PackedEnum {
+    a: u8,
+    e: Enum,
+}
+
+#[test]
+fn nested_enum_in_packed_rejects_invalid_field() {
+    // The bool of `Enum::A` sits at offset 1 + 4 and holds 2.
+    let Err(error) = load_bytes::<PackedEnum>(&[0, 0, 0, 0, 0, 2, 0]) else {
+        panic!("expected an invalid bool error");
+    };
+    assert_eq!(error.to_string(), "Invalid bool representation 2");
+}
+
+#[test]
+fn nested_enum_in_packed_accepts_valid_field() {
+    // The high byte of the `u16` holds 2, which must not be validated as a
+    // bool.
+    let value = load_bytes::<PackedEnum>(&[0, 0, 0, 0, 2, 1, 0]).unwrap();
+    let Enum::A(_, b) = value.e;
+    assert!(b);
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, ZeroCopy)]
+#[repr(u16)]
+#[zero_copy(crate)]
+enum Enum16 {
+    A = 0,
+    B = 1,
+}
+
+#[derive(Clone, Copy, ZeroCopy)]
+#[repr(C, packed)]
+#[zero_copy(crate)]
+struct PackedEnum16 {
+    a: u8,
+    e: Enum16,
+    b: u8,
+}
+
+#[test]
+fn nested_enum_discriminant_in_packed() {
+    // The discriminant sits unaligned at offset 1.
+    let [d0, d1] = 1u16.to_ne_bytes();
+    let value = load_bytes::<PackedEnum16>(&[0, d0, d1, 0xff]).unwrap();
+    let e = value.e;
+    assert_eq!(e, Enum16::B);
+
+    let [d0, d1] = 5u16.to_ne_bytes();
+    assert!(load_bytes::<PackedEnum16>(&[0, d0, d1, 0]).is_err());
+}
+
+#[test]
+fn unaligned_load_validates_relative_to_value() -> Result<()> {
+    let mut buf = OwnedBuf::with_alignment::<u64>();
+
+    // `Inner` stored at offset 1, with `y` holding 2.
+    buf.extend_from_slice(&[0, 0, 0, 2, 0])?;
+    let Err(error) = buf.load_at_unaligned::<Inner>(1) else {
+        panic!("expected an invalid bool error");
+    };
+    assert_eq!(error.to_string(), "Invalid bool representation 2");
+
+    // `Inner` stored at offset 1 with `y` holding 1, and 2 in its padding.
+    buf.clear();
+    buf.extend_from_slice(&[0, 0, 0, 1, 2])?;
+    assert!(buf.load_at_unaligned::<Inner>(1)?.y);
+    Ok(())
+}
+
+/// A `Ref` validates its fields through loads which must not assume that the
+/// `Ref` itself is aligned.
+#[derive(Clone, Copy, ZeroCopy)]
+#[repr(C, packed)]
+#[zero_copy(crate)]
+struct PackedRef {
+    a: u8,
+    r: Ref<[u8]>,
+}
+
+#[test]
+fn nested_ref_in_packed() -> Result<()> {
+    assert_eq!(offset_of!(PackedRef, r), 1);
+
+    let mut buf = OwnedBuf::with_alignment::<u64>();
+    let slice = buf.store_slice(&[1u8, 2, 3])?;
+    let packed = buf.store(&PackedRef { a: 7, r: slice })?;
+    let packed = *buf.load(packed)?;
+    let r = packed.r;
+    assert_eq!(buf.load(r)?, &[1, 2, 3]);
     Ok(())
 }
