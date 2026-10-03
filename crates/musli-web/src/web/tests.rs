@@ -23,6 +23,10 @@ thread_local! {
     static OPS: RefCell<Vec<Op>> = const { RefCell::new(Vec::new()) };
     static TIMERS: RefCell<Vec<Option<Rc<dyn Fn()>>>> = const { RefCell::new(Vec::new()) };
     static UNLOAD: RefCell<Option<Rc<dyn Fn()>>> = const { RefCell::new(None) };
+    /// The protocol of the page, or `None` if looking up the location fails.
+    static PROTOCOL: RefCell<Option<&'static str>> = const { RefCell::new(Some("http:")) };
+    /// Whether opening a socket fails.
+    static FAIL_SOCKET: Cell<bool> = const { Cell::new(false) };
 }
 
 fn push_op(op: Op) {
@@ -90,6 +94,10 @@ impl SocketImpl for MockSocket {
     type Handles = ();
 
     fn new(url: &str, _: &Self::Handles) -> Result<Self, Error> {
+        if FAIL_SOCKET.with(Cell::get) {
+            return Err(Error::message("Socket failed"));
+        }
+
         push_op(Op::Connect(url.to_string()));
         Ok(MockSocket)
     }
@@ -116,8 +124,12 @@ impl WindowImpl for MockWindow {
     }
 
     fn location(&self) -> Result<Location, Error> {
+        let Some(protocol) = PROTOCOL.with(|p| *p.borrow()) else {
+            return Err(Error::message("No location"));
+        };
+
         Ok(Location {
-            protocol: String::from("http:"),
+            protocol: String::from(protocol),
             host: String::from("localhost"),
             port: String::from("8080"),
         })
@@ -361,4 +373,57 @@ fn close_before_unload_closes_the_socket() {
 
     assert_eq!(take_ops(), vec![Op::Close]);
     assert_eq!(state(&service), State::Closed);
+}
+
+/// A failed attempt to connect is reported, and does not stop the service
+/// from being opened again.
+fn failed_connect_can_be_retried(connect: Connect, fail: impl FnOnce(), recover: impl FnOnce()) {
+    fail();
+
+    let (builder, errors) = builder(connect);
+    let service = builder.build();
+
+    assert!(take_ops().is_empty());
+    assert_eq!(errors.borrow().len(), 1, "{:?}", errors.borrow());
+
+    // NB: A failure is not retried on its own, since there is no reason to
+    // believe that it is transient.
+    assert_eq!(fire_timers(), 0);
+
+    recover();
+    service.open();
+
+    assert_eq!(
+        take_ops(),
+        vec![Op::Connect(String::from("ws://localhost:8080/ws"))]
+    );
+
+    assert_eq!(errors.borrow().len(), 1, "{:?}", errors.borrow());
+}
+
+#[test]
+fn failed_location_lookup_can_be_retried() {
+    failed_connect_can_be_retried(
+        Connect::location("ws"),
+        || PROTOCOL.with(|p| *p.borrow_mut() = None),
+        || PROTOCOL.with(|p| *p.borrow_mut() = Some("http:")),
+    );
+}
+
+#[test]
+fn unsupported_protocol_can_be_retried() {
+    failed_connect_can_be_retried(
+        Connect::location("ws"),
+        || PROTOCOL.with(|p| *p.borrow_mut() = Some("file:")),
+        || PROTOCOL.with(|p| *p.borrow_mut() = Some("http:")),
+    );
+}
+
+#[test]
+fn failed_socket_can_be_retried() {
+    failed_connect_can_be_retried(
+        Connect::location("ws"),
+        || FAIL_SOCKET.with(|f| f.set(true)),
+        || FAIL_SOCKET.with(|f| f.set(false)),
+    );
 }
