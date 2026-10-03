@@ -61,7 +61,11 @@ impl<'a, T: ?Sized> Padder<'a, T> {
         }
     }
 
-    /// Pad around the given field with zeros using a custom alignment `align`.
+    /// Pad around the given field with zeros for a struct marked
+    /// `#[repr(packed(align))]`.
+    ///
+    /// The field is aligned to `min(align, align_of::<F>())`, which is the
+    /// alignment the compiler uses for fields in a packed struct.
     ///
     /// Note that this is necessary to do correctly in order to satisfy the
     /// safety requirements by [`remaining()`].
@@ -76,13 +80,15 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     ///
     /// The caller must ensure that the field type `F` is an actual field in
     /// order in the struct being padded and that `align` matches the argument
-    /// provided to `#[repr(packed)]` (note that empty means 1).
+    /// provided to `#[repr(packed)]` (note that empty means 1). `align` must
+    /// be a power of two.
     #[inline]
     pub unsafe fn pad_with<F>(&mut self, align: usize)
     where
         F: ZeroCopy,
     {
         unsafe {
+            let align = align.min(align_of::<F>());
             let count = buf::padding_to(self.offset, align);
             // zero out padding.
             self.data.as_ptr().add(self.offset).write_bytes(0, count);
@@ -147,6 +153,11 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     where
         T: Sized,
     {
+        debug_assert!(
+            self.offset <= size_of::<T>(),
+            "padded fields extend past the end of the type"
+        );
+
         unsafe {
             let count = size_of::<T>() - self.offset;
             self.data.as_ptr().add(self.offset).write_bytes(0, count);
@@ -156,6 +167,11 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     /// Finalize remaining padding based on the size of an unsized value.
     #[inline]
     pub(crate) unsafe fn remaining_unsized(self, value: &T) {
+        debug_assert!(
+            self.offset <= size_of_val(value),
+            "padded fields extend past the end of the value"
+        );
+
         unsafe {
             let count = size_of_val(value) - self.offset;
             self.data.as_ptr().add(self.offset).write_bytes(0, count);

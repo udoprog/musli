@@ -188,7 +188,11 @@ impl<'a, T: ?Sized> Validator<'a, T> {
         unsafe { self.validate_with::<F>(align_of::<F>()) }
     }
 
-    /// Validate an additional field in the struct with alignment `align`.
+    /// Validate an additional field in a struct marked
+    /// `#[repr(packed(align))]`.
+    ///
+    /// The field is aligned to `min(align, align_of::<F>())`, which is the
+    /// alignment the compiler uses for fields in a packed struct.
     ///
     /// # Safety
     ///
@@ -198,7 +202,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
     ///
     /// The `align` argument must match the alignment `N` used in the
     /// `#[repr(packed(N))]` argument, note that `#[repr(packed)]` has an
-    /// argument of 1.
+    /// argument of 1. `align` must be a power of two.
     ///
     /// # Examples
     ///
@@ -236,7 +240,7 @@ impl<'a, T: ?Sized> Validator<'a, T> {
         F: ZeroCopy,
     {
         unsafe {
-            self.align_with(align);
+            self.align_with(align.min(align_of::<F>()));
             F::validate(&mut Validator::new(self.data))?;
             self.advance::<F>();
             Ok(())
