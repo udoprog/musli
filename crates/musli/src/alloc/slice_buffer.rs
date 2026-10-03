@@ -19,61 +19,37 @@ mod sealed {
     impl<const N: usize> Sealed for [MaybeUninit<u32>; N] {}
     impl<const N: usize> Sealed for [MaybeUninit<u64>; N] {}
     impl<const N: usize> Sealed for [MaybeUninit<u128>; N] {}
-    impl Sealed for [u8] {}
-    impl Sealed for [u16] {}
-    impl Sealed for [u32] {}
-    impl Sealed for [u64] {}
-    impl Sealed for [u128] {}
-    impl<const N: usize> Sealed for [u8; N] {}
-    impl<const N: usize> Sealed for [u16; N] {}
-    impl<const N: usize> Sealed for [u32; N] {}
-    impl<const N: usize> Sealed for [u64; N] {}
-    impl<const N: usize> Sealed for [u128; N] {}
     impl<const N: usize> Sealed for ArrayBuffer<N> {}
 }
 
 /// The trait over anything that can be treated as a buffer by the [`Slice`]
 /// allocator.
 ///
+/// Only buffers of [`MaybeUninit`] and [`ArrayBuffer`] can be used. The
+/// allocator writes arbitrary values into the buffer which might leave bytes
+/// uninitialized, such as padding, so it would not be sound to read the buffer
+/// back as initialized integers after the allocator has been dropped:
+///
+/// ```compile_fail,E0277
+/// use musli::alloc::{Slice, Vec};
+///
+/// let mut buf = [0u8; 256];
+///
+/// {
+///     let alloc = Slice::new(&mut buf);
+///     let mut values = Vec::new_in(&alloc);
+///     values.push((1u8, 2u32))?;
+/// }
+///
+/// // Would read uninitialized padding bytes.
+/// let sum = buf.iter().map(|&b| b as u32).sum::<u32>();
+/// # Ok::<_, musli::alloc::AllocError>(())
+/// ```
+///
 /// [`Slice`]: super::Slice
 pub trait SliceBuffer: self::sealed::Sealed {
     #[doc(hidden)]
     fn as_uninit_bytes(&mut self) -> &mut [MaybeUninit<u8>];
-}
-
-/// The [`SliceBuffer`] implementation for `[u8]`.
-///
-/// # Examples
-///
-/// ```
-/// use musli::alloc::Slice;
-///
-/// let mut bytes = [0u8; 128];
-/// let alloc = Slice::new(&mut bytes[..]);
-/// ```
-impl SliceBuffer for [u8] {
-    #[inline]
-    fn as_uninit_bytes(&mut self) -> &mut [MaybeUninit<u8>] {
-        // SAFEYT: &mut [u8] has the same layout as &mut [MaybeUninit<u8>]
-        unsafe { from_raw_parts_mut(self.as_mut_ptr().cast(), self.len()) }
-    }
-}
-
-/// The [`SliceBuffer`] implementation for `[u8; N]`.
-///
-/// # Examples
-///
-/// ```
-/// use musli::alloc::Slice;
-///
-/// let mut bytes = [0u8; 128];
-/// let alloc = Slice::new(&mut bytes);
-/// ```
-impl<const N: usize> SliceBuffer for [u8; N] {
-    #[inline]
-    fn as_uninit_bytes(&mut self) -> &mut [MaybeUninit<u8>] {
-        self.as_mut_slice().as_uninit_bytes()
-    }
 }
 
 /// The [`SliceBuffer`] implementation for `[MaybeUninit<u8>]`.
@@ -138,29 +114,6 @@ impl<const N: usize> SliceBuffer for ArrayBuffer<N> {
 macro_rules! primitive {
     ($($ty:ty, $len:expr),* $(,)?) => {
         $(
-            #[doc = concat!(" The [`SliceBuffer`] implementation for `[", stringify!($ty), "]`.")]
-            ///
-            /// # Examples
-            ///
-            /// ```
-            /// use musli::alloc::Slice;
-            /// # use musli::alloc::SliceBuffer as _;
-            ///
-            #[doc = concat!(" let mut bytes = [0", stringify!($ty), "; 128];")]
-            #[doc = concat!(" # assert_eq!(bytes.as_uninit_bytes().len(), ", stringify!($len), ");")]
-            /// let alloc = Slice::new(&mut bytes[..]);
-            /// ```
-            impl SliceBuffer for [$ty] {
-                #[inline]
-                fn as_uninit_bytes(&mut self) -> &mut [MaybeUninit<u8>] {
-                    // SAFEYT: &mut [u8] has the same layout as &mut [MaybeUninit<u8>]
-                    unsafe {
-                        let len = <[_]>::len(self) * (<$ty>::BITS / 8u32) as usize;
-                        from_raw_parts_mut(self.as_mut_ptr().cast(), len)
-                    }
-                }
-            }
-
             #[doc = concat!(" The [`SliceBuffer`] implementation for `[MaybeUninit<", stringify!($ty), ">]`.")]
             ///
             /// # Examples
@@ -178,7 +131,8 @@ macro_rules! primitive {
             impl SliceBuffer for [MaybeUninit<$ty>] {
                 #[inline]
                 fn as_uninit_bytes(&mut self) -> &mut [MaybeUninit<u8>] {
-                    // SAFEYT: &mut [u8] has the same layout as &mut [MaybeUninit<u8>]
+                    // SAFETY: An integer is made up of `BITS / 8` bytes without
+                    // padding, so the region can be viewed as uninitialized bytes.
                     unsafe {
                         let len = <[_]>::len(self) * (<$ty>::BITS / 8u32) as usize;
                         from_raw_parts_mut(self.as_mut_ptr().cast(), len)
@@ -186,7 +140,7 @@ macro_rules! primitive {
                 }
             }
 
-            #[doc = concat!(" The [`SliceBuffer`] implementation for `[", stringify!($ty), "]`.")]
+            #[doc = concat!(" The [`SliceBuffer`] implementation for `[MaybeUninit<", stringify!($ty), ">; N]`.")]
             ///
             /// # Examples
             ///
@@ -196,26 +150,7 @@ macro_rules! primitive {
             /// use musli::alloc::Slice;
             /// # use musli::alloc::SliceBuffer as _;
             ///
-            #[doc = concat!(" let mut bytes = [0", stringify!($ty), "; 128];")]
-            #[doc = concat!(" # assert_eq!(bytes.as_uninit_bytes().len(), ", stringify!($len), ");")]
-            /// let alloc = Slice::new(&mut bytes);
-            /// ```
-            impl<const N: usize> SliceBuffer for [$ty; N] {
-                #[inline]
-                fn as_uninit_bytes(&mut self) -> &mut [MaybeUninit<u8>] {
-                    self.as_mut_slice().as_uninit_bytes()
-                }
-            }
-
-            #[doc = concat!(" The [`SliceBuffer`] implementation for `[MaybeUninit<", stringify!($ty), ">; N]`.")]
-            ///
-            /// # Examples
-            ///
-            /// ```
-            /// use musli::alloc::Slice;
-            /// # use musli::alloc::SliceBuffer as _;
-            ///
-            #[doc = concat!(" let mut bytes = [0", stringify!($ty), "; 128];")]
+            #[doc = concat!(" let mut bytes: [MaybeUninit<", stringify!($ty), ">; 128] = [const { MaybeUninit::uninit() }; 128];")]
             #[doc = concat!(" # assert_eq!(bytes.as_uninit_bytes().len(), ", stringify!($len), ");")]
             /// let alloc = Slice::new(&mut bytes);
             /// ```
