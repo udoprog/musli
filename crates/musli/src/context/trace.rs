@@ -267,6 +267,7 @@ where
     #[inline]
     fn clear(&self) {
         self.mark.set(0);
+        self.cap.set(0);
         let _access = self.access.exclusive();
 
         // SAFETY: We have acquired exclusive access just above.
