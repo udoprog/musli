@@ -1179,10 +1179,18 @@ where
         self.try_once();
     }
 
-    #[inline]
     fn close(self: &Rc<Self>) {
         self.should_be.set(State::Closed);
-        self.try_once();
+
+        // NB: A pending reconnect would otherwise only be stopped by
+        // `should_be` once it fires, and would keep the timer alive until then.
+        let timeout = self.reconnect_timeout.borrow_mut().take();
+        drop(timeout);
+
+        // NB: The next `open` starts over rather than inheriting the back-off
+        // of the connection which was closed on purpose.
+        self.current_timeout.set(INITIAL_TIMEOUT);
+        self.close_once();
     }
 
     fn try_once(self: &Rc<Self>) {
