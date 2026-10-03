@@ -243,3 +243,130 @@ fn nested_ref_in_packed() -> Result<()> {
     assert_eq!(buf.load(r)?, &[1, 2, 3]);
     Ok(())
 }
+
+/// An ignored zero-sized field with an alignment larger than 1 moves the
+/// fields that follow it.
+#[derive(Clone, Copy, ZeroCopy)]
+#[repr(C)]
+#[zero_copy(crate)]
+struct IgnoredAligned {
+    a: u8,
+    #[zero_copy(ignore)]
+    _z: [u64; 0],
+    b: bool,
+}
+
+#[derive(Clone, Copy, ZeroCopy)]
+#[repr(C, packed(2))]
+#[zero_copy(crate)]
+struct PackedIgnoredAligned {
+    a: u8,
+    #[zero_copy(ignore)]
+    _z: [u64; 0],
+    b: bool,
+}
+
+#[derive(Clone, Copy, ZeroCopy)]
+#[repr(u8)]
+#[zero_copy(crate)]
+enum EnumIgnoredAligned {
+    A {
+        #[zero_copy(ignore)]
+        _z: [u64; 0],
+        b: bool,
+    },
+}
+
+#[test]
+fn ignored_aligned_layout() {
+    assert_eq!(offset_of!(IgnoredAligned, b), 8);
+    assert_eq!(size_of::<IgnoredAligned>(), 16);
+    assert_eq!(offset_of!(PackedIgnoredAligned, b), 2);
+    assert_eq!(size_of::<PackedIgnoredAligned>(), 4);
+    assert_eq!(size_of::<EnumIgnoredAligned>(), 16);
+}
+
+#[test]
+fn ignored_aligned_rejects_invalid_field() {
+    let mut bytes = [0u8; 16];
+    bytes[8] = 2;
+    let Err(error) = load_bytes::<IgnoredAligned>(&bytes) else {
+        panic!("expected an invalid bool error");
+    };
+    assert_eq!(error.to_string(), "Invalid bool representation 2");
+}
+
+#[test]
+fn ignored_aligned_accepts_valid_field() {
+    // Byte 1 is padding and must not be validated as a bool.
+    let mut bytes = [0u8; 16];
+    bytes[1] = 2;
+    bytes[8] = 1;
+    assert!(load_bytes::<IgnoredAligned>(&bytes).unwrap().b);
+}
+
+#[test]
+fn ignored_aligned_pad_preserves_fields() -> Result<()> {
+    let mut buf = OwnedBuf::new();
+    buf.store(&IgnoredAligned {
+        a: 1,
+        _z: [],
+        b: true,
+    })?;
+
+    assert_eq!(
+        buf.as_slice(),
+        &[1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
+    );
+    Ok(())
+}
+
+#[test]
+fn packed_ignored_aligned_validates_field() {
+    let Err(error) = load_bytes::<PackedIgnoredAligned>(&[0, 0, 2, 0]) else {
+        panic!("expected an invalid bool error");
+    };
+    assert_eq!(error.to_string(), "Invalid bool representation 2");
+
+    let value = load_bytes::<PackedIgnoredAligned>(&[0, 2, 1, 0]).unwrap();
+    let b = value.b;
+    assert!(b);
+}
+
+#[test]
+fn packed_ignored_aligned_pad_preserves_fields() -> Result<()> {
+    let mut buf = OwnedBuf::new();
+    buf.store(&PackedIgnoredAligned {
+        a: 1,
+        _z: [],
+        b: true,
+    })?;
+
+    assert_eq!(buf.as_slice(), &[1, 0, 1, 0]);
+    Ok(())
+}
+
+#[test]
+fn enum_ignored_aligned_validates_field() {
+    let mut bytes = [0u8; 16];
+    bytes[8] = 2;
+    assert!(load_bytes::<EnumIgnoredAligned>(&bytes).is_err());
+
+    let mut bytes = [0u8; 16];
+    bytes[1] = 2;
+    bytes[8] = 1;
+    let EnumIgnoredAligned::A { b, .. } = load_bytes::<EnumIgnoredAligned>(&bytes).unwrap();
+    assert!(b);
+}
+
+#[test]
+fn enum_ignored_aligned_pad_preserves_fields() -> Result<()> {
+    let mut buf = OwnedBuf::new();
+    buf.store(&EnumIgnoredAligned::A { _z: [], b: true })?;
+
+    assert_eq!(
+        buf.as_slice(),
+        &[0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
+    );
+    Ok(())
+}

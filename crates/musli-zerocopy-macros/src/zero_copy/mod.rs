@@ -186,32 +186,20 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                 _ => {
                     let types = &output.types;
 
-                    match r.repr_packed {
-                        Some((_, align)) => {
-                            pad = quote! {
-                                #(#padder::pad_with::<#types>(padder, #align);)*
-                            };
+                    let packed = r.repr_packed.map(|(_, align)| align);
+                    let pad_steps = output.pad_steps(&padder, packed);
+                    let validate_steps = output.validate_steps(&validator, packed);
 
-                            validate = quote! {
-                                // SAFETY: We've systematically ensured that we're
-                                // only validating over fields within the size of
-                                // this type.
-                                #(#validator::validate_with::<#types>(validator, #align)?;)*
-                            };
-                        }
-                        _ => {
-                            pad = quote! {
-                                #(#padder::pad::<#types>(padder);)*
-                            };
+                    pad = quote! {
+                        #(#pad_steps)*
+                    };
 
-                            validate = quote! {
-                                // SAFETY: We've systematically ensured that we're
-                                // only validating over fields within the size of
-                                // this type.
-                                #(#validator::validate::<#types>(validator)?;)*
-                            };
-                        }
-                    }
+                    validate = quote! {
+                        // SAFETY: We've systematically ensured that we're
+                        // only validating over fields within the size of
+                        // this type.
+                        #(#validate_steps)*
+                    };
 
                     let Fields {
                         members,
@@ -374,8 +362,6 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     }
                 }
 
-                let types = &output.types;
-
                 let discriminant_const =
                     syn::Ident::new(&format!("DISCRIMINANT{index}"), variant.ident.span());
 
@@ -385,19 +371,21 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                     const #discriminant_const: #ty = #discriminant;
                 });
 
+                let validate_steps = output.validate_steps(&validator, None);
+
                 validate_variants.push(quote! {
                     #discriminant_const => {
-                        #(#validator::validate::<#types>(validator)?;)*
+                        #(#validate_steps)*
                     }
                 });
 
                 let ident = &variant.ident;
 
-                let Fields { types, .. } = &output;
+                let pad_steps = output.pad_steps(&padder, None);
 
                 pad_variants.push(quote! {
                     #discriminant_const => {
-                        #(#padder::pad::<#types>(padder);)*
+                        #(#pad_steps)*
                     }
                 });
 
@@ -737,6 +725,48 @@ struct Fields<'a> {
     ignored_members: Vec<syn::Member>,
     ignored_variables: Vec<syn::Ident>,
     check_zero_sized: Vec<&'a syn::Type>,
+    /// Every field in declaration order, and whether it is ignored.
+    ordered: Vec<(&'a syn::Type, bool)>,
+}
+
+impl Fields<'_> {
+    /// Padding calls for every field in order.
+    ///
+    /// Ignored zero-sized fields are included since they might have an
+    /// alignment which affects the offset of the fields that follow them.
+    fn pad_steps(&self, padder: &syn::Path, packed: Option<usize>) -> Vec<TokenStream> {
+        self.ordered
+            .iter()
+            .map(|&(ty, ignored)| match (ignored, packed) {
+                (false, None) => quote!(#padder::pad::<#ty>(padder);),
+                (false, Some(align)) => quote!(#padder::pad_with::<#ty>(padder, #align);),
+                (true, None) => quote!(#padder::pad_zero_sized::<#ty>(padder);),
+                (true, Some(align)) => {
+                    quote!(#padder::pad_zero_sized_with::<#ty>(padder, #align);)
+                }
+            })
+            .collect()
+    }
+
+    /// Validation calls for every field in order.
+    ///
+    /// Ignored zero-sized fields are included since they might have an
+    /// alignment which affects the offset of the fields that follow them.
+    fn validate_steps(&self, validator: &syn::Path, packed: Option<usize>) -> Vec<TokenStream> {
+        self.ordered
+            .iter()
+            .map(|&(ty, ignored)| match (ignored, packed) {
+                (false, None) => quote!(#validator::validate::<#ty>(validator)?;),
+                (false, Some(align)) => {
+                    quote!(#validator::validate_with::<#ty>(validator, #align)?;)
+                }
+                (true, None) => quote!(#validator::validate_zero_sized::<#ty>(validator);),
+                (true, Some(align)) => {
+                    quote!(#validator::validate_zero_sized_with::<#ty>(validator, #align);)
+                }
+            })
+            .collect()
+    }
 }
 
 fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
@@ -788,6 +818,8 @@ fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
             syn::Member::Named(ident) => syn::parse_quote!(#ident),
             syn::Member::Unnamed(index) => syn::parse_quote!(#index: #variable),
         });
+
+        output.ordered.push((ty, ignore.is_some()));
 
         if ignore.is_some() {
             output.check_zero_sized.push(ty);
