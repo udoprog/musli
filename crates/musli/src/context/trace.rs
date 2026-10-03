@@ -206,13 +206,22 @@ where
     /// Push a path.
     #[inline]
     fn push_path(&self, step: Step<A>) {
+        let cap = self.cap.get();
+
+        // Once a step has been capped, every step entered under it is capped
+        // as well. Otherwise popping would remove them in the wrong order.
+        if cap > 0 {
+            self.cap.set(cap + 1);
+            return;
+        }
+
         let _access = self.access.exclusive();
 
         // SAFETY: We've checked that we have exclusive access just above.
         let path = unsafe { &mut (*self.path.get()) };
 
         if path.push(step).is_err() {
-            self.cap.set(&self.cap.get() + 1);
+            self.cap.set(self.cap.get() + 1);
         }
     }
 
@@ -406,8 +415,11 @@ where
     where
         T: fmt::Display,
     {
-        if let Some(string) = self.format_string(alloc, field) {
-            self.push_path(Step::Key(string));
+        match self.format_string(alloc, field) {
+            Some(string) => self.push_path(Step::Key(string)),
+            // The key could not be formatted, so count it as a capped step so
+            // that leaving it does not pop its parent.
+            None => self.cap.set(self.cap.get() + 1),
         }
     }
 
