@@ -99,14 +99,14 @@ where
 }
 
 macro_rules! atomic_impl {
-    ($size:literal $(, $ty:ident)*) => {
+    ($size:literal, $bitwise:literal $(, $ty:ident)*) => {
         $(
             #[cfg(target_has_atomic = $size)]
             impl<'de, M, A> Decode<'de, M, A> for core::sync::atomic::$ty
             where
                 A: Allocator
             {
-                const IS_BITWISE_DECODE: bool = true;
+                const IS_BITWISE_DECODE: bool = $bitwise;
 
                 fn decode<D>(decoder: D) -> Result<Self, D::Error>
                 where
@@ -141,11 +141,14 @@ macro_rules! atomic_impl {
     };
 }
 
-atomic_impl!("8", AtomicBool, AtomicI8, AtomicU8);
-atomic_impl!("16", AtomicI16, AtomicU16);
-atomic_impl!("32", AtomicI32, AtomicU32);
-atomic_impl!("64", AtomicI64, AtomicU64);
-atomic_impl!("ptr", AtomicIsize, AtomicUsize);
+// An atomic boolean is not bitwise decoded for the same reason as `bool`: not
+// every bit pattern that comes in is a valid boolean.
+atomic_impl!("8", false, AtomicBool);
+atomic_impl!("8", true, AtomicI8, AtomicU8);
+atomic_impl!("16", true, AtomicI16, AtomicU16);
+atomic_impl!("32", true, AtomicI32, AtomicU32);
+atomic_impl!("64", true, AtomicI64, AtomicU64);
+atomic_impl!("ptr", true, AtomicIsize, AtomicUsize);
 
 macro_rules! non_zero {
     ($ty:ty) => {
