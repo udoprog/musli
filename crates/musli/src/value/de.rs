@@ -317,9 +317,19 @@ where
     where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, Self::Error>,
     {
-        ensure!(self, hint, ExpectedVariant(hint), ValueKind::Variant(st) => {
-            f(&mut IterValueVariantDecoder::new(self.cx, st))
-        })
+        match &self.value.kind {
+            ValueKind::Variant(st) => f(&mut IterValueVariantDecoder::new(self.cx, st)),
+            // Self-describing formats like JSON represent an externally tagged
+            // variant as a map with a single entry, so a value decoded from
+            // them stores it as such.
+            ValueKind::Map(map) if map.len() == 1 => {
+                f(&mut IterValueVariantDecoder::new(self.cx, &map[0]))
+            }
+            _ => {
+                let hint = self.value.type_hint();
+                Err(self.cx.message(ErrorMessage::ExpectedVariant(hint)))
+            }
+        }
     }
 
     #[inline]
