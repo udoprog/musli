@@ -25,7 +25,7 @@ use core::str;
 
 use crate::Context;
 use crate::Options;
-use crate::alloc::Vec;
+use crate::alloc::{AllocError, Allocator, Vec};
 use crate::de::{Decoder, SequenceDecoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 use crate::hint::{MapHint, SequenceHint};
 use crate::options;
@@ -67,25 +67,121 @@ where
     }
 
     /// Skip over any values.
+    ///
+    /// This is iterative so that deeply nested input cannot overflow the
+    /// stack. It accepts the same grammar as decoding through
+    /// [`JsonSequenceDecoder`] and [`JsonObjectDecoder`] does.
     pub(crate) fn skip_any(mut self) -> Result<(), C::Error> {
-        let start = self.cx.mark();
-        let actual = self.parser.lex(self.cx);
+        let cx = self.cx;
+        let mut nesting = Nesting::new(cx.alloc());
+        // Whether we are at the first entry of the innermost container, where
+        // a leading comma is not permitted.
+        let mut first;
 
-        match actual {
-            Token::OpenBrace => self.decode_map(|_| Ok(())),
-            Token::OpenBracket => self.decode_sequence(|_| Ok(())),
-            Token::Null => self.parse_null(),
-            Token::True => self.parse_true(),
-            Token::False => self.parse_false(),
-            Token::Number => number::skip_number(self.cx, self.parser.borrow_mut()),
-            Token::String => {
-                // Skip over opening quote.
-                self.parser.skip(self.cx, 1)?;
-                self.parser.skip_string_inner(self.cx)
+        'value: loop {
+            let start = cx.mark();
+
+            match self.parser.lex(cx) {
+                Token::OpenBrace => {
+                    self.parser.skip(cx, 1)?;
+                    nesting.push(true).map_err(cx.map())?;
+                    first = true;
+                }
+                Token::OpenBracket => {
+                    self.parser.skip(cx, 1)?;
+                    nesting.push(false).map_err(cx.map())?;
+                    first = true;
+                }
+                Token::Null => {
+                    self.parser.parse_exact(cx, "null")?;
+                    first = false;
+                }
+                Token::True => {
+                    self.parser.parse_exact(cx, "true")?;
+                    first = false;
+                }
+                Token::False => {
+                    self.parser.parse_exact(cx, "false")?;
+                    first = false;
+                }
+                Token::Number => {
+                    number::skip_number(cx, self.parser.borrow_mut())?;
+                    first = false;
+                }
+                Token::String => {
+                    // Skip over opening quote.
+                    self.parser.skip(cx, 1)?;
+                    self.parser.skip_string_inner(cx)?;
+                    first = false;
+                }
+                actual => {
+                    return Err(
+                        cx.message_at(&start, format_args!("Expected value, found {actual}"))
+                    );
+                }
             }
-            actual => Err(self
-                .cx
-                .message_at(&start, format_args!("Expected value, found {actual}"))),
+
+            // Find the next value in the enclosing containers, closing the ones
+            // that end along the way.
+            while let Some(is_object) = nesting.last() {
+                let token = self.parser.lex(cx);
+
+                if is_object {
+                    match token {
+                        Token::String => {
+                            // Skip over the key and its opening quote.
+                            self.parser.skip(cx, 1)?;
+                            self.parser.skip_string_inner(cx)?;
+
+                            let actual = self.parser.lex(cx);
+
+                            if !matches!(actual, Token::Colon) {
+                                return Err(
+                                    cx.message(format_args!("Expected colon `:`, was {actual}"))
+                                );
+                            }
+
+                            self.parser.skip(cx, 1)?;
+                            continue 'value;
+                        }
+                        Token::Comma if !first => {
+                            self.parser.skip(cx, 1)?;
+                        }
+                        Token::CloseBrace => {
+                            self.parser.skip(cx, 1)?;
+                            nesting.pop();
+                            first = false;
+                        }
+                        token => {
+                            return Err(cx.message(format_args!(
+                                "Expected value, or closing brace `}}` but found {token:?}"
+                            )));
+                        }
+                    }
+                } else {
+                    if token.is_value() {
+                        continue 'value;
+                    }
+
+                    match token {
+                        Token::Comma if !first => {
+                            self.parser.skip(cx, 1)?;
+                        }
+                        Token::CloseBracket => {
+                            self.parser.skip(cx, 1)?;
+                            nesting.pop();
+                            first = false;
+                        }
+                        token => {
+                            return Err(cx.message(format_args!(
+                                "Expected value or closing bracket `]`, but found {token}"
+                            )));
+                        }
+                    }
+                }
+            }
+
+            return Ok(());
         }
     }
 
@@ -458,5 +554,76 @@ where
             }
             token => Err(cx.message(format_args!("Expected value, found {token:?}"))),
         }
+    }
+}
+
+/// A stack of the kinds of containers being skipped over, `true` for objects
+/// and `false` for arrays.
+///
+/// The first levels are tracked inline, deeper levels spill into the
+/// allocator.
+struct Nesting<A>
+where
+    A: Allocator,
+{
+    len: usize,
+    inline: u64,
+    spill: Vec<u64, A>,
+}
+
+impl<A> Nesting<A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn new(alloc: A) -> Self {
+        Self {
+            len: 0,
+            inline: 0,
+            spill: Vec::new_in(alloc),
+        }
+    }
+
+    #[inline]
+    fn push(&mut self, is_object: bool) -> Result<(), AllocError> {
+        let (word, bit) = (self.len / 64, self.len % 64);
+
+        let slot = if word == 0 {
+            &mut self.inline
+        } else {
+            if word > self.spill.len() {
+                self.spill.push(0)?;
+            }
+
+            &mut self.spill.as_mut_slice()[word - 1]
+        };
+
+        if is_object {
+            *slot |= 1 << bit;
+        } else {
+            *slot &= !(1 << bit);
+        }
+
+        self.len += 1;
+        Ok(())
+    }
+
+    #[inline]
+    fn pop(&mut self) {
+        self.len -= 1;
+    }
+
+    #[inline]
+    fn last(&self) -> Option<bool> {
+        let index = self.len.checked_sub(1)?;
+        let (word, bit) = (index / 64, index % 64);
+
+        let slot = if word == 0 {
+            self.inline
+        } else {
+            self.spill.as_slice()[word - 1]
+        };
+
+        Some(slot & (1 << bit) != 0)
     }
 }
