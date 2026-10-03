@@ -5,7 +5,7 @@ use core::ptr::{self, NonNull};
 
 use crate::buf::padding_to;
 use crate::error::{Error, ErrorKind};
-use crate::traits::ZeroCopy;
+use crate::traits::{ZeroCopy, ZeroSized};
 
 /// Validator over a [`Buf`] constructed using [`Buf::validate_struct`].
 ///
@@ -305,6 +305,46 @@ impl<'a, T: ?Sized> Validator<'a, T> {
             F::validate(&mut Validator::new(self.current()))?;
             self.advance::<F>();
             Ok(())
+        }
+    }
+
+    /// Skip over an ignored zero-sized field `F`.
+    ///
+    /// Zero-sized fields can have an alignment larger than 1, in which case
+    /// they affect the offset of the fields that follow them.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the field type `F` is an actual field in
+    /// order in the struct being validated.
+    #[inline]
+    pub unsafe fn validate_zero_sized<F>(&mut self)
+    where
+        F: ZeroSized,
+    {
+        unsafe {
+            self.align_with(align_of::<F>());
+        }
+    }
+
+    /// Skip over an ignored zero-sized field `F` in a struct marked
+    /// `#[repr(packed(align))]`.
+    ///
+    /// The field is aligned to `min(align, align_of::<F>())`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the field type `F` is an actual field in
+    /// order in the struct being validated and that `align` matches the
+    /// argument provided to `#[repr(packed)]` (note that empty means 1).
+    /// `align` must be a power of two.
+    #[inline]
+    pub unsafe fn validate_zero_sized_with<F>(&mut self, align: usize)
+    where
+        F: ZeroSized,
+    {
+        unsafe {
+            self.align_with(align.min(align_of::<F>()));
         }
     }
 

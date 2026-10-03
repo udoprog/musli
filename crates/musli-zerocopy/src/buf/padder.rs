@@ -3,7 +3,7 @@ use core::mem::{MaybeUninit, align_of, size_of, size_of_val, transmute};
 use core::ptr::NonNull;
 
 use crate::buf;
-use crate::traits::ZeroCopy;
+use crate::traits::{ZeroCopy, ZeroSized};
 
 /// A struct padder as provided to the [`ZeroCopy::pad`] method.
 ///
@@ -105,6 +105,59 @@ impl<'a, T: ?Sized> Padder<'a, T> {
         }
     }
 
+    /// Pad up to an ignored zero-sized field `F`.
+    ///
+    /// Zero-sized fields can have an alignment larger than 1, in which case
+    /// they affect the offset of the fields that follow them.
+    ///
+    /// This is typically not called directly, but rather is implemented by the
+    /// [`ZeroCopy`] derive.
+    ///
+    /// [`ZeroCopy`]: derive@crate::ZeroCopy
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the field type `F` is an actual field in
+    /// order in the struct being padded.
+    #[inline]
+    pub unsafe fn pad_zero_sized<F>(&mut self)
+    where
+        F: ZeroSized,
+    {
+        unsafe {
+            self.pad_zero_sized_with::<F>(align_of::<F>());
+        }
+    }
+
+    /// Pad up to an ignored zero-sized field `F` in a struct marked
+    /// `#[repr(packed(align))]`.
+    ///
+    /// The field is aligned to `min(align, align_of::<F>())`.
+    ///
+    /// This is typically not called directly, but rather is implemented by the
+    /// [`ZeroCopy`] derive.
+    ///
+    /// [`ZeroCopy`]: derive@crate::ZeroCopy
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the field type `F` is an actual field in
+    /// order in the struct being padded and that `align` matches the argument
+    /// provided to `#[repr(packed)]` (note that empty means 1). `align` must
+    /// be a power of two.
+    #[inline]
+    pub unsafe fn pad_zero_sized_with<F>(&mut self, align: usize)
+    where
+        F: ZeroSized,
+    {
+        unsafe {
+            let count = buf::padding_to(self.offset, align.min(align_of::<F>()));
+            // zero out padding.
+            self.data.as_ptr().add(self.offset).write_bytes(0, count);
+            self.offset += count;
+        }
+    }
+
     /// Specific method to both pad for a discriminant and load it
     /// simultaneously for inspection.
     ///
@@ -144,9 +197,12 @@ impl<'a, T: ?Sized> Padder<'a, T> {
     /// the necessary padding to ensure that all bytes related to the struct are
     /// initialized. Failure to do so would result in undefined behavior.
     ///
-    /// Fields which are [`ZeroSized`] can be skipped.
+    /// Fields which are [`ZeroSized`] must be padded with
+    /// [`pad_zero_sized::<F>()`] unless their alignment is 1, since they can
+    /// affect the offset of the fields that follow them.
     ///
     /// [`pad::<F>()`]: Self::pad
+    /// [`pad_zero_sized::<F>()`]: Self::pad_zero_sized
     /// [`ZeroSized`]: crate::traits::ZeroSized
     #[inline]
     pub unsafe fn remaining(self)
