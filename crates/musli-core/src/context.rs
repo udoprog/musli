@@ -120,6 +120,38 @@ pub trait Context: Copy {
         self.custom(message)
     }
 
+    /// Enter one level of nesting while decoding.
+    ///
+    /// Decoders call this before decoding the contents of a nested container,
+    /// such as a sequence, a map, a pack, a variant or a present optional
+    /// value, and call [`leave_nesting`] once it has been decoded, whether
+    /// decoding succeeded or not. Since decoding a nested container generally
+    /// recurses, this allows the context to bound recursion by returning an
+    /// error once input is nested too deeply, instead of letting it overflow
+    /// the stack.
+    ///
+    /// The default implementation accepts any depth. [`DefaultContext`]
+    /// limits nesting to 128 levels by default, which can be changed with
+    /// [`with_nesting_limit`] and [`without_nesting_limit`].
+    ///
+    /// An error returned from this method means that the level was not
+    /// entered, so it must not be matched with a call to [`leave_nesting`].
+    ///
+    /// [`leave_nesting`]: Context::leave_nesting
+    /// [`DefaultContext`]: https://docs.rs/musli/latest/musli/context/struct.DefaultContext.html
+    /// [`with_nesting_limit`]: https://docs.rs/musli/latest/musli/context/struct.DefaultContext.html#method.with_nesting_limit
+    /// [`without_nesting_limit`]: https://docs.rs/musli/latest/musli/context/struct.DefaultContext.html#method.without_nesting_limit
+    #[inline]
+    fn enter_nesting(self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    /// Leave a level of nesting previously entered with [`enter_nesting`].
+    ///
+    /// [`enter_nesting`]: Context::enter_nesting
+    #[inline]
+    fn leave_nesting(self) {}
+
     /// Indicate that we've entered a struct with the given `name`.
     ///
     /// The `name` variable corresponds to the identifiers of the struct.

@@ -3,6 +3,7 @@ use core::marker::PhantomData;
 use core::mem::take;
 
 use crate::alloc::Vec;
+use crate::context::nested;
 use crate::de::{
     Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, Skip,
     UnsizedVisitor, VariantDecoder,
@@ -286,7 +287,7 @@ where
         let mark = self.cx.mark();
         let len = self.decode_len(&mark, "pack")?;
         let mut decoder = WireDecoder::new(self.cx, self.reader.limit(len));
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.end()?;
         Ok(output)
     }
@@ -486,8 +487,9 @@ where
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
+        let cx = self.cx;
         let mut decoder = self.shared_decode_sequence()?;
-        let output = f(&mut decoder)?;
+        let output = nested(cx, || f(&mut decoder))?;
         decoder.skip_sequence_remaining()?;
         Ok(output)
     }
@@ -505,8 +507,9 @@ where
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
+        let cx = self.cx;
         let mut decoder = self.shared_decode_pair_sequence()?;
-        let output = f(&mut decoder)?;
+        let output = nested(cx, || f(&mut decoder))?;
         decoder.skip_remaining_entries()?;
         Ok(output)
     }
@@ -541,7 +544,8 @@ where
             }));
         }
 
-        f(&mut self)
+        let cx = self.cx;
+        nested(cx, || f(&mut self))
     }
 }
 

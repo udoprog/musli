@@ -4,6 +4,7 @@ use core::mem::take;
 
 use crate::Context;
 use crate::alloc::Vec;
+use crate::context::nested;
 use crate::de::{
     Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, Skip,
     UnsizedVisitor, VariantDecoder, Visitor,
@@ -303,7 +304,7 @@ where
         let pos = self.cx.mark();
         let len = self.decode_pack_length(&pos)?;
         let mut decoder = SelfDecoder::new(self.cx, self.reader.limit(len));
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.end()?;
         Ok(output)
     }
@@ -581,8 +582,9 @@ where
     where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
+        let cx = self.cx;
         let mut decoder = self.shared_decode_sequence()?;
-        let output = f(&mut decoder)?;
+        let output = nested(cx, || f(&mut decoder))?;
         decoder.skip_sequence_remaining()?;
         Ok(output)
     }
@@ -592,8 +594,9 @@ where
     where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
+        let cx = self.cx;
         let mut decoder = self.shared_decode_map()?;
-        let output = f(&mut decoder)?;
+        let output = nested(cx, || f(&mut decoder))?;
         decoder.skip_map_remaining()?;
         Ok(output)
     }
@@ -603,8 +606,9 @@ where
     where
         F: FnOnce(&mut Self::DecodeMapEntries) -> Result<O, Self::Error>,
     {
+        let cx = self.cx;
         let mut decoder = self.shared_decode_map()?;
-        let output = f(&mut decoder)?;
+        let output = nested(cx, || f(&mut decoder))?;
         decoder.skip_map_remaining()?;
         Ok(output)
     }
@@ -625,7 +629,8 @@ where
             }));
         }
 
-        f(&mut self)
+        let cx = self.cx;
+        nested(cx, || f(&mut self))
     }
 
     #[inline]
@@ -699,13 +704,13 @@ where
             }
             Kind::Sequence => {
                 let mut sequence = self.shared_decode_sequence()?;
-                let output = visitor.visit_sequence(&mut sequence)?;
+                let output = nested(cx, || visitor.visit_sequence(&mut sequence))?;
                 sequence.skip_sequence_remaining()?;
                 Ok(output)
             }
             Kind::Map => {
                 let mut map = self.shared_decode_map()?;
-                let output = visitor.visit_map(&mut map)?;
+                let output = nested(cx, || visitor.visit_map(&mut map))?;
                 map.skip_map_remaining()?;
                 Ok(output)
             }
@@ -732,7 +737,7 @@ where
                 }
                 Mark::Variant => self.decode_variant(|decoder| visitor.visit_variant(decoder)),
                 Mark::Some | Mark::None => match self.decode_option()? {
-                    Some(decoder) => visitor.visit_some(decoder),
+                    Some(decoder) => nested(cx, || visitor.visit_some(decoder)),
                     None => visitor.visit_none(cx),
                 },
                 Mark::Char => {

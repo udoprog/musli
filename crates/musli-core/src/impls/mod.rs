@@ -706,8 +706,15 @@ where
     where
         D: Decoder<'de, Mode = M, Allocator = A>,
     {
+        let cx = decoder.cx();
+
         if let Some(decoder) = decoder.decode_option()? {
-            Ok(Some(decoder.decode()?))
+            // A present optional value counts as one level of nesting, since
+            // it allows types to recurse through `Option<Box<Self>>`.
+            cx.enter_nesting()?;
+            let value = decoder.decode();
+            cx.leave_nesting();
+            Ok(Some(value?))
         } else {
             Ok(None)
         }

@@ -27,9 +27,14 @@ use super::type_hint::{FloatKind, IntegerKind, NumberHint, TypeHint};
 ///
 /// # Nesting limit
 ///
-/// Decoding a value accepts at most 128 levels of nested containers, where
-/// sequences, maps, variants and optional values each count as one level.
-/// Deeper input is rejected with an error instead of overflowing the stack.
+/// Decoding a value is subject to the nesting limit of the context in use,
+/// where sequences, maps, variants and optional values each count as one level.
+/// The [`DefaultContext`] accepts at most 128 levels by default, deeper input
+/// is rejected with an error instead of overflowing the stack. See
+/// [`DefaultContext::with_nesting_limit`] to change it.
+///
+/// [`DefaultContext`]: crate::context::DefaultContext
+/// [`DefaultContext::with_nesting_limit`]: crate::context::DefaultContext::with_nesting_limit
 ///
 /// # Examples
 ///
@@ -605,34 +610,13 @@ impl Number {
     }
 }
 
-/// The maximum number of nested containers accepted when decoding a [`Value`].
+/// Visitor decoding any [`Value`].
 ///
-/// Decoding a value recurses once per level of nesting, so without a limit
-/// deeply nested input would overflow the stack.
-const MAX_DEPTH: usize = 128;
-
+/// Decoding a value recurses once per level of nesting. Decoders bound this
+/// through [`Context::enter_nesting`], which is called for every nested
+/// container they decode.
 #[derive(Clone, Copy)]
-struct AnyVisitor {
-    /// The number of containers which may still be entered.
-    remaining: usize,
-}
-
-impl AnyVisitor {
-    /// Enter a container, returning the visitor used for its contents.
-    #[inline]
-    fn enter<C>(self, cx: C) -> Result<Self, C::Error>
-    where
-        C: Context,
-    {
-        let Some(remaining) = self.remaining.checked_sub(1) else {
-            return Err(cx.message(format_args!(
-                "Recursion limit exceeded, values may be nested at most {MAX_DEPTH} levels deep"
-            )));
-        };
-
-        Ok(Self { remaining })
-    }
-}
+struct AnyVisitor;
 
 #[crate::trait_defaults(crate)]
 impl<'de, C> Visitor<'de, C> for AnyVisitor
@@ -786,8 +770,7 @@ where
         D: Decoder<'de, Cx = C, Error = C::Error, Allocator = C::Allocator>,
     {
         let cx = decoder.cx();
-        let visitor = self.enter(cx)?;
-        let value = decoder.decode_any(visitor)?;
+        let value = decoder.decode_any(self)?;
         let value = Box::new_in(value, cx.alloc()).map_err(cx.map())?;
         Ok(Value::new(ValueKind::Option(Some(value))))
     }
@@ -798,13 +781,12 @@ where
         D: ?Sized + SequenceDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = seq.cx();
-        let visitor = self.enter(cx)?;
 
         let size = cautious::<Value<C::Allocator>>(seq.size_hint());
         let mut out = Vec::with_capacity_in(size, cx.alloc()).map_err(cx.map())?;
 
         while let Some(item) = seq.try_decode_next()? {
-            let item = item.decode_any(visitor)?;
+            let item = item.decode_any(self)?;
             out.push(item).map_err(cx.map())?;
         }
 
@@ -817,14 +799,13 @@ where
         D: ?Sized + MapDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
         let cx = map.cx();
-        let visitor = self.enter(cx)?;
 
         let size = cautious::<(Value<C::Allocator>, Value<C::Allocator>)>(map.size_hint());
         let mut out = Vec::with_capacity_in(size, cx.alloc()).map_err(cx.map())?;
 
         while let Some(mut entry) = map.decode_entry()? {
-            let first = entry.decode_key()?.decode_any(visitor)?;
-            let second = entry.decode_value()?.decode_any(visitor)?;
+            let first = entry.decode_key()?.decode_any(self)?;
+            let second = entry.decode_value()?.decode_any(self)?;
             out.push((first, second)).map_err(cx.map())?;
         }
 
@@ -846,9 +827,8 @@ where
     where
         D: ?Sized + VariantDecoder<'de, Cx = C, Error = Self::Error, Allocator = Self::Allocator>,
     {
-        let visitor = self.enter(variant.cx())?;
-        let first = variant.decode_tag()?.decode_any(visitor)?;
-        let second = variant.decode_value()?.decode_any(visitor)?;
+        let first = variant.decode_tag()?.decode_any(self)?;
+        let second = variant.decode_value()?.decode_any(self)?;
         let value =
             Box::new_in((first, second), variant.cx().alloc()).map_err(variant.cx().map())?;
         Ok(Value::new(ValueKind::Variant(value)))
@@ -866,9 +846,7 @@ where
     where
         D: Decoder<'de, Mode = M, Allocator = A>,
     {
-        decoder.decode_any(AnyVisitor {
-            remaining: MAX_DEPTH,
-        })
+        decoder.decode_any(AnyVisitor)
     }
 }
 

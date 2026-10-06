@@ -201,8 +201,16 @@ where
     where
         V: de::Visitor<'de>,
     {
+        let cx = self.decoder.cx();
+
         match self.decoder.decode_option()? {
-            Some(decoder) => visitor.visit_some(Deserializer::new(decoder)),
+            Some(decoder) => {
+                // A present optional value counts as one level of nesting.
+                cx.enter_nesting()?;
+                let result = visitor.visit_some(Deserializer::new(decoder));
+                cx.leave_nesting();
+                result
+            }
             None => visitor.visit_none(),
         }
     }
