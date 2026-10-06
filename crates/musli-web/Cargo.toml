@@ -98,7 +98,7 @@ optional = true
 anyhow = "1.0.99"
 axum08 = { package = "axum", version = "0.8.0", features = ["ws"] }
 musli = { path = "../musli", version = "0.1.8" }
-tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros", "net", "sync", "time", "io-util"] }
 tracing = "0.1.40"
 
 # This cfg cannot be enabled, but it still forces Cargo to keep
