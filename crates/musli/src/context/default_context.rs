@@ -1,6 +1,11 @@
 use core::error::Error;
 use core::fmt;
 
+#[cfg(not(target_has_atomic = "ptr"))]
+use core::cell::Cell;
+#[cfg(target_has_atomic = "ptr")]
+use core::sync::atomic::{AtomicUsize, Ordering};
+
 #[cfg(feature = "alloc")]
 use crate::alloc::Global;
 use crate::{Allocator, Context};
@@ -19,8 +24,21 @@ use super::{
 /// The default constructor is only available when the `alloc` feature is
 /// enabled, and will use the [`Global`] allocator.
 ///
+/// # Nesting limit
+///
+/// Decoding nested containers recurses, so the context limits how deeply input
+/// may be nested to avoid overflowing the stack on untrusted input. By default
+/// at most [`DEFAULT_NESTING_LIMIT`] (128) levels are accepted, where every
+/// sequence, map, pack, variant and present optional value counts as one
+/// level. Deeper input is rejected with an error.
+///
+/// The limit can be changed with [`with_nesting_limit`] or removed with
+/// [`without_nesting_limit`].
+///
 /// [`new`]: super::new
 /// [`new_in`]: super::new_in
+/// [`with_nesting_limit`]: DefaultContext::with_nesting_limit
+/// [`without_nesting_limit`]: DefaultContext::without_nesting_limit
 pub struct DefaultContext<A, T, C>
 where
     A: Allocator,
@@ -29,6 +47,66 @@ where
     alloc: A,
     trace: T::Impl<A>,
     capture: C,
+    depth: Depth,
+    nesting_limit: Option<usize>,
+}
+
+/// The default number of nested levels accepted when decoding through a
+/// [`DefaultContext`].
+///
+/// This matches the default recursion limit in `serde_json`.
+pub const DEFAULT_NESTING_LIMIT: usize = 128;
+
+/// The current nesting depth.
+///
+/// The depth is only ever accessed through relaxed loads and stores, which
+/// keeps [`DefaultContext`] [`Sync`] where pointer-sized atomics are available.
+/// A context shared between threads which decode concurrently would see a
+/// confused depth, but decoding through a shared context is not meaningful in
+/// the first place.
+struct Depth {
+    #[cfg(target_has_atomic = "ptr")]
+    value: AtomicUsize,
+    #[cfg(not(target_has_atomic = "ptr"))]
+    value: Cell<usize>,
+}
+
+impl Depth {
+    #[inline]
+    const fn new() -> Self {
+        Self {
+            #[cfg(target_has_atomic = "ptr")]
+            value: AtomicUsize::new(0),
+            #[cfg(not(target_has_atomic = "ptr"))]
+            value: Cell::new(0),
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> usize {
+        #[cfg(target_has_atomic = "ptr")]
+        {
+            self.value.load(Ordering::Relaxed)
+        }
+
+        #[cfg(not(target_has_atomic = "ptr"))]
+        {
+            self.value.get()
+        }
+    }
+
+    #[inline]
+    fn set(&self, value: usize) {
+        #[cfg(target_has_atomic = "ptr")]
+        {
+            self.value.store(value, Ordering::Relaxed);
+        }
+
+        #[cfg(not(target_has_atomic = "ptr"))]
+        {
+            self.value.set(value);
+        }
+    }
 }
 
 #[cfg(feature = "alloc")]
@@ -54,6 +132,8 @@ where
             alloc,
             trace,
             capture: Ignore,
+            depth: Depth::new(),
+            nesting_limit: Some(DEFAULT_NESTING_LIMIT),
         }
     }
 }
@@ -100,6 +180,8 @@ where
             alloc: self.alloc,
             trace,
             capture: self.capture,
+            depth: Depth::new(),
+            nesting_limit: self.nesting_limit,
         }
     }
 
@@ -151,6 +233,8 @@ where
             alloc: self.alloc,
             trace: self.trace,
             capture: Capture::new(),
+            depth: Depth::new(),
+            nesting_limit: self.nesting_limit,
         }
     }
 
@@ -198,7 +282,74 @@ where
             alloc: self.alloc,
             trace: self.trace,
             capture: Emit::new(),
+            depth: Depth::new(),
+            nesting_limit: self.nesting_limit,
         }
+    }
+
+    /// Limit how many levels of nested containers are accepted while
+    /// decoding.
+    ///
+    /// Every sequence, map, pack, variant and present optional value counts as
+    /// one level. Input nested deeper than `limit` levels is rejected with an
+    /// error. The default limit is [`DEFAULT_NESTING_LIMIT`] (128).
+    ///
+    /// Since decoding nested containers recurses, a large limit allows
+    /// deeply nested input to use a correspondingly large amount of stack.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::context;
+    /// use musli::json::Encoding;
+    ///
+    /// const ENCODING: Encoding = Encoding::new();
+    ///
+    /// let input = "[[[[1]]]]";
+    ///
+    /// let cx = context::new().with_nesting_limit(3);
+    /// assert!(ENCODING.from_str_with::<_, Vec<Vec<Vec<Vec<u32>>>>>(&cx, input).is_err());
+    ///
+    /// let cx = context::new().with_nesting_limit(4);
+    /// let value: Vec<Vec<Vec<Vec<u32>>>> = ENCODING.from_str_with(&cx, input)?;
+    /// assert_eq!(value, [[[[1]]]]);
+    /// # Ok::<_, musli::context::ErrorMarker>(())
+    /// ```
+    #[inline]
+    pub fn with_nesting_limit(mut self, limit: usize) -> Self {
+        self.nesting_limit = Some(limit);
+        self
+    }
+
+    /// Accept any level of nesting while decoding.
+    ///
+    /// This restores the behavior from before nesting was limited by default.
+    /// Note that decoding nested containers recurses, so deeply nested input
+    /// can then overflow the stack and abort the process. Only use this for
+    /// trusted input.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::context;
+    /// use musli::json::Encoding;
+    /// use musli::value::Value;
+    ///
+    /// const ENCODING: Encoding = Encoding::new();
+    ///
+    /// let input = format!("{}{}", "[".repeat(200), "]".repeat(200));
+    ///
+    /// let cx = context::new();
+    /// assert!(ENCODING.from_str_with::<_, Value<_>>(&cx, &input).is_err());
+    ///
+    /// let cx = context::new().without_nesting_limit();
+    /// let value: Value<_> = ENCODING.from_str_with(&cx, &input)?;
+    /// # Ok::<_, musli::context::ErrorMarker>(())
+    /// ```
+    #[inline]
+    pub fn without_nesting_limit(mut self) -> Self {
+        self.nesting_limit = None;
+        self
     }
 }
 
@@ -323,6 +474,7 @@ where
     fn clear(self) {
         self.trace.clear();
         self.capture.clear();
+        self.depth.set(0);
     }
 
     #[inline]
@@ -379,6 +531,29 @@ where
     #[inline]
     fn advance(self, n: usize) {
         self.trace.advance(n);
+    }
+
+    #[inline]
+    fn enter_nesting(self) -> Result<(), Self::Error> {
+        let Some(limit) = self.nesting_limit else {
+            return Ok(());
+        };
+
+        let depth = self.depth.get();
+
+        if depth >= limit {
+            return Err(self.message(NestingLimitExceeded { limit }));
+        }
+
+        self.depth.set(depth + 1);
+        Ok(())
+    }
+
+    #[inline]
+    fn leave_nesting(self) {
+        if self.nesting_limit.is_some() {
+            self.depth.set(self.depth.get().saturating_sub(1));
+        }
     }
 
     #[inline]
@@ -456,5 +631,20 @@ where
     #[inline]
     fn leave_map_key(self) {
         self.trace.leave_map_key();
+    }
+}
+
+struct NestingLimitExceeded {
+    limit: usize,
+}
+
+impl fmt::Display for NestingLimitExceeded {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Recursion limit exceeded, input may be nested at most {} levels deep",
+            self.limit
+        )
     }
 }

@@ -5,6 +5,7 @@ use core::marker::PhantomData;
 use core::slice;
 
 use crate::alloc::Allocator;
+use crate::context::nested;
 use crate::de::UnsizedVisitor;
 use crate::de::{
     AsDecoder, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, Skip,
@@ -270,7 +271,7 @@ where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
     {
         ensure!(self, hint, ExpectedPack(hint), ValueKind::Bytes(pack) => {
-            f(&mut StorageDecoder::new(self.cx, SliceReader::new(pack)))
+            nested(self.cx, || f(&mut StorageDecoder::new(self.cx, SliceReader::new(pack))))
         })
     }
 
@@ -280,7 +281,7 @@ where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
         ensure!(self, hint, ExpectedSequence(hint), ValueKind::Sequence(sequence) => {
-            f(&mut IterValueDecoder::new(self.cx, sequence))
+            nested(self.cx, || f(&mut IterValueDecoder::new(self.cx, sequence)))
         })
     }
 
@@ -290,7 +291,7 @@ where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
         ensure!(self, hint, ExpectedSequence(hint), ValueKind::Sequence(sequence) => {
-            f(&mut IterValueDecoder::new(self.cx, sequence))
+            nested(self.cx, || f(&mut IterValueDecoder::new(self.cx, sequence)))
         })
     }
 
@@ -300,7 +301,7 @@ where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
         ensure!(self, hint, ExpectedMap(hint), ValueKind::Map(st) => {
-            f(&mut IterValuePairsDecoder::new(self.cx, st))
+            nested(self.cx, || f(&mut IterValuePairsDecoder::new(self.cx, st)))
         })
     }
 
@@ -318,13 +319,15 @@ where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, Self::Error>,
     {
         match &self.value.kind {
-            ValueKind::Variant(st) => f(&mut IterValueVariantDecoder::new(self.cx, st)),
+            ValueKind::Variant(st) => nested(self.cx, || {
+                f(&mut IterValueVariantDecoder::new(self.cx, st))
+            }),
             // Self-describing formats like JSON represent an externally tagged
             // variant as a map with a single entry, so a value decoded from
             // them stores it as such.
-            ValueKind::Map(map) if map.len() == 1 => {
+            ValueKind::Map(map) if map.len() == 1 => nested(self.cx, || {
                 f(&mut IterValueVariantDecoder::new(self.cx, &map[0]))
-            }
+            }),
             _ => {
                 let hint = self.value.type_hint();
                 Err(self.cx.message(ErrorMessage::ExpectedVariant(hint)))
@@ -363,20 +366,22 @@ where
                 let visitor = visitor.visit_string(self.cx, SizeHint::exact(string.len()))?;
                 visitor.visit_borrowed(self.cx, string)
             }
-            ValueKind::Sequence(values) => {
+            ValueKind::Sequence(values) => nested(self.cx, || {
                 visitor.visit_sequence(&mut IterValueDecoder::<OPT, _, _, M>::new(self.cx, values))
-            }
-            ValueKind::Map(values) => visitor.visit_map(
-                &mut IterValuePairsDecoder::<OPT, _, _, M>::new(self.cx, values),
-            ),
-            ValueKind::Variant(variant) => {
+            }),
+            ValueKind::Map(values) => nested(self.cx, || {
+                visitor.visit_map(&mut IterValuePairsDecoder::<OPT, _, _, M>::new(
+                    self.cx, values,
+                ))
+            }),
+            ValueKind::Variant(variant) => nested(self.cx, || {
                 visitor.visit_variant(&mut IterValueVariantDecoder::<OPT, _, _, M>::new(
                     self.cx, variant,
                 ))
-            }
-            ValueKind::Option(Some(value)) => {
+            }),
+            ValueKind::Option(Some(value)) => nested(self.cx, || {
                 visitor.visit_some(ValueDecoder::<OPT, _, _, M>::new(self.cx, value))
-            }
+            }),
             ValueKind::Option(None) => visitor.visit_none(self.cx),
         }
     }

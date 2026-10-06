@@ -17,6 +17,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use crate::alloc::Vec;
+use crate::context::nested;
 use crate::de::{Decoder, SequenceDecoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 use crate::hint::{MapHint, SequenceHint};
 use crate::value::{IntoValueDecoder, Value};
@@ -455,7 +456,7 @@ where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonbSequenceDecoder::new(self.cx, self.container(ARRAY)?);
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.end()?;
         Ok(output)
     }
@@ -466,7 +467,7 @@ where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonbSequenceDecoder::new(self.cx, self.container(ARRAY)?);
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.end()?;
         Ok(output)
     }
@@ -485,7 +486,7 @@ where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonbObjectDecoder::new(self.cx, self.container(OBJECT)?);
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.end()?;
         Ok(output)
     }
@@ -512,7 +513,7 @@ where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonbVariantDecoder::new(self.cx, self.container(OBJECT)?);
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.end()?;
         Ok(output)
     }

@@ -26,6 +26,7 @@ use core::str;
 use crate::Context;
 use crate::Options;
 use crate::alloc::{AllocError, Allocator, Vec};
+use crate::context::nested;
 use crate::de::{Decoder, SequenceDecoder, SizeHint, Skip, UnsizedVisitor, Visitor};
 use crate::hint::{MapHint, SequenceHint};
 use crate::options;
@@ -448,7 +449,7 @@ where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonSequenceDecoder::new(self.cx, None, self.parser)?;
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.skip_sequence_remaining()?;
         Ok(output)
     }
@@ -459,7 +460,7 @@ where
         F: FnOnce(&mut Self::DecodeSequence) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonSequenceDecoder::new(self.cx, None, self.parser)?;
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.skip_sequence_remaining()?;
         Ok(output)
     }
@@ -471,7 +472,7 @@ where
     {
         let size = hint.get();
         let mut decoder = JsonSequenceDecoder::new(self.cx, size, self.parser)?;
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.skip_sequence_remaining()?;
         Ok(output)
     }
@@ -482,7 +483,7 @@ where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonObjectDecoder::new(self.cx, None, self.parser)?;
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.skip_object_remaining()?;
         Ok(output)
     }
@@ -493,7 +494,7 @@ where
         F: FnOnce(&mut Self::DecodeMap) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonObjectDecoder::new(self.cx, hint.get(), self.parser)?;
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.skip_object_remaining()?;
         Ok(output)
     }
@@ -512,7 +513,7 @@ where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, Self::Error>,
     {
         let mut decoder = JsonVariantDecoder::new(self.cx, self.parser)?;
-        let output = f(&mut decoder)?;
+        let output = nested(self.cx, || f(&mut decoder))?;
         decoder.end()?;
         Ok(output)
     }

@@ -19,7 +19,7 @@ pub use self::error_marker::ErrorMarker;
 
 mod default_context;
 #[doc(inline)]
-pub use self::default_context::DefaultContext;
+pub use self::default_context::{DEFAULT_NESTING_LIMIT, DefaultContext};
 
 mod context_error;
 #[doc(inline)]
@@ -93,4 +93,21 @@ where
     A: Allocator,
 {
     DefaultContext::new_in(alloc)
+}
+
+/// Decode the contents of a nested container through `f`, one level of
+/// nesting deeper.
+///
+/// The level is left whether or not `f` succeeds, so a context which is
+/// reused after an error does not keep counting the levels which were active
+/// when the error occurred.
+#[inline(always)]
+pub(crate) fn nested<C, O>(cx: C, f: impl FnOnce() -> Result<O, C::Error>) -> Result<O, C::Error>
+where
+    C: crate::Context,
+{
+    cx.enter_nesting()?;
+    let result = f();
+    cx.leave_nesting();
+    result
 }

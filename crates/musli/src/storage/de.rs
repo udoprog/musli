@@ -3,6 +3,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 use crate::alloc::Vec;
+use crate::context::nested;
 use crate::de::{
     DecodeSliceBuilder, Decoder, EntriesDecoder, EntryDecoder, MapDecoder, SequenceDecoder,
     SizeHint, TryFastDecode, UnsizedVisitor, VariantDecoder, utils,
@@ -123,8 +124,9 @@ where
     where
         F: FnOnce(&mut Self::DecodePack) -> Result<O, Self::Error>,
     {
+        let cx = self.cx;
         let mut this = StorageDecoder::new(self.cx, self.reader);
-        f(&mut this)
+        nested(cx, || f(&mut this))
     }
 
     #[inline]
@@ -382,7 +384,7 @@ where
     {
         let cx = self.cx;
         let mut decoder = LimitedStorageDecoder::new(self.cx, self.reader)?;
-        let output = f(&mut decoder)?;
+        let output = nested(cx, || f(&mut decoder))?;
 
         if decoder.remaining != 0 {
             return Err(cx.message("Caller did not decode all available map entries"));
@@ -398,7 +400,7 @@ where
     {
         let cx = self.cx;
         let mut decoder = LimitedStorageDecoder::new(self.cx, self.reader)?;
-        let output = f(&mut decoder)?;
+        let output = nested(cx, || f(&mut decoder))?;
 
         if decoder.remaining != 0 {
             return Err(cx.message("Caller did not decode all available map entries"));
@@ -420,7 +422,8 @@ where
     where
         F: FnOnce(&mut Self::DecodeVariant) -> Result<O, Self::Error>,
     {
-        f(&mut self)
+        let cx = self.cx;
+        nested(cx, || f(&mut self))
     }
 }
 
