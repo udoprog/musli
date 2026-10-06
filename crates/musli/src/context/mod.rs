@@ -101,6 +101,14 @@ where
 /// The level is left whether or not `f` succeeds, so a context which is
 /// reused after an error does not keep counting the levels which were active
 /// when the error occurred.
+#[cfg(any(
+    feature = "storage",
+    feature = "wire",
+    feature = "descriptive",
+    feature = "value",
+    feature = "json",
+    feature = "sqlite-jsonb"
+))]
 #[inline(always)]
 pub(crate) fn nested<C, O>(cx: C, f: impl FnOnce() -> Result<O, C::Error>) -> Result<O, C::Error>
 where
