@@ -200,6 +200,10 @@ where
 ///
 /// What `url` is used for during the handshake is up to the implementation; it
 /// is never connected to directly.
+#[cfg_attr(
+    not(any(feature = "tungstenite029", feature = "tungstenite030")),
+    allow(dead_code)
+)]
 pub(crate) fn connect_with<T>(
     url: impl AsRef<str>,
     connector: T::Connector,
