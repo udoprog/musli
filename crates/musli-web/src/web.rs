@@ -1122,6 +1122,15 @@ where
         Ok(())
     }
 
+    /// Fail the pending request with the given serial, if it is still pending.
+    fn fail_request(&self, serial: u32, error: Error) {
+        let p = self.g.requests.borrow_mut().remove(&serial);
+
+        if let Some(p) = p {
+            p.callback.error(error);
+        }
+    }
+
     /// Close an pending requests with an error, since there is no chance they
     /// will be responded to any more.
     fn close_pending(self: &Rc<Self>) {
@@ -1475,12 +1484,6 @@ where
         }
 
         let serial = shared.serial.get();
-
-        if let Err(error) = shared.send_connect(serial) {
-            shared.on_error.call(error);
-            return Request::new();
-        }
-
         shared.serial.set(serial.wrapping_add(1));
 
         let callback = {
@@ -1515,6 +1518,15 @@ where
 
         if let Some(p) = existing {
             p.callback.error(Error::message("Request cancelled"));
+        }
+
+        if let Err(error) = shared.send_connect(serial) {
+            // NB: The request is registered before it is sent, since sending
+            // can observe synchronously that the peer has gone away and fail
+            // every pending request before it returns. If that did not already
+            // fail this request, it is failed here.
+            shared.fail_request(serial, error);
+            return Request::new();
         }
 
         Request {
@@ -1813,12 +1825,6 @@ where
         };
 
         let serial = shared.serial.get();
-
-        if let Err(error) = shared.send_client_request(serial, channel, &self.body) {
-            shared.on_error.call(error);
-            return Request::new();
-        }
-
         shared.serial.set(serial.wrapping_add(1));
 
         let pending = Pending {
@@ -1835,6 +1841,15 @@ where
 
         if let Some(p) = existing {
             p.callback.error(Error::message("Request cancelled"));
+        }
+
+        if let Err(error) = shared.send_client_request(serial, channel, &self.body) {
+            // NB: The request is registered before it is sent, since sending
+            // can observe synchronously that the peer has gone away and fail
+            // every pending request before it returns. If that did not already
+            // fail this request, it is failed here.
+            shared.fail_request(serial, error);
+            return Request::new();
         }
 
         Request {

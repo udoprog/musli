@@ -27,6 +27,13 @@ thread_local! {
     static PROTOCOL: RefCell<Option<&'static str>> = const { RefCell::new(Some("http:")) };
     /// Whether opening a socket fails.
     static FAIL_SOCKET: Cell<bool> = const { Cell::new(false) };
+    /// Called instead of sending a frame, if set.
+    static SEND: RefCell<Option<Rc<dyn Fn() -> Result<(), Error>>>> = const { RefCell::new(None) };
+}
+
+/// Make every following send call `send` instead, which decides its outcome.
+fn on_send(send: impl Fn() -> Result<(), Error> + 'static) {
+    SEND.with(|s| *s.borrow_mut() = Some(Rc::new(send)));
 }
 
 fn push_op(op: Op) {
@@ -103,6 +110,12 @@ impl SocketImpl for MockSocket {
     }
 
     fn send(&self, mode: Mode, data: &[u8]) -> Result<(), Error> {
+        let send = SEND.with(|s| s.borrow().clone());
+
+        if let Some(send) = send {
+            return send();
+        }
+
         push_op(Op::Send(mode, data.to_vec()));
         Ok(())
     }
@@ -176,6 +189,35 @@ impl Broadcast for Ping {
     };
 
     fn __do_not_implement_broadcast() {}
+}
+
+/// A request with an empty body.
+#[derive(musli::Encode, musli::Decode)]
+struct Hello;
+
+enum HelloEndpoint {}
+
+impl api::Decodable for HelloEndpoint {
+    type Type<'de> = Hello;
+
+    fn __do_not_implement_decodable() {}
+}
+
+impl api::Endpoint for HelloEndpoint {
+    const ID: MessageId = match MessageId::new(2) {
+        Some(id) => id,
+        None => panic!("Invalid message id"),
+    };
+
+    type Response<'de> = Hello;
+
+    fn __do_not_implement_endpoint() {}
+}
+
+impl api::Request for Hello {
+    type Endpoint = HelloEndpoint;
+
+    fn __do_not_implement_request() {}
 }
 
 const URL: &str = "ws://example.com/ws";
@@ -426,4 +468,138 @@ fn failed_socket_can_be_retried() {
         || FAIL_SOCKET.with(|f| f.set(true)),
         || FAIL_SOCKET.with(|f| f.set(false)),
     );
+}
+
+/// The outcomes a request or channel callback has been called with, as the
+/// error message or `None` for a success.
+type Outcomes = Rc<RefCell<Vec<Option<String>>>>;
+
+fn outcome<T>(result: Result<T>) -> Option<String> {
+    result.err().map(|error| error.to_string())
+}
+
+/// Send a [`Hello`] request, recording what its callback is called with.
+fn send_hello(service: &Service<MockImpl>) -> (Outcomes, Request) {
+    let outcomes = Outcomes::default();
+
+    let request = service
+        .handle()
+        .request()
+        .body(Hello)
+        .on_raw_packet({
+            let outcomes = outcomes.clone();
+            move |result: Result<RawPacket>| outcomes.borrow_mut().push(outcome(result))
+        })
+        .send();
+
+    (outcomes, request)
+}
+
+/// Open a channel, recording what its callback is called with.
+fn open_channel(service: &Service<MockImpl>) -> (Outcomes, Request) {
+    let outcomes = Outcomes::default();
+
+    let request = service
+        .handle()
+        .channel()
+        .on_open({
+            let outcomes = outcomes.clone();
+            move |result: Result<Channel<MockImpl>>| outcomes.borrow_mut().push(outcome(result))
+        })
+        .send();
+
+    (outcomes, request)
+}
+
+/// Whether any request is still waiting for a response.
+fn has_pending(service: &Service<MockImpl>) -> bool {
+    !service.shared.g.requests.borrow().is_empty()
+}
+
+/// A request which could not be sent is failed through its own callback,
+/// rather than only through the connection-wide error handler.
+#[test]
+fn send_error_fails_the_request() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    on_send(|| Err(Error::message("Send failed")));
+
+    let (outcomes, _request) = send_hello(&service);
+
+    assert_eq!(*outcomes.borrow(), vec![Some(String::from("Send failed"))]);
+    assert!(!has_pending(&service));
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// A channel which could not be requested is failed through its own callback.
+#[test]
+fn send_error_fails_the_channel() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    on_send(|| Err(Error::message("Send failed")));
+
+    let (outcomes, _request) = open_channel(&service);
+
+    assert_eq!(*outcomes.borrow(), vec![Some(String::from("Send failed"))]);
+    assert!(!has_pending(&service));
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// Make sending fail every pending request before it returns an error, the
+/// way the close handler does when sending observes that the peer is gone.
+fn fail_pending_on_send(service: &Service<MockImpl>) {
+    on_send({
+        let shared = Rc::downgrade(&service.shared);
+
+        move || {
+            if let Some(shared) = shared.upgrade() {
+                shared.close_pending();
+            }
+
+            Err(Error::message("Send failed"))
+        }
+    });
+}
+
+/// Sending can observe that the peer is gone and fail every pending request
+/// before it returns. The request being sent must be among them, and must only
+/// be failed once.
+#[test]
+fn send_error_after_pending_requests_were_failed() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+    fail_pending_on_send(&service);
+
+    let (outcomes, _request) = send_hello(&service);
+
+    assert_eq!(
+        *outcomes.borrow(),
+        vec![Some(String::from("Connection closed"))]
+    );
+    assert!(!has_pending(&service));
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// Like [`send_error_after_pending_requests_were_failed`], but for opening a
+/// channel.
+#[test]
+fn channel_send_error_after_pending_requests_were_failed() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+    fail_pending_on_send(&service);
+
+    let (outcomes, _request) = open_channel(&service);
+
+    assert_eq!(
+        *outcomes.borrow(),
+        vec![Some(String::from("Connection closed"))]
+    );
+    assert!(!has_pending(&service));
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
 }
