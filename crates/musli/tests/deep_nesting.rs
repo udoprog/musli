@@ -16,7 +16,7 @@ const STACK_SIZE: usize = 2 * 1024 * 1024;
 /// Deep enough that recursing once per level overflows `STACK_SIZE`.
 const DEEP: usize = 100_000;
 
-/// The nesting depth that `Value` decoding accepts.
+/// The nesting depth that the default context accepts.
 const LIMIT: usize = 128;
 
 fn with_stack<T>(f: impl FnOnce() -> T + Send + 'static) -> T
