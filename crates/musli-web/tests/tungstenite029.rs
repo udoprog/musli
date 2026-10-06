@@ -7,7 +7,10 @@
 
 #![cfg(all(feature = "tungstenite029", feature = "axum08", not(miri)))]
 
+use std::io;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum08 as axum;
@@ -20,7 +23,7 @@ use axum::routing::any;
 use musli_web::api::{ChannelId, Format, MessageId, Mode};
 use musli_web::client::{self, Handle, State as ClientState};
 use musli_web::{tungstenite029, ws};
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, watch};
 use tokio::task::JoinHandle;
 
@@ -2109,4 +2112,184 @@ async fn every_frame_states_the_version() {
     assert_eq!(frame.header.version, musli_web::api::VERSION);
 
     server.shutdown().await;
+}
+
+/// Bind a local port and release it again, so that nothing is listening on the
+/// returned address.
+async fn unused_addr() -> SocketAddr {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind listener");
+    listener.local_addr().expect("Failed to get local address")
+}
+
+/// A websocket established over a caller-supplied stream behaves like one
+/// connected to the url. The url is only used for the handshake and never
+/// connected to, and `open` is called again for every reconnect.
+#[tokio::test]
+async fn connect_with_a_caller_supplied_stream() {
+    let server = TestServer::new().await;
+    let addr = server.addr();
+    let opened = Arc::new(AtomicUsize::new(0));
+
+    let mut service = tungstenite029::connect_with("ws://never-connected.invalid/ws", {
+        let opened = opened.clone();
+
+        move || {
+            opened.fetch_add(1, Ordering::SeqCst);
+            TcpStream::connect(addr)
+        }
+    })
+    .build();
+
+    timeout!(service.try_connect()).expect("Failed to connect");
+    assert_eq!(opened.load(Ordering::SeqCst), 1);
+
+    // Already connected, so this does nothing.
+    timeout!(service.try_connect()).expect("Failed to connect");
+    assert_eq!(opened.load(Ordering::SeqCst), 1);
+
+    let handle = service.handle().clone();
+
+    let task = tokio::spawn(async move {
+        service.run().await.expect("Client service failed");
+    });
+
+    timeout!(handle.wait_until_open()).expect("Failed to open connection");
+    // The established connection is the one which is driven.
+    assert_eq!(opened.load(Ordering::SeqCst), 1);
+
+    let (message, _) = hello(&handle, "Over a stream").await;
+    assert_eq!(message, "Over a stream");
+
+    let mut states = handle.on_state_change();
+
+    server.shutdown().await;
+    assert!(timeout!(states.wait_until(ClientState::Closed)));
+
+    let server = TestServer::bind(addr).await;
+    assert!(timeout!(states.wait_until(ClientState::Open)));
+    assert!(opened.load(Ordering::SeqCst) >= 2);
+
+    let (message, _) = hello(&handle, "Reconnected").await;
+    assert_eq!(message, "Reconnected");
+
+    handle.close();
+    timeout!(task).expect("Client task panicked");
+    server.shutdown().await;
+}
+
+/// A websocket can be established over one half of an in-process duplex
+/// stream, which is handed out once.
+#[tokio::test]
+async fn connect_with_an_in_process_duplex() {
+    let server = TestServer::new().await;
+    let addr = server.addr();
+
+    let (ours, mut theirs) = tokio::io::duplex(1024);
+
+    // Bridge the other half to the server, standing in for a service running
+    // in-process.
+    let bridge = tokio::spawn(async move {
+        let mut tcp = TcpStream::connect(addr)
+            .await
+            .expect("Failed to connect bridge");
+        _ = tokio::io::copy_bidirectional(&mut theirs, &mut tcp).await;
+    });
+
+    let mut stream = Some(ours);
+
+    let mut service = tungstenite029::connect_with("ws://in-process.invalid/ws", move || {
+        let stream = stream.take();
+
+        async move {
+            stream.ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "Stream already used"))
+        }
+    })
+    .reconnect(false)
+    .build();
+
+    timeout!(service.try_connect()).expect("Failed to connect");
+
+    let handle = service.handle().clone();
+
+    let task = tokio::spawn(async move {
+        service.run().await.expect("Client service failed");
+    });
+
+    timeout!(handle.wait_until_open()).expect("Failed to open connection");
+
+    let (message, _) = hello(&handle, "In process").await;
+    assert_eq!(message, "In process");
+
+    handle.close();
+    timeout!(task).expect("Client task panicked");
+    timeout!(bridge).expect("Bridge task panicked");
+    server.shutdown().await;
+}
+
+/// `try_connect` returns the error `open` failed with to the caller, rather
+/// than reporting it through `on_error` and retrying in the background.
+#[tokio::test]
+async fn try_connect_returns_the_open_error() {
+    let opened = Arc::new(AtomicUsize::new(0));
+    let errors = Arc::new(Mutex::new(Vec::new()));
+
+    let mut service = tungstenite029::connect_with("ws://localhost/ws", {
+        let opened = opened.clone();
+
+        move || {
+            opened.fetch_add(1, Ordering::SeqCst);
+
+            async {
+                Err::<TcpStream, _>(io::Error::new(
+                    io::ErrorKind::ConnectionRefused,
+                    "Nothing to connect to",
+                ))
+            }
+        }
+    })
+    .on_error({
+        let errors = errors.clone();
+        move |error: client::Error| errors.lock().unwrap().push(error.to_string())
+    })
+    .build();
+
+    let error = timeout!(service.try_connect()).expect_err("Expected connecting to fail");
+
+    let source = core::error::Error::source(&error).expect("Missing transport error");
+
+    let Some(tokio_tungstenite029::tungstenite::Error::Io(error)) =
+        source.downcast_ref::<tokio_tungstenite029::tungstenite::Error>()
+    else {
+        panic!("Expected an IO error, got {source:?}");
+    };
+
+    assert_eq!(error.kind(), io::ErrorKind::ConnectionRefused);
+    assert_eq!(opened.load(Ordering::SeqCst), 1);
+    assert!(errors.lock().unwrap().is_empty());
+
+    // Nothing was established, so the caller can try again.
+    timeout!(service.try_connect()).expect_err("Expected connecting to fail");
+    assert_eq!(opened.load(Ordering::SeqCst), 2);
+    assert!(errors.lock().unwrap().is_empty());
+}
+
+/// `try_connect` fails fast for a url nothing is listening on.
+#[tokio::test]
+async fn try_connect_fails_fast_without_a_server() {
+    let addr = unused_addr().await;
+
+    let errors = Arc::new(Mutex::new(Vec::new()));
+
+    let mut service = tungstenite029::connect(format!("ws://{addr}/ws"))
+        .on_error({
+            let errors = errors.clone();
+            move |error: client::Error| errors.lock().unwrap().push(error.to_string())
+        })
+        .build();
+
+    timeout!(service.try_connect()).expect_err("Expected connecting to fail");
+    assert!(errors.lock().unwrap().is_empty());
+    assert!(!service.handle().is_open());
 }

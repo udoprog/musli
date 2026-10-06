@@ -64,5 +64,36 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! # Connecting over any stream
+//!
+//! [`connect_with()`] establishes the websocket over a stream the caller
+//! opens, such as a [`UnixStream`], instead of connecting to the url. Combined
+//! with [`Service::try_connect`] a caller can fail fast if there is nothing to
+//! connect to, rather than retrying in the background:
+//!
+//! ```no_run
+//! use musli_web::tungstenite029::prelude::*;
+//!
+//! # async fn example() -> Result<(), Box<dyn core::error::Error>> {
+//! let mut service = ws::connect_with("ws://localhost/ws", || {
+//!     tokio::net::UnixStream::connect("/run/user/1000/app.sock")
+//! })
+//! .reconnect(false)
+//! .build();
+//!
+//! service.try_connect().await?;
+//!
+//! tokio::spawn(async move {
+//!     if let Err(error) = service.run().await {
+//!         tracing::error!("WebSocket service error: {error}");
+//!     }
+//! });
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! [`UnixStream`]: <https://docs.rs/tokio/1/tokio/net/struct.UnixStream.html>
+//! [`Service::try_connect`]: crate::client::Service::try_connect
 
 tungstenite_impl!(tokio_tungstenite029, Tungstenite029Impl, "0.29.x");

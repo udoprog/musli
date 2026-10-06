@@ -161,8 +161,21 @@ where
     #[allow(private_bounds)]
     type Socket: SocketImpl<Error = Self::Error>;
 
+    /// A caller-supplied way of establishing the underlying socket, used in
+    /// place of connecting to the url. See constructors such as
+    /// [`tungstenite029::connect_with`].
+    ///
+    /// [`tungstenite029::connect_with`]: crate::tungstenite029::connect_with
+    #[doc(hidden)]
+    type Connector: 'static + Send;
+
     #[doc(hidden)]
     fn connect(url: &str) -> impl Future<Output = Result<Self::Socket, Self::Error>> + Send;
+
+    #[doc(hidden)]
+    fn connect_with(
+        connector: &mut Self::Connector,
+    ) -> impl Future<Output = Result<Self::Socket, Self::Error>> + Send + '_;
 }
 
 /// Construct a new [`ServiceBuilder`] which will connect to `url`.
@@ -172,12 +185,31 @@ where
 {
     ServiceBuilder {
         url: url.as_ref().to_string(),
+        connector: None,
         on_error: EmptyCallback,
         reconnect: true,
         seed: DEFAULT_SEED,
         format: Format::DEFAULT,
         mode: Mode::DEFAULT,
         _marker: PhantomData,
+    }
+}
+
+/// Construct a new [`ServiceBuilder`] which establishes its socket through
+/// `connector` instead of connecting to `url`.
+///
+/// What `url` is used for during the handshake is up to the implementation; it
+/// is never connected to directly.
+pub(crate) fn connect_with<T>(
+    url: impl AsRef<str>,
+    connector: T::Connector,
+) -> ServiceBuilder<T, EmptyCallback>
+where
+    T: ClientImpl,
+{
+    ServiceBuilder {
+        connector: Some(connector),
+        ..connect(url)
     }
 }
 
@@ -516,8 +548,12 @@ impl Shared {
 /// Builder of a [`Service`].
 ///
 /// Constructed through [`connect()`].
-pub struct ServiceBuilder<T, E> {
+pub struct ServiceBuilder<T, E>
+where
+    T: ClientImpl,
+{
     url: String,
+    connector: Option<T::Connector>,
     on_error: E,
     reconnect: bool,
     seed: u64,
@@ -543,6 +579,7 @@ where
     {
         ServiceBuilder {
             url: self.url,
+            connector: self.connector,
             on_error,
             reconnect: self.reconnect,
             seed: self.seed,
@@ -621,7 +658,8 @@ where
 
     /// Build the service.
     ///
-    /// Note that no connection is established until [`Service::run`] is called.
+    /// Note that no connection is established until [`Service::run`] or
+    /// [`Service::try_connect`] is called.
     pub fn build(self) -> Service<T> {
         let (tx, rx) = mpsc::unbounded_channel();
         let (state, _) = watch::channel(State::Closed);
@@ -643,6 +681,7 @@ where
             shared,
             rx,
             url: self.url,
+            connector: self.connector,
             on_error: Box::new(self.on_error),
             reconnect: self.reconnect,
             socket: None,
@@ -669,6 +708,7 @@ where
     shared: Arc<Shared>,
     rx: mpsc::UnboundedReceiver<Command>,
     url: String,
+    connector: Option<T::Connector>,
     on_error: Box<dyn Callback<Error>>,
     reconnect: bool,
     socket: Option<T::Socket>,
@@ -805,16 +845,52 @@ where
         Ok(())
     }
 
-    /// Try to establish a connection.
-    async fn connect(&mut self) {
+    /// Establish the connection now, returning a failure to the caller instead
+    /// of scheduling a reconnect.
+    ///
+    /// This lets a caller fail fast when there is nothing to connect to, such
+    /// as a refused connection or a missing unix socket, rather than leaving
+    /// [`Service::run`] to retry with a backoff. On success the established
+    /// connection is the one [`Service::run`] goes on to drive. If a connection
+    /// is already established this does nothing.
+    ///
+    /// The error is not reported through [`ServiceBuilder::on_error`]. The
+    /// underlying transport error is available through
+    /// [`core::error::Error::source`] on the returned error.
+    pub async fn try_connect(&mut self) -> Result<()> {
+        if self.socket.is_some() {
+            return Ok(());
+        }
+
+        let socket = self.open().await.map_err(Error::transport)?;
+        self.established(socket);
+        Ok(())
+    }
+
+    /// Open a new socket, either through the caller-supplied connector or by
+    /// connecting to the url.
+    async fn open(&mut self) -> Result<T::Socket, T::Error> {
         tracing::debug!(url = self.url.as_str(), "Connecting");
 
-        match T::connect(&self.url).await {
+        match &mut self.connector {
+            Some(connector) => T::connect_with(connector).await,
+            None => T::connect(&self.url).await,
+        }
+    }
+
+    /// Install a newly established socket.
+    fn established(&mut self, socket: T::Socket) {
+        tracing::debug!("Connection established");
+        self.socket = Some(socket);
+        self.next_attempt = None;
+        self.timeout = INITIAL_TIMEOUT;
+    }
+
+    /// Try to establish a connection.
+    async fn connect(&mut self) {
+        match self.open().await {
             Ok(socket) => {
-                tracing::debug!("Connection established");
-                self.socket = Some(socket);
-                self.next_attempt = None;
-                self.timeout = INITIAL_TIMEOUT;
+                self.established(socket);
             }
             Err(error) => {
                 self.on_error.call(Error::transport(error));
