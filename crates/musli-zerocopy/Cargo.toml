@@ -1,6 +1,6 @@
 [package]
 name = "musli-zerocopy"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2024"
 rust-version = "1.85"
@@ -27,7 +27,7 @@ std = []
 alloc = []
 
 [dependencies]
-musli-zerocopy-macros = { version = "=0.1.1", path = "../musli-zerocopy-macros" }
+musli-zerocopy-macros = { version = "=0.1.2", path = "../musli-zerocopy-macros" }
 rand = { version = "0.10.0", default-features = false }
 
 # Note that musli-macros is tightly coupled with the version of musli-core used.
@@ -37,9 +37,9 @@ rand = { version = "0.10.0", default-features = false }
 #
 # See https://github.com/serde-rs/serde/blob/master/serde/Cargo.toml
 [target.'cfg(any())'.dependencies]
-musli-zerocopy-macros = { version = "=0.1.1", path = "../musli-zerocopy-macros" }
+musli-zerocopy-macros = { version = "=0.1.2", path = "../musli-zerocopy-macros" }
 
 [dev-dependencies]
 anyhow = "1.0.81"
 trybuild = "1.0.90"
-musli-zerocopy-macros = { version = "=0.1.1", path = "../musli-zerocopy-macros", features = ["sneaky-fields"] }
+musli-zerocopy-macros = { version = "=0.1.2", path = "../musli-zerocopy-macros", features = ["sneaky-fields"] }
