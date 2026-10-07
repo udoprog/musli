@@ -208,40 +208,40 @@ macro_rules! tungstenite_impl {
                 cx: &mut Context<'_>,
             ) -> Poll<Option<Result<WsMessage, Error>>> {
                 match self {
-                    Socket::Url(socket) => Pin::new(socket).poll_next(cx),
-                    Socket::Stream(socket) => Pin::new(socket).poll_next(cx),
+                    Socket::Url(socket) => Pin::new(&mut **socket).poll_next(cx),
+                    Socket::Stream(socket) => Pin::new(&mut **socket).poll_next(cx),
                 }
             }
 
             #[inline]
             fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
                 match self {
-                    Socket::Url(socket) => Pin::new(socket).poll_ready(cx),
-                    Socket::Stream(socket) => Pin::new(socket).poll_ready(cx),
+                    Socket::Url(socket) => Pin::new(&mut **socket).poll_ready(cx),
+                    Socket::Stream(socket) => Pin::new(&mut **socket).poll_ready(cx),
                 }
             }
 
             #[inline]
             fn start_send(&mut self, message: WsMessage) -> Result<(), Error> {
                 match self {
-                    Socket::Url(socket) => Pin::new(socket).start_send(message),
-                    Socket::Stream(socket) => Pin::new(socket).start_send(message),
+                    Socket::Url(socket) => Pin::new(&mut **socket).start_send(message),
+                    Socket::Stream(socket) => Pin::new(&mut **socket).start_send(message),
                 }
             }
 
             #[inline]
             fn poll_flush(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
                 match self {
-                    Socket::Url(socket) => Pin::new(socket).poll_flush(cx),
-                    Socket::Stream(socket) => Pin::new(socket).poll_flush(cx),
+                    Socket::Url(socket) => Pin::new(&mut **socket).poll_flush(cx),
+                    Socket::Stream(socket) => Pin::new(&mut **socket).poll_flush(cx),
                 }
             }
 
             #[inline]
             fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
                 match self {
-                    Socket::Url(socket) => Pin::new(socket).poll_close(cx),
-                    Socket::Stream(socket) => Pin::new(socket).poll_close(cx),
+                    Socket::Url(socket) => Pin::new(&mut **socket).poll_close(cx),
+                    Socket::Stream(socket) => Pin::new(&mut **socket).poll_close(cx),
                 }
             }
         }
