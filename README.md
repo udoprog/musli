@@ -213,6 +213,27 @@ read back with its `json` functions.
 
 <br>
 
+## Nesting limit
+
+Decoding nested data recurses, so deeply nested untrusted input could
+otherwise overflow the stack and abort the process. To prevent this the
+default context limits decoding to 128 levels of nesting in every format,
+where every sequence, map, pack, variant and present optional value counts as
+one level. Deeper input is rejected with an error.
+
+Input nested deeper than that, such as a long linked list stored as a
+recursive type, needs a context with a raised limit through
+[`DefaultContext::with_nesting_limit`], or no limit at all through
+[`DefaultContext::without_nesting_limit`]. Custom [`Context`]
+implementations can limit nesting through [`Context::enter_nesting`].
+
+[`DefaultContext::with_nesting_limit`]: <https://docs.rs/musli/latest/musli/context/struct.DefaultContext.html#method.with_nesting_limit>
+[`DefaultContext::without_nesting_limit`]: <https://docs.rs/musli/latest/musli/context/struct.DefaultContext.html#method.without_nesting_limit>
+[`Context`]: <https://docs.rs/musli/latest/musli/trait.Context.html>
+[`Context::enter_nesting`]: <https://docs.rs/musli/latest/musli/trait.Context.html#method.enter_nesting>
+
+<br>
+
 ## Upgrade stability
 
 The following is an example of *full upgrade stability* using
