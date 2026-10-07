@@ -476,8 +476,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                         members,
                         types,
                         variables,
-                        ignored_variables,
-                        ignored_members,
+                        ignored_assigns,
                         ..
                     } = &output;
 
@@ -485,7 +484,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                         Self::#from { #(#assigns),* } => {
                             Self::#to {
                                 #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(#variables),)*
-                                #(#ignored_members: #ignored_variables,)*
+                                #(#ignored_assigns,)*
                             }
                         }
                     });
@@ -510,8 +509,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                         members,
                         types,
                         variables,
-                        ignored_variables,
-                        ignored_members,
+                        ignored_assigns,
                         ..
                     } = &output;
 
@@ -519,7 +517,7 @@ fn expand(cx: &Ctxt, input: syn::DeriveInput) -> Result<TokenStream, ()> {
                         Self::#ident { #(#assigns),* } => {
                             Self::#ident {
                                 #(#members: <#types as #zero_copy>::swap_bytes::<#endianness>(#variables),)*
-                                #(#ignored_members: #ignored_variables,)*
+                                #(#ignored_assigns,)*
                             }
                         }
                     });
@@ -723,7 +721,7 @@ struct Fields<'a> {
     variables: Vec<syn::Ident>,
     first_field: Option<(&'a syn::Type, syn::Member)>,
     ignored_members: Vec<syn::Member>,
-    ignored_variables: Vec<syn::Ident>,
+    ignored_assigns: Vec<syn::FieldValue>,
     check_zero_sized: Vec<&'a syn::Type>,
     /// Every field in declaration order, and whether it is ignored.
     ordered: Vec<(&'a syn::Type, bool)>,
@@ -814,17 +812,19 @@ fn process_fields<'a>(cx: &Ctxt, fields: &'a syn::Fields) -> Fields<'a> {
             syn::Member::Unnamed(index) => quote::format_ident!("_f{}", index.index),
         };
 
-        output.assigns.push(match &member {
+        let assign: syn::FieldValue = match &member {
             syn::Member::Named(ident) => syn::parse_quote!(#ident),
             syn::Member::Unnamed(index) => syn::parse_quote!(#index: #variable),
-        });
+        };
+
+        output.assigns.push(assign.clone());
 
         output.ordered.push((ty, ignore.is_some()));
 
         if ignore.is_some() {
             output.check_zero_sized.push(ty);
             output.ignored_members.push(member);
-            output.ignored_variables.push(variable);
+            output.ignored_assigns.push(assign);
             continue;
         }
 
