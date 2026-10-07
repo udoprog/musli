@@ -1,6 +1,6 @@
 [package]
 name = "musli-core"
-version = "0.1.7"
+version = "0.1.9"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 edition = "2024"
 rust-version = "1.85"
@@ -28,7 +28,7 @@ alloc = []
 verbose = ["musli-macros/verbose"]
 
 [dependencies]
-musli-macros = { version = "0.1.8", path = "../musli-macros", default-features = false }
+musli-macros = { version = "0.1.9", path = "../musli-macros", default-features = false }
 
 # This cfg cannot be enabled, but it still forces Cargo to keep musli-macros's
 # version in lockstep with musli's, even if someone depends on the two crates
@@ -36,7 +36,7 @@ musli-macros = { version = "0.1.8", path = "../musli-macros", default-features =
 # is compatible with exactly one musli release because the generated code
 # involves nonpublic APIs which are not bound by semver.
 [target.'cfg(any())'.dependencies]
-musli-macros = { version = "=0.1.8", path = "../musli-macros" }
+musli-macros = { version = "=0.1.9", path = "../musli-macros" }
 
 [dev-dependencies]
-musli = { version = "=0.1.8", path = "../musli", features = ["json"] }
+musli = { version = "=0.1.9", path = "../musli", features = ["json"] }
