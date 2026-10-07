@@ -9,9 +9,15 @@ unsafe extern "C" {}
 #[link(name = "c")]
 unsafe extern "C" {}
 
+unsafe extern "C" {
+    fn abort() -> !;
+}
+
 #[panic_handler]
 fn rust_begin_panic(_: &core::panic::PanicInfo) -> ! {
-    core::intrinsics::abort();
+    // SAFETY: `abort` is provided by the C runtime linked above and takes no
+    // arguments.
+    unsafe { abort() }
 }
 
 #[lang = "eh_personality"]

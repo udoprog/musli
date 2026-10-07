@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 #![allow(internal_features)]
-#![feature(core_intrinsics, lang_items, link_cfg)]
+#![feature(lang_items)]
 
 mod prelude;
 
