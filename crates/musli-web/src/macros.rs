@@ -47,9 +47,9 @@ macro_rules! tungstenite_impl {
         #[doc(hidden)]
         pub enum Socket {
             /// A socket connected to a url.
-            Url(WebSocketStream<MaybeTlsStream<TcpStream>>),
+            Url(Box<WebSocketStream<MaybeTlsStream<TcpStream>>>),
             /// A socket established over a caller-supplied stream.
-            Stream(WebSocketStream<Box<dyn ByteStream>>),
+            Stream(Box<WebSocketStream<Box<dyn ByteStream>>>),
         }
 
         /// A caller-supplied way of opening the stream a websocket is
@@ -184,7 +184,7 @@ macro_rules! tungstenite_impl {
             #[inline]
             async fn connect(url: &str) -> Result<Self::Socket, Self::Error> {
                 let (socket, _) = connect_async(url).await?;
-                Ok(Socket::Url(socket))
+                Ok(Socket::Url(Box::new(socket)))
             }
 
             #[inline]
@@ -196,7 +196,7 @@ macro_rules! tungstenite_impl {
                 async move {
                     let stream = open.await.map_err(Error::Io)?;
                     let (socket, _) = client_async(connector.url.as_str(), stream).await?;
-                    Ok(Socket::Stream(socket))
+                    Ok(Socket::Stream(Box::new(socket)))
                 }
             }
         }

@@ -16,18 +16,18 @@ error: ZeroCopy: only supported for repr(i*) or repr(u*) enums
 16 | #[repr(C)]
    |        ^
 
-error: `#[repr(packed)]` attribute cannot be used on enums
- --> tests/ui/repr_enum_error.rs:4:1
+error: the `repr(packed)` attribute cannot be used on enums
+ --> tests/ui/repr_enum_error.rs:4:3
   |
 4 | #[repr(C, packed)]
-  | ^^^^^^^^^^^^^^^^^^
+  |   ^^^^^^^^^^^^^^^
   |
-  = help: `#[repr(packed)]` can be applied to structs and unions
+  = help: the `repr(packed)` attribute can be applied to structs and unions
 
-error: `#[repr(packed)]` attribute cannot be used on enums
-  --> tests/ui/repr_enum_error.rs:10:1
+error: the `repr(packed)` attribute cannot be used on enums
+  --> tests/ui/repr_enum_error.rs:10:3
    |
 10 | #[repr(u8, packed)]
-   | ^^^^^^^^^^^^^^^^^^^
+   |   ^^^^^^^^^^^^^^^^
    |
-   = help: `#[repr(packed)]` can be applied to structs and unions
+   = help: the `repr(packed)` attribute can be applied to structs and unions
