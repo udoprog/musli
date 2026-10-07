@@ -9,7 +9,6 @@ Types for integrating Müsli with websocket frameworks.
 """
 documentation = "https://docs.rs/musli"
 readme = "README.md"
-homepage = "https://github.com/udoprog/musli"
 repository = "https://github.com/udoprog/musli"
 license = "MIT OR Apache-2.0"
 keywords = ["framework", "http", "web"]
