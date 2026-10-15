@@ -59,7 +59,7 @@ url = { version = "2.5.0", features = ["serde"] }
 trybuild = "1.0.90"
 # Used to check JSONB against a real SQLite. `threadsafe` is required since
 # tests open a connection per test and cargo runs them in parallel.
-sqll = { version = "0.14.6", default-features = false, features = ["std", "bundled", "threadsafe"] }
+sqll = { version = "0.14.7", default-features = false, features = ["std", "bundled", "threadsafe"] }
 bstr = "1.9.1"
 
 [[example]]
