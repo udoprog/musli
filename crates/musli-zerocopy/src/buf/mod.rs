@@ -164,6 +164,7 @@ impl AllocError {
 
     /// Construct a new allocation error due to an underlying allocation
     /// failure.
+    #[cfg(feature = "alloc")]
     #[inline]
     #[allow(clippy::self_named_constructors)]
     pub(crate) fn alloc_error(layout: Layout) -> Self {
@@ -176,9 +177,18 @@ impl AllocError {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 enum AllocErrorKind {
-    Capacity { current: usize, needed: usize },
-    Alignment { offset: usize, align: usize },
-    AllocError { layout: Layout },
+    Capacity {
+        current: usize,
+        needed: usize,
+    },
+    Alignment {
+        offset: usize,
+        align: usize,
+    },
+    #[cfg(feature = "alloc")]
+    AllocError {
+        layout: Layout,
+    },
 }
 
 impl fmt::Display for AllocError {
@@ -192,6 +202,7 @@ impl fmt::Display for AllocError {
             AllocErrorKind::Alignment { offset, align } => {
                 write!(f, "Container is not aligned to {align} by {offset} bytes",)
             }
+            #[cfg(feature = "alloc")]
             AllocErrorKind::AllocError { layout } => {
                 write!(
                     f,

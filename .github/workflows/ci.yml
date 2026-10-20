@@ -135,6 +135,9 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
     - uses: Swatinem/rust-cache@v2
     - run: cargo build -p musli --no-default-features
+    - run: cargo check -p musli-zerocopy --no-default-features
+    - run: cargo check -p musli-zerocopy --no-default-features --features alloc
+    - run: cargo check -p musli-zerocopy --no-default-features --features std
 
   musli_feature:
     needs: [no_default_features, rustfmt, clippy]
