@@ -292,6 +292,29 @@ pub(crate) use bare_encoding;
 
 /// Generate all public encoding helpers.
 macro_rules! encoding_impls {
+    // A format which also builds its decoder from the configuration of the
+    // encoding passes the name of a method on the encoding which takes
+    // `(self, cx, reader)` and constructs the decoder.
+    (
+        custom,
+        $mode:ident,
+        $what:ident,
+        self.$decoder_method:ident,
+        $reader_trait:ident :: $into_reader:ident,
+        $reader_kind:path,
+        $writer_trait:ident :: $into_writer:ident $(,)?
+    ) => {
+        $crate::macros::encoding_impls!(
+            @body
+            $mode,
+            $what,
+            [method $decoder_method],
+            $reader_trait::$into_reader,
+            $reader_kind,
+            $writer_trait::$into_writer,
+        );
+    };
+
     // A format which builds its encoder differently per configuration defines
     // `encode_into` itself and passes `custom` in place of a constructor.
     (
@@ -307,7 +330,7 @@ macro_rules! encoding_impls {
             @body
             $mode,
             $what,
-            $decoder_new,
+            [new $decoder_new],
             $reader_trait::$into_reader,
             $reader_kind,
             $writer_trait::$into_writer,
@@ -339,18 +362,26 @@ macro_rules! encoding_impls {
             @body
             $mode,
             $what,
-            $decoder_new,
+            [new $decoder_new],
             $reader_trait::$into_reader,
             $reader_kind,
             $writer_trait::$into_writer,
         );
     };
 
+    (@new_decoder $this:tt, $cx:ident, $reader:expr, new $decoder_new:path) => {
+        $decoder_new($cx, $reader)
+    };
+
+    (@new_decoder $this:tt, $cx:ident, $reader:expr, method $decoder_method:ident) => {
+        $this.$decoder_method($cx, $reader)
+    };
+
     (
         @body
         $mode:ident,
         $what:ident,
-        $decoder_new:path,
+        [$($decoder:tt)*],
         $reader_trait:ident :: $into_reader:ident,
         $reader_kind:path,
         $writer_trait:ident :: $into_writer:ident $(,)?
@@ -992,7 +1023,7 @@ macro_rules! encoding_impls {
         {
             cx.clear();
             let reader = $reader_trait::$into_reader(reader);
-            T::decode($decoder_new(cx, reader))
+            T::decode($crate::macros::encoding_impls!(@new_decoder self, cx, reader, $($decoder)*))
         }
 
         /// Decode the given type `T` from the given slice using the current
@@ -1043,9 +1074,12 @@ macro_rules! encoding_impls {
         {
             cx.clear();
             let mut reader = $reader_trait::$into_reader(bytes);
-            let value = T::decode($decoder_new(
+            let value = T::decode($crate::macros::encoding_impls!(
+                @new_decoder
+                self,
                 cx,
                 <_ as $reader_kind>::borrow_mut(&mut reader),
+                $($decoder)*
             ))?;
 
             if !<_ as $reader_kind>::is_exhausted(&mut reader, cx) {
@@ -1070,9 +1104,12 @@ macro_rules! encoding_impls {
         {
             cx.clear();
             let mut reader = $reader_trait::$into_reader(string);
-            let value = T::decode($decoder_new(
+            let value = T::decode($crate::macros::encoding_impls!(
+                @new_decoder
+                self,
                 cx,
                 <_ as $reader_kind>::borrow_mut(&mut reader),
+                $($decoder)*
             ))?;
 
             if !<_ as $reader_kind>::is_exhausted(&mut reader, cx) {

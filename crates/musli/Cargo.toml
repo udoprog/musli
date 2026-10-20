@@ -31,11 +31,12 @@ wire = []
 descriptive = ["value"]
 json = ["value", "dep:itoa", "dep:ryu"]
 sqlite-jsonb = ["value", "dep:itoa", "dep:ryu"]
+csv = ["dep:itoa", "dep:ryu"]
 parse-full = []
 value = []
 serde = ["dep:serde"]
 
-test = ["storage", "wire", "descriptive", "json", "sqlite-jsonb", "parse-full", "value", "serde"]
+test = ["storage", "wire", "descriptive", "json", "sqlite-jsonb", "csv", "parse-full", "value", "serde"]
 
 [dependencies]
 musli-core = { version = "0.1.9", path = "../musli-core", default-features = false }

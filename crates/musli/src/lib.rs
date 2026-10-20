@@ -721,6 +721,7 @@ pub mod alloc;
 #[doc(inline)]
 pub use self::alloc::{Allocator, GlobalAllocator};
 
+pub mod csv;
 pub mod descriptive;
 pub mod json;
 pub mod packed;
