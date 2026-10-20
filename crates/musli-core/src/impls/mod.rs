@@ -4,11 +4,11 @@ mod alloc;
 #[cfg(feature = "std")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
 mod net;
-#[cfg(all(any(unix, windows), all(feature = "std", feature = "alloc")))]
+#[cfg(all(any(unix, windows), feature = "std"))]
 mod platform_tag;
 mod range;
 mod tuples;
-#[cfg(all(any(unix, windows), all(feature = "std", feature = "alloc")))]
+#[cfg(all(any(unix, windows), feature = "std"))]
 use platform_tag::PlatformTag;
 
 use core::ffi::CStr;

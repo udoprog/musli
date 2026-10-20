@@ -104,10 +104,10 @@ mod buf;
 #[cfg(feature = "axum08")]
 use self::buf::Buf;
 
-#[cfg(all(feature = "json", feature = "alloc"))]
+#[cfg(feature = "json")]
 mod json;
-#[cfg(all(feature = "json", feature = "alloc"))]
-#[cfg_attr(doc_cfg, doc(cfg(all(feature = "json", feature = "alloc"))))]
+#[cfg(feature = "json")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "json")))]
 pub use self::json::Json;
 
 #[cfg(feature = "api")]

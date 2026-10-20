@@ -185,8 +185,8 @@ macro_rules! bare_encoding {
         /// assert_eq!(person.age, 61);
         /// # Ok::<_, Error>(())
         /// ```
-        #[cfg(all(feature = "std", feature = "alloc"))]
-        #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
+        #[cfg(feature = "std")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
         #[inline]
         pub fn to_writer<W, T>(writer: W, value: &T) -> Result<(), Error>
         where
@@ -591,8 +591,8 @@ macro_rules! encoding_impls {
         /// assert_eq!(person.age, 61);
         /// # Ok::<_, Error>(())
         /// ```
-        #[cfg(all(feature = "std", feature = "alloc"))]
-        #[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
+        #[cfg(feature = "std")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
         #[inline]
         pub fn to_writer<W, T>(self, write: W, value: &T) -> Result<(), Error>
         where

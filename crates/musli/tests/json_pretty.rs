@@ -1,4 +1,4 @@
-#![cfg(all(feature = "std", feature = "alloc"))]
+#![cfg(feature = "std")]
 
 use std::collections::BTreeMap;
 

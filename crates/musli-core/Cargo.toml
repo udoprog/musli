@@ -23,7 +23,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(doc_cfg)'] }
 
 [features]
 default = ["std", "alloc"]
-std = []
+std = ["alloc"]
 alloc = []
 verbose = ["musli-macros/verbose"]
 

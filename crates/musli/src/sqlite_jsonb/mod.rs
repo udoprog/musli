@@ -134,8 +134,8 @@ pub use self::encoding::Encoding;
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]
 pub use self::encoding::to_vec;
-#[cfg(all(feature = "std", feature = "alloc"))]
-#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
+#[cfg(feature = "std")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
 #[doc(inline)]
 pub use self::encoding::to_writer;
 #[cfg(feature = "alloc")]

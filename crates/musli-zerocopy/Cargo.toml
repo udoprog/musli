@@ -23,8 +23,8 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(musli_nightly, doc_cfg)'] 
 
 [features]
 default = ["std", "alloc"]
-std = []
-alloc = []
+std = ["alloc", "rand/std"]
+alloc = ["rand/alloc"]
 
 [dependencies]
 musli-zerocopy-macros = { version = "=0.1.2", path = "../musli-zerocopy-macros" }

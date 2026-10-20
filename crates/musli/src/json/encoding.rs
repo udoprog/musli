@@ -220,8 +220,8 @@ where
 /// }"#);
 /// # Ok::<_, Error>(())
 /// ```
-#[cfg(all(feature = "std", feature = "alloc"))]
-#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
+#[cfg(feature = "std")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
 #[inline]
 pub fn to_writer_pretty<W, T>(writer: W, value: &T) -> Result<(), Error>
 where

@@ -134,8 +134,8 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 #[doc(inline)]
 pub use self::encoding::to_vec;
 #[doc(inline)]
-#[cfg(all(feature = "std", feature = "alloc"))]
-#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
+#[cfg(feature = "std")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "std")))]
 pub use self::encoding::to_writer;
 #[doc(inline)]
 pub use self::encoding::{Encoding, OPTIONS};

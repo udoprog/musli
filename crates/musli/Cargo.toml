@@ -23,7 +23,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(doc_cfg, loom)'] }
 
 [features]
 default = ["std", "alloc"]
-std = ["musli-core/std", "serde?/std", "simdutf8?/std"]
+std = ["alloc", "musli-core/std", "serde?/std", "simdutf8?/std"]
 alloc = ["musli-core/alloc", "serde?/alloc"]
 verbose = ["musli-core/verbose"]
 storage = []
@@ -65,4 +65,4 @@ bstr = "1.9.1"
 
 [[example]]
 name = "sqlite_jsonb"
-required-features = ["sqlite-jsonb", "std", "alloc"]
+required-features = ["sqlite-jsonb", "std"]
