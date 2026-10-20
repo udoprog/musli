@@ -567,7 +567,13 @@ where
     }
 
     /// Construct a record-oriented [`Writer`][CsvWriter] which writes records
-    /// to the given [`Writer`].
+    /// to the given writer.
+    ///
+    /// The writer can be anything which implements [`IntoWriter`], such as
+    /// `&mut Vec<u8>`, `&mut [u8]`, or a [`std::io::Write`] implementation
+    /// adapted with [`wrap`].
+    ///
+    /// [`wrap`]: crate::wrap::wrap
     ///
     /// # Examples
     ///
@@ -584,20 +590,21 @@ where
     ///     age: u32,
     /// }
     ///
-    /// let mut writer = ENCODING.writer(Vec::new());
+    /// let mut data = Vec::new();
+    ///
+    /// let mut writer = ENCODING.writer(&mut data);
     /// writer.serialize(&Person { name: "Aristotle", age: 61 })?;
     /// writer.serialize(&Person { name: "Plato", age: 80 })?;
     ///
-    /// let data = writer.into_inner();
     /// assert_eq!(data, b"name,age\nAristotle,61\nPlato,80\n");
     /// # Ok::<_, Error>(())
     /// ```
     #[inline]
-    pub fn writer<W>(self, writer: W) -> CsvWriter<W, M>
+    pub fn writer<W>(self, writer: W) -> CsvWriter<W::Writer, M>
     where
-        W: Writer,
+        W: IntoWriter,
     {
-        CsvWriter::new(self.config, writer)
+        CsvWriter::new(self.config, writer.into_writer())
     }
 
     /// Construct the decoder used for the given parser.

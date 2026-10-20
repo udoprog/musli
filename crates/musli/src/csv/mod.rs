@@ -117,10 +117,11 @@
 //!
 //! const ENCODING: Encoding = Encoding::new().with_delimiter(b';');
 //!
-//! let mut writer = ENCODING.writer(Vec::new());
+//! let mut data = Vec::new();
+//!
+//! let mut writer = ENCODING.writer(&mut data);
 //! writer.serialize(&Person { name: "Aristotle", age: 61 })?;
 //! writer.serialize(&Person { name: "Plato", age: 80 })?;
-//! let data = writer.into_inner();
 //!
 //! assert_eq!(data, b"name;age\nAristotle;61\nPlato;80\n");
 //!

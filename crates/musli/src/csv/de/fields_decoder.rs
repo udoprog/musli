@@ -88,6 +88,19 @@ where
     #[inline]
     fn next_key(&mut self) -> Result<Option<Key<'_>>, C::Error> {
         if !self.has_next()? {
+            let doc = self.doc.borrow_mut();
+
+            // Report short records before the fields are found to be missing.
+            if let Some(expected) = doc.expected {
+                if self.count < expected && !self.cfg.flexible {
+                    return Err(self.cx.message(format_args!(
+                        "Record {} has {} fields, but expected {expected}",
+                        doc.record_number(),
+                        self.count
+                    )));
+                }
+            }
+
             return Ok(None);
         }
 

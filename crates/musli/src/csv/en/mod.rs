@@ -703,8 +703,21 @@ where
     }
 
     #[inline]
-    fn encode_none(self) -> Result<(), Self::Error> {
-        self.single()?.encode_none()
+    fn encode_none(mut self) -> Result<(), Self::Error> {
+        if self.pass == Pass::Header {
+            return self.single()?.encode_none();
+        }
+
+        self.begin()?;
+
+        // A missing record is written as a single empty field, which is exempt
+        // from the field count check since it has no fields.
+        self.writer
+            .write_bytes(self.cx, &[self.cfg.quote, self.cfg.quote])?;
+        self.writer
+            .write_bytes(self.cx, self.cfg.terminator.write_bytes())?;
+        self.state.borrow_mut().records += 1;
+        Ok(())
     }
 
     #[inline]

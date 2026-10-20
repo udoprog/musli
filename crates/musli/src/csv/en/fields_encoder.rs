@@ -49,6 +49,19 @@ where
     /// Begin the next field, writing a delimiter if needed.
     #[inline]
     fn next_field(&mut self) -> Result<(), C::Error> {
+        if self.pass == Pass::Value && !self.cfg.flexible {
+            let state = self.state.borrow_mut();
+
+            if let Some(expected) = state.fields {
+                if self.count >= expected {
+                    return Err(self.cx.message(format_args!(
+                        "Record {} has more than the expected {expected} fields",
+                        state.records + 1
+                    )));
+                }
+            }
+        }
+
         if self.count > 0 {
             self.writer.write_byte(self.cx, self.cfg.delimiter)?;
         }

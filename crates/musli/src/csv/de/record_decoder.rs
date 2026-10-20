@@ -276,8 +276,11 @@ where
     fn decode_option(mut self) -> Result<Option<Self::DecodeSome>, Self::Error> {
         self.begin()?;
 
+        // A missing record is a single empty field, which is exempt from the
+        // field count check since it has no fields.
         if parser::peek_empty(&mut self.parser, &self.cfg, true).is_some() {
-            self.single()?.decode_empty()?;
+            parser::skip_field(self.cx, &mut self.parser, &self.cfg)?;
+            self.doc.borrow_mut().records += 1;
             return Ok(None);
         }
 
