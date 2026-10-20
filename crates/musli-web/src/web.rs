@@ -5,6 +5,135 @@
 //! * [`web03`] for `web-sys` `0.3.x`.
 //!
 //! [`web03`]: crate::web03
+//!
+//! # Reconnecting
+//!
+//! The service reconnects on its own whenever the connection is lost, but
+//! nothing sent over the old connection carries over: pending requests fail
+//! with [`Error::is_connection_lost`], and the server forgets every
+//! [`Channel`] which was opened over it. Anything a page fetched has to be
+//! fetched again once the connection is back.
+//!
+//! To tell when that is, every handle exposes a connection generation through
+//! [`Handle::generation`]. It counts how many times the connection has opened
+//! so far, so it starts at `0` and goes up by one each time the connection
+//! reaches [`State::Open`]. Since it never goes back, a component can hold on
+//! to the generation it last fetched for and compare it to a single [`Copy`]
+//! value, rather than tracking whether it has seen the connection close.
+//!
+//! There are two ways to learn that the generation has changed:
+//!
+//! * [`Handle::on_open`] calls a listener with the new generation every time
+//!   the connection opens. This suits a component which holds a [`Handle`]
+//!   and fetches its own data.
+//! * [`Handle::on_state_change`] reports every change of [`State`]. A root
+//!   component which already listens for it can read [`Handle::generation`]
+//!   when it sees [`State::Open`], and pass the value down as a property, so
+//!   that a child refetches when the property changes.
+//!
+//! A [`Channel`] remembers the generation it was opened over in
+//! [`Channel::generation`]. Once the connection has reopened the channel is
+//! stale: [`Channel::is_open`] returns `false`, requests over it fail with
+//! [`Error::is_not_connected`], and it has to be opened again over the new
+//! connection.
+//!
+//! ## Refetching after a reconnect
+//!
+//! This passes the generation down from the root component:
+//!
+//! ```
+//! # extern crate yew023 as yew;
+//! use yew::prelude::*;
+//! use musli_web::web03::prelude::*;
+//!
+//! #[derive(Properties, PartialEq)]
+//! struct ListProps {
+//!     ws: ws::Handle,
+//!     /// The connection generation, from `ws::Handle::generation`.
+//!     generation: u64,
+//! }
+//!
+//! struct List;
+//!
+//! impl List {
+//!     fn fetch(&mut self, ctx: &Context<Self>) {
+//!         // Send the requests this component shows the result of. Before the
+//!         // connection is open they fail as not connected, and are sent again
+//!         // once the generation changes.
+//!     }
+//! }
+//!
+//! impl Component for List {
+//!     type Message = ();
+//!     type Properties = ListProps;
+//!
+//!     fn create(ctx: &Context<Self>) -> Self {
+//!         let mut this = Self;
+//!         this.fetch(ctx);
+//!         this
+//!     }
+//!
+//!     fn changed(&mut self, ctx: &Context<Self>, old: &ListProps) -> bool {
+//!         if ctx.props().generation != old.generation {
+//!             self.fetch(ctx);
+//!         }
+//!
+//!         true
+//!     }
+//!
+//!     fn view(&self, _: &Context<Self>) -> Html {
+//!         html! {}
+//!     }
+//! }
+//!
+//! enum Msg {
+//!     StateChanged(ws::State),
+//! }
+//!
+//! #[derive(Properties, PartialEq)]
+//! struct AppProps {
+//!     ws: ws::Handle,
+//! }
+//!
+//! struct App {
+//!     generation: u64,
+//!     _state: ws::StateListener,
+//! }
+//!
+//! impl Component for App {
+//!     type Message = Msg;
+//!     type Properties = AppProps;
+//!
+//!     fn create(ctx: &Context<Self>) -> Self {
+//!         let (_, state) = ctx
+//!             .props()
+//!             .ws
+//!             .on_state_change(ctx.link().callback(Msg::StateChanged));
+//!
+//!         Self {
+//!             generation: ctx.props().ws.generation(),
+//!             _state: state,
+//!         }
+//!     }
+//!
+//!     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+//!         match msg {
+//!             Msg::StateChanged(_) => {
+//!                 let generation = ctx.props().ws.generation();
+//!                 let changed = self.generation != generation;
+//!                 self.generation = generation;
+//!                 changed
+//!             }
+//!         }
+//!     }
+//!
+//!     fn view(&self, ctx: &Context<Self>) -> Html {
+//!         html! {
+//!             <List ws={ctx.props().ws.clone()} generation={self.generation} />
+//!         }
+//!     }
+//! }
+//! ```
 
 use core::cell::{Cell, RefCell};
 use core::marker::PhantomData;
@@ -552,6 +681,9 @@ impl fmt::Debug for Connect {
 /// Generic but shared fields which do not depend on specialization over `H`.
 struct Generic {
     state_listeners: RefCell<StateListeners>,
+    /// The number of times the connection has opened, see
+    /// [`Handle::generation`].
+    generation: Cell<u64>,
     requests: RefCell<Requests>,
     broadcasts: RefCell<Broadcasts>,
     buffers: RefCell<Buffers>,
@@ -774,6 +906,7 @@ where
                 _window_onbeforeunload: window_onbeforeunload,
                 g: Rc::new(Generic {
                     state_listeners: RefCell::new(Slab::new()),
+                    generation: Cell::new(0),
                     broadcasts: RefCell::new(HashMap::new()),
                     requests: RefCell::new(Requests::new()),
                     buffers: RefCell::new(VecDeque::new()),
@@ -1328,6 +1461,13 @@ where
 
         self.state.set(state);
 
+        if state == State::Open {
+            // NB: Bumped before any listener runs, so that every listener sees
+            // the generation of the connection that just opened.
+            let generation = self.g.generation.get().wrapping_add(1);
+            self.g.generation.set(generation);
+        }
+
         {
             // We need to collect callbacks to avoid the callback recursively
             // borrowing state listeners, which it would if it modifies any
@@ -1663,6 +1803,7 @@ where
                 let result = match result {
                     Err(error) => Err(error),
                     Ok(id) => Ok(Channel {
+                        generation: shared.upgrade().map_or(0, |s| s.g.generation.get()),
                         handle: Handle {
                             shared: shared.clone(),
                         },
@@ -2849,6 +2990,38 @@ where
         shared.mode.get()
     }
 
+    /// The generation of the connection.
+    ///
+    /// This counts the number of times the connection has opened, that is
+    /// reached [`State::Open`]. It is `0` until the connection first opens,
+    /// and goes up by one every time it opens again after having been closed.
+    /// A handle which is not connected to a service, such as
+    /// [`Handle::default`], always reports `0`.
+    ///
+    /// The generation is updated before any listener hears of the connection
+    /// opening, so it can be read from inside [`Handle::on_state_change`] and
+    /// [`Handle::on_open`] callbacks.
+    ///
+    /// Comparing the generation to the one data was last fetched in tells
+    /// whether it has to be fetched again, see [refetching after a
+    /// reconnect](crate::web#refetching-after-a-reconnect).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// let handle = ws::Handle::default();
+    /// assert_eq!(handle.generation(), 0);
+    /// ```
+    pub fn generation(&self) -> u64 {
+        let Some(shared) = self.shared.upgrade() else {
+            return 0;
+        };
+
+        shared.g.generation.get()
+    }
+
     pub fn channel(&self) -> ChannelBuilder<'_, H, EmptyCallback> {
         ChannelBuilder {
             shared: &self.shared,
@@ -3255,6 +3428,128 @@ where
 
         (state, listener)
     }
+
+    /// Listen for the connection opening.
+    ///
+    /// The callback is called with the new [generation] every time the
+    /// connection reaches [`State::Open`], which is the point at which a
+    /// component should fetch what it shows again. It is not called when the
+    /// connection closes.
+    ///
+    /// The returned generation is `Some` with the current generation if the
+    /// connection is open already, in which case the callback is not called
+    /// for it, and `None` if it is not. A component can fetch straight away
+    /// if it is `Some`, and otherwise wait for the callback.
+    ///
+    /// Dropping the returned handle will cancel the listener.
+    ///
+    /// [generation]: Self::generation
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew023 as yew;
+    /// use yew::prelude::*;
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// enum Msg {
+    ///     Opened(u64),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     /// The generation the data was last fetched in.
+    ///     fetched: Option<u64>,
+    ///     _open: ws::StateListener,
+    /// }
+    ///
+    /// impl App {
+    ///     fn fetch(&mut self, ctx: &Context<Self>, generation: u64) {
+    ///         if self.fetched == Some(generation) {
+    ///             return;
+    ///         }
+    ///
+    ///         self.fetched = Some(generation);
+    ///         // Send the requests this component shows the result of.
+    ///     }
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let (generation, open) = ctx.props().ws.on_open(ctx.link().callback(Msg::Opened));
+    ///
+    ///         let mut this = Self {
+    ///             fetched: None,
+    ///             _open: open,
+    ///         };
+    ///
+    ///         if let Some(generation) = generation {
+    ///             this.fetch(ctx, generation);
+    ///         }
+    ///
+    ///         this
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::Opened(generation) => {
+    ///                 self.fetch(ctx, generation);
+    ///                 true
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, _: &Context<Self>) -> Html {
+    ///         html! {}
+    ///     }
+    /// }
+    /// ```
+    pub fn on_open(&self, callback: impl Callback<u64>) -> (Option<u64>, StateListener) {
+        let Some(shared) = self.shared.upgrade() else {
+            return (None, StateListener::new());
+        };
+
+        let callback = {
+            // NB: Weak, since the listener is owned by the generic state.
+            let g = Rc::downgrade(&shared.g);
+
+            move |state: State| {
+                if state != State::Open {
+                    return;
+                }
+
+                if let Some(g) = g.upgrade() {
+                    callback.call(g.generation.get());
+                }
+            }
+        };
+
+        let index = shared
+            .g
+            .state_listeners
+            .borrow_mut()
+            .insert(Rc::new(callback));
+
+        let generation = shared
+            .state
+            .get()
+            .is_open()
+            .then(|| shared.g.generation.get());
+
+        let listener = StateListener {
+            index,
+            g: Rc::downgrade(&shared.g),
+        };
+
+        (generation, listener)
+    }
 }
 
 impl<H> Clone for Handle<H>
@@ -3326,6 +3621,8 @@ where
 {
     handle: Handle<H>,
     id: ChannelId,
+    /// The generation of the connection the channel was opened over.
+    generation: u64,
 }
 
 impl<H> Channel<H>
@@ -3336,6 +3633,50 @@ where
     #[inline]
     pub fn id(&self) -> ChannelId {
         self.id
+    }
+
+    /// The [generation] of the connection this channel was opened over.
+    ///
+    /// The server forgets a channel when the connection it was opened over
+    /// closes, so once the [generation] of the handle has moved past this one
+    /// the channel is stale and has to be opened again, see
+    /// [`Channel::is_open`].
+    ///
+    /// [generation]: Handle::generation
+    #[inline]
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// Whether requests can be sent over this channel.
+    ///
+    /// This is `true` while the connection the channel was opened over is
+    /// still open. It is `false` for a [default] channel, while the connection
+    /// is closed, and for good once the connection has reopened, since the
+    /// channel belongs to the connection that was lost. A request over a
+    /// channel which is not open fails with [`Error::is_not_connected`]
+    /// without being sent.
+    ///
+    /// [default]: Channel::default
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// let channel = ws::Channel::default();
+    /// assert!(!channel.is_open());
+    /// ```
+    pub fn is_open(&self) -> bool {
+        if self.id == ChannelId::NONE {
+            return false;
+        }
+
+        let Some(shared) = self.handle.shared.upgrade() else {
+            return false;
+        };
+
+        shared.state.get().is_open() && shared.g.generation.get() == self.generation
     }
 
     /// Get a handle for this channel.
@@ -3462,7 +3803,7 @@ where
     pub fn request(&self) -> RequestBuilder<'_, H, EmptyBody, EmptyCallback> {
         RequestBuilder {
             shared: &self.handle.shared,
-            channel: (self.id != ChannelId::NONE).then_some(self.id),
+            channel: self.is_open().then_some(self.id),
             body: EmptyBody,
             callback: EmptyCallback,
         }
@@ -3488,6 +3829,7 @@ where
         Self {
             handle: Handle::default(),
             id: ChannelId::NONE,
+            generation: 0,
         }
     }
 }
@@ -3508,8 +3850,13 @@ where
 {
     #[inline]
     fn drop(&mut self) {
+        // NB: A channel from an earlier connection was dropped by the server
+        // along with that connection, and its id may since have been handed
+        // to another channel over the current one.
         if let Some(shared) = self.handle.shared.upgrade() {
-            shared.remove_channel(self.id);
+            if self.generation == shared.g.generation.get() {
+                shared.remove_channel(self.id);
+            }
         }
     }
 }
@@ -3528,6 +3875,7 @@ where
         }
 
         f.field("id", &self.id);
+        f.field("generation", &self.generation);
         f.finish()
     }
 }
