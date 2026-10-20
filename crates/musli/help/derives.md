@@ -235,6 +235,80 @@ Ok::<_, musli::wire::Error>(())
 
 <br>
 
+#### `#[musli(display)]`
+
+The type is a string on the wire. It is encoded through its [`Display`]
+implementation and decoded through its [`FromStr`] implementation, and its
+fields and variants are not used. A string which does not parse is reported as
+a decoding error, with the [`FromStr`] error formatted through its [`Display`]
+implementation.
+
+The implementations apply to every mode, so this attribute can not be combined
+with `#[musli(mode = ..)]`, `#[musli(encode_only)]` or `#[musli(decode_only)]`,
+nor with any other container attribute except `#[musli(crate = ..)]`. A type
+which only derives [`Encode`] only needs to implement [`Display`].
+
+Since the type implements [`Encode`] and [`Decode`] itself, it can be used in
+an `Option<T>`, a `Vec<T>` or any other container without further attributes.
+For a type defined in another crate, use [`musli::display`] as a field adapter
+instead, as described in [`#[musli(with = <path>)]`](#musliwith--path).
+
+<br>
+
+##### Examples
+
+```rust
+use core::fmt;
+use core::str::FromStr;
+
+use musli::{Decode, Encode};
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+#[musli(display)]
+enum Level {
+    Low,
+    High,
+}
+
+impl fmt::Display for Level {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Level::Low => f.write_str("low"),
+            Level::High => f.write_str("high"),
+        }
+    }
+}
+
+impl FromStr for Level {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "low" => Ok(Level::Low),
+            "high" => Ok(Level::High),
+            other => Err(format!("unknown level `{other}`")),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct Alarm {
+    level: Level,
+    escalate: Option<Level>,
+}
+
+let alarm = Alarm { level: Level::Low, escalate: Some(Level::High) };
+let json = musli::json::to_string(&alarm)?;
+assert_eq!(json, r#"{"level":"low","escalate":"high"}"#);
+assert_eq!(musli::json::from_str::<Alarm>(&json)?, alarm);
+
+let error = musli::json::from_str::<Level>(r#""medium""#).unwrap_err();
+assert!(error.to_string().contains("unknown level `medium`"));
+Ok::<_, musli::json::Error>(())
+```
+
+<br>
+
 #### `#[musli(packed)]`
 
 This attribute will disable all *tagging* and the structure will simply be
@@ -1316,6 +1390,52 @@ mod example {
 
 <br>
 
+##### Display and FromStr
+
+[`musli::display`] encodes a field through its [`Display`] implementation and
+decodes it through its [`FromStr`] implementation, which makes it a string on
+the wire. This is useful for types defined in other crates, such as addresses
+or timestamps. A string which does not parse is reported as a decoding error.
+
+A `with` module applies to the type of the field as written, so an
+`Option<T>` field uses [`musli::display::option`] instead. It encodes `None`
+the same way as any other `Option<T>`, and can be combined with
+`#[musli(default)]` and `#[musli(skip_encoding_if = Option::is_none)]`.
+
+```rust
+use std::net::Ipv4Addr;
+
+use musli::{Decode, Encode};
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct Host {
+    #[musli(with = musli::display)]
+    address: Ipv4Addr,
+    #[musli(default, skip_encoding_if = Option::is_none, with = musli::display::option)]
+    gateway: Option<Ipv4Addr>,
+}
+
+let host = Host { address: Ipv4Addr::new(10, 0, 0, 2), gateway: None };
+let json = musli::json::to_string(&host)?;
+assert_eq!(json, r#"{"address":"10.0.0.2"}"#);
+assert_eq!(musli::json::from_str::<Host>(&json)?, host);
+
+let gateway = Some(Ipv4Addr::new(10, 0, 0, 1));
+let host = Host { address: Ipv4Addr::new(10, 0, 0, 2), gateway };
+let json = musli::json::to_string(&host)?;
+assert_eq!(json, r#"{"address":"10.0.0.2","gateway":"10.0.0.1"}"#);
+assert_eq!(musli::json::from_str::<Host>(&json)?, host);
+
+assert!(musli::json::from_str::<Host>(r#"{"address":"10.0.0"}"#).is_err());
+Ok::<_, musli::json::Error>(())
+```
+
+For a type in your own crate which is always a string on the wire,
+[`#[musli(display)]`](#muslidisplay) on the type does the same for every use
+of it.
+
+<br>
+
 #### `#[musli(encode_with = <path>)]`
 
 This specifies the path to a function to use instead of the fields default
@@ -1754,6 +1874,7 @@ which decoder implementation to call.
 [`Decoder::try_clone`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html#method.try_clone>
 [`Decoder`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html>
 [`DecodeTrace`]: <https://docs.rs/musli/latest/musli/trait.DecodeTrace.html>
+[`Display`]: <https://doc.rust-lang.org/core/fmt/trait.Display.html>
 [`Drop`]: <https://doc.rust-lang.org/std/ops/trait.Drop.html>
 [`Encode`]: <https://docs.rs/musli/latest/musli/trait.Encode.html>
 [`Global`]: <https://docs.rs/musli/latest/musli/alloc/struct.Global.html>
@@ -1762,6 +1883,9 @@ which decoder implementation to call.
 [`Encoder::encode_variant`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html#method.encode_variant>
 [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
 [`EncodeTrace`]: <https://docs.rs/musli/latest/musli/en/trait.EncodeTrace.html>
+[`FromStr`]: <https://doc.rust-lang.org/core/str/trait.FromStr.html>
+[`musli::display`]: <https://docs.rs/musli/latest/musli/display/index.html>
+[`musli::display::option`]: <https://docs.rs/musli/latest/musli/display/option/index.html>
 [`musli::is_bitwise_decode`]: https://docs.rs/musli/latest/musli/fn.is_bitwise_decode.html
 [`musli::is_bitwise_encode`]: https://docs.rs/musli/latest/musli/fn.is_bitwise_encode.html
 [`String<Global>`]: <https://docs.rs/musli/latest/musli/alloc/struct.String.html>

@@ -1,0 +1,36 @@
+error: #[musli(display)] applies to every mode, and cannot be combined with #[musli(mode = ..)], #[musli(encode_only)] or #[musli(decode_only)]
+  --> tests/ui/display_error.rs:27:21
+   |
+27 | #[musli(mode = Alt, display)]
+   |                     ^^^^^^^
+
+error: #[musli(display)] applies to every mode, and cannot be combined with #[musli(mode = ..)], #[musli(encode_only)] or #[musli(decode_only)]
+  --> tests/ui/display_error.rs:32:22
+   |
+32 | #[musli(encode_only, display)]
+   |                      ^^^^^^^
+
+error: #[musli(display)] cannot be combined with other type attributes, except for #[musli(crate)]
+  --> tests/ui/display_error.rs:37:18
+   |
+37 | #[musli(display, packed)]
+   |                  ^^^^^^
+
+error: #[musli(display)] cannot be combined with other type attributes, except for #[musli(crate)]
+  --> tests/ui/display_error.rs:43:9
+   |
+43 | #[musli(name_all = "kebab-case")]
+   |         ^^^^^^^^
+
+error[E0277]: `NoDisplay` doesn't implement `std::fmt::Display`
+  --> tests/ui/display_error.rs:47:10
+   |
+47 | #[derive(Encode)]
+   |          ^^^^^^ unsatisfied trait bound
+   |
+help: the trait `std::fmt::Display` is not implemented for `NoDisplay`
+  --> tests/ui/display_error.rs:49:1
+   |
+49 | struct NoDisplay;
+   | ^^^^^^^^^^^^^^^^
+   = note: this error originates in the derive macro `Encode` (in Nightly builds, run with -Z macro-backtrace for more info)

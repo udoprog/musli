@@ -34,6 +34,8 @@ pub mod de;
 #[doc(inline)]
 pub use self::de::{Decode, Decoder};
 
+pub mod display;
+
 pub mod en;
 #[doc(inline)]
 pub use self::en::{Encode, Encoder};
@@ -202,10 +204,13 @@ pub mod __priv {
     pub use crate::hint::MapHint;
     pub use crate::never::Never;
 
+    pub use crate::display::{decode as display_decode, encode as display_encode};
+
     pub use ::core::fmt;
     pub use ::core::mem::{needs_drop, offset_of, size_of};
     pub use ::core::option::Option;
     pub use ::core::result::Result;
+    pub use ::core::str::FromStr;
 
     #[inline]
     pub fn default<T>() -> T

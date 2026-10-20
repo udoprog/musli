@@ -571,6 +571,8 @@ pub mod de;
 pub mod en;
 
 #[doc(inline)]
+pub use musli_core::display;
+#[doc(inline)]
 pub use musli_core::hint;
 #[doc(inline)]
 pub use musli_core::mode;

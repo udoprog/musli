@@ -402,8 +402,13 @@ impl<'a> Expander<'a> {
 
     /// Expand Encode implementation.
     pub(crate) fn expand_encode(&self) -> Result<TokenStream> {
-        let modes = self.cx.modes();
         let tokens = self.tokens();
+
+        if crate::display::is_display(self)? {
+            return Ok(crate::display::expand_encode(self, &tokens));
+        }
+
+        let modes = self.cx.modes();
         let builds = self.setup_builds(&modes, &tokens, Only::Encode)?;
 
         let mut out = TokenStream::new();
@@ -417,8 +422,13 @@ impl<'a> Expander<'a> {
 
     /// Expand Decode implementation.
     pub(crate) fn expand_decode(&self) -> Result<TokenStream> {
-        let modes = self.cx.modes();
         let tokens = self.tokens();
+
+        if crate::display::is_display(self)? {
+            return Ok(crate::display::expand_decode(self, &tokens));
+        }
+
+        let modes = self.cx.modes();
         let builds = self.setup_builds(&modes, &tokens, Only::Decode)?;
 
         let mut out = TokenStream::new();

@@ -19,6 +19,7 @@
 #![allow(missing_docs)]
 
 mod de;
+mod display;
 mod en;
 mod expander;
 mod internals;

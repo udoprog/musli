@@ -180,6 +180,42 @@ macro_rules! layer {
             )*)*
         }
 
+        impl $attr {
+            /// Call `f` with the name and span of every attribute set, in any
+            /// mode.
+            #[allow(unused)]
+            pub(crate) fn each_attribute(&self, mut f: impl FnMut(&'static str, Span, bool)) {
+                let layers = core::iter::once((&self.root, false))
+                    .chain(self.modes.values().map(|layer| (layer, true)));
+
+                for (layer, in_mode) in layers {
+                    $(
+                        for (only, value) in [
+                            (false, &layer.$single.any),
+                            (true, &layer.$single.encode),
+                            (true, &layer.$single.decode),
+                        ] {
+                            if let Some((span, _)) = value {
+                                f(first!($($single_example)?, stringify!($single)), *span, in_mode || only);
+                            }
+                        }
+                    )*
+
+                    $($(
+                        for (only, values) in [
+                            (false, &layer.$multiple.any),
+                            (true, &layer.$multiple.encode),
+                            (true, &layer.$multiple.decode),
+                        ] {
+                            for (span, _) in values {
+                                f(stringify!($multiple), *span, in_mode || only);
+                            }
+                        }
+                    )*)*
+                }
+            }
+        }
+
         #[derive(Default)]
         struct $new {
             $(
@@ -292,6 +328,9 @@ layer! {
         /// `#[musli(global)]`.
         #[example = "global"]
         global: (),
+        /// `#[musli(display)]`.
+        #[example = "display"]
+        display: (),
         @multiple
         /// Bounds in a where predicate.
         bounds: MusliBound,
@@ -444,6 +483,11 @@ pub(crate) fn type_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> TypeAttr {
 
             if meta.path.is_ident("global") {
                 new.global.push((meta.path.span(), ()));
+                return Ok(());
+            }
+
+            if meta.path.is_ident("display") {
+                new.display.push((meta.path.span(), ()));
                 return Ok(());
             }
 
