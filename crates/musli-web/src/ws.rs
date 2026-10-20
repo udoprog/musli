@@ -108,15 +108,16 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use alloc::boxed::Box;
-use alloc::collections::VecDeque;
+use alloc::collections::{BTreeSet, VecDeque};
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
+use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
+
 use bytes::Bytes;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
-use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 use tokio::time::{Duration, Instant, Sleep};
 
@@ -131,6 +132,8 @@ use crate::format;
 const MAX_CAPACITY: usize = 1048576;
 const DEFAULT_MAX_IN_FLIGHT: usize = 128;
 const DEFAULT_MAX_OUTBOUND: usize = 8 * 1048576;
+/// The default number of channels one client may hold open at once.
+const DEFAULT_MAX_CHANNELS: usize = 1024;
 const CLOSE_NORMAL: u16 = 1000;
 const CLOSE_PROTOCOL_ERROR: u16 = 1002;
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -603,22 +606,94 @@ type HandlerOutput<H> = (
 
 /// Trait which governs how channel identifiers are allocated with a [`Server`].
 ///
-/// By default channel identifiers are scoped to the server which is set up
-/// per-connection. If you want distinct and unique channel identifiers across
-/// multiple websocket connections a custom [`ChannelAllocator`] can be
-/// constructed.
+/// Every [`Server`] hands the ids it allocates for its client to the
+/// [`Handler`], and a broadcast names the channel it is sent in. For an id to
+/// say which connection a channel belongs to it has to be unique among every
+/// connection the application talks to, so by default every [`Server`] in the
+/// process allocates from one shared pool, [`Channels::global()`]. Two
+/// connections never hold the same id at the same time.
+///
+/// To scope ids differently, for example to keep the connections of one
+/// service apart from those of another or to give a test its own ids, pass
+/// another allocator to [`Connect::with_channel_allocator`]. A
+/// [`Channels::new()`] is an independent pool which is shared by every clone of
+/// it.
+///
+/// A [`Server`] only frees the ids it allocated itself: when the client closes
+/// one of its channels, and for every channel still open when the [`Server`]
+/// is dropped. An id the client names but does not own is ignored, so one
+/// client cannot release a channel which belongs to another. How many channels
+/// a client may hold at once is limited by [`Connect::max_channels`].
+///
+/// # Examples
+///
+/// Giving the connections of one route their own pool of ids:
+///
+/// ```
+/// # extern crate axum08 as axum;
+/// use axum::extract::ws::WebSocket;
+/// use musli_web::axum08;
+/// use musli_web::ws::{self, Channels};
+///
+/// # mod api {
+/// #     use musli::{Decode, Encode};
+/// #     use musli_web::api;
+/// #     #[derive(Encode, Decode)]
+/// #     pub struct HelloRequest;
+/// #     #[derive(Encode, Decode)]
+/// #     pub struct HelloResponse;
+/// #     api::define! {
+/// #         pub type Hello;
+/// #         impl Endpoint for Hello {
+/// #             impl Request for HelloRequest;
+/// #             type Response<'de> = HelloResponse;
+/// #         }
+/// #     }
+/// # }
+/// # #[derive(Clone)]
+/// # struct MyHandler;
+/// # impl ws::Handler for MyHandler {
+/// #     type Id = api::Request;
+/// #     type Response = bool;
+/// #     async fn handle(
+/// #         &self,
+/// #         _: Self::Id,
+/// #         _: &mut ws::Incoming<'_>,
+/// #         _: &mut ws::Outgoing<'_>,
+/// #     ) -> bool {
+/// #         false
+/// #     }
+/// # }
+/// async fn connection(socket: WebSocket, channels: Channels) -> Result<(), ws::Error> {
+///     let mut server = axum08::server(socket, MyHandler)
+///         .with_channel_allocator(channels)
+///         .connect()
+///         .await?;
+///
+///     server.run().await
+/// }
+///
+/// // Shared by every connection made with a clone of it, but distinct from
+/// // the ids of connections which use the default pool.
+/// let channels = Channels::new();
+/// # let _ = connection;
+/// ```
 pub trait ChannelAllocator {
-    /// Allocate the next channel id.
+    /// Allocate an id which is not currently allocated, or `None` if every id
+    /// is in use.
     ///
     /// Using `0` is equivalent to [`ChannelId::NONE`] so the allocator must
-    /// avoid constructor identifiers with this value since it is equivalent to
-    /// no channel.
-    ///
-    /// [`ChannelAllocator`]: crate::ws::ChannelAllocator
-    fn next(&self) -> impl Future<Output = Option<ChannelId>> + Send + '_;
+    /// never hand out an identifier with this value, since it is equivalent
+    /// to no channel. A [`Server`] which is handed [`ChannelId::NONE`], or an
+    /// id it already holds, refuses to open the channel.
+    fn next(&self) -> Option<ChannelId>;
 
-    /// Free the given channel id.
-    fn free(&self, channel: ChannelId) -> impl Future<Output = ()> + Send + '_;
+    /// Return an id previously handed out by [`ChannelAllocator::next`] so it
+    /// can be allocated again.
+    ///
+    /// A [`Server`] calls this exactly once for every id it allocated, which
+    /// can happen while it is being dropped.
+    fn free(&self, channel: ChannelId);
 }
 
 /// A connection which has not yet completed the [negotiation protocol].
@@ -777,6 +852,7 @@ where
     max_capacity: usize,
     max_in_flight: usize,
     max_outbound: usize,
+    max_channels: usize,
     /// Formats this server is willing to negotiate, or `None` to accept every
     /// format it was built with support for.
     formats: Option<&'static [Format]>,
@@ -793,11 +869,12 @@ where
         Self {
             handler,
             socket,
-            channels: Channels::default(),
+            channels: Channels::global(),
             seed: DEFAULT_SEED,
             max_capacity: MAX_CAPACITY,
             max_in_flight: DEFAULT_MAX_IN_FLIGHT,
             max_outbound: DEFAULT_MAX_OUTBOUND,
+            max_channels: DEFAULT_MAX_CHANNELS,
             formats: None,
         }
     }
@@ -819,7 +896,11 @@ where
         self
     }
 
-    /// Associate the specified channel allocator with the connection.
+    /// Allocate the channel ids of this connection from `channels`.
+    ///
+    /// By default ids come from [`Channels::global()`], which makes them
+    /// unique across every connection in the process. Use this to scope them
+    /// differently, see [`ChannelAllocator`].
     #[inline]
     pub fn with_channel_allocator<U>(self, channels: U) -> Connect<S, H, U>
     where
@@ -833,6 +914,7 @@ where
             max_capacity: self.max_capacity,
             max_in_flight: self.max_in_flight,
             max_outbound: self.max_outbound,
+            max_channels: self.max_channels,
             formats: self.formats,
         }
     }
@@ -929,6 +1011,21 @@ where
         self.max_outbound = max_outbound;
         self
     }
+
+    /// Limit the number of channels the client may hold open at once.
+    ///
+    /// Channel ids come from a pool shared with other connections, see
+    /// [`ChannelAllocator`], so without a limit a single client could take
+    /// every id there is. A request to open a channel beyond the limit is
+    /// answered with an error and the connection stays up. Zero refuses every
+    /// channel.
+    ///
+    /// By default, the limit is 1024.
+    #[inline]
+    pub fn max_channels(mut self, max_channels: usize) -> Self {
+        self.max_channels = max_channels;
+        self
+    }
 }
 
 impl<S, H, C> Connect<S, H, C>
@@ -966,7 +1063,7 @@ where
                 close_sleep: tokio::time::sleep_until(now + CLOSE_TIMEOUT),
                 ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
             }),
-            channels: self.channels,
+            channels: OwnedChannels::new(self.channels, self.max_channels),
             closing: false,
             pool: BufPool::new(self.max_capacity),
             outbound: VecDeque::new(),
@@ -1014,10 +1111,13 @@ pub struct Server<S, H, C = Channels>
 where
     S: ServerImpl,
     H: Handler,
+    C: ChannelAllocator,
 {
     handler: H,
     pinned: Pin<Box<Pinned<S::Socket>>>,
-    channels: C,
+    /// The channels the client holds, which are freed when the server is
+    /// dropped.
+    channels: OwnedChannels<C>,
     closing: bool,
     pool: BufPool,
     outbound: VecDeque<Buf>,
@@ -1062,6 +1162,7 @@ impl<S, H, C> Server<S, H, C>
 where
     S: ServerImpl,
     H: Handler,
+    C: ChannelAllocator,
 {
     /// Get a reference to the handler.
     #[inline]
@@ -1645,12 +1746,12 @@ where
 
             match id {
                 MessageId::CONNECT => {
-                    let Some(channel) = self.channels.next().await else {
-                        self.format_error_message(format_args!(
-                            "Failed to allocate connection ID"
-                        ))?;
-
-                        break 'err true;
+                    let channel = match self.channels.open() {
+                        Ok(channel) => channel,
+                        Err(error) => {
+                            self.format_error_message(format_args!("{error}"))?;
+                            break 'err true;
+                        }
                     };
 
                     self.handler.open_channel(channel).await;
@@ -1688,8 +1789,16 @@ where
                     break 'err false;
                 }
                 MessageId::DISCONNECT => {
-                    self.channels.free(header.channel).await;
-                    self.handler.close_channel(header.channel).await;
+                    // NB: Only a channel this connection opened is closed. An
+                    // id which belongs to some other connection, or to none,
+                    // must not go back into a pool other connections draw
+                    // from.
+                    if self.channels.close(header.channel) {
+                        self.handler.close_channel(header.channel).await;
+                    } else {
+                        tracing::debug!(channel = ?header.channel, "Ignoring close of a channel which is not open");
+                    }
+
                     break 'err false;
                 }
                 MessageId::NEGOTIATE => {
@@ -2230,18 +2339,84 @@ struct ChannelsInner {
     free: VecDeque<NonZeroU16>,
 }
 
-/// A global channel allocator which can be cloned and re-used across multiple
-/// servers allowing channels across servers to have distinct channel
-/// identifiers.
-#[derive(Default, Clone)]
+/// The pool behind [`Channels::global()`].
+static GLOBAL_CHANNELS: LazyLock<Channels> = LazyLock::new(Channels::new);
+
+/// The default [`ChannelAllocator`], a pool of channel ids.
+///
+/// Every clone of a `Channels` allocates from the same pool, so the ids it
+/// hands out are distinct from one another for as long as they are held. Ids
+/// are reused once freed.
+///
+/// [`Channels::global()`] is the pool every [`Server`] uses unless told
+/// otherwise, which makes channel ids unique across every connection in the
+/// process. [`Channels::new()`] is a pool of its own, for when ids should be
+/// scoped more narrowly, see [`ChannelAllocator`].
+///
+/// A pool holds at most [`u16::MAX`] ids at once.
+#[derive(Clone)]
 pub struct Channels {
     inner: Arc<Mutex<ChannelsInner>>,
 }
 
+impl Channels {
+    /// Construct a new pool of channel ids which is independent of every other
+    /// pool, including [`Channels::global()`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::ws::{ChannelAllocator, Channels};
+    ///
+    /// let channels = Channels::new();
+    /// let a = channels.next().unwrap();
+    /// let b = channels.clone().next().unwrap();
+    /// assert_ne!(a, b);
+    /// ```
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(ChannelsInner::default())),
+        }
+    }
+
+    /// The process-wide pool of channel ids, which every [`Server`] allocates
+    /// from by default.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::ws::{ChannelAllocator, Channels};
+    ///
+    /// let a = Channels::global().next().unwrap();
+    /// let b = Channels::global().next().unwrap();
+    /// assert_ne!(a, b);
+    /// ```
+    #[inline]
+    pub fn global() -> Self {
+        GLOBAL_CHANNELS.clone()
+    }
+
+    #[inline]
+    fn lock(&self) -> MutexGuard<'_, ChannelsInner> {
+        // NB: Nothing panics while the lock is held, and the state is valid
+        // between every statement anyway.
+        self.inner.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl Default for Channels {
+    /// Same as [`Channels::new()`].
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChannelAllocator for Channels {
     #[inline]
-    async fn next(&self) -> Option<ChannelId> {
-        let mut inner = self.inner.lock().await;
+    fn next(&self) -> Option<ChannelId> {
+        let mut inner = self.lock();
 
         if let Some(id) = inner.free.pop_front() {
             return Some(ChannelId::from_u16(id.get()));
@@ -2255,13 +2430,96 @@ impl ChannelAllocator for Channels {
     }
 
     #[inline]
-    async fn free(&self, id: ChannelId) {
+    fn free(&self, id: ChannelId) {
         tracing::debug!(?id, "Freeing channel id");
 
-        let mut inner = self.inner.lock().await;
-
         if let Some(id) = NonZeroU16::new(id.raw()) {
-            inner.free.push_back(id);
+            self.lock().free.push_back(id);
+        }
+    }
+}
+
+/// Why a channel could not be opened.
+#[derive(Debug, PartialEq, Eq)]
+enum OpenChannelError {
+    /// The client already holds as many channels as it may.
+    Limit(usize),
+    /// The allocator has no id to hand out.
+    Exhausted,
+}
+
+impl fmt::Display for OpenChannelError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Limit(limit) => write!(f, "Too many open channels, at most {limit} are allowed"),
+            Self::Exhausted => f.write_str("No channel id is available"),
+        }
+    }
+}
+
+/// The channels one client holds, allocated from `C`.
+///
+/// This is what keeps a connection to the ids it was handed: only those are
+/// ever freed, and every one still held is freed on drop.
+struct OwnedChannels<C>
+where
+    C: ChannelAllocator,
+{
+    allocator: C,
+    open: BTreeSet<ChannelId>,
+    max: usize,
+}
+
+impl<C> OwnedChannels<C>
+where
+    C: ChannelAllocator,
+{
+    #[inline]
+    fn new(allocator: C, max: usize) -> Self {
+        Self {
+            allocator,
+            open: BTreeSet::new(),
+            max,
+        }
+    }
+
+    /// Allocate and take hold of a new channel.
+    fn open(&mut self) -> Result<ChannelId, OpenChannelError> {
+        if self.open.len() >= self.max {
+            return Err(OpenChannelError::Limit(self.max));
+        }
+
+        let id = self.allocator.next().ok_or(OpenChannelError::Exhausted)?;
+
+        // NB: An allocator which breaks its contract by handing out no
+        // channel, or one this connection already holds, is refused. Neither
+        // is freed here: the first was never allocated and the second is
+        // freed once, when the channel it already names closes.
+        if id == ChannelId::NONE || !self.open.insert(id) {
+            return Err(OpenChannelError::Exhausted);
+        }
+
+        Ok(id)
+    }
+
+    /// Release a channel, returning `false` if it is not held.
+    fn close(&mut self, id: ChannelId) -> bool {
+        if !self.open.remove(&id) {
+            return false;
+        }
+
+        self.allocator.free(id);
+        true
+    }
+}
+
+impl<C> Drop for OwnedChannels<C>
+where
+    C: ChannelAllocator,
+{
+    fn drop(&mut self) {
+        for id in mem::take(&mut self.open) {
+            self.allocator.free(id);
         }
     }
 }
@@ -2543,7 +2801,7 @@ mod tests {
                 close_sleep: tokio::time::sleep_until(close_deadline),
                 ping_sleep: tokio::time::sleep_until(now + PING_TIMEOUT),
             }),
-            channels: Channels::default(),
+            channels: OwnedChannels::new(Channels::new(), DEFAULT_MAX_CHANNELS),
             closing: false,
             pool: BufPool::new(MAX_CAPACITY),
             outbound: VecDeque::new(),
@@ -2764,5 +3022,138 @@ mod tests {
             sent.iter()
                 .all(|m| matches!(m, TestMessage::Binary(..) | TestMessage::Text(..)))
         );
+    }
+
+    /// The ids handed out by every clone of one pool are distinct while held,
+    /// and a pool of its own is independent of the global one.
+    #[test]
+    fn channels_are_distinct_within_a_pool() {
+        let pool = Channels::new();
+        let other = pool.clone();
+
+        let ids = (0..64)
+            .map(|n| if n % 2 == 0 { &pool } else { &other })
+            .map(|pool| pool.next().unwrap())
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(ids.len(), 64);
+        assert!(!ids.contains(&ChannelId::NONE));
+
+        // NB: The global pool is shared with every test in the binary, so all
+        // this can rely on is that its clones agree with one another.
+        let a = Channels::global().next().unwrap();
+        let b = Channels::global().next().unwrap();
+        assert_ne!(a, b);
+        Channels::global().free(a);
+        Channels::global().free(b);
+    }
+
+    /// A connection only frees the ids it holds, so one client cannot put the
+    /// live channel of another back into the pool.
+    #[test]
+    fn owned_channels_only_close_their_own() {
+        let pool = Channels::new();
+        let mut first = OwnedChannels::new(pool.clone(), DEFAULT_MAX_CHANNELS);
+        let mut second = OwnedChannels::new(pool.clone(), DEFAULT_MAX_CHANNELS);
+
+        let a = first.open().unwrap();
+
+        assert!(!second.close(a));
+        assert!(!second.close(ChannelId::NONE));
+        assert!(!second.close(ChannelId::from_u16(0x1234)));
+        assert!(pool.lock().free.is_empty());
+
+        let b = second.open().unwrap();
+        assert_ne!(a, b);
+
+        // Closing twice frees once.
+        assert!(first.close(a));
+        assert!(!first.close(a));
+        assert_eq!(pool.lock().free.len(), 1);
+    }
+
+    /// Dropping a connection returns every id it still holds, and nothing
+    /// else.
+    #[test]
+    fn owned_channels_free_on_drop() {
+        let pool = Channels::new();
+        let mut first = OwnedChannels::new(pool.clone(), DEFAULT_MAX_CHANNELS);
+        let mut second = OwnedChannels::new(pool.clone(), DEFAULT_MAX_CHANNELS);
+
+        let held = [first.open().unwrap(), first.open().unwrap()];
+        let other = second.open().unwrap();
+
+        drop(first);
+
+        let freed = pool
+            .lock()
+            .free
+            .iter()
+            .map(|id| ChannelId::from_u16(id.get()))
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(freed, BTreeSet::from(held));
+
+        // The ids are reused, but never the one the other connection holds.
+        let reused = [second.open().unwrap(), second.open().unwrap()];
+        assert_eq!(BTreeSet::from(reused), BTreeSet::from(held));
+        assert!(!reused.contains(&other));
+    }
+
+    /// A client which holds as many channels as it may is refused another
+    /// until it closes one, which keeps one client from draining a pool
+    /// shared with others.
+    #[test]
+    fn owned_channels_limit() {
+        let mut channels = OwnedChannels::new(Channels::new(), 2);
+
+        let a = channels.open().unwrap();
+        channels.open().unwrap();
+        assert_eq!(channels.open(), Err(OpenChannelError::Limit(2)));
+
+        assert!(channels.close(a));
+        channels.open().unwrap();
+
+        let mut none = OwnedChannels::new(Channels::new(), 0);
+        assert_eq!(none.open(), Err(OpenChannelError::Limit(0)));
+    }
+
+    /// An allocator which hands out no channel, or one already held, is
+    /// refused, and neither id is freed on its behalf.
+    #[test]
+    fn owned_channels_refuse_a_broken_allocator() {
+        #[derive(Default)]
+        struct Broken {
+            next: std::sync::Mutex<Vec<ChannelId>>,
+            freed: std::sync::Mutex<Vec<ChannelId>>,
+        }
+
+        impl ChannelAllocator for &Broken {
+            fn next(&self) -> Option<ChannelId> {
+                self.next.lock().unwrap().pop()
+            }
+
+            fn free(&self, channel: ChannelId) {
+                self.freed.lock().unwrap().push(channel);
+            }
+        }
+
+        let one = ChannelId::from_u16(1);
+        let broken = Broken::default();
+        broken
+            .next
+            .lock()
+            .unwrap()
+            .extend([one, ChannelId::NONE, one]);
+
+        let mut channels = OwnedChannels::new(&broken, DEFAULT_MAX_CHANNELS);
+
+        assert_eq!(channels.open(), Ok(one));
+        assert_eq!(channels.open(), Err(OpenChannelError::Exhausted));
+        assert_eq!(channels.open(), Err(OpenChannelError::Exhausted));
+        assert_eq!(channels.open(), Err(OpenChannelError::Exhausted));
+
+        drop(channels);
+        assert_eq!(*broken.freed.lock().unwrap(), [one]);
     }
 }

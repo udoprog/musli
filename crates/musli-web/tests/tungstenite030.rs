@@ -1367,6 +1367,7 @@ mod raw {
         pub(crate) const SERIAL: u8 = 2;
         pub(crate) const ID: u8 = 3;
         pub(crate) const FORMAT: u8 = 4;
+        pub(crate) const CHANNEL: u8 = 5;
 
         pub(crate) const RESPONSE_SERIAL: u8 = 2;
         pub(crate) const RESPONSE_BROADCAST: u8 = 3;
@@ -1394,6 +1395,14 @@ mod raw {
             out.push(id | (2 << 6));
             out.extend_from_slice(&value.to_le_bytes());
         }
+    }
+
+    /// The `u16` a channel id is carried as on the wire.
+    ///
+    /// The id is opaque, but it encodes transparently as the `u16` it wraps.
+    pub(crate) fn channel_raw(channel: ChannelId) -> u16 {
+        let bytes = musli::storage::to_vec(&channel).expect("Failed to encode channel");
+        musli::storage::from_slice(&bytes).expect("Failed to decode channel")
     }
 
     /// Read a response envelope by hand, returning it and where the body starts.
@@ -1483,6 +1492,11 @@ mod raw {
             write_header(&mut data, ids::SERIAL, header.serial);
             write_header(&mut data, ids::ID, u32::from(header.id));
             write_header(&mut data, ids::FORMAT, u32::from(header.format));
+            write_header(
+                &mut data,
+                ids::CHANNEL,
+                u32::from(channel_raw(header.channel)),
+            );
 
             data.push(END_OF_HEADERS);
             self.send_raw(data).await;
@@ -2334,4 +2348,116 @@ async fn try_connect_fails_fast_without_a_server() {
     timeout!(service.try_connect()).expect_err("Expected connecting to fail");
     assert!(errors.lock().unwrap().is_empty());
     assert!(!service.handle().is_open());
+}
+
+/// Channel ids are allocated from one pool for the whole process, so no two
+/// connections hold the same id at the same time, not even connections to
+/// different servers.
+#[tokio::test]
+async fn connections_never_share_a_live_channel_id() {
+    use std::collections::BTreeSet;
+
+    let server = TestServer::new().await;
+    let other_server = TestServer::new().await;
+
+    let first = TestClient::new(&server.url());
+    let second = TestClient::new(&server.url());
+    let third = TestClient::new(&other_server.url());
+
+    let handles = [first.open().await, second.open().await, third.open().await];
+
+    let mut ids = BTreeSet::new();
+    let mut held = Vec::new();
+
+    for _ in 0..16 {
+        for handle in handles {
+            let channel = timeout!(handle.channel()).expect("Failed to open channel");
+            let id = channel.id();
+            assert_ne!(id, ChannelId::NONE);
+            assert!(ids.insert(id), "Channel id {id:?} is held twice");
+            held.push(channel);
+        }
+    }
+
+    drop(held);
+    first.close().await;
+    second.close().await;
+    third.close().await;
+    server.shutdown().await;
+    other_server.shutdown().await;
+}
+
+/// A client can only close channels it opened itself. Closing one which belongs
+/// to another connection must neither close it nor hand its id out again.
+#[tokio::test]
+async fn a_client_cannot_close_another_connections_channel() {
+    use musli_web::api::{RequestHeader, VERSION};
+
+    let mut server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    let channel = timeout!(handle.channel()).expect("Failed to open channel");
+    assert_eq!(server.event().await, Event::OpenChannel(channel.id()));
+
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+
+    raw.negotiate(1, Format::Wire).await;
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.serial, 1);
+
+    let request = |serial, id: MessageId, channel| RequestHeader {
+        version: VERSION,
+        serial,
+        id: id.get(),
+        format: 0,
+        channel,
+    };
+
+    raw.send(request(2, MessageId::DISCONNECT, channel.id()))
+        .await;
+    raw.send(request(3, MessageId::CONNECT, ChannelId::NONE))
+        .await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.serial, 3);
+    assert_eq!(frame.header.error, 0);
+
+    let own = frame.header.channel;
+    assert_ne!(own, ChannelId::NONE);
+    assert_ne!(
+        own,
+        channel.id(),
+        "The id of a live channel was handed out again"
+    );
+
+    // The handler never heard of the foreign close, only of the new channel.
+    assert_eq!(server.event().await, Event::OpenChannel(own));
+
+    // The channel the raw client tried to close still works.
+    let packet = timeout!(
+        channel
+            .request()
+            .body(api::HelloRequest {
+                message: "Still open"
+            })
+            .send()
+    )
+    .expect("Hello request failed");
+
+    assert_eq!(packet.channel(), channel.id());
+
+    // Closing its own channel works as usual.
+    raw.send(request(4, MessageId::DISCONNECT, own)).await;
+    assert_eq!(server.event().await, Event::CloseChannel(own));
+
+    let id = channel.id();
+    drop(channel);
+    assert_eq!(server.event().await, Event::CloseChannel(id));
+
+    client.close().await;
+    server.shutdown().await;
 }
