@@ -74,7 +74,12 @@ fn needs_quotes(cfg: &Config, bytes: &[u8]) -> bool {
 }
 
 /// Write the content of a single field, quoting it if necessary.
-pub(crate) fn write_field<W, C>(cx: C, w: &mut W, cfg: &Config, bytes: &[u8]) -> Result<(), C::Error>
+pub(crate) fn write_field<W, C>(
+    cx: C,
+    w: &mut W,
+    cfg: &Config,
+    bytes: &[u8],
+) -> Result<(), C::Error>
 where
     W: ?Sized + Writer,
     C: Context,
@@ -425,6 +430,9 @@ where
     }
 }
 
+/// Encoder for a record which consists of a single field.
+type SingleField<W, C, M, S> = FieldEncoder<Sink<W>, C, M, EndRecord<S>>;
+
 /// Encoder for a single record.
 ///
 /// If `value` is set, it refers to the value being encoded which is used to
@@ -504,7 +512,7 @@ where
 
     /// Encode the record as a single field.
     #[inline]
-    fn single(mut self) -> Result<FieldEncoder<Sink<W>, C, M, EndRecord<S>>, C::Error> {
+    fn single(mut self) -> Result<SingleField<W, C, M, S>, C::Error> {
         self.begin()?;
 
         match self.pass {

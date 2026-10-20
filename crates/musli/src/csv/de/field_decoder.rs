@@ -51,8 +51,8 @@ where
         let mut scratch = Vec::new_in(cx.alloc());
         let field = parser::parse_field(cx, &mut self.parser, &self.cfg, &mut scratch)?;
 
-        let string = crate::str::from_utf8(field.as_bytes())
-            .map_err(|error| cx.custom_at(&mark, error))?;
+        let string =
+            crate::str::from_utf8(field.as_bytes()).map_err(|error| cx.custom_at(&mark, error))?;
 
         f(cx, &mark, string)
     }
@@ -122,10 +122,13 @@ where
     fn decode_empty(self) -> Result<(), Self::Error> {
         self.with_str(|cx, mark, string| {
             if !string.is_empty() {
-                return Err(cx.message_at(mark, Invalid {
-                    what: "an empty field",
-                    string,
-                }));
+                return Err(cx.message_at(
+                    mark,
+                    Invalid {
+                        what: "an empty field",
+                        string,
+                    },
+                ));
             }
 
             Ok(())
@@ -137,10 +140,13 @@ where
         self.with_str(|cx, mark, string| match string {
             "true" => Ok(true),
             "false" => Ok(false),
-            string => Err(cx.message_at(mark, Invalid {
-                what: "a boolean",
-                string,
-            })),
+            string => Err(cx.message_at(
+                mark,
+                Invalid {
+                    what: "a boolean",
+                    string,
+                },
+            )),
         })
     }
 
@@ -151,10 +157,13 @@ where
 
             match (it.next(), it.next()) {
                 (Some(c), None) => Ok(c),
-                _ => Err(cx.message_at(mark, Invalid {
-                    what: "a single character",
-                    string,
-                })),
+                _ => Err(cx.message_at(
+                    mark,
+                    Invalid {
+                        what: "a single character",
+                        string,
+                    },
+                )),
             }
         })
     }
@@ -378,7 +387,11 @@ where
 
     #[inline]
     fn decode_tag(&mut self) -> Result<Self::DecodeTag<'_>, Self::Error> {
-        Ok(FieldDecoder::new(self.cx, self.parser.borrow_mut(), self.cfg))
+        Ok(FieldDecoder::new(
+            self.cx,
+            self.parser.borrow_mut(),
+            self.cfg,
+        ))
     }
 
     #[inline]

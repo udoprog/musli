@@ -242,7 +242,12 @@ where
 
     /// Check that a record with `count` fields is acceptable.
     #[inline]
-    pub(crate) fn finish_record<C>(&mut self, cx: C, cfg: &Config, count: usize) -> Result<(), C::Error>
+    pub(crate) fn finish_record<C>(
+        &mut self,
+        cx: C,
+        cfg: &Config,
+        count: usize,
+    ) -> Result<(), C::Error>
     where
         C: Context,
     {
@@ -271,6 +276,9 @@ where
     }
 }
 
+/// A decoder for a document which consists of a single record.
+type SingleRecord<P, C, M> = RecordDecoder<P, C, M, DocState<<C as Context>::Allocator>>;
+
 /// A CSV decoder for a whole document.
 pub(crate) struct CsvDecoder<P, C, M> {
     cx: C,
@@ -297,7 +305,7 @@ where
 
     /// Decode the document as a single record.
     #[inline]
-    fn record(self) -> Result<RecordDecoder<P, C, M, DocState<C::Allocator>>, C::Error> {
+    fn record(self) -> Result<SingleRecord<P, C, M>, C::Error> {
         Ok(RecordDecoder::new(
             self.cx,
             self.parser,

@@ -174,6 +174,7 @@
 //! | [`musli::descriptive`]                       | ✔ | ✔ | ✔ | ✔ |
 //! | [`musli::json`] [^json]                      | ✔ | ✔ | ✔ | ✔ |
 //! | [`musli::sqlite_jsonb`] [^sqlite_jsonb]      | ✔ | ✔ | ✔ | ✔ |
+//! | [`musli::csv`] [^csv]                        | ✔ | ✔ | ✔ | ✗ |
 //!
 //! `reorder` determines whether fields must occur in exactly the order in which
 //! they are specified in their type. Reordering fields in such a type would
@@ -212,6 +213,11 @@
 //! [^sqlite_jsonb]: The binary representation SQLite uses for JSON. It carries
 //! the same data model as JSON, and blobs can be handed straight to SQLite and
 //! read back with its `json` functions.
+//!
+//! [^csv]: Records of scalar fields, modelled after the [`csv`] crate. Struct
+//! fields are matched by name against a header row, so `reorder`, `missing` and
+//! `unknown` only apply when headers are enabled. Fields cannot contain nested
+//! containers.
 //!
 //! <br>
 //!
@@ -499,6 +505,8 @@
 //! [`derives`]: <https://docs.rs/musli/latest/musli/_help/derives/>
 //! [`Encode`]: <https://docs.rs/musli/latest/musli/en/trait.Encode.html>
 //! [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
+//! [`csv`]: <https://docs.rs/csv>
+//! [`musli::csv`]: <https://docs.rs/musli/latest/musli/csv/>
 //! [`musli::descriptive`]: <https://docs.rs/musli/latest/musli/descriptive/>
 //! [`musli::json`]: <https://docs.rs/musli/latest/musli/json/>
 //! [`musli::sqlite_jsonb`]: <https://docs.rs/musli/latest/musli/sqlite_jsonb/>

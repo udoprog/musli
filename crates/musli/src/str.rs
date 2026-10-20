@@ -10,6 +10,18 @@
     feature = "csv",
     feature = "value"
 ))]
+// CSV only uses `from_utf8`.
+#![cfg_attr(
+    not(any(
+        feature = "storage",
+        feature = "wire",
+        feature = "descriptive",
+        feature = "json",
+        feature = "sqlite-jsonb",
+        feature = "value"
+    )),
+    allow(dead_code)
+)]
 
 use crate::alloc::{Allocator, String, Vec};
 

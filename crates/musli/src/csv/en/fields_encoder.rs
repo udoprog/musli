@@ -7,6 +7,9 @@ use crate::{Context, Writer};
 use super::super::encoding::Config;
 use super::{EncState, FieldEncoder, Pass, Sink, finish_record, write_field};
 
+/// Encoder for a field inside of a record.
+type InnerField<'a, W, C, M> = FieldEncoder<Sink<<W as Writer>::Mut<'a>>, C, M, &'a mut bool>;
+
 /// Encoder for the fields of a record, which is either a struct, a map or a
 /// sequence.
 ///
@@ -72,7 +75,7 @@ where
 
     /// An encoder for a field which is written.
     #[inline]
-    fn write(&mut self) -> Result<FieldEncoder<Sink<W::Mut<'_>>, C, M, &mut bool>, C::Error> {
+    fn write(&mut self) -> Result<InnerField<'_, W, C, M>, C::Error> {
         self.next_field()?;
 
         Ok(FieldEncoder::new(
@@ -85,13 +88,13 @@ where
 
     /// An encoder for a value which is ignored in the current pass.
     #[inline]
-    fn ignore(&mut self) -> FieldEncoder<Sink<W::Mut<'_>>, C, M, &mut bool> {
+    fn ignore(&mut self) -> InnerField<'_, W, C, M> {
         FieldEncoder::new(self.cx, Sink::Discard, self.cfg, &mut self.ignored)
     }
 
     /// Encode a map key.
     #[inline]
-    fn key(&mut self) -> Result<FieldEncoder<Sink<W::Mut<'_>>, C, M, &mut bool>, C::Error> {
+    fn key(&mut self) -> Result<InnerField<'_, W, C, M>, C::Error> {
         match self.pass {
             Pass::Header => self.write(),
             Pass::Value => Ok(self.ignore()),
@@ -100,7 +103,7 @@ where
 
     /// Encode a map value.
     #[inline]
-    fn value(&mut self) -> Result<FieldEncoder<Sink<W::Mut<'_>>, C, M, &mut bool>, C::Error> {
+    fn value(&mut self) -> Result<InnerField<'_, W, C, M>, C::Error> {
         match self.pass {
             Pass::Header => Ok(self.ignore()),
             Pass::Value => self.write(),
@@ -132,7 +135,7 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeNext<'this>
-        = FieldEncoder<Sink<W::Mut<'this>>, C, M, &'this mut bool>
+        = InnerField<'this, W, C, M>
     where
         Self: 'this;
 
@@ -209,11 +212,11 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeEntryKey<'this>
-        = FieldEncoder<Sink<W::Mut<'this>>, C, M, &'this mut bool>
+        = InnerField<'this, W, C, M>
     where
         Self: 'this;
     type EncodeEntryValue<'this>
-        = FieldEncoder<Sink<W::Mut<'this>>, C, M, &'this mut bool>
+        = InnerField<'this, W, C, M>
     where
         Self: 'this;
 
@@ -254,11 +257,11 @@ where
     type Error = C::Error;
     type Mode = M;
     type EncodeKey<'this>
-        = FieldEncoder<Sink<W::Mut<'this>>, C, M, &'this mut bool>
+        = InnerField<'this, W, C, M>
     where
         Self: 'this;
     type EncodeValue<'this>
-        = FieldEncoder<Sink<W::Mut<'this>>, C, M, &'this mut bool>
+        = InnerField<'this, W, C, M>
     where
         Self: 'this;
 

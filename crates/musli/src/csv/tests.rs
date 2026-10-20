@@ -183,7 +183,11 @@ fn structs() {
     );
 
     // A single struct at the top level is a document with a single record.
-    rt(DEFAULT, &person("Aristotle", 61), "name,age\nAristotle,61\n");
+    rt(
+        DEFAULT,
+        &person("Aristotle", 61),
+        "name,age\nAristotle,61\n",
+    );
     rt(DEFAULT, &Vec::<Person>::new(), "");
 }
 
@@ -191,7 +195,11 @@ fn structs() {
 fn tuples() {
     rt(DEFAULT, &vec![(1u32, 2u32), (3, 4)], "0,1\n1,2\n3,4\n");
     rt(NO_HEADERS, &vec![(1u32, 2u32), (3, 4)], "1,2\n3,4\n");
-    rt(DEFAULT, &vec![Point(1, -2), Point(3, 4)], "0,1\n1,-2\n3,4\n");
+    rt(
+        DEFAULT,
+        &vec![Point(1, -2), Point(3, 4)],
+        "0,1\n1,-2\n3,4\n",
+    );
     rt(NO_HEADERS, &vec![Point(1, -2), Point(3, 4)], "1,-2\n3,4\n");
     rt(
         NO_HEADERS,
@@ -231,7 +239,11 @@ fn scalars() {
         "a\n\"\"\nc\n",
     );
     rt(NO_HEADERS, &vec![Some(1u32), None, Some(3)], "1\n\"\"\n3\n");
-    rt(NO_HEADERS, &vec![Color::Red, Color::Blue], "Red\ndark-blue\n");
+    rt(
+        NO_HEADERS,
+        &vec![Color::Red, Color::Blue],
+        "Red\ndark-blue\n",
+    );
 }
 
 #[test]
@@ -534,9 +546,8 @@ fn quoting() {
 
     // Quotes inside of unquoted fields are taken literally, and quoted fields
     // may contain anything.
-    let decoded: Vec<(String, String, String)> = NO_HEADERS
-        .from_str("a\"b,\"c\nd\",\"\"\n")
-        .unwrap();
+    let decoded: Vec<(String, String, String)> =
+        NO_HEADERS.from_str("a\"b,\"c\nd\",\"\"\n").unwrap();
 
     assert_eq!(
         decoded,
@@ -609,7 +620,11 @@ fn malformed_field_count() {
         "Record 1 has 1 fields, but expected 2",
     );
     decode_err::<Vec<u32>>(NO_HEADERS, "1,2\n", "Record 1 has 2 fields, but expected 1");
-    decode_err::<Person>(DEFAULT, "", "Expected a record, but reached the end of the input");
+    decode_err::<Person>(
+        DEFAULT,
+        "",
+        "Expected a record, but reached the end of the input",
+    );
     decode_err::<Person>(
         DEFAULT,
         "name,age\n",
@@ -642,7 +657,11 @@ fn malformed_values() {
 
     // Invalid UTF-8.
     assert!(NO_HEADERS.from_slice::<Vec<String>>(b"\xff\n").is_err());
-    assert!(DEFAULT.from_slice::<Vec<Person>>(b"name,\xff\nA,1\n").is_err());
+    assert!(
+        DEFAULT
+            .from_slice::<Vec<Person>>(b"name,\xff\nA,1\n")
+            .is_err()
+    );
 }
 
 #[test]
@@ -658,9 +677,7 @@ fn nested_containers() {
 
     encode_err(
         DEFAULT,
-        &vec![WithVec {
-            values: vec![1, 2],
-        }],
+        &vec![WithVec { values: vec![1, 2] }],
         "CSV fields cannot contain containers",
     );
 
@@ -682,7 +699,11 @@ fn nested_containers() {
         "CSV fields cannot contain containers",
     );
 
-    encode_err(NO_HEADERS, &vec![(Vec::<(u32,)>::new(),)], "CSV fields cannot contain");
+    encode_err(
+        NO_HEADERS,
+        &vec![(Vec::<(u32,)>::new(),)],
+        "CSV fields cannot contain",
+    );
     encode_err(NO_HEADERS, &vec![Vec::<u32>::new()], "at least one field");
 }
 
@@ -734,7 +755,9 @@ fn writer() {
     let mut data = Vec::new();
     let mut writer = DEFAULT.writer(&mut data);
     writer.serialize(&person("Aristotle", 61)).unwrap();
-    writer.serialize(&person("Plato, the philosopher", 80)).unwrap();
+    writer
+        .serialize(&person("Plato, the philosopher", 80))
+        .unwrap();
     assert_eq!(
         data,
         b"name,age\nAristotle,61\n\"Plato, the philosopher\",80\n"
@@ -811,7 +834,14 @@ fn reader() {
         reader.next_record::<(String, u32)>().unwrap(),
         Some(("Aristotle".to_string(), 61))
     );
-    assert!(reader.headers().unwrap().unwrap().iter().eq(["name", "age"]));
+    assert!(
+        reader
+            .headers()
+            .unwrap()
+            .unwrap()
+            .iter()
+            .eq(["name", "age"])
+    );
 
     // Without headers.
     let mut reader = NO_HEADERS.reader(input);

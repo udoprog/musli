@@ -148,6 +148,7 @@ jobs:
         - wire
         - json
         - sqlite-jsonb
+        - csv
         - value
         - serde
     env:

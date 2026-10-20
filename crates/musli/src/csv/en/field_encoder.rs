@@ -67,7 +67,15 @@ where
             return Ok(());
         }
 
-        finish_record(cx, writer, cfg, self.state.borrow_mut(), self.pass, 1, empty)
+        finish_record(
+            cx,
+            writer,
+            cfg,
+            self.state.borrow_mut(),
+            self.pass,
+            1,
+            empty,
+        )
     }
 }
 

@@ -186,6 +186,10 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[doc(inline)]
 pub use self::de::Headers;
+#[cfg(all(feature = "std", feature = "alloc"))]
+#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
+#[doc(inline)]
+pub use self::encoding::to_writer;
 #[doc(inline)]
 pub use self::encoding::{Encoding, Terminator};
 #[cfg(feature = "alloc")]
@@ -195,10 +199,6 @@ pub use self::encoding::{decode, encode, from_slice, from_str, to_fixed_bytes, t
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]
 pub use self::encoding::{to_string, to_vec};
-#[cfg(all(feature = "std", feature = "alloc"))]
-#[cfg_attr(doc_cfg, doc(cfg(all(feature = "std", feature = "alloc"))))]
-#[doc(inline)]
-pub use self::encoding::to_writer;
 #[doc(inline)]
 pub use self::error::Error;
 pub use self::parser::{IntoParser, Parser};

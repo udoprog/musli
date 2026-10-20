@@ -5,6 +5,7 @@
     feature = "wire",
     feature = "descriptive",
     feature = "sqlite-jsonb",
+    feature = "csv",
     feature = "value"
 ))]
 mod internal;
@@ -13,6 +14,7 @@ mod internal;
     feature = "wire",
     feature = "descriptive",
     feature = "sqlite-jsonb",
+    feature = "csv",
     feature = "value"
 ))]
 pub(crate) use self::internal::{bare_encoding, encoding_impls, implement_error};
@@ -24,6 +26,7 @@ pub(crate) use self::internal::{bare_encoding, encoding_impls, implement_error};
         feature = "wire",
         feature = "descriptive",
         feature = "sqlite-jsonb",
+        feature = "csv",
         feature = "value"
     )
 ))]

@@ -42,15 +42,15 @@ where
         match self.key {
             Key::Name(name) => match name.parse() {
                 Ok(value) => Ok(value),
-                Err(..) => Err(self
-                    .cx
-                    .message(format_args!("Expected {what} field name, but found {name:?}"))),
+                Err(..) => Err(self.cx.message(format_args!(
+                    "Expected {what} field name, but found {name:?}"
+                ))),
             },
             Key::Index(index) => match T::try_from(index) {
                 Ok(value) => Ok(value),
-                Err(..) => Err(self
-                    .cx
-                    .message(format_args!("Field index {index} is out of range for {what}"))),
+                Err(..) => Err(self.cx.message(format_args!(
+                    "Field index {index} is out of range for {what}"
+                ))),
             },
         }
     }

@@ -107,7 +107,8 @@ where
     feature = "descriptive",
     feature = "value",
     feature = "json",
-    feature = "sqlite-jsonb"
+    feature = "sqlite-jsonb",
+    feature = "csv"
 ))]
 #[inline(always)]
 pub(crate) fn nested<C, O>(cx: C, f: impl FnOnce() -> Result<O, C::Error>) -> Result<O, C::Error>

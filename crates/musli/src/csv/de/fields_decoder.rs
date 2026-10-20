@@ -336,7 +336,6 @@ where
     }
 }
 
-
 impl<'de, P, C, M, S> EntriesDecoder<'de> for &mut FieldsDecoder<P, C, M, S>
 where
     P: Parser<'de>,
