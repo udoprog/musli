@@ -603,3 +603,350 @@ fn channel_send_error_after_pending_requests_were_failed() {
     assert!(!has_pending(&service));
     assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
 }
+
+/// Every error a callback has been called with.
+type Failures = Rc<RefCell<Vec<Error>>>;
+
+/// Send a [`Hello`] request, recording every error its callback gets.
+fn send_hello_failures(service: &Service<MockImpl>) -> (Failures, Request) {
+    let failures = Failures::default();
+
+    let request = service
+        .handle()
+        .request()
+        .body(Hello)
+        .on_raw_packet({
+            let failures = failures.clone();
+
+            move |result: Result<RawPacket>| {
+                if let Err(error) = result {
+                    failures.borrow_mut().push(error);
+                }
+            }
+        })
+        .send();
+
+    (failures, request)
+}
+
+/// Take the single error recorded in `failures`.
+fn single(failures: &Failures) -> Error {
+    let mut failures = failures.borrow_mut();
+    assert_eq!(failures.len(), 1, "{failures:?}");
+    failures.pop().unwrap()
+}
+
+/// The serial of the last request sent.
+fn last_serial() -> u32 {
+    let Some(Op::Send(mode, bytes)) = take_ops().pop() else {
+        panic!("Expected a request to be sent");
+    };
+
+    let mut at = 0;
+    let request: api::RequestHeader = format::decode_envelope(mode, &bytes, &mut at).unwrap();
+    request.serial
+}
+
+/// The body of an error response carrying `message`.
+fn error_body(message: &str) -> Vec<u8> {
+    let mut body = Vec::new();
+
+    Format::DEFAULT
+        .encode(&mut body, &api::ErrorMessage { message })
+        .unwrap();
+
+    body
+}
+
+/// Check every accessor at once, so that each error kind is shown to match
+/// exactly one of them.
+#[track_caller]
+fn assert_kind(error: &Error, expected: &str) {
+    let actual = [
+        ("not_connected", error.is_not_connected()),
+        ("connection_lost", error.is_connection_lost()),
+        ("cancelled", error.is_cancelled()),
+        ("server", error.as_server_error().is_some()),
+        ("decode", error.is_decode()),
+    ]
+    .into_iter()
+    .filter(|(_, is)| *is)
+    .map(|(name, _)| name)
+    .collect::<Vec<_>>();
+
+    let expected = if expected.is_empty() {
+        vec![]
+    } else {
+        vec![expected]
+    };
+
+    assert_eq!(actual, expected, "{error}");
+}
+
+/// A request sent before the connection is open is never sent, and says so.
+#[test]
+fn request_before_open_is_not_connected() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    let (failures, _request) = send_hello_failures(&service);
+
+    let error = single(&failures);
+    assert_kind(&error, "not_connected");
+    assert_eq!(error.to_string(), "WebSocket is not connected");
+    assert!(take_ops().is_empty());
+}
+
+/// A request over a channel which is not open is never sent.
+#[test]
+fn request_over_closed_channel_is_not_connected() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+    take_ops();
+
+    let failures = Failures::default();
+
+    let channel = Channel {
+        handle: service.handle().clone(),
+        id: ChannelId::NONE,
+    };
+
+    let _request = channel
+        .request()
+        .body(Hello)
+        .on_raw_packet({
+            let failures = failures.clone();
+
+            move |result: Result<RawPacket>| {
+                if let Err(error) = result {
+                    failures.borrow_mut().push(error);
+                }
+            }
+        })
+        .send();
+
+    let error = single(&failures);
+    assert_kind(&error, "not_connected");
+    assert_eq!(error.to_string(), "WebSocket request over closed channel");
+    assert!(take_ops().is_empty());
+}
+
+/// A request which could not be sent since the socket is gone is not
+/// connected, and is not reported as lost.
+#[test]
+fn send_without_socket_is_not_connected() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    // The state is still open, but the socket has gone away.
+    service.shared.socket.borrow_mut().take();
+
+    let (failures, _request) = send_hello_failures(&service);
+
+    let error = single(&failures);
+    assert_kind(&error, "not_connected");
+    assert_eq!(error.to_string(), "Socket is not connected");
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// A request which was sent but not answered before the connection closed
+/// is lost, which is distinct from never having been sent.
+#[test]
+fn pending_request_is_lost_on_close() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let (failures, _request) = send_hello_failures(&service);
+    assert!(failures.borrow().is_empty());
+
+    service.shared.close_pending();
+
+    let error = single(&failures);
+    assert_kind(&error, "connection_lost");
+    assert_eq!(error.to_string(), "Connection closed");
+}
+
+/// Dropping the service fails pending requests as lost.
+#[test]
+fn pending_request_is_lost_on_drop() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let (failures, _request) = send_hello_failures(&service);
+    drop(service);
+
+    let error = single(&failures);
+    assert_kind(&error, "connection_lost");
+    assert_eq!(error.to_string(), "Websocket service closed");
+}
+
+/// A request replaced by another under the same serial is cancelled.
+#[test]
+fn replaced_request_is_cancelled() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let (first, _first) = send_hello_failures(&service);
+    let serial = last_serial();
+
+    // NB: Serials wrap around, so a request which is outstanding for long
+    // enough is replaced by a later one.
+    service.shared.serial.set(serial);
+    let (second, _second) = send_hello_failures(&service);
+
+    let error = single(&first);
+    assert_kind(&error, "cancelled");
+    assert_eq!(error.to_string(), "Request cancelled");
+    assert!(second.borrow().is_empty());
+}
+
+/// An error response exposes the server's message without the prefix used
+/// when displaying it.
+#[test]
+fn error_response_is_server_error() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let (failures, _request) = send_hello_failures(&service);
+    let serial = last_serial();
+
+    let header = api::ResponseHeader {
+        version: api::VERSION,
+        serial,
+        broadcast: 0,
+        error: MessageId::ERROR_MESSAGE.get(),
+        format: Format::DEFAULT.to_u8(),
+        channel: ChannelId::NONE,
+    };
+
+    deliver(&service, Mode::Binary, &header, &error_body("No such user"));
+
+    let error = single(&failures);
+    assert_kind(&error, "server");
+    assert_eq!(error.as_server_error(), Some("No such user"));
+    assert_eq!(error.to_string(), "Server error: No such user");
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// A request the server does not support is a server error.
+#[test]
+fn unsupported_request_is_server_error() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let (failures, _request) = send_hello_failures(&service);
+    let serial = last_serial();
+
+    let header = api::ResponseHeader {
+        version: api::VERSION,
+        serial,
+        broadcast: 0,
+        // Any error id other than an error message.
+        error: MessageId::CONNECT.get(),
+        format: Format::DEFAULT.to_u8(),
+        channel: ChannelId::NONE,
+    };
+
+    deliver(&service, Mode::Binary, &header, b"");
+
+    let error = single(&failures);
+    assert_kind(&error, "server");
+    assert_eq!(error.as_server_error(), Some("Unsupported request"));
+}
+
+/// An error broadcast is delivered to listeners as a server error.
+#[test]
+fn error_broadcast_is_server_error() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+
+    let failures = Failures::default();
+
+    let _listener = service.handle().on_raw_broadcast::<Ping>({
+        let failures = failures.clone();
+
+        move |result: Result<RawPacket>| {
+            if let Err(error) = result {
+                failures.borrow_mut().push(error);
+            }
+        }
+    });
+
+    let header = api::ResponseHeader {
+        error: MessageId::ERROR_MESSAGE.get(),
+        ..broadcast_header(Ping::ID)
+    };
+
+    deliver(&service, Mode::Binary, &header, &error_body("Overloaded"));
+
+    let error = single(&failures);
+    assert_kind(&error, "server");
+    assert_eq!(error.as_server_error(), Some("Overloaded"));
+}
+
+/// A response which does not decode as the requested type is a decode error.
+#[test]
+fn undecodable_packet_is_decode() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+
+    let packets = Rc::new(RefCell::new(Vec::new()));
+
+    let _listener = service.handle().on_raw_broadcast::<Ping>({
+        let packets = packets.clone();
+        move |result: Result<RawPacket>| packets.borrow_mut().push(result.unwrap())
+    });
+
+    deliver(
+        &service,
+        Mode::Binary,
+        &broadcast_header(Ping::ID),
+        &[0xff; 4],
+    );
+
+    let packet = packets.borrow_mut().pop().unwrap();
+    let error = packet.decode::<String>().unwrap_err();
+    assert_kind(&error, "decode");
+    assert!(!error.is_empty_packet());
+
+    let error = RawPacket::empty().decode::<String>().unwrap_err();
+    assert_kind(&error, "decode");
+    assert!(error.is_empty_packet());
+}
+
+/// A frame using a format the client does not know is a decode error.
+#[test]
+fn unknown_format_is_decode() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    let (_received, _listener) = on_ping(&service);
+
+    let header = api::ResponseHeader {
+        format: u8::MAX,
+        ..broadcast_header(Ping::ID)
+    };
+
+    let mut out = Vec::new();
+    format::encode_envelope(Mode::Binary, &mut out, &header).unwrap();
+    let mut buf = service.shared.next_buffer(out.len());
+    buf.data.extend_from_slice(&out);
+
+    let error = service.shared.message(Mode::Binary, buf).unwrap_err();
+    assert_kind(&error, "decode");
+}
+
+/// A plain message matches none of the accessors.
+#[test]
+fn message_matches_no_accessor() {
+    let error = Error::message("Something else");
+    assert_kind(&error, "");
+    assert!(!error.is_empty_packet());
+}

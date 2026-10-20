@@ -223,6 +223,55 @@ impl State {
 }
 
 /// Error type for the WebSocket service.
+///
+/// Errors are delivered to request, channel and broadcast callbacks, and to
+/// the connection-wide handler set with [`ServiceBuilder::on_error`]. Use the
+/// accessors below to tell what failed instead of matching on the text
+/// produced by [`Display`], which is meant for humans and may change:
+///
+/// * [`is_not_connected`] - the request was never sent, since there was no
+///   open connection or channel to send it over. It is safe to send it again
+///   once the connection is open.
+/// * [`is_connection_lost`] - the request was sent, or about to be, but the
+///   connection closed before a response arrived. The server may or may not
+///   have handled it.
+/// * [`is_cancelled`] - the request was replaced by another one before it was
+///   answered.
+/// * [`as_server_error`] - the server answered with an error, such as one
+///   returned by its handler.
+/// * [`is_decode`] - something received could not be decoded, such as a
+///   response which does not match the expected type.
+///
+/// Anything else, such as a failure in the browser APIs, only carries a
+/// message.
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::web::Error;
+///
+/// fn describe(error: &Error) -> String {
+///     if error.is_not_connected() {
+///         String::from("Not connected, try again later")
+///     } else if error.is_connection_lost() {
+///         String::from("Connection lost, the request may not have been handled")
+///     } else if let Some(message) = error.as_server_error() {
+///         format!("The server said: {message}")
+///     } else {
+///         error.to_string()
+///     }
+/// }
+///
+/// let error = Error::message("Something else");
+/// assert_eq!(describe(&error), "Something else");
+/// ```
+///
+/// [`Display`]: core::fmt::Display
+/// [`is_not_connected`]: Self::is_not_connected
+/// [`is_connection_lost`]: Self::is_connection_lost
+/// [`is_cancelled`]: Self::is_cancelled
+/// [`as_server_error`]: Self::as_server_error
+/// [`is_decode`]: Self::is_decode
 #[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
@@ -236,6 +285,8 @@ impl Error {
 
     /// Check if the error is caused by an empty packet.
     ///
+    /// An empty packet is also a [decode error](Self::is_decode).
+    ///
     /// # Examples
     ///
     /// ```
@@ -245,16 +296,115 @@ impl Error {
     /// let e = packet.decode::<u32>().unwrap_err();
     ///
     /// assert!(e.is_empty_packet());
+    /// assert!(e.is_decode());
     /// ```
     #[inline]
     pub fn is_empty_packet(&self) -> bool {
         matches!(self.kind, ErrorKind::EmptyPacket)
     }
 
+    /// Check if the request was never sent, since there was no open
+    /// connection or channel to send it over.
+    ///
+    /// This is the error a request or channel gets when it is sent before the
+    /// connection is [open](State::Open), after the [`Service`] has been
+    /// dropped, or over a [`Channel`] which is not open. Since the server never
+    /// saw the request, it is safe to send it again once the connection is
+    /// open, see [`Handle::on_state_change`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::Error;
+    ///
+    /// let error = Error::message("Something else");
+    /// assert!(!error.is_not_connected());
+    /// ```
+    #[inline]
+    pub fn is_not_connected(&self) -> bool {
+        matches!(self.kind, ErrorKind::NotConnected(..))
+    }
+
+    /// Check if the connection closed before a response to the request
+    /// arrived.
+    ///
+    /// Unlike [`is_not_connected`], the request was sent, or was being sent,
+    /// so the server may or may not have handled it. This is the error every
+    /// pending request gets when the connection closes or when the
+    /// [`Service`] is dropped.
+    ///
+    /// [`is_not_connected`]: Self::is_not_connected
+    #[inline]
+    pub fn is_connection_lost(&self) -> bool {
+        matches!(self.kind, ErrorKind::ConnectionLost(..))
+    }
+
+    /// Check if the request was cancelled before it was answered, since
+    /// another request took its place.
+    #[inline]
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self.kind, ErrorKind::Cancelled)
+    }
+
+    /// Check if the error is a server error, and if so return the message
+    /// reported by the server.
+    ///
+    /// Server errors are produced by a [`Handler`] which returns an error or
+    /// which does not support the request or broadcast being made. The message
+    /// is returned as the server sent it, without the `Server error: ` prefix
+    /// that [`Display`] adds.
+    ///
+    /// [`Display`]: core::fmt::Display
+    /// [`Handler`]: <https://docs.rs/musli-web/latest/musli_web/ws/trait.Handler.html>
+    #[inline]
+    pub fn as_server_error(&self) -> Option<&str> {
+        match &self.kind {
+            ErrorKind::Server(message) => Some(message),
+            _ => None,
+        }
+    }
+
+    /// Check if the error is caused by something received which could not be
+    /// decoded.
+    ///
+    /// This covers a response or broadcast whose body does not decode as the
+    /// requested type, an [empty packet](Self::is_empty_packet), and a frame
+    /// from the server whose header, error message or format could not be
+    /// decoded.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::RawPacket;
+    ///
+    /// let packet = RawPacket::empty();
+    /// let e = packet.decode::<u32>().unwrap_err();
+    ///
+    /// assert!(e.is_decode());
+    /// ```
+    #[inline]
+    pub fn is_decode(&self) -> bool {
+        matches!(
+            self.kind,
+            ErrorKind::EmptyPacket
+                | ErrorKind::UnknownFormat(..)
+                | ErrorKind::DecodeResponseHeader(..)
+                | ErrorKind::DecodeErrorMessage(..)
+                | ErrorKind::DecodePacket(..)
+        )
+    }
+
     /// Format a WebSocket error consisting of a message.
+    ///
+    /// None of the accessors on [`Error`] match an error constructed this way.
     #[inline]
     pub fn message(message: impl fmt::Display) -> Self {
         Self::new(ErrorKind::Message(message.to_string()))
+    }
+
+    #[inline]
+    fn server(message: impl fmt::Display) -> Self {
+        Self::new(ErrorKind::Server(message.to_string()))
     }
 
     #[inline]
@@ -286,7 +436,15 @@ impl Error {
 #[derive(Debug)]
 enum ErrorKind {
     EmptyPacket,
+    /// The request was never sent. Carries the text to display.
+    NotConnected(&'static str),
+    /// The connection closed while the request was pending. Carries the text
+    /// to display.
+    ConnectionLost(&'static str),
+    Cancelled,
     Message(String),
+    Server(String),
+    UnknownFormat(u8),
     DecodeResponseHeader(format::Error),
     DecodeErrorMessage(format::Error),
     DecodePacket(format::Error),
@@ -299,7 +457,15 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             ErrorKind::EmptyPacket => write!(f, "Packet is empty"),
+            ErrorKind::NotConnected(message) => write!(f, "{message}"),
+            ErrorKind::ConnectionLost(message) => write!(f, "{message}"),
+            ErrorKind::Cancelled => write!(f, "Request cancelled"),
             ErrorKind::Message(message) => write!(f, "{message}"),
+            ErrorKind::Server(message) => write!(f, "Server error: {message}"),
+            ErrorKind::UnknownFormat(format) => write!(
+                f,
+                "Server used unknown format id {format} for a message body"
+            ),
             ErrorKind::DecodeResponseHeader(..) => {
                 write!(f, "Encoding error when decoding response header")
             }
@@ -450,7 +616,9 @@ where
         }
 
         for (_, p) in requests.drain() {
-            p.callback.error(Error::message("Websocket service closed"));
+            p.callback.error(Error::new(ErrorKind::ConnectionLost(
+                "Websocket service closed",
+            )));
         }
     }
 }
@@ -691,7 +859,9 @@ where
         T: api::Request,
     {
         let Some(ref socket) = *self.socket.borrow() else {
-            return Err(Error::message("Socket is not connected"));
+            return Err(Error::new(ErrorKind::NotConnected(
+                "Socket is not connected",
+            )));
         };
 
         let format = self.format.get();
@@ -729,7 +899,9 @@ where
     /// Send a client message.
     fn send_connect(&self, serial: u32) -> Result<()> {
         let Some(ref socket) = *self.socket.borrow() else {
-            return Err(Error::message("Socket is not connected"));
+            return Err(Error::new(ErrorKind::NotConnected(
+                "Socket is not connected",
+            )));
         };
 
         let mode = self.mode.get();
@@ -771,7 +943,9 @@ where
 
         {
             let Some(ref socket) = *self.socket.borrow() else {
-                return Err(Error::message("Socket is not connected"));
+                return Err(Error::new(ErrorKind::NotConnected(
+                    "Socket is not connected",
+                )));
             };
 
             let header = api::RequestHeader {
@@ -810,7 +984,7 @@ where
             .insert(serial, Box::new(pending));
 
         if let Some(p) = existing {
-            p.callback.error(Error::message("Request cancelled"));
+            p.callback.error(Error::new(ErrorKind::Cancelled));
         }
 
         Ok(())
@@ -825,7 +999,9 @@ where
 
     fn _send_disconnect(&self, channel: ChannelId) -> Result<()> {
         let Some(ref socket) = *self.socket.borrow() else {
-            return Err(Error::message("Socket is not connected"));
+            return Err(Error::new(ErrorKind::NotConnected(
+                "Socket is not connected",
+            )));
         };
 
         let mode = self.mode.get();
@@ -881,10 +1057,7 @@ where
     /// Resolve the format a message body is encoded with from its envelope.
     fn body_format(header: &api::ResponseHeader) -> Result<Format> {
         let Some(format) = Format::from_u8(header.format) else {
-            return Err(Error::message(format_args!(
-                "Server used unknown format id {} for a message body",
-                header.format
-            )));
+            return Err(Error::new(ErrorKind::UnknownFormat(header.format)));
         };
 
         Ok(format)
@@ -937,10 +1110,7 @@ where
 
                 while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
                     if let Some(callback) = callback.upgrade() {
-                        callback.call(Err(Error::message(format_args!(
-                            "Server error: {}",
-                            error.message
-                        ))));
+                        callback.call(Err(Error::server(error.message)));
                     }
                 }
 
@@ -996,10 +1166,7 @@ where
                         return Ok(());
                     }
 
-                    p.callback.error(Error::message(format_args!(
-                        "Server error: {}",
-                        error.message
-                    )));
+                    p.callback.error(Error::server(error.message));
                     return Ok(());
                 }
 
@@ -1149,7 +1316,8 @@ where
                 p
             };
 
-            p.callback.error(Error::message("Connection closed"));
+            p.callback
+                .error(Error::new(ErrorKind::ConnectionLost("Connection closed")));
         }
     }
 
@@ -1472,14 +1640,16 @@ where
         }
 
         let Some(shared) = self.shared.upgrade() else {
-            self.callback
-                .call(Err(Error::message("WebSocket service is down")));
+            self.callback.call(Err(Error::new(ErrorKind::NotConnected(
+                "WebSocket service is down",
+            ))));
             return Request::new();
         };
 
         if shared.state.get() != State::Open {
-            self.callback
-                .call(Err(Error::message("WebSocket is not connected")));
+            self.callback.call(Err(Error::new(ErrorKind::NotConnected(
+                "WebSocket is not connected",
+            ))));
             return Request::new();
         }
 
@@ -1517,7 +1687,7 @@ where
             .insert(serial, Box::new(pending));
 
         if let Some(p) = existing {
-            p.callback.error(Error::message("Request cancelled"));
+            p.callback.error(Error::new(ErrorKind::Cancelled));
         }
 
         if let Err(error) = shared.send_connect(serial) {
@@ -1807,20 +1977,23 @@ where
         }
 
         let Some(shared) = self.shared.upgrade() else {
-            self.callback
-                .call(Err(Error::message("WebSocket service is down")));
+            self.callback.call(Err(Error::new(ErrorKind::NotConnected(
+                "WebSocket service is down",
+            ))));
             return Request::new();
         };
 
         if shared.state.get() != State::Open {
-            self.callback
-                .call(Err(Error::message("WebSocket is not connected")));
+            self.callback.call(Err(Error::new(ErrorKind::NotConnected(
+                "WebSocket is not connected",
+            ))));
             return Request::new();
         }
 
         let Some(channel) = self.channel else {
-            self.callback
-                .call(Err(Error::message("WebSocket request over closed channel")));
+            self.callback.call(Err(Error::new(ErrorKind::NotConnected(
+                "WebSocket request over closed channel",
+            ))));
             return Request::new();
         };
 
@@ -1840,7 +2013,7 @@ where
             .insert(serial, Box::new(pending));
 
         if let Some(p) = existing {
-            p.callback.error(Error::message("Request cancelled"));
+            p.callback.error(Error::new(ErrorKind::Cancelled));
         }
 
         if let Err(error) = shared.send_client_request(serial, channel, &self.body) {
