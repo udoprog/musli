@@ -95,6 +95,124 @@
 //! }
 //! ```
 //!
+//! # Broadcast origin
+//!
+//! A broadcast can say which channel caused it. When a request over a
+//! channel changes something every client shows, write the resulting
+//! broadcast with [`Server::broadcast_from`] and the [`Incoming::channel`] of
+//! that request as its origin. The client reads the origin back as the
+//! channel of the broadcast packet, so the page which made the change can
+//! recognize its own echo with `web::Packet::is_from` and skip it, while every
+//! other page applies it. There is no need to carry the origin in the body of
+//! the event.
+//!
+//! This relies on channel ids being unique across every connection, since
+//! the broadcast is written by the [`Server`] of each connection and not only
+//! the one the request came in over. That is the default, see
+//! [`ChannelAllocator`].
+//!
+//! ```
+//! use musli_web::api::ChannelId;
+//! use musli_web::ws;
+//! use tokio::sync::broadcast::Sender;
+//!
+//! mod api {
+//!     use musli::{Decode, Encode};
+//!     use musli_web::api;
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct RenameRequest<'de> {
+//!         pub name: &'de str,
+//!     }
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct RenameResponse;
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct RenamedEvent<'de> {
+//!         pub name: &'de str,
+//!     }
+//!
+//!     api::define! {
+//!         pub type Rename;
+//!
+//!         impl Endpoint for Rename {
+//!             impl<'de> Request for RenameRequest<'de>;
+//!             type Response<'de> = RenameResponse;
+//!         }
+//!
+//!         pub type Renamed;
+//!
+//!         impl Broadcast for Renamed {
+//!             impl<'de> Event for RenamedEvent<'de>;
+//!         }
+//!     }
+//! }
+//!
+//! /// A change which every connection forwards to its client.
+//! #[derive(Clone)]
+//! struct Change {
+//!     name: String,
+//!     /// The channel whose request made the change.
+//!     origin: ChannelId,
+//! }
+//!
+//! #[derive(Clone)]
+//! struct MyHandler {
+//!     changes: Sender<Change>,
+//! }
+//!
+//! impl ws::Handler for MyHandler {
+//!     type Id = api::Request;
+//!     type Response = Option<()>;
+//!
+//!     async fn handle(
+//!         &self,
+//!         id: Self::Id,
+//!         incoming: &mut ws::Incoming<'_>,
+//!         outgoing: &mut ws::Outgoing<'_>,
+//!     ) -> Self::Response {
+//!         match id {
+//!             api::Request::Rename => {
+//!                 let request = incoming.read::<api::RenameRequest<'_>>()?;
+//!
+//!                 _ = self.changes.send(Change {
+//!                     name: request.name.to_owned(),
+//!                     origin: incoming.channel(),
+//!                 });
+//!
+//!                 outgoing.write(api::RenameResponse);
+//!                 Some(())
+//!             }
+//!             api::Request::Unknown(..) => None,
+//!         }
+//!     }
+//! }
+//!
+//! /// Called by the connection loop of every connection for each change it
+//! /// receives from the shared sender.
+//! fn forward<S>(server: &mut ws::Server<S, MyHandler>, change: &Change) -> Result<(), ws::Error>
+//! where
+//!     S: ws::ServerImpl,
+//!     ws::Error: From<S::Error>,
+//! {
+//!     server.broadcast_from(api::RenamedEvent { name: &change.name }, change.origin)
+//! }
+//! ```
+//!
+//! The client which sent the request compares the origin to its own channel:
+//!
+//! ```text
+//! if packet.is_from(channel.id()) {
+//!     // Our own change, which is already shown.
+//!     return;
+//! }
+//! ```
+//!
+//! `is_from` is never true for [`ChannelId::NONE`], so a page which has not
+//! opened its channel yet, or a broadcast written with [`Server::broadcast`],
+//! never counts as an echo.
+//!
 //! [`server()`]: crate::axum08::server
 //! [axum]: <https://docs.rs/axum>
 //! [negotiation protocol]: crate::api#negotiating-the-format
@@ -1583,7 +1701,11 @@ where
         }
     }
 
-    /// Write a broadcast message.
+    /// Write a broadcast message which no channel is credited with.
+    ///
+    /// The client sees it with a channel of [`ChannelId::NONE`]. Use
+    /// [`Server::broadcast_from`] when the broadcast is the result of something
+    /// a client did over a channel, so that client can tell it apart.
     ///
     /// Note that the written message is buffered, and will be sent when
     /// [`Server::run`] is called.
@@ -1591,14 +1713,30 @@ where
     where
         T: Event,
     {
-        self.broadcast_in(message, ChannelId::NONE)
+        self.broadcast_from(message, ChannelId::NONE)
     }
 
-    /// Write a broadcast message over a specific `channel`.
+    /// Write a broadcast message which originated from `origin`.
+    ///
+    /// The broadcast still reaches every listener of its kind on the client.
+    /// `origin` only says which channel caused it: it is carried in the
+    /// broadcast header, and the client reads it back as the channel of the
+    /// packet, such as `web::Packet::channel`, or tests it with
+    /// `web::Packet::is_from`. Passing [`ChannelId::NONE`] is the same as
+    /// [`Server::broadcast`].
+    ///
+    /// The typical origin is the [`Incoming::channel`] of the request which
+    /// made the change being broadcast, so that the page which made it can
+    /// skip its own echo. The broadcast is usually written by the [`Server`]
+    /// of every connection, not only the one the request came in over, which
+    /// works because channel ids are unique across connections by default,
+    /// see [`ChannelAllocator`]. See [Broadcast origin] for an example.
     ///
     /// Note that the written message is buffered, and will be sent when
     /// [`Server::run`] is called.
-    pub fn broadcast_in<T>(&mut self, message: T, channel: ChannelId) -> Result<(), Error>
+    ///
+    /// [Broadcast origin]: self#broadcast-origin
+    pub fn broadcast_from<T>(&mut self, message: T, origin: ChannelId) -> Result<(), Error>
     where
         T: Event,
     {
@@ -1619,7 +1757,7 @@ where
                         broadcast: <T::Broadcast as Broadcast>::ID.get(),
                         error: 0,
                         format: format.to_u8(),
-                        channel,
+                        channel: origin,
                     },
                 )
                 .map_err(Error::encode_broadcast_header)?;
@@ -2189,8 +2327,10 @@ pub struct Incoming<'de> {
 impl<'de> Incoming<'de> {
     /// The channel over which the incoming request was received.
     ///
-    /// This is [`ChannelId::NONE`] unless the packet belongs to a response to a
-    /// handle constructed with [`Handle::channel`].
+    /// This is [`ChannelId::NONE`] unless the client sent the request over a
+    /// channel, such as one opened with [`Handle::channel`]. Pass it to
+    /// [`Server::broadcast_from`] to credit a broadcast to the channel whose
+    /// request caused it.
     ///
     /// [`Handle::channel`]: crate::web::Handle::channel
     pub fn channel(&self) -> ChannelId {

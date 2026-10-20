@@ -260,7 +260,7 @@ async fn connection(socket: WebSocket, mut state: AppState) {
                     channel,
                 };
 
-                if let Err(error) = server.broadcast_in(event, channel) {
+                if let Err(error) = server.broadcast_from(event, channel) {
                     panic!("Broadcast failed: {error}");
                 }
             }
@@ -815,6 +815,66 @@ async fn broadcast_over_channel() {
     assert_eq!(event.channel, channel.id());
 
     client.close().await;
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn broadcast_from_carries_its_origin_to_every_connection() {
+    let mut server = TestServer::new().await;
+    let a = TestClient::new(&server.url());
+    let b = TestClient::new(&server.url());
+    let a_handle = a.open().await;
+    let b_handle = b.open().await;
+
+    let a_channel = timeout!(a_handle.channel()).expect("Failed to open channel");
+    assert_eq!(server.event().await, Event::OpenChannel(a_channel.id()));
+
+    let b_channel = timeout!(b_handle.channel()).expect("Failed to open channel");
+    assert_eq!(server.event().await, Event::OpenChannel(b_channel.id()));
+
+    // Ids are unique across connections, so the origin says which one it is.
+    assert_ne!(a_channel.id(), b_channel.id());
+
+    let mut a_listener = a_handle.on_broadcast::<api::Tick>();
+    let mut b_listener = b_handle.on_broadcast::<api::Tick>();
+
+    // A broadcast from a channel of `a` reaches both connections with that
+    // channel as its origin, so only `a` sees it as its own.
+    server.tick_in(7, a_channel.id());
+
+    let packet = timeout!(a_listener.recv())
+        .expect("Listener is closed")
+        .expect("Broadcast failed");
+
+    assert_eq!(packet.channel(), a_channel.id());
+    assert!(packet.is_from(a_channel.id()));
+    assert_eq!(packet.decode_event().expect("Failed to decode").tick, 7);
+
+    let packet = timeout!(b_listener.recv())
+        .expect("Listener is closed")
+        .expect("Broadcast failed");
+
+    assert_eq!(packet.channel(), a_channel.id());
+    assert!(!packet.is_from(b_channel.id()));
+    assert_eq!(packet.decode_event().expect("Failed to decode").tick, 7);
+
+    // A broadcast no channel is credited with is nobody's echo, not even
+    // that of a page without a channel.
+    server.tick(8);
+
+    for listener in [&mut a_listener, &mut b_listener] {
+        let packet = timeout!(listener.recv())
+            .expect("Listener is closed")
+            .expect("Broadcast failed");
+
+        assert_eq!(packet.channel(), ChannelId::NONE);
+        assert!(!packet.is_from(ChannelId::NONE));
+        assert!(!packet.is_from(a_channel.id()));
+        assert_eq!(packet.decode_event().expect("Failed to decode").tick, 8);
+    }
+
+    a.close().await;
+    b.close().await;
     server.shutdown().await;
 }
 

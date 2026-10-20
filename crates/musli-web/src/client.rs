@@ -1833,11 +1833,50 @@ impl RawPacket {
 
     /// Return the channel this packet belongs to.
     ///
-    /// This is [`ChannelId::NONE`] unless the packet belongs to a response over
-    /// a channel constructed with [`Handle::channel`].
+    /// For a response this is the channel the request was sent over, and for
+    /// a broadcast it is the channel the broadcast originated from, as written
+    /// by [`ws::Server::broadcast_from`]. A page can compare it to the id of its
+    /// own channel to recognize the echo of a change it made itself, see
+    /// [`RawPacket::is_from`].
+    ///
+    /// This is [`ChannelId::NONE`] for a request which was not sent over a
+    /// channel, and for a broadcast which no channel is credited with, such as
+    /// one written with [`ws::Server::broadcast`].
+    ///
+    /// [`ws::Server::broadcast`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html#method.broadcast
+    /// [`ws::Server::broadcast_from`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html#method.broadcast_from
     #[inline]
     pub fn channel(&self) -> ChannelId {
         self.channel
+    }
+
+    /// Test if this packet originated from `channel`.
+    ///
+    /// This is `true` if the packet is a broadcast which was written with
+    /// [`ws::Server::broadcast_from`] and `channel` as its origin, or a
+    /// response to a request sent over `channel`. It is never `true` for
+    /// [`ChannelId::NONE`], so a broadcast which no channel is credited with
+    /// is not mistaken for the echo of a page which has not opened a channel
+    /// yet.
+    ///
+    /// Channel ids are unique across every connection to a server by
+    /// default, so a broadcast caused by another client never matches.
+    ///
+    /// [`ws::Server::broadcast_from`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html#method.broadcast_from
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::ChannelId;
+    /// use musli_web::client::RawPacket;
+    ///
+    /// let packet = RawPacket::empty();
+    /// assert_eq!(packet.channel(), ChannelId::NONE);
+    /// assert!(!packet.is_from(ChannelId::NONE));
+    /// ```
+    #[inline]
+    pub fn is_from(&self, channel: ChannelId) -> bool {
+        channel != ChannelId::NONE && self.channel == channel
     }
 
     /// Decode the contents of a raw packet.
@@ -1992,11 +2031,50 @@ impl<T> Packet<T> {
 
     /// Return the channel this packet belongs to.
     ///
-    /// This is [`ChannelId::NONE`] unless the packet belongs to a response over
-    /// a channel constructed with [`Handle::channel`].
+    /// For a response this is the channel the request was sent over, and for
+    /// a broadcast it is the channel the broadcast originated from, as written
+    /// by [`ws::Server::broadcast_from`]. A page can compare it to the id of its
+    /// own channel to recognize the echo of a change it made itself, see
+    /// [`Packet::is_from`].
+    ///
+    /// This is [`ChannelId::NONE`] for a request which was not sent over a
+    /// channel, and for a broadcast which no channel is credited with, such as
+    /// one written with [`ws::Server::broadcast`].
+    ///
+    /// [`ws::Server::broadcast`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html#method.broadcast
+    /// [`ws::Server::broadcast_from`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html#method.broadcast_from
     #[inline]
     pub fn channel(&self) -> ChannelId {
         self.raw.channel()
+    }
+
+    /// Test if this packet originated from `channel`.
+    ///
+    /// This is `true` if the packet is a broadcast which was written with
+    /// [`ws::Server::broadcast_from`] and `channel` as its origin, or a
+    /// response to a request sent over `channel`. It is never `true` for
+    /// [`ChannelId::NONE`], so a broadcast which no channel is credited with
+    /// is not mistaken for the echo of a page which has not opened a channel
+    /// yet.
+    ///
+    /// Channel ids are unique across every connection to a server by
+    /// default, so a broadcast caused by another client never matches.
+    ///
+    /// [`ws::Server::broadcast_from`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html#method.broadcast_from
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::ChannelId;
+    /// use musli_web::client::Packet;
+    ///
+    /// let packet = Packet::<()>::empty();
+    /// assert_eq!(packet.channel(), ChannelId::NONE);
+    /// assert!(!packet.is_from(ChannelId::NONE));
+    /// ```
+    #[inline]
+    pub fn is_from(&self, channel: ChannelId) -> bool {
+        self.raw.is_from(channel)
     }
 
     /// The [`Format`] the body of this packet is encoded with.
