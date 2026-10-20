@@ -6,8 +6,11 @@
 //! itself. This also comes with a derive allowing you to derive high
 //! performance decoding associated with native Rust types.
 //!
-//! Note that using derives directly from `musli_core` requires you to use the
-//! `#[musli(crate = musli_core)]` attribute.
+//! The derive in this module generates code which refers to `musli_core`, so a
+//! crate which depends on `musli_core` alone can use it without a
+//! `#[musli(crate = ..)]` attribute. If the dependency is renamed in
+//! `Cargo.toml`, point the derive at the new name with
+//! `#[musli(crate = <name>)]`.
 //!
 //! # Examples
 //!
@@ -15,7 +18,6 @@
 //! use musli_core::Decode;
 //!
 //! #[derive(Decode)]
-//! #[musli(crate = musli_core)]
 //! pub struct Person<'a> {
 //!     name: &'a str,
 //!     age: u32,
@@ -35,13 +37,16 @@
 /// use musli_core::Decode;
 ///
 /// #[derive(Decode)]
-/// #[musli(crate = musli_core)]
 /// struct MyType {
 ///     data: [u8; 128],
 /// }
 /// ```
+///
+/// A crate which renames `musli_core`, such as with `musli_core01 = { package =
+/// "musli-core", .. }` in `Cargo.toml`, has to name it with `#[musli(crate =
+/// musli_core01)]`.
 #[doc(inline)]
-pub use musli_macros::Decode;
+pub use musli_macros::MusliCoreDecode as Decode;
 
 #[doc(inline)]
 pub use self::__traits::*;

@@ -7,4 +7,24 @@
 
 Core traits for [Müsli].
 
+The [`Encode`] and [`Decode`] derives exported by this crate generate code
+which refers to `musli_core`, so a crate which depends on `musli_core` alone
+derives them without a `#[musli(crate = ..)]` attribute:
+
+```rust
+use musli_core::{Decode, Encode};
+
+#[derive(Encode, Decode)]
+pub struct Person<'a> {
+    name: &'a str,
+    age: u32,
+}
+```
+
+If `musli_core` is renamed in `Cargo.toml`, such as with `musli_core01 = {
+package = "musli-core", .. }`, the derives have to be told the new name with
+`#[musli(crate = musli_core01)]`.
+
+[`Decode`]: https://docs.rs/musli-core/latest/musli_core/derive.Decode.html
+[`Encode`]: https://docs.rs/musli-core/latest/musli_core/derive.Encode.html
 [Müsli]: https://docs.rs/musli

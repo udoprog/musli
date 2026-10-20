@@ -684,6 +684,36 @@ with a type which already has an `A` allocator parameter, or with
 
 <br>
 
+#### `#[musli(crate = <path>)]`
+
+Sets the path of the crate the generated implementation refers to.
+
+The derives exported by `musli` refer to `musli`, and the ones exported by
+`musli_core` refer to `musli_core`, so neither needs this attribute while the
+crate it was imported from is a dependency under its own name. A crate which
+renames the dependency in `Cargo.toml` names it here:
+
+```toml
+[dependencies]
+musli_core01 = { package = "musli-core", version = "0.1" }
+```
+
+```rust
+# extern crate musli_core as musli_core01;
+use musli_core01::{Decode, Encode};
+
+#[derive(Encode, Decode)]
+#[musli(crate = musli_core01)]
+struct Person {
+    age: u32,
+}
+```
+
+`#[musli(crate)]` without a path refers to `crate`, for use inside `musli` or
+`musli_core` themselves.
+
+<br>
+
 ## Enum attributes
 
 <br>

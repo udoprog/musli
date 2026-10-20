@@ -1,0 +1,11 @@
+[package]
+name = "tests-core"
+edition = "2024"
+publish = false
+description = """
+Derives through `musli-core` alone, with `musli` absent from the dependencies.
+"""
+
+[dependencies]
+musli-core = { path = "../crates/musli-core" }
+

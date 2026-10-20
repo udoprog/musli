@@ -44,6 +44,18 @@ pub fn musli_derive_decode(input: TokenStream) -> TokenStream {
     derive_decode(input, MUSLI_CRATE)
 }
 
+#[proc_macro_derive(MusliCoreEncode, attributes(musli))]
+#[doc(hidden)]
+pub fn musli_core_derive_encode(input: TokenStream) -> TokenStream {
+    derive_encode(input, MUSLI_CORE_CRATE)
+}
+
+#[proc_macro_derive(MusliCoreDecode, attributes(musli))]
+#[doc(hidden)]
+pub fn musli_core_derive_decode(input: TokenStream) -> TokenStream {
+    derive_decode(input, MUSLI_CORE_CRATE)
+}
+
 fn derive_encode(input: TokenStream, crate_default: &str) -> TokenStream {
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
     let expander = expander::Expander::new(&input, crate_default);

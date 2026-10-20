@@ -34,13 +34,12 @@
 /// }
 /// ```
 ///
-/// When using through `musli_core`, the crate needs to be specified:
+/// The derive re-exported by `musli_core` needs no `crate` attribute either:
 ///
 /// ```
 /// use musli_core::Encode;
 ///
 /// #[derive(Encode)]
-/// #[musli(crate = musli_core)]
 /// struct MyType {
 ///     data: [u8; 128],
 /// }
