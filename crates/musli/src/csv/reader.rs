@@ -132,7 +132,9 @@ where
 
     /// Read and decode the next record.
     ///
-    /// Returns `None` once there are no more records.
+    /// Returns `None` once there are no more records. If an error is returned,
+    /// the record might have been partially read so the position of the
+    /// reader is unspecified.
     ///
     /// This is the same as [`Reader::next_record`] but allows for using a
     /// configurable [`Context`].
@@ -230,7 +232,9 @@ where
 
     /// Read and decode the next record.
     ///
-    /// Returns `None` once there are no more records.
+    /// Returns `None` once there are no more records. If an error is returned,
+    /// the record might have been partially read so the position of the
+    /// reader is unspecified.
     ///
     /// # Examples
     ///

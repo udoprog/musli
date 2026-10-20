@@ -93,9 +93,14 @@
 //! # Ok::<_, Error>(())
 //! ```
 //!
-//! Since structs are encoded the same way twice when writing a header, fields
-//! which are conditionally skipped using `#[musli(skip_encoding_if = ..)]` are
-//! not supported, since that would cause records to have differing columns.
+//! Since columns are identified by the order in which fields are encoded,
+//! every record has to encode its fields in the same order. Fields which are
+//! conditionally skipped using `#[musli(skip_encoding_if = ..)]` are therefore
+//! not supported, and maps can only be used as records if they always contain
+//! the same keys in the same order.
+//!
+//! Like with the `csv` crate, an empty field is decoded as `None` for fields
+//! which are an [`Option`], so `Some(String::new())` reads back as `None`.
 //!
 //! <br>
 //!
