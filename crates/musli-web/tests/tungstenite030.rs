@@ -72,6 +72,11 @@ mod api {
     #[derive(Debug, Encode, Decode)]
     pub struct HangRequest;
 
+    /// A request which the server reports as handled without writing a
+    /// response.
+    #[derive(Debug, Encode, Decode)]
+    pub struct SilentRequest;
+
     #[derive(Debug, Encode, Decode)]
     pub struct TickEvent<'de> {
         pub message: &'de str,
@@ -101,6 +106,15 @@ mod api {
 
         impl Endpoint for Hang {
             impl Request for HangRequest;
+            type Response<'de> = Empty;
+        }
+
+        /// An endpoint which the server reports as handled without writing a
+        /// response.
+        pub type Silent;
+
+        impl Endpoint for Silent {
+            impl Request for SilentRequest;
             type Response<'de> = Empty;
         }
 
@@ -185,6 +199,8 @@ impl ws::Handler for TestHandler {
                 core::future::pending::<()>().await;
                 Ok(true)
             }
+            // Reported as handled, but no response is written.
+            api::Request::Silent => Ok(true),
             // Deliberately reported as unsupported by the server.
             api::Request::Unhandled => Ok(false),
             api::Request::Unknown(..) => Ok(false),
@@ -577,6 +593,32 @@ async fn unsupported_endpoint() {
         message.contains("No support for request"),
         "Unexpected error message: {message}"
     );
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+#[tokio::test]
+async fn handled_without_response_is_an_error() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    let error = timeout!(handle.request().body(api::SilentRequest).send())
+        .expect_err("Expected the request to fail");
+
+    let message = error
+        .as_server_error()
+        .expect("Expected a server reported error");
+
+    assert!(
+        message.contains("wrote no response"),
+        "Unexpected error message: {message}"
+    );
+
+    // The connection is still usable afterwards.
+    let (message, _) = hello(handle, "Still here").await;
+    assert_eq!(message, "Still here");
 
     client.close().await;
     server.shutdown().await;
