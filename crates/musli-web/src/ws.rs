@@ -559,6 +559,11 @@ where
     }
 
     /// Handle a request.
+    ///
+    /// A response which reports the request as handled (such as `()`, `true`
+    /// or `Ok(())`) must have written a response with [`Outgoing::write`].
+    /// If it did not, the client is sent an error stating that the handler
+    /// wrote no response, rather than being left waiting for one.
     fn handle<'this>(
         &'this self,
         id: Self::Id,
@@ -587,7 +592,14 @@ impl<S> Pinned<S> {
     }
 }
 
-type HandlerOutput<H> = (Result<<H as Handler>::Response, Error>, RequestHeader, Buf);
+/// The output of a handler task: its result, whether it wrote a response, the
+/// header of the request it handled, and the buffer it wrote into.
+type HandlerOutput<H> = (
+    Result<<H as Handler>::Response, Error>,
+    bool,
+    RequestHeader,
+    Buf,
+);
 
 /// Trait which governs how channel identifiers are allocated with a [`Server`].
 ///
@@ -1415,7 +1427,7 @@ where
 
                     self.socket_flush = false;
                 }
-                Output::Handle(result, header, buf) => {
+                Output::Handle(result, written, header, buf) => {
                     let err = 'err: {
                         let res = match result {
                             Ok(res) => res,
@@ -1436,6 +1448,16 @@ where
                         if !res.handled {
                             self.format_error_message(format_args!(
                                 "No support for request {}",
+                                header.id
+                            ))?;
+                            break 'err true;
+                        }
+
+                        // NB: A handled request must be answered, otherwise
+                        // the client waits for a response forever.
+                        if !written {
+                            self.format_error_message(format_args!(
+                                "Handler for request {} wrote no response",
                                 header.id
                             ))?;
                             break 'err true;
@@ -1915,7 +1937,7 @@ where
                     len: bytes.len(),
                 };
 
-                return (Err(Error::new(kind)), header, buf);
+                return (Err(Error::new(kind)), false, header, buf);
             }
 
             let mut incoming = Incoming {
@@ -1936,16 +1958,17 @@ where
             };
 
             let response = handler.handle(id, &mut incoming, &mut outgoing).await;
+            let written = outgoing.serial.is_none();
 
             if let Some(error) = incoming.error.take() {
-                return (Err(Error::incoming(error)), header, buf);
+                return (Err(Error::incoming(error)), written, header, buf);
             }
 
             if let Some(error) = outgoing.error.take() {
-                return (Err(Error::outgoing(error)), header, buf);
+                return (Err(Error::outgoing(error)), written, header, buf);
             }
 
-            (Ok(response), header, buf)
+            (Ok(response), written, header, buf)
         });
     }
 }
@@ -1961,8 +1984,8 @@ enum Output<E, R> {
     Send(Result<(), E>),
     /// Outgoing messages have been successfully flushed.
     Flushed(Result<(), E>),
-    /// Handle output.
-    Handle(Result<R, Error>, RequestHeader, Buf),
+    /// Handle output, and whether the handler wrote a response.
+    Handle(Result<R, Error>, bool, RequestHeader, Buf),
 }
 
 struct Select<'a, S, H>
@@ -2033,8 +2056,8 @@ where
                 }
             };
 
-            let (result, header, buf) = output;
-            return Poll::Ready(Output::Handle(result, header, buf));
+            let (result, written, header, buf) = output;
+            return Poll::Ready(Output::Handle(result, written, header, buf));
         }
 
         Poll::Pending
@@ -2128,6 +2151,10 @@ impl Outgoing<'_> {
     /// Write a response.
     ///
     /// This can only be called once. Calling this multiple times has no effect.
+    ///
+    /// A handler which reports a request as handled must call this, otherwise
+    /// the client receives an error instead of a response. See
+    /// [`Handler::handle`].
     ///
     /// See [`server()`] for how to use with `axum`.
     ///
