@@ -14,6 +14,11 @@
 //! [`Channel`] which was opened over it. Anything a page fetched has to be
 //! fetched again once the connection is back.
 //!
+//! The one thing it does not reconnect after is a server which states another
+//! application version than the page, which it reports as
+//! [`State::Incompatible`]. The page is out of date and the usual response is
+//! to reload it, see [`ServiceBuilder::app_version`].
+//!
 //! To tell when that is, every handle exposes a connection generation through
 //! [`Handle::generation`]. It counts how many times the connection has opened
 //! so far, so it starts at `0` and goes up by one each time the connection
@@ -328,6 +333,7 @@ where
         close_before_unload: false,
         format: Format::DEFAULT,
         mode: Mode::DEFAULT,
+        app: 0,
         _marker: PhantomData,
     }
 }
@@ -343,12 +349,41 @@ pub enum State {
     Open,
     /// The connection is closed.
     Closed,
+    /// The server states an application version other than the one this
+    /// client was built with, see [`ServiceBuilder::app_version`].
+    ///
+    /// The connection is closed and the service stops reconnecting, since
+    /// connecting again reaches the same server. The page is out of date, so
+    /// the usual thing to do is to ask the user to reload it, or to reload it
+    /// outright. [`Service::open`] tries again, which is only worth doing if
+    /// the server might have changed back.
+    Incompatible {
+        /// The application version the server states.
+        server: u32,
+        /// The application version this client states.
+        client: u32,
+    },
 }
 
 impl State {
     /// Check if the state is open.
     pub fn is_open(&self) -> bool {
         matches!(self, Self::Open)
+    }
+
+    /// Check if the connection was refused because the server states another
+    /// application version, see [`State::Incompatible`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::State;
+    ///
+    /// assert!(State::Incompatible { server: 2, client: 1 }.is_incompatible());
+    /// assert!(!State::Closed.is_incompatible());
+    /// ```
+    pub fn is_incompatible(&self) -> bool {
+        matches!(self, Self::Incompatible { .. })
     }
 }
 
@@ -800,6 +835,8 @@ where
     mode: Cell<Mode>,
     /// The mode the user asked for, re-negotiated on every reconnect.
     requested_mode: Mode,
+    /// The application version this client states, or zero for none.
+    app: u32,
     handle: Handle<H>,
     pub(crate) on_error: Box<dyn Callback<Error>>,
     window: H::Window,
@@ -860,6 +897,7 @@ where
     close_before_unload: bool,
     format: Format,
     mode: Mode,
+    app: u32,
     _marker: PhantomData<H>,
 }
 
@@ -879,6 +917,7 @@ where
             close_before_unload: self.close_before_unload,
             format: self.format,
             mode: self.mode,
+            app: self.app,
             _marker: self._marker,
         }
     }
@@ -925,6 +964,64 @@ where
     #[inline]
     pub fn mode(mut self, mode: Mode) -> ServiceBuilder<H, E> {
         self.mode = mode;
+        self
+    }
+
+    /// State the version of the application's API this client was built
+    /// with.
+    ///
+    /// This is a version of *your* protocol, the requests and broadcasts
+    /// defined with [`api::define!`], as opposed to [`api::VERSION`] which is
+    /// the version of the envelope this crate puts around them. Give it the
+    /// same constant the server passes to `ws::Connect::app_version`, from a
+    /// crate both of them depend on, and bump it whenever the API changes in a
+    /// way an older page cannot cope with.
+    ///
+    /// When the connection is established the server states its version, and
+    /// if it is not this one the service reports [`State::Incompatible`]
+    /// instead of [`State::Open`], closes the connection and stops
+    /// reconnecting. That is how a page which was loaded before the server was
+    /// upgraded learns that it has to reload.
+    ///
+    /// Zero, which is the default, states no version. The check only applies
+    /// when both peers state one, so a client or a server which does not opt
+    /// in behaves exactly as if this did not exist. See [application
+    /// versions].
+    ///
+    /// [`api::define!`]: crate::api::define
+    /// [application versions]: crate::api#application-versions
+    ///
+    /// # Examples
+    ///
+    /// Reloading the page once the server says it is out of date:
+    ///
+    /// ```no_run
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// /// Shared with the server, bumped whenever the API changes.
+    /// const APP_VERSION: u32 = 7;
+    ///
+    /// let service = ws::connect(ws::Connect::location("ws"))
+    ///     .app_version(APP_VERSION)
+    ///     .build();
+    ///
+    /// // Keep the listener for as long as the page should reload itself.
+    /// let (_, listener) = service.handle().on_state_change(|state: ws::State| {
+    ///     // Carries both versions, as `State::Incompatible { server, client }`.
+    ///     if state.is_incompatible() {
+    ///         reload_page();
+    ///     }
+    /// });
+    ///
+    /// /// With `web-sys`, `window().location().reload()`.
+    /// fn reload_page() {
+    ///     # todo!()
+    /// }
+    /// # drop(listener);
+    /// ```
+    #[inline]
+    pub fn app_version(mut self, version: u32) -> Self {
+        self.app = version;
         self
     }
 
@@ -985,6 +1082,7 @@ where
                 requested: self.format,
                 mode: Cell::new(self.mode),
                 requested_mode: self.mode,
+                app: self.app,
                 handle: Handle {
                     shared: shared.clone(),
                 },
@@ -1101,6 +1199,7 @@ where
             id: <T::Endpoint as api::Endpoint>::ID.get(),
             format: format.to_u8(),
             channel,
+            app: 0,
         };
 
         let out = &mut *self.output.borrow_mut();
@@ -1141,6 +1240,7 @@ where
             // NB: Carries no body.
             format: 0,
             channel: ChannelId::NONE,
+            app: 0,
         };
 
         let out = &mut *self.output.borrow_mut();
@@ -1183,6 +1283,7 @@ where
                 format: format.to_u8(),
                 // NB: Carries no body.
                 channel: ChannelId::NONE,
+                app: self.app,
             };
 
             let out = &mut *self.output.borrow_mut();
@@ -1241,6 +1342,7 @@ where
             // NB: Carries no body.
             format: 0,
             channel,
+            app: 0,
         };
 
         let out = &mut *self.output.borrow_mut();
@@ -1355,6 +1457,14 @@ where
                 // never encoded with a format this client did not agree to.
                 tracing::debug!("Server hello, negotiating format");
                 self.send_negotiate()?;
+
+                // NB: Checked after negotiating, so that the server hears
+                // which version this client states and can tell why it goes
+                // away.
+                if self.app != 0 && header.app != 0 && header.app != self.app {
+                    self.incompatible(header.app);
+                }
+
                 return Ok(());
             }
 
@@ -1547,6 +1657,34 @@ where
         drop(self.reconnect_timeout.borrow_mut().replace(timeout));
         self.connecting.set(false);
         Ok(())
+    }
+
+    /// Give up on a server which states application version `server`.
+    ///
+    /// Connecting again would reach the same server, so this stops
+    /// reconnecting until [`Service::open`] is called again.
+    fn incompatible(self: &Rc<Self>, server: u32) {
+        let client = self.app;
+        tracing::debug!(server, client, "Incompatible server");
+
+        self.should_be.set(State::Closed);
+
+        let timeout = self.reconnect_timeout.borrow_mut().take();
+        drop(timeout);
+
+        self.current_timeout.set(INITIAL_TIMEOUT);
+        self.connecting.set(false);
+
+        // NB: The socket goes first, so that a listener which looks at the
+        // service sees it closed.
+        if let Some(s) = self.socket.take() {
+            if let Err(error) = s.close() {
+                self.on_error.call(error);
+            }
+        }
+
+        self.close_pending();
+        self.emit_state_change(State::Incompatible { server, client });
     }
 
     /// Fail the pending request with the given serial, if it is still pending.
@@ -4015,7 +4153,9 @@ where
     ///
     /// This indicates when the connection is open and ready to receive requests
     /// through [`State::Open`], or if it's closed and requests will be queued
-    /// through [`State::Closed`].
+    /// through [`State::Closed`]. A server which states another application
+    /// version is reported through [`State::Incompatible`], see
+    /// [`ServiceBuilder::app_version`].
     ///
     /// Note that if you are connecting through a proxy the reported updates
     /// might be volatile. It is always best to send a message over the
@@ -4376,7 +4516,7 @@ where
             State::Open => {
                 self.connect();
             }
-            State::Closed => {
+            State::Closed | State::Incompatible { .. } => {
                 // NB: Dropped outside of the borrow, since dropping a request
                 // touches the shared request table.
                 let connect = mem::take(&mut *self.connect.borrow_mut());

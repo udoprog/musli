@@ -194,6 +194,7 @@ envelope! {
         3 => id,
         4 => format,
         5 => channel,
+        6 => app,
     }
 }
 
@@ -205,6 +206,7 @@ envelope! {
         4 => error,
         5 => format,
         6 => channel,
+        7 => app,
     }
 }
 
@@ -864,6 +866,7 @@ mod tests {
                 id: 11,
                 format: format.to_u8(),
                 channel: ChannelId::from_u16(3),
+                app: 0,
             };
 
             let mut buf = Vec::new();
@@ -918,6 +921,7 @@ mod tests {
             id: 11,
             format: Format::Json.to_u8(),
             channel: ChannelId::from_u16(3),
+            app: 0,
         };
 
         let expected = JsonTarget::Port { id: 1 };
@@ -973,6 +977,78 @@ mod tests {
         );
     }
 
+    /// The application version is an ordinary header in both envelopes, so it
+    /// round trips at every width and is left out of a binary one when unset.
+    #[test]
+    fn app_header_round_trips() {
+        for app in [0, 7, 300, 70_000, u32::MAX] {
+            for mode in Mode::ALL {
+                let request = RequestHeader {
+                    version: VERSION,
+                    serial: 1,
+                    id: 2,
+                    format: 0,
+                    channel: ChannelId::NONE,
+                    app,
+                };
+
+                let mut buf = Vec::new();
+                encode_envelope(*mode, &mut buf, &request).unwrap();
+                let mut at = 0;
+                let decoded: RequestHeader = decode_envelope(*mode, &buf, &mut at).unwrap();
+                assert_eq!(decoded.app, app);
+                assert_eq!(at, buf.len());
+
+                let response = ResponseHeader {
+                    version: VERSION,
+                    serial: 0,
+                    broadcast: 1,
+                    error: 0,
+                    format: 0,
+                    channel: ChannelId::NONE,
+                    app,
+                };
+
+                let mut buf = Vec::new();
+                encode_envelope(*mode, &mut buf, &response).unwrap();
+                let mut at = 0;
+                let decoded: ResponseHeader = decode_envelope(*mode, &buf, &mut at).unwrap();
+                assert_eq!(decoded.app, app);
+                assert_eq!(at, buf.len());
+            }
+        }
+
+        // NB: Request id 6 and response id 7, and absent when zero.
+        let mut buf = Vec::new();
+
+        let request = RequestHeader {
+            version: VERSION,
+            serial: 0,
+            id: 0,
+            format: 0,
+            channel: ChannelId::NONE,
+            app: 5,
+        };
+
+        encode_envelope(Mode::Binary, &mut buf, &request).unwrap();
+        assert_eq!(buf, [0x01, VERSION as u8, 0x06, 5, 0x00]);
+
+        buf.clear();
+
+        let response = ResponseHeader {
+            version: VERSION,
+            serial: 0,
+            broadcast: 0,
+            error: 0,
+            format: 0,
+            channel: ChannelId::NONE,
+            app: 0,
+        };
+
+        encode_envelope(Mode::Binary, &mut buf, &response).unwrap();
+        assert_eq!(buf, [0x01, VERSION as u8, 0x00]);
+    }
+
     /// The text envelope is what makes a frame readable by hand, so its exact
     /// shape is part of the protocol.
     #[test]
@@ -985,13 +1061,14 @@ mod tests {
             id: 11,
             format: Format::Json.to_u8(),
             channel: ChannelId::from_u16(3),
+            app: 9,
         };
 
         encode_envelope(Mode::Text, &mut buf, &header).unwrap();
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "version: 2\nserial: 7\nid: 11\nformat: 5\nchannel: 3\n\n"
+            "version: 2\nserial: 7\nid: 11\nformat: 5\nchannel: 3\napp: 9\n\n"
         );
 
         let mut buf = Vec::new();
@@ -1003,13 +1080,14 @@ mod tests {
             error: 0,
             format: Format::Json.to_u8(),
             channel: ChannelId::NONE,
+            app: 0,
         };
 
         encode_envelope(Mode::Text, &mut buf, &header).unwrap();
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "version: 2\nserial: 0\nbroadcast: 13\nerror: 0\nformat: 5\nchannel: 0\n\n"
+            "version: 2\nserial: 0\nbroadcast: 13\nerror: 0\nformat: 5\nchannel: 0\napp: 0\n\n"
         );
     }
 
@@ -1026,6 +1104,7 @@ mod tests {
                 id: 65535,
                 format: Format::Json.to_u8(),
                 channel: ChannelId::from_u16(65535),
+                app: 0,
             };
 
             encode_envelope(mode, &mut buf, &request).unwrap();
@@ -1051,6 +1130,7 @@ mod tests {
                 error: 17,
                 format: Format::Json.to_u8(),
                 channel: ChannelId::from_u16(21),
+                app: 0,
             };
 
             encode_envelope(mode, &mut buf, &response).unwrap();
@@ -1086,6 +1166,7 @@ mod tests {
             id: 2,
             format: Format::Json.to_u8(),
             channel: ChannelId::NONE,
+            app: 0,
         };
 
         encode_envelope(Mode::Text, &mut buf, &header).unwrap();
@@ -1099,7 +1180,7 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "version: 2\nserial: 1\nid: 2\nformat: 5\nchannel: 0\n\n{\"message\":\"hello\",\"tick\":42}"
+            "version: 2\nserial: 1\nid: 2\nformat: 5\nchannel: 0\napp: 0\n\n{\"message\":\"hello\",\"tick\":42}"
         );
 
         let mut at = 0;
@@ -1141,6 +1222,7 @@ mod tests {
             id: 300,
             format: Format::Json.to_u8(),
             channel: ChannelId::NONE,
+            app: 0,
         };
 
         encode_envelope(Mode::Binary, &mut buf, &header).unwrap();

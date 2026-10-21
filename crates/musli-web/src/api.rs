@@ -87,6 +87,7 @@
 //! id: 1
 //! format: 5
 //! channel: 0
+//! app: 0
 //!
 //! {"message":"Hello!"}
 //! ```
@@ -154,6 +155,44 @@
 //! Since formats are gated behind [features], a server may genuinely be unable
 //! to speak a format a client asks for, which is why step 3 can fail.
 //!
+//! # Application versions
+//!
+//! [`VERSION`] only covers the envelope. The requests and broadcasts an
+//! application defines with [`define!`] are its own protocol, and a page which
+//! was loaded before the server was upgraded keeps speaking the old one for as
+//! long as it stays open. An upgrade safe [`Format`] tolerates added and
+//! missing fields, but not every change is like that.
+//!
+//! To find out, both peers can state an *application version* in the
+//! handshake: a number the application bumps whenever its API changes in a
+//! way an older peer cannot cope with, kept in a crate both sides depend on.
+//! The server states it with [`ws::Connect::app_version`] and a client with
+//! `ServiceBuilder::app_version`, in [`web`] or in [`client`].
+//!
+//! 1. The server states its version in the `app` header of
+//!    [`MessageId::SERVER_HELLO`].
+//! 2. The client compares it with its own. It always sends its
+//!    [`MessageId::NEGOTIATE`] request, stating its own version in the same
+//!    header, so that the server can tell why it goes away.
+//! 3. If the two differ the client closes the connection and reports it as
+//!    incompatible, with both versions, instead of opening it. It does not
+//!    reconnect, since that reaches the same server. A page usually responds
+//!    by reloading, which fetches the page the server is built with.
+//! 4. A server which is negotiated with by a client stating another version
+//!    refuses it with a close frame, and [`ws::Connect::connect`] fails with an
+//!    error for which [`ws::Error::is_incompatible`] holds.
+//!
+//! Zero means that no version is stated, and is what both sides default to.
+//! Versions are only compared when both peers state one, so a peer which does
+//! not opt in behaves exactly as it would without this, whatever the other
+//! one does. Every other message leaves the header at zero, which a binary
+//! envelope does not write at all.
+//!
+//! [`web`]: <https://docs.rs/musli-web/latest/musli_web/web/>
+//! [`client`]: <https://docs.rs/musli-web/latest/musli_web/client/>
+//! [`ws::Connect::app_version`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Connect.html#method.app_version>
+//! [`ws::Error::is_incompatible`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Error.html#method.is_incompatible>
+//!
 //! # Error responses
 //!
 //! A request which fails is answered with a response whose `error` header is
@@ -204,10 +243,12 @@ pub use musli_web_macros::define;
 ///
 /// # History
 ///
-/// * `2` - a request may fail with a typed error, see [error responses].
+/// * `2` - a request may fail with a typed error, see [error responses], and
+///   the handshake carries an [application version].
 /// * `1` - the first versioned protocol.
 ///
 /// [error responses]: crate::api#error-responses
+/// [application version]: crate::api#application-versions
 ///
 /// # Examples
 ///
@@ -1173,6 +1214,12 @@ pub struct ResponseHeader {
     pub format: u8,
     /// The channel over which the response will be sent.
     pub channel: ChannelId,
+    /// The application version the server states, see [application
+    /// versions]. Only [`MessageId::SERVER_HELLO`] carries it, and zero means
+    /// that none is stated.
+    ///
+    /// [application versions]: crate::api#application-versions
+    pub app: u32,
 }
 
 /// The body of an error response.
@@ -1209,4 +1256,10 @@ pub struct RequestHeader {
     pub format: u8,
     /// The channel over which the request was received.
     pub channel: ChannelId,
+    /// The application version the client states, see [application
+    /// versions]. Only [`MessageId::NEGOTIATE`] carries it, and zero means
+    /// that none is stated.
+    ///
+    /// [application versions]: crate::api#application-versions
+    pub app: u32,
 }

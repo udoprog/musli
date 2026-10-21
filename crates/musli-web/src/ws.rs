@@ -362,6 +362,7 @@ const DEFAULT_MAX_OUTBOUND: usize = 8 * 1048576;
 const DEFAULT_MAX_CHANNELS: usize = 1024;
 const CLOSE_NORMAL: u16 = 1000;
 const CLOSE_PROTOCOL_ERROR: u16 = 1002;
+const CLOSE_POLICY_VIOLATION: u16 = 1008;
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(30);
 const PING_TIMEOUT: Duration = Duration::from_secs(10);
 const DEFAULT_SEED: u64 = 0xdeadbeef;
@@ -507,6 +508,12 @@ enum ErrorKind {
     UnsupportedVersion {
         error: format::Error,
     },
+    /// The client stated an application version other than the one this
+    /// server states, see [`Connect::app_version`].
+    Incompatible {
+        server: u32,
+        client: u32,
+    },
 }
 
 /// The error produced by the server side of the websocket protocol
@@ -547,6 +554,19 @@ impl Error {
 
     pub(crate) fn encode_error_message(error: format::Error) -> Self {
         Self::new(ErrorKind::ErrorMessage { error })
+    }
+
+    /// Test if the connection was refused because the client states an
+    /// application version other than the one this server states.
+    ///
+    /// This is what [`Connect::connect`] fails with for a client built against
+    /// a different version of the application's API, see
+    /// [`Connect::app_version`]. It is the client which is out of date (or the
+    /// server), not the connection which is broken, so it is usually worth
+    /// logging at a lower level than other errors.
+    #[inline]
+    pub fn is_incompatible(&self) -> bool {
+        matches!(self.kind, ErrorKind::Incompatible { .. })
     }
 }
 
@@ -606,6 +626,12 @@ impl fmt::Display for Error {
             }
             ErrorKind::UnsupportedVersion { error } => {
                 write!(f, "Client speaks a different protocol: {error}")
+            }
+            ErrorKind::Incompatible { server, client } => {
+                write!(
+                    f,
+                    "Client states application version {client}, this server states {server}"
+                )
             }
         }
     }
@@ -1318,6 +1344,8 @@ where
     /// Formats this server is willing to negotiate, or `None` to accept every
     /// format it was built with support for.
     formats: Option<&'static [Format]>,
+    /// The application version this server states, or zero for none.
+    app: u32,
 }
 
 impl<S, H> Connect<S, H, Channels>
@@ -1338,6 +1366,7 @@ where
             max_outbound: DEFAULT_MAX_OUTBOUND,
             max_channels: DEFAULT_MAX_CHANNELS,
             formats: None,
+            app: 0,
         }
     }
 }
@@ -1378,6 +1407,7 @@ where
             max_outbound: self.max_outbound,
             max_channels: self.max_channels,
             formats: self.formats,
+            app: self.app,
         }
     }
 
@@ -1408,6 +1438,90 @@ where
     #[inline]
     pub fn accepts(&self, format: Format) -> bool {
         accepts(self.formats, format)
+    }
+
+    /// State the version of the application's API this server speaks.
+    ///
+    /// This is a version of *your* protocol, the requests and broadcasts
+    /// defined with [`api::define!`], as opposed to [`VERSION`] which is the
+    /// version of the envelope this crate puts around them. Bump it whenever
+    /// the API changes in a way an older client cannot cope with.
+    ///
+    /// The server states it in [`MessageId::SERVER_HELLO`], and a client which
+    /// was given one too through its own `ServiceBuilder::app_version` compares
+    /// the two before it negotiates. If they differ the client reports the
+    /// connection as incompatible instead of opening it, which is what lets a
+    /// page served by an older build learn that it has to reload. A client
+    /// which states a different version is also refused here: it gets a close
+    /// frame and [`Connect::connect`] fails with an error for which
+    /// [`Error::is_incompatible`] holds.
+    ///
+    /// Zero, which is the default, states no version. The check only applies
+    /// when both peers state one, so a server or a client which does not opt
+    /// in behaves exactly as if this did not exist. See [application
+    /// versions].
+    ///
+    /// [`api::define!`]: crate::api::define
+    /// [application versions]: crate::api#application-versions
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate axum08 as axum;
+    /// use axum::extract::ws::WebSocket;
+    /// use musli_web::axum08;
+    /// use musli_web::ws;
+    ///
+    /// # mod api {
+    /// #     use musli::{Decode, Encode};
+    /// #     use musli_web::api;
+    /// #     #[derive(Encode, Decode)]
+    /// #     pub struct HelloRequest;
+    /// #     #[derive(Encode, Decode)]
+    /// #     pub struct HelloResponse;
+    /// #     api::define! {
+    /// #         pub type Hello;
+    /// #         impl Endpoint for Hello {
+    /// #             impl Request for HelloRequest;
+    /// #             type Response<'de> = HelloResponse;
+    /// #         }
+    /// #     }
+    /// # }
+    /// # #[derive(Clone)]
+    /// # struct MyHandler;
+    /// # impl ws::Handler for MyHandler {
+    /// #     type Id = api::Request;
+    /// #     type Response = bool;
+    /// #     async fn handle(
+    /// #         &self,
+    /// #         _: Self::Id,
+    /// #         _: &mut ws::Incoming<'_>,
+    /// #         _: &mut ws::Outgoing<'_>,
+    /// #     ) -> bool {
+    /// #         false
+    /// #     }
+    /// # }
+    /// /// Bumped whenever the API changes in a way old pages cannot cope with.
+    /// const APP_VERSION: u32 = 7;
+    ///
+    /// async fn connection(socket: WebSocket) -> Result<(), ws::Error> {
+    ///     let server = axum08::server(socket, MyHandler).app_version(APP_VERSION);
+    ///
+    ///     let mut server = match server.connect().await {
+    ///         Ok(server) => server,
+    ///         // A page from another build, which is told to reload.
+    ///         Err(error) if error.is_incompatible() => return Ok(()),
+    ///         Err(error) => return Err(error),
+    ///     };
+    ///
+    ///     server.run().await
+    /// }
+    /// # let _ = connection;
+    /// ```
+    #[inline]
+    pub fn app_version(mut self, version: u32) -> Self {
+        self.app = version;
+        self
     }
 
     /// Modify the max allocated capacity of the buffers used for outgoing
@@ -1546,12 +1660,22 @@ where
             mode: Mode::DEFAULT,
             failure: None,
             formats: self.formats,
+            app: self.app,
         };
 
         server.hello()?;
         server.negotiate().await?;
         Ok(server)
     }
+}
+
+/// The error for a peer which went away during negotiation.
+///
+/// A failure which was already held explains why better than the peer going
+/// away does, since it is usually the reason it went away.
+#[inline]
+fn gone(failure: Option<Error>) -> Error {
+    failure.unwrap_or_else(|| Error::new(ErrorKind::NotNegotiated))
 }
 
 /// Test if `formats` is willing to negotiate `format`.
@@ -1626,6 +1750,8 @@ where
     /// Formats this server is willing to negotiate, or `None` to accept every
     /// format it was built with support for.
     formats: Option<&'static [Format]>,
+    /// The application version this server states, or zero for none.
+    app: u32,
 }
 
 impl<S, H, C> Server<S, H, C>
@@ -1717,17 +1843,22 @@ where
 
             match result {
                 Output::Close => {
-                    return Err(Error::new(ErrorKind::NotNegotiated));
+                    return Err(gone(failure));
                 }
                 Output::Ping => {
                     self.handle_ping()?;
                 }
                 Output::Recv(message) => {
                     let Some(message) = message else {
-                        return Err(Error::new(ErrorKind::NotNegotiated));
+                        return Err(gone(failure));
                     };
 
-                    match message? {
+                    let message = match message {
+                        Ok(message) => message,
+                        Err(error) => return Err(failure.unwrap_or_else(|| Error::from(error))),
+                    };
+
+                    match message {
                         // NB: The frame type is the mode, so the negotiation is
                         // what tells the server which envelope the rest of the
                         // connection is spelled in.
@@ -1748,7 +1879,7 @@ where
                             self.handle_pong(data)?;
                         }
                         Message::Close => {
-                            return Err(Error::new(ErrorKind::NotNegotiated));
+                            return Err(gone(failure));
                         }
                     }
                 }
@@ -1814,6 +1945,28 @@ where
             return Err(Error::new(ErrorKind::ExpectedNegotiate { id: header.id }));
         }
 
+        // NB: Only refused when both sides state a version, so that a peer
+        // which has not opted in behaves as it always has. A client which
+        // states a different one was built against another API, and nothing it
+        // sends can be trusted to mean what this server thinks it does.
+        if self.app != 0 && header.app != 0 && header.app != self.app {
+            tracing::debug!(
+                server = self.app,
+                client = header.app,
+                "Incompatible client"
+            );
+
+            self.out.push_back(S::close(
+                CLOSE_POLICY_VIOLATION,
+                "Incompatible application version",
+            ));
+
+            return Err(Error::new(ErrorKind::Incompatible {
+                server: self.app,
+                client: header.app,
+            }));
+        }
+
         // NB: The connection stays up on a rejected format and settles on the
         // default instead, which is what the client falls back to. The error
         // tells it which formats it could have asked for.
@@ -1875,6 +2028,7 @@ where
                     error: 0,
                     format: format.to_u8(),
                     channel: header.channel,
+                    app: 0,
                 },
             );
 
@@ -2110,6 +2264,7 @@ where
                         error: 0,
                         format: format.to_u8(),
                         channel: origin,
+                        app: 0,
                     },
                 )
                 .map_err(Error::encode_broadcast_header)?;
@@ -2150,6 +2305,10 @@ where
                         // NB: Carries no body, so no format applies.
                         format: 0,
                         channel: ChannelId::NONE,
+                        // NB: Stated here, ahead of negotiation, so that a
+                        // client from another build can tell before it has
+                        // agreed to anything.
+                        app: self.app,
                     },
                 )
                 .map_err(Error::encode_broadcast_header)?;
@@ -2297,6 +2456,7 @@ where
                                 error: 0,
                                 format: 0,
                                 channel,
+                                app: 0,
                             },
                         );
 
@@ -2416,6 +2576,7 @@ where
                     error: error.get(),
                     format: format.to_u8(),
                     channel: header.channel,
+                    app: 0,
                 },
             );
 
@@ -2831,6 +2992,7 @@ impl Outgoing<'_> {
                 error: 0,
                 format: self.format.to_u8(),
                 channel: self.channel,
+                app: 0,
             },
         );
 
@@ -3324,6 +3486,7 @@ mod tests {
                             error: 0,
                             format: Format::DEFAULT.to_u8(),
                             channel: ChannelId::NONE,
+                            app: 0,
                         },
                     )
                     .map_err(Error::encode_connect_header)?;
@@ -3366,6 +3529,7 @@ mod tests {
             mode: Mode::DEFAULT,
             failure: None,
             formats: None,
+            app: 0,
         }
     }
 
@@ -3483,6 +3647,7 @@ mod tests {
             id: 1,
             format: Format::DEFAULT.to_u8(),
             channel: ChannelId::NONE,
+            app: 0,
         };
 
         format::encode_envelope(mode, &mut out, &header).unwrap();

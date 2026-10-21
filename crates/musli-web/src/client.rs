@@ -191,6 +191,7 @@ where
         seed: DEFAULT_SEED,
         format: Format::DEFAULT,
         mode: Mode::DEFAULT,
+        app: 0,
         _marker: PhantomData,
     }
 }
@@ -227,6 +228,18 @@ pub enum State {
     Open,
     /// The connection is closed.
     Closed,
+    /// The server states an application version other than the one this
+    /// client was built with, see [`ServiceBuilder::app_version`].
+    ///
+    /// The connection is closed and [`Service::run`] returns an error for
+    /// which [`Error::is_incompatible`] holds, since connecting again reaches
+    /// the same server. This state is kept once the service is gone.
+    Incompatible {
+        /// The application version the server states.
+        server: u32,
+        /// The application version this client states.
+        client: u32,
+    },
 }
 
 impl State {
@@ -243,6 +256,22 @@ impl State {
     #[inline]
     pub fn is_open(&self) -> bool {
         matches!(self, Self::Open)
+    }
+
+    /// Check if the connection was refused because the server states another
+    /// application version, see [`State::Incompatible`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::client::State;
+    ///
+    /// assert!(State::Incompatible { server: 2, client: 1 }.is_incompatible());
+    /// assert!(!State::Closed.is_incompatible());
+    /// ```
+    #[inline]
+    pub fn is_incompatible(&self) -> bool {
+        matches!(self, Self::Incompatible { .. })
     }
 }
 
@@ -307,6 +336,17 @@ impl Error {
     #[inline]
     pub fn is_not_connected(&self) -> bool {
         matches!(self.kind, ErrorKind::NotConnected)
+    }
+
+    /// Check if the server states an application version other than the one
+    /// this client states, see [`ServiceBuilder::app_version`].
+    ///
+    /// This is what [`Service::run`] and [`Handle::wait_until_open`] fail with
+    /// once the service has found out, and the versions on either side are
+    /// available through [`State::Incompatible`].
+    #[inline]
+    pub fn is_incompatible(&self) -> bool {
+        matches!(self.kind, ErrorKind::Incompatible { .. })
     }
 
     /// Check if the error is a server error, and if so return the message
@@ -379,6 +419,11 @@ impl Error {
         Ok(Some(value))
     }
 
+    #[inline]
+    fn incompatible(server: u32, client: u32) -> Self {
+        Self::new(ErrorKind::Incompatible { server, client })
+    }
+
     /// Format a client error consisting of a message.
     #[inline]
     pub fn message(message: impl fmt::Display) -> Self {
@@ -428,6 +473,7 @@ impl Error {
 enum ErrorKind {
     EmptyPacket,
     NotConnected,
+    Incompatible { server: u32, client: u32 },
     Message(String),
     Server(ServerError),
     Transport(Box<dyn core::error::Error + Send + Sync>),
@@ -444,6 +490,10 @@ impl fmt::Display for Error {
         match &self.kind {
             ErrorKind::EmptyPacket => write!(f, "Packet is empty"),
             ErrorKind::NotConnected => write!(f, "Client is not connected"),
+            ErrorKind::Incompatible { server, client } => write!(
+                f,
+                "Server states application version {server}, this client states {client}"
+            ),
             ErrorKind::Message(message) => write!(f, "{message}"),
             ErrorKind::Server(error) => write!(f, "Server error: {}", error.message),
             ErrorKind::Transport(..) => write!(f, "Error in underlying transport"),
@@ -612,7 +662,12 @@ impl Shared {
         self.gone.store(true, Ordering::Release);
         // NB: Unlike `send_if_modified` this always notifies, which is needed
         // to wake up waiters even if the state itself did not change.
-        self.state.send_modify(|state| *state = State::Closed);
+        self.state.send_modify(|state| {
+            // NB: Kept, since it is what explains why the service is gone.
+            if !state.is_incompatible() {
+                *state = State::Closed;
+            }
+        });
     }
 
     #[inline]
@@ -639,6 +694,7 @@ where
     seed: u64,
     format: Format,
     mode: Mode,
+    app: u32,
     _marker: PhantomData<T>,
 }
 
@@ -665,6 +721,7 @@ where
             seed: self.seed,
             format: self.format,
             mode: self.mode,
+            app: self.app,
             _marker: self._marker,
         }
     }
@@ -711,6 +768,57 @@ where
     #[inline]
     pub fn mode(mut self, mode: Mode) -> Self {
         self.mode = mode;
+        self
+    }
+
+    /// State the version of the application's API this client was built
+    /// with.
+    ///
+    /// This is a version of *your* protocol, the requests and broadcasts
+    /// defined with [`api::define!`], as opposed to [`api::VERSION`] which is
+    /// the version of the envelope this crate puts around them. Give it the
+    /// same constant the server passes to `ws::Connect::app_version`, and bump
+    /// it whenever the API changes in a way an older client cannot cope with.
+    ///
+    /// When the connection is established the server states its version, and
+    /// if it is not this one the service reports [`State::Incompatible`]
+    /// instead of [`State::Open`], closes the connection, and [`Service::run`]
+    /// returns an error for which [`Error::is_incompatible`] holds. It does so
+    /// whether or not [reconnecting] is enabled, since connecting again would
+    /// reach the same server.
+    ///
+    /// Zero, which is the default, states no version. The check only applies
+    /// when both peers state one, so a client or a server which does not opt
+    /// in behaves exactly as if this did not exist. See [application
+    /// versions].
+    ///
+    /// [`api::define!`]: crate::api::define
+    /// [reconnecting]: Self::reconnect
+    /// [application versions]: crate::api#application-versions
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use musli_web::tungstenite030;
+    ///
+    /// /// Shared with the server, bumped whenever the API changes.
+    /// const APP_VERSION: u32 = 7;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let mut service = tungstenite030::connect("ws://127.0.0.1:8080/ws")
+    ///     .app_version(APP_VERSION)
+    ///     .build();
+    ///
+    /// if let Err(error) = service.run().await {
+    ///     if error.is_incompatible() {
+    ///         println!("{}, please upgrade", error);
+    ///     }
+    /// }
+    /// # Ok(()) }
+    /// ```
+    #[inline]
+    pub fn app_version(mut self, version: u32) -> Self {
+        self.app = version;
         self
     }
 
@@ -770,8 +878,10 @@ where
             next_attempt: Some(Instant::now()),
             rng: SmallRng::seed_from_u64(self.seed),
             closed: false,
+            incompatible: None,
             requested: self.format,
             requested_mode: self.mode,
+            app: self.app,
         }
     }
 }
@@ -797,12 +907,17 @@ where
     next_attempt: Option<Instant>,
     rng: SmallRng,
     closed: bool,
+    /// The application versions of the server and of this client, once the
+    /// server has been found to state another one than this client.
+    incompatible: Option<(u32, u32)>,
     /// The format the user asked for, which is re-negotiated on every
     /// reconnect.
     requested: Format,
     /// The mode which was asked for, which the connection falls back from if
     /// the server cannot carry the negotiated format that way.
     requested_mode: Mode,
+    /// The application version this client states, or zero for none.
+    app: u32,
 }
 
 /// The event produced by one iteration of the [`Service::run`] loop.
@@ -839,7 +954,17 @@ where
     ///
     /// This returns once [`Handle::close`] has been called, or the connection
     /// has been lost while reconnecting is disabled.
+    ///
+    /// # Errors
+    ///
+    /// Errors if the server states another application version, see
+    /// [`ServiceBuilder::app_version`]. The service has then stopped for good,
+    /// and calling this again returns immediately.
     pub async fn run(&mut self) -> Result<()> {
+        if let Some((server, client)) = self.incompatible {
+            return Err(Error::incompatible(server, client));
+        }
+
         while !self.closed {
             let output = {
                 let rx = &mut self.rx;
@@ -895,18 +1020,14 @@ where
                     match message {
                         // NB: The frame type is the mode, so a message can
                         // always be read regardless of what has been agreed on.
-                        Message::Binary(bytes) => match self.message(Mode::Binary, bytes) {
-                            Ok(Post::Negotiate) => self.send_negotiate().await,
-                            Ok(Post::None) => {}
-                            Ok(Post::Reject) => self.disconnect().await,
-                            Err(error) => self.on_error.call(error),
-                        },
-                        Message::Text(bytes) => match self.message(Mode::Text, bytes) {
-                            Ok(Post::Negotiate) => self.send_negotiate().await,
-                            Ok(Post::None) => {}
-                            Ok(Post::Reject) => self.disconnect().await,
-                            Err(error) => self.on_error.call(error),
-                        },
+                        Message::Binary(bytes) => {
+                            let post = self.message(Mode::Binary, bytes);
+                            self.post(post).await;
+                        }
+                        Message::Text(bytes) => {
+                            let post = self.message(Mode::Text, bytes);
+                            self.post(post).await;
+                        }
                         Message::Unsupported => {
                             self.on_error.call(Error::message("Unsupported message"));
                             self.disconnect().await;
@@ -922,7 +1043,43 @@ where
         }
 
         self.shutdown().await;
-        Ok(())
+
+        match self.incompatible {
+            Some((server, client)) => Err(Error::incompatible(server, client)),
+            None => Ok(()),
+        }
+    }
+
+    /// Carry out what processing a message said has to happen next.
+    async fn post(&mut self, post: Result<Post>) {
+        match post {
+            Ok(Post::Negotiate) => self.send_negotiate().await,
+            Ok(Post::None) => {}
+            Ok(Post::Reject) => self.disconnect().await,
+            Ok(Post::Incompatible { server }) => {
+                // NB: Negotiated anyway, so that the server hears which
+                // version this client states and can tell why it goes away.
+                self.send_negotiate().await;
+                self.incompatible(server).await;
+            }
+            Err(error) => self.on_error.call(error),
+        }
+    }
+
+    /// Give up on a server which states application version `server`.
+    async fn incompatible(&mut self, server: u32) {
+        let client = self.app;
+        tracing::debug!(server, client, "Incompatible server");
+
+        if let Some(mut socket) = self.socket.take() {
+            _ = socket.close().await;
+        }
+
+        self.close_pending(|| Error::incompatible(server, client));
+        self.emit_state(State::Incompatible { server, client });
+        self.next_attempt = None;
+        self.closed = true;
+        self.incompatible = Some((server, client));
     }
 
     /// Establish the connection now, returning a failure to the caller instead
@@ -996,7 +1153,11 @@ where
             _ = socket.close().await;
         }
 
-        self.emit_state(State::Closed);
+        // NB: Kept, since it is what explains why the service stopped.
+        if !self.shared.state.borrow().is_incompatible() {
+            self.emit_state(State::Closed);
+        }
+
         self.close_pending(|| Error::message("Client service closed"));
     }
 
@@ -1088,6 +1249,7 @@ where
             // NB: Carries no body.
             format: 0,
             channel,
+            app: 0,
         };
 
         format::encode_envelope(mode, &mut data, &header).map_err(Error::encoding_header)?;
@@ -1192,6 +1354,10 @@ where
             tracing::debug!(?header, "Got broadcast");
 
             if broadcast == MessageId::SERVER_HELLO {
+                if self.app != 0 && header.app != 0 && header.app != self.app {
+                    return Ok(Post::Incompatible { server: header.app });
+                }
+
                 // NB: The connection is not reported as open until the format
                 // has been negotiated, so that server-initiated messages are
                 // never encoded with a format this client did not agree to.
@@ -1318,6 +1484,7 @@ where
             format: format.to_u8(),
             // NB: Carries no body.
             channel: ChannelId::NONE,
+            app: self.app,
         };
 
         let mut data = Vec::new();
@@ -1355,6 +1522,9 @@ enum Post {
     Negotiate,
     /// The server cannot be talked to, so the connection has to be dropped.
     Reject,
+    /// The server states application version `server`, which is not the one
+    /// this client states.
+    Incompatible { server: u32 },
 }
 
 impl<T> Drop for Service<T>
@@ -1437,7 +1607,9 @@ impl Handle {
     ///
     /// This indicates when the connection is open and ready to receive requests
     /// through [`State::Open`], or if it's closed and requests will be rejected
-    /// through [`State::Closed`].
+    /// through [`State::Closed`]. A server which states another application
+    /// version is reported through [`State::Incompatible`], see
+    /// [`ServiceBuilder::app_version`].
     #[inline]
     pub fn on_state_change(&self) -> StateListener {
         StateListener {
@@ -1453,15 +1625,25 @@ impl Handle {
     /// the [`Error::is_not_connected`] error.
     ///
     /// This errors if the [`Service`] driving the connection is gone, since the
-    /// connection can then never be established.
+    /// connection can then never be established, and with an error for which
+    /// [`Error::is_incompatible`] holds if the server states another
+    /// application version, see [`ServiceBuilder::app_version`].
     pub async fn wait_until_open(&self) -> Result<()> {
-        let mut listener = self.on_state_change();
+        let mut rx = self.shared.state.subscribe();
 
-        if listener.wait_until(State::Open).await {
-            return Ok(());
+        loop {
+            match *rx.borrow_and_update() {
+                State::Open => return Ok(()),
+                State::Incompatible { server, client } => {
+                    return Err(Error::incompatible(server, client));
+                }
+                State::Closed => {}
+            }
+
+            if self.shared.is_gone() || rx.changed().await.is_err() {
+                return Err(Error::message("Client service is down"));
+            }
         }
-
-        Err(Error::message("Client service is down"))
     }
 
     /// Open a new logical channel to the websocket server.
@@ -1494,6 +1676,7 @@ impl Handle {
             // NB: Carries no body.
             format: 0,
             channel: ChannelId::NONE,
+            app: 0,
         };
 
         let mode = self.shared.mode();
@@ -1706,6 +1889,7 @@ where
             id: id.get(),
             format: format.to_u8(),
             channel: self.channel,
+            app: 0,
         };
 
         let mut data = Vec::new();

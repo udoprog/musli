@@ -324,6 +324,7 @@ struct AppState {
     shutdown: watch::Receiver<bool>,
     handler: TestHandler,
     formats: Option<&'static [Format]>,
+    app: u32,
     errors: mpsc::UnboundedSender<String>,
 }
 
@@ -337,6 +338,10 @@ async fn connection(socket: WebSocket, mut state: AppState) {
 
     if let Some(formats) = state.formats {
         connect = connect.with_formats(formats);
+    }
+
+    if state.app != 0 {
+        connect = connect.app_version(state.app);
     }
 
     if *state.shutdown.borrow_and_update() {
@@ -404,15 +409,20 @@ impl TestServer {
 
     /// Bind a server which only accepts the given formats.
     async fn with_formats(formats: &'static [Format]) -> Self {
-        Self::bind_with(SocketAddr::from(([127, 0, 0, 1], 0)), Some(formats)).await
+        Self::bind_with(SocketAddr::from(([127, 0, 0, 1], 0)), Some(formats), 0).await
+    }
+
+    /// Bind a server which states the given application version.
+    async fn with_app_version(app: u32) -> Self {
+        Self::bind_with(SocketAddr::from(([127, 0, 0, 1], 0)), None, app).await
     }
 
     /// Bind a server to the specified address.
     async fn bind(addr: SocketAddr) -> Self {
-        Self::bind_with(addr, None).await
+        Self::bind_with(addr, None, 0).await
     }
 
-    async fn bind_with(addr: SocketAddr, formats: Option<&'static [Format]>) -> Self {
+    async fn bind_with(addr: SocketAddr, formats: Option<&'static [Format]>, app: u32) -> Self {
         let listener = TcpListener::bind(addr).await.expect("Failed to bind");
         let addr = listener.local_addr().expect("Missing local address");
 
@@ -426,6 +436,7 @@ impl TestServer {
             shutdown: shutdown_rx.clone(),
             handler: TestHandler { events: events_tx },
             formats,
+            app,
             errors: errors_tx,
         };
 
@@ -1709,12 +1720,14 @@ mod raw {
         pub(crate) const ID: u8 = 3;
         pub(crate) const FORMAT: u8 = 4;
         pub(crate) const CHANNEL: u8 = 5;
+        pub(crate) const APP: u8 = 6;
 
         pub(crate) const RESPONSE_SERIAL: u8 = 2;
         pub(crate) const RESPONSE_BROADCAST: u8 = 3;
         pub(crate) const RESPONSE_ERROR: u8 = 4;
         pub(crate) const RESPONSE_FORMAT: u8 = 5;
         pub(crate) const RESPONSE_CHANNEL: u8 = 6;
+        pub(crate) const RESPONSE_APP: u8 = 7;
     }
 
     /// Write one header of a binary envelope by hand.
@@ -1755,6 +1768,7 @@ mod raw {
             error: 0,
             format: 0,
             channel: ChannelId::NONE,
+            app: 0,
         };
 
         let mut at = 0;
@@ -1786,6 +1800,7 @@ mod raw {
                 ids::RESPONSE_ERROR => header.error = value as u16,
                 ids::RESPONSE_FORMAT => header.format = value as u8,
                 ids::RESPONSE_CHANNEL => header.channel = ChannelId::from_u16(value as u16),
+                ids::RESPONSE_APP => header.app = value,
                 id => panic!("Unknown response header {id}"),
             }
         }
@@ -1838,6 +1853,7 @@ mod raw {
                 ids::CHANNEL,
                 u32::from(channel_raw(header.channel)),
             );
+            write_header(&mut data, ids::APP, header.app);
 
             data.push(END_OF_HEADERS);
             self.send_raw(data).await;
@@ -1853,12 +1869,18 @@ mod raw {
 
         /// Ask the server to use `format` for the rest of the connection.
         pub(crate) async fn negotiate(&mut self, serial: u32, format: Format) {
+            self.negotiate_app(serial, format, 0).await;
+        }
+
+        /// Ask the server to use `format`, stating application version `app`.
+        pub(crate) async fn negotiate_app(&mut self, serial: u32, format: Format, app: u32) {
             self.send(RequestHeader {
                 version: VERSION,
                 serial,
                 id: MessageId::NEGOTIATE.get(),
                 format: format.to_u8(),
                 channel: ChannelId::NONE,
+                app,
             })
             .await;
         }
@@ -2019,6 +2041,15 @@ mod raw_server {
         /// Accept one connection and take it through the hello and the format
         /// negotiation, accepting whatever format the client asks for.
         pub(crate) async fn accept(&self) -> RawPeer {
+            let mut peer = self.accept_hello(0).await;
+            let (serial, format, _) = peer.negotiation().await;
+            peer.ack(serial, format).await;
+            peer
+        }
+
+        /// Accept one connection and send the hello, stating application
+        /// version `app`, but leave the negotiation to the caller.
+        pub(crate) async fn accept_hello(&self, app: u32) -> RawPeer {
             let (stream, _) = timeout!(self.listener.accept()).expect("Failed to accept");
             let socket =
                 timeout!(tokio_tungstenite029::accept_async(stream)).expect("Failed handshake");
@@ -2031,18 +2062,9 @@ mod raw_server {
                 ids::RESPONSE_BROADCAST,
                 u32::from(MessageId::SERVER_HELLO.get()),
             );
+            write_header(&mut hello, ids::RESPONSE_APP, app);
             hello.push(END_OF_HEADERS);
             peer.send(hello).await;
-
-            let (serial, id, format) = peer.request().await;
-            assert_eq!(id, u32::from(MessageId::NEGOTIATE.get()));
-
-            let mut ack = Vec::new();
-            write_header(&mut ack, ids::VERSION, VERSION);
-            write_header(&mut ack, ids::RESPONSE_SERIAL, serial);
-            write_header(&mut ack, ids::RESPONSE_FORMAT, format);
-            ack.push(END_OF_HEADERS);
-            peer.send(ack).await;
             peer
         }
     }
@@ -2052,6 +2074,37 @@ mod raw_server {
     }
 
     impl RawPeer {
+        /// Receive the negotiation, returning its serial, the format it asks
+        /// for and the application version it states.
+        pub(crate) async fn negotiation(&mut self) -> (u32, u32, u32) {
+            let (serial, id, format, app) = self.request_full().await;
+            assert_eq!(id, u32::from(MessageId::NEGOTIATE.get()));
+            (serial, format, app)
+        }
+
+        /// Accept the negotiation `serial` asked for `format` with.
+        pub(crate) async fn ack(&mut self, serial: u32, format: u32) {
+            let mut ack = Vec::new();
+            write_header(&mut ack, ids::VERSION, VERSION);
+            write_header(&mut ack, ids::RESPONSE_SERIAL, serial);
+            write_header(&mut ack, ids::RESPONSE_FORMAT, format);
+            ack.push(END_OF_HEADERS);
+            self.send(ack).await;
+        }
+
+        /// Wait for the client to go away, ignoring keepalive traffic.
+        pub(crate) async fn expect_closed(&mut self) {
+            loop {
+                let message = timeout!(poll_fn(|cx| Pin::new(&mut self.socket).poll_next(cx)));
+
+                match message {
+                    None | Some(Err(..)) | Some(Ok(WsMessage::Close(..))) => return,
+                    Some(Ok(WsMessage::Ping(..) | WsMessage::Pong(..))) => continue,
+                    Some(Ok(message)) => panic!("Expected the client to close, got {message:?}"),
+                }
+            }
+        }
+
         /// Receive the next request and return its serial.
         pub(crate) async fn request_serial(&mut self) -> u32 {
             self.request().await.0
@@ -2080,6 +2133,13 @@ mod raw_server {
         /// Receive the next binary request, returning its serial, id and
         /// format.
         async fn request(&mut self) -> (u32, u32, u32) {
+            let (serial, id, format, _) = self.request_full().await;
+            (serial, id, format)
+        }
+
+        /// Receive the next binary request, returning its serial, id, format
+        /// and application version.
+        async fn request_full(&mut self) -> (u32, u32, u32, u32) {
             let bytes = loop {
                 let message = timeout!(poll_fn(|cx| Pin::new(&mut self.socket).poll_next(cx)))
                     .expect("Connection closed")
@@ -2092,7 +2152,7 @@ mod raw_server {
                 }
             };
 
-            let (mut serial, mut id, mut format) = (0, 0, 0);
+            let (mut serial, mut id, mut format, mut app) = (0, 0, 0, 0);
             let mut at = 0;
 
             loop {
@@ -2113,11 +2173,12 @@ mod raw_server {
                     ids::SERIAL => serial = value,
                     ids::ID => id = value,
                     ids::FORMAT => format = value,
+                    ids::APP => app = value,
                     _ => {}
                 }
             }
 
-            (serial, id, format)
+            (serial, id, format, app)
         }
 
         async fn send(&mut self, data: Vec<u8>) {
@@ -2209,6 +2270,7 @@ async fn first_message_is_rejected(id: MessageId) {
         id: id.get(),
         format: Format::DEFAULT.to_u8(),
         channel: ChannelId::NONE,
+        app: 0,
     })
     .await;
 
@@ -2298,7 +2360,7 @@ async fn text_frames_are_readable_by_hand() {
     assert_eq!(
         text,
         format!(
-            "version: {}\nserial: 1\nbroadcast: 0\nerror: 0\nformat: {}\nchannel: 0\n\n",
+            "version: {}\nserial: 1\nbroadcast: 0\nerror: 0\nformat: {}\nchannel: 0\napp: 0\n\n",
             musli_web::api::VERSION,
             Format::Json.to_u8()
         )
@@ -2356,6 +2418,7 @@ async fn a_frame_of_the_wrong_type_is_refused() {
         id: MessageId::CONNECT.get(),
         format: 0,
         channel: ChannelId::NONE,
+        app: 0,
     })
     .await;
 
@@ -2912,6 +2975,7 @@ async fn a_client_cannot_close_another_connections_channel() {
         id: id.get(),
         format: 0,
         channel,
+        app: 0,
     };
 
     raw.send(request(2, MessageId::DISCONNECT, channel.id()))
@@ -2957,4 +3021,169 @@ async fn a_client_cannot_close_another_connections_channel() {
 
     client.close().await;
     server.shutdown().await;
+}
+
+/// Build a client which states application version `app` and is driven in
+/// the background, handing back what [`client::Service::run`] returned.
+fn app_client(url: &str, app: u32) -> (Handle, JoinHandle<Result<(), client::Error>>) {
+    let mut service = tungstenite029::connect(url).app_version(app).build();
+    let handle = service.handle().clone();
+    let task = tokio::spawn(async move { service.run().await });
+    (handle, task)
+}
+
+/// The close code a server uses to refuse a client from another build.
+const CLOSE_POLICY_VIOLATION: u16 = 1008;
+
+/// Peers which state the same application version connect as usual.
+#[tokio::test]
+async fn matching_app_versions_open() {
+    let server = TestServer::with_app_version(7).await;
+    let (handle, task) = app_client(&server.url(), 7);
+
+    timeout!(handle.wait_until_open()).expect("Failed to open connection");
+    assert_eq!(handle.state(), ClientState::Open);
+
+    let (message, _) = hello(&handle, "Hello!").await;
+    assert_eq!(message, "Hello!");
+
+    handle.close();
+    timeout!(task)
+        .expect("Client task panicked")
+        .expect("Client failed");
+    server.shutdown().await;
+}
+
+/// A client built against another version of the application's API is told
+/// so, distinctly from a lost connection, and gives up rather than reconnect.
+#[tokio::test]
+async fn mismatched_app_versions_are_incompatible() {
+    let mut server = TestServer::with_app_version(8).await;
+    let (handle, task) = app_client(&server.url(), 7);
+
+    let error = timeout!(handle.wait_until_open()).expect_err("Must not open");
+    assert!(error.is_incompatible(), "{error}");
+
+    // NB: Reconnecting is enabled, and still the service stops.
+    let error = timeout!(task)
+        .expect("Client task panicked")
+        .expect_err("Client must fail");
+    assert!(error.is_incompatible(), "{error}");
+
+    assert_eq!(
+        handle.state(),
+        ClientState::Incompatible {
+            server: 8,
+            client: 7
+        }
+    );
+
+    // The server heard which version the client states.
+    assert_eq!(
+        server.error().await,
+        "Client states application version 7, this server states 8"
+    );
+
+    server.shutdown().await;
+}
+
+/// The check only applies when both peers state a version, so a peer which
+/// does not opt in behaves as it always has.
+#[tokio::test]
+async fn an_unstated_app_version_is_not_checked() {
+    // The server states one, the client does not.
+    let server = TestServer::with_app_version(8).await;
+    let client = TestClient::new(&server.url());
+    let (message, _) = hello(client.open().await, "Hello!").await;
+    assert_eq!(message, "Hello!");
+    client.close().await;
+    server.shutdown().await;
+
+    // The client states one, the server does not.
+    let server = TestServer::new().await;
+    let (handle, task) = app_client(&server.url(), 7);
+    timeout!(handle.wait_until_open()).expect("Failed to open connection");
+    let (message, _) = hello(&handle, "Hello!").await;
+    assert_eq!(message, "Hello!");
+    handle.close();
+    timeout!(task)
+        .expect("Client task panicked")
+        .expect("Client failed");
+    server.shutdown().await;
+}
+
+/// The server states its application version in the hello, ahead of anything
+/// the client has to agree to, and refuses a client which states another.
+#[tokio::test]
+async fn the_server_refuses_another_app_version() {
+    let mut server = TestServer::with_app_version(8).await;
+
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+    assert_eq!(frame.header.app, 8);
+
+    raw.negotiate_app(1, Format::DEFAULT, 7).await;
+    assert_eq!(raw.expect_close().await, Some(CLOSE_POLICY_VIOLATION));
+
+    assert_eq!(
+        server.error().await,
+        "Client states application version 7, this server states 8"
+    );
+
+    // The same version, or none at all, is accepted.
+    for app in [8, 0] {
+        let mut raw = raw::RawClient::connect(&server.url()).await;
+        let frame = raw.frame().await;
+        assert_eq!(frame.header.app, 8);
+
+        raw.negotiate_app(1, Format::DEFAULT, app).await;
+
+        let frame = raw.frame().await;
+        assert_eq!(frame.header.serial, 1);
+        assert_eq!(frame.header.error, 0);
+        assert_eq!(frame.header.app, 0, "Only the hello states the version");
+    }
+
+    server.shutdown().await;
+}
+
+/// A server which states no application version leaves the header out of the
+/// hello entirely, so the frame is what it always was.
+#[tokio::test]
+async fn an_unstated_app_version_is_not_written() {
+    let server = TestServer::new().await;
+    let mut raw = raw::RawClient::connect(&server.url()).await;
+
+    let frame = raw.frame().await;
+    assert_eq!(frame.header.broadcast, MessageId::SERVER_HELLO.get());
+    assert_eq!(frame.header.app, 0);
+
+    server.shutdown().await;
+}
+
+/// The client states its application version in the negotiation, and finds
+/// out about a mismatch from the hello of a server it has never talked to.
+#[tokio::test]
+async fn the_client_states_its_app_version() {
+    let server = raw_server::RawServer::bind().await;
+    let (handle, task) = app_client(&server.url(), 7);
+
+    let mut peer = server.accept_hello(8).await;
+    let (_, _, app) = peer.negotiation().await;
+    assert_eq!(app, 7);
+
+    let error = timeout!(task)
+        .expect("Client task panicked")
+        .expect_err("Client must fail");
+    assert!(error.is_incompatible(), "{error}");
+    assert_eq!(
+        handle.state(),
+        ClientState::Incompatible {
+            server: 8,
+            client: 7
+        }
+    );
+
+    peer.expect_closed().await;
 }

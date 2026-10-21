@@ -51,6 +51,9 @@ See the following modules for how to use:
   it was written against and a header which is not recognized is refused
   rather than skipped, so peers which do not speak the same protocol part
   ways before either has acted on what the other said.
+* An optional [application version] in the handshake, so a page which was
+  loaded before the server was upgraded learns that it has to reload instead
+  of talking to an API which has moved on.
 
 The available formats, from most compact to most capable, are
 [`Format::Packed`], [`Format::Storage`], [`Format::Wire`] (the default, and
@@ -61,6 +64,7 @@ and [`Format::Json`]. Each is gated behind a `format-*` feature.
 [negotiable body format]: https://docs.rs/musli-web/latest/musli_web/api/index.html#wire-format
 [selectable socket mode]: https://docs.rs/musli-web/latest/musli_web/api/index.html#the-text-envelope
 [explicitly versioned]: https://docs.rs/musli-web/latest/musli_web/api/index.html#the-protocol-version
+[application version]: https://docs.rs/musli-web/latest/musli_web/api/index.html#application-versions
 [Typed request errors]: https://docs.rs/musli-web/latest/musli_web/ws/index.html#errors
 
 <br>

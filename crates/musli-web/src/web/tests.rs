@@ -263,6 +263,7 @@ fn broadcast_header(id: MessageId) -> api::ResponseHeader {
         error: 0,
         format: Format::DEFAULT.to_u8(),
         channel: ChannelId::NONE,
+        app: 0,
     }
 }
 
@@ -346,6 +347,7 @@ fn open_session(service: &Service<MockImpl>) {
         error: 0,
         format: Format::DEFAULT.to_u8(),
         channel: ChannelId::NONE,
+        app: 0,
     };
 
     deliver(service, mode, &response, b"");
@@ -843,6 +845,7 @@ fn error_response_is_server_error() {
         error: MessageId::ERROR_MESSAGE.get(),
         format: Format::DEFAULT.to_u8(),
         channel: ChannelId::NONE,
+        app: 0,
     };
 
     deliver(&service, Mode::Binary, &header, &error_body("No such user"));
@@ -872,6 +875,7 @@ fn unsupported_request_is_server_error() {
         error: MessageId::CONNECT.get(),
         format: Format::DEFAULT.to_u8(),
         channel: ChannelId::NONE,
+        app: 0,
     };
 
     deliver(&service, Mode::Binary, &header, b"");
@@ -952,6 +956,7 @@ fn error_header(serial: u32, error: MessageId, format: Format) -> api::ResponseH
         error: error.get(),
         format: format.to_u8(),
         channel: ChannelId::NONE,
+        app: 0,
     }
 }
 
@@ -1279,6 +1284,7 @@ fn generation_counts_open_after_rejected_format() {
         error: MessageId::ERROR_MESSAGE.get(),
         format: Format::DEFAULT.to_u8(),
         channel: ChannelId::NONE,
+        app: 0,
     };
 
     deliver(
@@ -1390,6 +1396,7 @@ fn answer_connect(service: &Service<MockImpl>, serial: u32, id: u16) {
         error: 0,
         format: Format::DEFAULT.to_u8(),
         channel: ChannelId::from_u16(id),
+        app: 0,
     };
 
     deliver(service, Mode::Binary, &response, b"");
@@ -1763,6 +1770,7 @@ fn channel_refused_by_server_is_failed() {
         error: MessageId::ERROR_MESSAGE.get(),
         format: Format::DEFAULT.to_u8(),
         channel: ChannelId::NONE,
+        app: 0,
     };
 
     deliver(
@@ -1881,6 +1889,7 @@ fn respond(service: &Service<MockImpl>, serial: u32) {
         error: 0,
         format: Format::DEFAULT.to_u8(),
         channel: ChannelId::NONE,
+        app: 0,
     };
 
     deliver(service, Mode::Binary, &header, b"");
@@ -2118,4 +2127,163 @@ fn keyed_requests_drop_and_clear_cancel_all() {
     requests.clear();
     assert!(requests.is_empty());
     assert!(!has_pending(&service));
+}
+
+/// Deliver a hello stating application version `app`, returning the request
+/// the client answered it with.
+fn hello_app(service: &Service<MockImpl>, app: u32) -> api::RequestHeader {
+    let header = api::ResponseHeader {
+        format: 0,
+        app,
+        ..broadcast_header(MessageId::SERVER_HELLO)
+    };
+
+    deliver(service, Mode::Binary, &header, b"");
+
+    let ops = take_ops();
+
+    let Some(Op::Send(mode, bytes)) = ops.first() else {
+        panic!("Expected a negotiation request, got {ops:?}");
+    };
+
+    let mut at = 0;
+    let request: api::RequestHeader = format::decode_envelope(*mode, bytes, &mut at).unwrap();
+    assert_eq!(request.id, MessageId::NEGOTIATE.get());
+
+    // NB: Whatever else happened is checked by the caller.
+    for op in ops.into_iter().skip(1) {
+        push_op(op);
+    }
+
+    request
+}
+
+/// Answer a negotiation the way a server which accepted it does.
+fn accept_negotiation(service: &Service<MockImpl>, request: &api::RequestHeader) {
+    let response = api::ResponseHeader {
+        serial: request.serial,
+        broadcast: 0,
+        ..broadcast_header(MessageId::SERVER_HELLO)
+    };
+
+    deliver(service, Mode::Binary, &response, b"");
+}
+
+/// A server which states another application version leaves the client
+/// incompatible rather than open, and it does not reconnect on its own.
+#[test]
+fn mismatched_app_version_is_incompatible() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.app_version(7).build();
+    take_ops();
+
+    let states = Rc::new(RefCell::new(Vec::new()));
+
+    let (_, _listener) = service.handle().on_state_change({
+        let states = states.clone();
+        move |state: State| states.borrow_mut().push(state)
+    });
+
+    let request = hello_app(&service, 8);
+
+    // The server still hears which version this client states.
+    assert_eq!(request.app, 7);
+    assert_eq!(take_ops(), vec![Op::Close]);
+
+    let incompatible = State::Incompatible {
+        server: 8,
+        client: 7,
+    };
+
+    assert_eq!(state(&service), incompatible);
+    assert_eq!(*states.borrow(), vec![incompatible]);
+    assert_eq!(service.handle().generation(), 0);
+
+    // Connecting again would only reach the same server.
+    assert_eq!(pending_timers(), 0);
+    assert_eq!(fire_timers(), 0);
+    assert!(take_ops().is_empty());
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+
+    // Opening again on purpose does try again.
+    service.open();
+    assert_eq!(take_ops(), vec![Op::Connect(String::from(URL))]);
+
+    let request = hello_app(&service, 7);
+    accept_negotiation(&service, &request);
+    assert_eq!(state(&service), State::Open);
+}
+
+/// Matching application versions open the connection as usual.
+#[test]
+fn matching_app_version_opens() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.app_version(7).build();
+    take_ops();
+
+    let request = hello_app(&service, 7);
+    assert_eq!(request.app, 7);
+    assert!(take_ops().is_empty());
+
+    accept_negotiation(&service, &request);
+    assert_eq!(state(&service), State::Open);
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// The check only applies when both peers state an application version.
+#[test]
+fn unstated_app_version_is_not_checked() {
+    for (client, server) in [(0, 8), (7, 0)] {
+        let (builder, errors) = builder(Connect::url(String::from(URL)));
+        let service = builder.app_version(client).build();
+        take_ops();
+
+        let request = hello_app(&service, server);
+        assert_eq!(request.app, client);
+        assert!(take_ops().is_empty());
+
+        accept_negotiation(&service, &request);
+        assert_eq!(
+            state(&service),
+            State::Open,
+            "client {client}, server {server}"
+        );
+        assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+    }
+}
+
+/// A channel stays closed while the client is incompatible, and opens again
+/// once the service is opened on purpose against a server which matches.
+#[test]
+fn incompatible_keeps_channels_closed() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.app_version(7).build();
+    take_ops();
+
+    let (events, channel) = open_channel(&service);
+    open_session(&service);
+    accept_channel(&service, 7);
+    assert_eq!(take_events(&events), vec![String::from("opened 7")]);
+
+    // The connection drops and comes back to a server from another build.
+    service.shared.close_and_reconnect().unwrap();
+    assert_eq!(take_events(&events), vec![String::from("closed")]);
+    assert_eq!(fire_timers(), 1);
+    take_ops();
+
+    hello_app(&service, 8);
+    assert_eq!(take_ops(), vec![Op::Close]);
+    assert!(state(&service).is_incompatible());
+    assert!(!channel.is_open());
+    assert!(take_events(&events).is_empty());
+
+    service.open();
+    take_ops();
+    let request = hello_app(&service, 7);
+    accept_negotiation(&service, &request);
+    accept_channel(&service, 9);
+
+    assert_eq!(take_events(&events), vec![String::from("opened 9")]);
+    assert!(channel.is_open());
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
 }
