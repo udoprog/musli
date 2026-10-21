@@ -312,7 +312,7 @@ macro_rules! tungstenite_impl {
 ///
 /// NB: yew's own `#[hook]` and `#[derive(Properties)]` macros expand to paths
 /// through `::yew`, which this crate does not link under that name, so the
-/// hooks here implement [`Hook`] by hand.
+/// hooks here implement `Hook` by hand.
 #[cfg(any(feature = "yew022", feature = "yew023"))]
 macro_rules! yew_impl {
     ($krate:ident) => {
