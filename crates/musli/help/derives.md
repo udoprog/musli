@@ -747,15 +747,15 @@ renames the dependency in `Cargo.toml` names it here:
 
 ```toml
 [dependencies]
-musli_core01 = { package = "musli-core", version = "0.1" }
+musli_core02 = { package = "musli-core", version = "0.2" }
 ```
 
 ```rust
-# extern crate musli_core as musli_core01;
-use musli_core01::{Decode, Encode};
+# extern crate musli_core as musli_core02;
+use musli_core02::{Decode, Encode};
 
 #[derive(Encode, Decode)]
-#[musli(crate = musli_core01)]
+#[musli(crate = musli_core02)]
 struct Person {
     age: u32,
 }

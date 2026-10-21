@@ -1,0 +1,2 @@
+[[version_group]]
+crates = ["musli-zerocopy", "musli-zerocopy-macros"]
