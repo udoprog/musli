@@ -624,21 +624,44 @@ where
 }
 ```
 
-This is a problem for fields whose type is tied to a *specific* allocator, such
-as [`String<Global>`]. It only implements [`Decode`] for the allocator it is
-allocated in, so the bound `String<Global>: Decode<'de, Binary, A>` can never be
-satisfied for a generic `A`.
-
-[`Value<Global>`] is not affected. It can be decoded by a decoder using any
-allocator, so a type holding one needs none of the attributes below:
+Müsli's own allocator-tied containers are not a problem. [`String<Global>`],
+[`Vec<T, Global>`] and [`Value<Global>`] can be decoded by a decoder using any
+allocator, so a type holding them needs none of the attributes below:
 
 ```rust
+use musli::alloc::{Global, String, Vec};
 use musli::value::Value;
 use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
 struct Struct {
+    string: String<Global>,
+    numbers: Vec<u32, Global>,
+    #[musli(bytes)]
+    bytes: Vec<u8, Global>,
     value: Value,
+}
+```
+
+It is a problem for fields whose type only implements [`Decode`] for a
+*specific* allocator, such as the following type which is only decoded by a
+decoder using the [`Global`] allocator. The bound `OnlyGlobal: Decode<'de,
+Binary, A>` can never be satisfied for a generic `A`:
+
+```rust
+use musli::alloc::Global;
+use musli::{Decode, Decoder, Encode};
+
+#[derive(Encode)]
+struct OnlyGlobal(u32);
+
+impl<'de, M> Decode<'de, M, Global> for OnlyGlobal {
+    fn decode<D>(decoder: D) -> Result<Self, D::Error>
+    where
+        D: Decoder<'de, Mode = M, Allocator = Global>,
+    {
+        Ok(Self(decoder.decode()?))
+    }
 }
 ```
 
@@ -646,13 +669,22 @@ struct Struct {
 implementation to a concrete type instead, so that such fields can be used:
 
 ```rust
-use musli::alloc::{Global, String};
-use musli::{Decode, Encode};
-
+# use musli::alloc::Global;
+# use musli::{Decode, Decoder, Encode};
+# #[derive(Encode)]
+# struct OnlyGlobal(u32);
+# impl<'de, M> Decode<'de, M, Global> for OnlyGlobal {
+#     fn decode<D>(decoder: D) -> Result<Self, D::Error>
+#     where
+#         D: Decoder<'de, Mode = M, Allocator = Global>,
+#     {
+#         Ok(Self(decoder.decode()?))
+#     }
+# }
 #[derive(Encode, Decode)]
 #[musli(allocator = Global)]
 struct Struct {
-    string: String<Global>,
+    field: OnlyGlobal,
 }
 ```
 
@@ -660,19 +692,29 @@ struct Struct {
 allocator, so the following is equivalent to the above:
 
 ```rust
-use musli::alloc::{Global, String};
-use musli::{Decode, Encode};
-
+# use musli::alloc::Global;
+# use musli::{Decode, Decoder, Encode};
+# #[derive(Encode)]
+# struct OnlyGlobal(u32);
+# impl<'de, M> Decode<'de, M, Global> for OnlyGlobal {
+#     fn decode<D>(decoder: D) -> Result<Self, D::Error>
+#     where
+#         D: Decoder<'de, Mode = M, Allocator = Global>,
+#     {
+#         Ok(Self(decoder.decode()?))
+#     }
+# }
 #[derive(Encode, Decode)]
 #[musli(global)]
 struct Struct {
-    string: String<Global>,
+    field: OnlyGlobal,
 }
 ```
 
 Note that this restricts the type to being decoded by a decoder using that exact
-allocator. The alternative is to make the container generic over the allocator,
-which keeps it usable with any of them:
+allocator. Where a field is a container which can be allocated in any
+allocator, the alternative is to make the type generic over the allocator, which
+decodes the container in the allocator of the decoder:
 
 ```rust
 use musli::alloc::{Global, String};
@@ -2018,6 +2060,7 @@ which decoder implementation to call.
 [`String<Global>`]: <https://docs.rs/musli/latest/musli/alloc/struct.String.html>
 [`Text`]: <https://docs.rs/musli/latest/musli/mode/enum.Text.html>
 [`Value<Global>`]: <https://docs.rs/musli/latest/musli/value/struct.Value.html>
+[`Vec<T, Global>`]: <https://docs.rs/musli/latest/musli/alloc/struct.Vec.html>
 [default mode]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
 [skip-if]: #musliskip_encoding_if--path
 [repr-rust]: <https://doc.rust-lang.org/nomicon/repr-rust.html>

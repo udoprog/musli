@@ -1,15 +1,17 @@
 use core::borrow::Borrow;
 use core::cmp::Ordering;
 use core::fmt;
+use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 use core::slice;
 
 use crate::de::{DecodeBytes, UnsizedVisitor};
-use crate::{Context, Decoder};
+use crate::en::EncodeBytes;
+use crate::{Context, Decoder, Encoder};
 
-use super::{Alloc, AllocError, Allocator, GlobalAllocator};
+use super::{Alloc, AllocError, Allocator, FromAllocator, GlobalAllocator};
 
 /// A Müsli-allocated contiguous growable array type, written as `Vec<T>`, short
 /// for 'vector'.
@@ -847,7 +849,46 @@ where
     }
 }
 
+/// Encode implementation for a Müsli-allocated byte array stored in a [`Vec`].
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::Vec;
+/// use musli::{Allocator, Encode};
+///
+/// #[derive(Encode)]
+/// struct Struct<A> where A: Allocator {
+///     #[musli(bytes)]
+///     field: Vec<u8, A>
+/// }
+/// ```
+impl<M, A> EncodeBytes<M> for Vec<u8, A>
+where
+    A: Allocator,
+{
+    const ENCODE_BYTES_PACKED: bool = false;
+
+    type EncodeBytes = [u8];
+
+    #[inline]
+    fn encode_bytes<E>(&self, encoder: E) -> Result<(), E::Error>
+    where
+        E: Encoder<Mode = M>,
+    {
+        encoder.encode_bytes(self.as_slice())
+    }
+
+    #[inline]
+    fn as_encode_bytes(&self) -> &Self::EncodeBytes {
+        self
+    }
+}
+
 /// Decode implementation for a Müsli-allocated byte array stored in a [`Vec`].
+///
+/// A `Vec<u8, B>` can be decoded by a decoder using any allocator `A` that `B`
+/// can be obtained from through [`FromAllocator`].
 ///
 /// # Examples
 ///
@@ -861,9 +902,23 @@ where
 ///     field: Vec<u8, A>
 /// }
 /// ```
-impl<'de, M, A> DecodeBytes<'de, M, A> for Vec<u8, A>
+///
+/// Holding a `Vec<u8, Global>` requires no attributes on the container:
+///
+/// ```
+/// use musli::alloc::{Global, Vec};
+/// use musli::{Decode, Encode};
+///
+/// #[derive(Encode, Decode)]
+/// struct Struct {
+///     #[musli(bytes)]
+///     field: Vec<u8, Global>,
+/// }
+/// ```
+impl<'de, M, A, B> DecodeBytes<'de, M, A> for Vec<u8, B>
 where
     A: Allocator,
+    B: Allocator + FromAllocator<A>,
 {
     const DECODE_BYTES_PACKED: bool = false;
 
@@ -872,14 +927,15 @@ where
     where
         D: Decoder<'de, Mode = M, Allocator = A>,
     {
-        struct Visitor;
+        struct Visitor<B>(PhantomData<B>);
 
         #[crate::trait_defaults(crate)]
-        impl<C> UnsizedVisitor<'_, C, [u8]> for Visitor
+        impl<C, B> UnsizedVisitor<'_, C, [u8]> for Visitor<B>
         where
             C: Context,
+            B: Allocator + FromAllocator<C::Allocator>,
         {
-            type Ok = Vec<u8, Self::Allocator>;
+            type Ok = Vec<u8, B>;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -889,29 +945,32 @@ where
             #[inline]
             fn visit_owned(
                 self,
-                _: C,
+                cx: C,
                 value: Vec<u8, Self::Allocator>,
             ) -> Result<Self::Ok, Self::Error> {
-                Ok(value)
+                match B::__from_vec(value) {
+                    Ok(vec) => Ok(vec),
+                    Err(vec) => self.visit_ref(cx, vec.as_slice()),
+                }
             }
 
             #[inline]
             fn visit_ref(self, cx: C, bytes: &[u8]) -> Result<Self::Ok, Self::Error> {
-                let mut buf = Vec::new_in(cx.alloc());
+                let mut buf = Vec::new_in(B::from_allocator(cx.alloc()));
                 buf.extend_from_slice(bytes).map_err(cx.map())?;
                 Ok(buf)
             }
         }
 
-        decoder.decode_bytes(Visitor)
+        decoder.decode_bytes(Visitor(PhantomData))
     }
 }
 
 crate::internal::macros::slice_sequence! {
     cx,
-    Vec<T, A>,
-    || Vec::new_in(cx.alloc()),
+    Vec<T, B>,
+    || Vec::new_in(B::from_allocator(cx.alloc())),
     |vec, value| vec.push(value).map_err(cx.map())?,
     |vec, capacity| vec.reserve(capacity).map_err(cx.map())?,
-    |capacity| Vec::with_capacity_in(capacity, cx.alloc()).map_err(cx.map())?,
+    |capacity| Vec::with_capacity_in(capacity, B::from_allocator(cx.alloc())).map_err(cx.map())?,
 }

@@ -5,7 +5,7 @@ use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
-use super::{Alloc, AllocError, Allocator, FromAllocator, SliceBuffer};
+use super::{Alloc, AllocError, Allocator, FromAllocator, SliceBuffer, Vec};
 
 #[cfg(test)]
 mod tests;
@@ -190,6 +190,11 @@ impl<'a, 'buf> FromAllocator<&'a Slice<'buf>> for &'a Slice<'buf> {
     #[inline]
     fn from_allocator(alloc: &'a Slice<'buf>) -> Self {
         alloc
+    }
+
+    #[inline]
+    fn __from_vec<T>(vec: Vec<T, Self>) -> Result<Vec<T, Self>, Vec<T, Self>> {
+        Ok(vec)
     }
 }
 

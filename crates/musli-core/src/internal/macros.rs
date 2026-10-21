@@ -33,10 +33,11 @@ macro_rules! __slice_sequence {
         }
 
         $(#[$($meta)*])*
-        impl<'de, M, A, T> $crate::de::Decode<'de, M, A> for $ty<T $(, $alloc)*>
+        impl<'de, M, A, T $(, $alloc)*> $crate::de::Decode<'de, M, A> for $ty<T $(, $alloc)*>
         where
             A: $crate::alloc::Allocator,
             T: $crate::de::Decode<'de, M, A>,
+            $($alloc: $crate::alloc::Allocator + $crate::alloc::FromAllocator<A>,)*
         {
             const IS_BITWISE_DECODE: bool = false;
 
@@ -45,7 +46,7 @@ macro_rules! __slice_sequence {
             where
                 D: Decoder<'de, Mode = M, Allocator = A>,
             {
-                struct Builder<'de, M, A, T>
+                struct Builder<'de, M, A, T $(, $alloc)*>
                 where
                     $($alloc: $crate::alloc::Allocator,)*
                 {
@@ -54,10 +55,11 @@ macro_rules! __slice_sequence {
                 }
 
                 #[allow(unused_variables)]
-                impl<'de, M, A, T> $crate::de::DecodeSliceBuilder<T, A> for Builder<'de, M, A, T>
+                impl<'de, M, A, T $(, $alloc)*> $crate::de::DecodeSliceBuilder<T, A> for Builder<'de, M, A, T $(, $alloc)*>
                 where
                     T: $crate::de::Decode<'de, M, A>,
                     A: $crate::alloc::Allocator,
+                    $($alloc: $crate::alloc::Allocator + $crate::alloc::FromAllocator<A>,)*
                 {
                     #[inline]
                     fn new<C>($cx: C) -> Result<Self, C::Error>

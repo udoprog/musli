@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 use core::ptr::NonNull;
 
-use super::{Alloc, AllocError, Allocator, FromAllocator};
+use super::{Alloc, AllocError, Allocator, FromAllocator, Vec};
 
 /// An empty buffer.
 pub struct EmptyBuf<T> {
@@ -64,6 +64,11 @@ impl FromAllocator<Disabled> for Disabled {
     #[inline]
     fn from_allocator(alloc: Disabled) -> Self {
         alloc
+    }
+
+    #[inline]
+    fn __from_vec<T>(vec: Vec<T, Self>) -> Result<Vec<T, Self>, Vec<T, Self>> {
+        Ok(vec)
     }
 }
 

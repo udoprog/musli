@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 #[cfg(feature = "alloc")]
 use core::ptr::NonNull;
 
-use super::{Alloc, AllocError, Allocator, FromAllocator};
+use super::{Alloc, AllocError, Allocator, FromAllocator, Vec};
 #[cfg(feature = "alloc")]
 use super::{Global, GlobalAlloc, GlobalAllocator};
 #[cfg(not(feature = "alloc"))]
@@ -100,6 +100,11 @@ impl<'a, 'buf, const BUF: usize> FromAllocator<&'a DefaultAllocator<'buf, BUF>>
     #[inline]
     fn from_allocator(alloc: &'a DefaultAllocator<'buf, BUF>) -> Self {
         alloc
+    }
+
+    #[inline]
+    fn __from_vec<T>(vec: Vec<T, Self>) -> Result<Vec<T, Self>, Vec<T, Self>> {
+        Ok(vec)
     }
 }
 

@@ -1,6 +1,6 @@
 use core::ptr::NonNull;
 
-use super::{Alloc, AllocError};
+use super::{Alloc, AllocError, Vec};
 
 /// The trait governing a global allocator.
 ///
@@ -59,8 +59,8 @@ where
 /// This is used when decoding a container which is tied to a particular
 /// allocator. A decoder hands out its own allocator `A`, which the container
 /// converts into the allocator it stores its data in. This is what allows a
-/// field of type `Value<Global>` to be decoded by a decoder using any
-/// allocator.
+/// field of type `String<Global>`, `Vec<T, Global>` or `Value<Global>` to be
+/// decoded by a decoder using any allocator.
 ///
 /// This is implemented for every allocator provided by Müsli, and only Müsli
 /// can implement [`Allocator`], so it does not need to be implemented
@@ -91,6 +91,26 @@ where
 pub trait FromAllocator<A> {
     /// Obtain this allocator from the allocator `alloc`.
     fn from_allocator(alloc: A) -> Self;
+
+    /// Take over a vector allocated in `A` without copying it, if its
+    /// allocation is compatible with this allocator.
+    ///
+    /// This lets a decoder hand an owned buffer to a container stored in a
+    /// different but compatible allocator, such as an allocation backed by the
+    /// global allocator to a container using [`Global`]. If the allocation
+    /// cannot be taken over, the vector is returned as-is and the caller has to
+    /// copy it.
+    ///
+    /// [`Global`]: super::Global
+    #[doc(hidden)]
+    #[inline]
+    fn __from_vec<T>(vec: Vec<T, A>) -> Result<Vec<T, Self>, Vec<T, A>>
+    where
+        A: Allocator,
+        Self: Allocator,
+    {
+        Err(vec)
+    }
 }
 
 /// An allocator that can be used in combination with a context.

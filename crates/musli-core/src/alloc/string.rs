@@ -2,6 +2,7 @@ use core::borrow::Borrow;
 use core::cmp::Ordering;
 use core::error::Error;
 use core::fmt;
+use core::marker::PhantomData;
 use core::ops::Deref;
 use core::str::{self, Utf8Error};
 
@@ -11,7 +12,7 @@ use rust_alloc::borrow::Cow;
 use crate::de::UnsizedVisitor;
 use crate::{Context, Decode, Decoder, Encode, Encoder};
 
-use super::{AllocError, Allocator, GlobalAllocator, Vec};
+use super::{AllocError, Allocator, FromAllocator, GlobalAllocator, Vec};
 
 /// Collect a string into a string buffer.
 #[inline]
@@ -807,6 +808,11 @@ where
 
 /// Decode implementation for a Müsli-allocated [`String`].
 ///
+/// A `String<B>` can be decoded by a decoder using any allocator `A` that `B`
+/// can be obtained from through [`FromAllocator`]. So a field of type
+/// `String<Global>` can be decoded regardless of which allocator the decoder
+/// uses.
+///
 /// # Examples
 ///
 /// ```
@@ -818,9 +824,22 @@ where
 ///     field: String<A>
 /// }
 /// ```
-impl<'de, M, A> Decode<'de, M, A> for String<A>
+///
+/// Holding a `String<Global>` requires no attributes:
+///
+/// ```
+/// use musli::alloc::{Global, String};
+/// use musli::{Decode, Encode};
+///
+/// #[derive(Encode, Decode)]
+/// struct Struct {
+///     field: String<Global>,
+/// }
+/// ```
+impl<'de, M, A, B> Decode<'de, M, A> for String<B>
 where
     A: Allocator,
+    B: Allocator + FromAllocator<A>,
 {
     const IS_BITWISE_DECODE: bool = false;
 
@@ -829,14 +848,15 @@ where
     where
         D: Decoder<'de, Mode = M, Allocator = A>,
     {
-        struct Visitor;
+        struct Visitor<B>(PhantomData<B>);
 
         #[crate::trait_defaults(crate)]
-        impl<C> UnsizedVisitor<'_, C, str> for Visitor
+        impl<C, B> UnsizedVisitor<'_, C, str> for Visitor<B>
         where
             C: Context,
+            B: Allocator + FromAllocator<C::Allocator>,
         {
-            type Ok = String<Self::Allocator>;
+            type Ok = String<B>;
 
             #[inline]
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -846,20 +866,30 @@ where
             #[inline]
             fn visit_owned(
                 self,
-                _: C,
+                cx: C,
                 value: String<Self::Allocator>,
             ) -> Result<Self::Ok, C::Error> {
-                Ok(value)
+                match B::__from_vec(value.into_bytes()) {
+                    // SAFETY: The bytes come from a string, so they are valid
+                    // UTF-8.
+                    Ok(vec) => Ok(unsafe { String::from_utf8_unchecked(vec) }),
+                    Err(vec) => {
+                        // SAFETY: The bytes come from a string, so they are
+                        // valid UTF-8.
+                        let string = unsafe { str::from_utf8_unchecked(vec.as_slice()) };
+                        self.visit_ref(cx, string)
+                    }
+                }
             }
 
             #[inline]
             fn visit_ref(self, cx: C, string: &str) -> Result<Self::Ok, C::Error> {
-                let mut s = String::new_in(cx.alloc());
+                let mut s = String::new_in(B::from_allocator(cx.alloc()));
                 s.push_str(string).map_err(cx.map())?;
                 Ok(s)
             }
         }
 
-        decoder.decode_string(Visitor)
+        decoder.decode_string(Visitor(PhantomData))
     }
 }

@@ -5,7 +5,7 @@ use core::ptr::NonNull;
 
 use rust_alloc::alloc;
 
-use super::{Alloc, AllocError, Allocator, FromAllocator, GlobalAllocator};
+use super::{Alloc, AllocError, Allocator, FromAllocator, GlobalAllocator, Vec};
 
 /// Global buffer that can be used in combination with an [`Allocator`].
 ///
@@ -106,6 +106,16 @@ impl<A> FromAllocator<A> for Global {
     #[inline]
     fn from_allocator(_: A) -> Self {
         Self
+    }
+
+    #[inline]
+    fn __from_vec<T>(vec: Vec<T, A>) -> Result<Vec<T, Self>, Vec<T, A>>
+    where
+        A: Allocator,
+    {
+        // An allocation backed by the global allocator can be converted
+        // through a standard vector without copying.
+        Ok(Vec::from(vec.into_std()?))
     }
 }
 
