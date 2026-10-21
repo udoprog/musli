@@ -285,6 +285,50 @@ macro_rules! bare_encoding {
         {
             $default.from_slice(bytes)
         }
+
+        /// Decode the given type `T` from the given slice using the default
+        /// [`Encoding`], recording where in the input an error is raised.
+        ///
+        /// This is the same as [`from_slice`], except that the returned error
+        /// includes the path to the value being decoded and the position in
+        /// the input, such as `.field[2].name: Expected string (at byte 14)`.
+        /// See [`Encoding::from_slice_traced`].
+        ///
+        /// [`from_slice`]: self::from_slice
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        #[doc = concat!("use musli::", stringify!($what), ";")]
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        #[doc = concat!("let data = ", stringify!($what), "::to_vec(&Person {")]
+        ///     name: "Aristotle".to_string(),
+        ///     age: 61,
+        /// })?;
+        ///
+        /// // Leave out the last byte.
+        #[doc = concat!("if let Err(error) = ", stringify!($what), "::from_slice_traced::<Person>(&data[..data.len() - 1]) {")]
+        ///     assert!(error.range().is_some());
+        ///     println!("{error}");
+        /// }
+        #[doc = concat!("# Ok::<_, musli::", stringify!($what), "::Error>(())")]
+        /// ```
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+        #[inline]
+        pub fn from_slice_traced<'de, T>(bytes: &'de [u8]) -> Result<T, Error>
+        where
+            T: Decode<'de, $mode, Global>,
+        {
+            $default.from_slice_traced(bytes)
+        }
     };
 }
 
@@ -712,6 +756,111 @@ macro_rules! encoding_impls {
             T: Decode<'de, M, Global>,
         {
             let cx = $crate::context::new().with_error();
+            self.from_str_with(&cx, string)
+        }
+
+        /// Decode the given type `T` from the given [`Reader`] using the
+        /// current [`Encoding`], recording where in the input an error is
+        /// raised.
+        ///
+        /// This is the same as [`Encoding::decode`], except that the returned
+        /// error includes the path to the value being decoded and the position
+        /// in the input, such as `.field[2].name: Expected string (at byte 14)`.
+        /// These are also available through [`Error::path`] and
+        /// [`Error::range`].
+        ///
+        /// Tracing is not free, so the plain methods leave it out. To configure
+        /// the tracing context further, build one with
+        /// [`DefaultContext::with_trace`] and [`DefaultContext::with_error`] and
+        /// pass it to [`Encoding::decode_with`].
+        ///
+        /// [`Reader`]: crate::Reader
+        /// [`DefaultContext::with_trace`]: crate::context::DefaultContext::with_trace
+        /// [`DefaultContext::with_error`]: crate::context::DefaultContext::with_error
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+        #[inline]
+        pub fn decode_traced<'de, R, T>(self, reader: R) -> Result<T, Error>
+        where
+            R: $reader_trait<'de>,
+            T: Decode<'de, $mode, Global>,
+        {
+            let cx = $crate::context::new().with_trace().with_error();
+            self.decode_with(&cx, reader)
+        }
+
+        /// Decode the given type `T` from the given slice using the current
+        /// [`Encoding`], recording where in the input an error is raised.
+        ///
+        /// This is the same as [`Encoding::from_slice`], except that the
+        /// returned error includes the path to the value being decoded and the
+        /// position in the input, such as
+        /// `.field[2].name: Expected string (at byte 14)`. These are also
+        /// available through [`Error::path`] and [`Error::range`].
+        ///
+        /// Tracing is not free, so the plain methods leave it out. To configure
+        /// the tracing context further, build one with
+        /// [`DefaultContext::with_trace`] and [`DefaultContext::with_error`] and
+        /// pass it to [`Encoding::from_slice_with`].
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use musli::{Decode, Encode};
+        #[doc = concat!("use musli::", stringify!($what), "::Encoding;")]
+        #[doc = concat!("# use musli::", stringify!($what), "::Error;")]
+        ///
+        /// const ENCODING: Encoding = Encoding::new();
+        ///
+        /// #[derive(Decode, Encode)]
+        /// struct Person {
+        ///     name: String,
+        ///     age: u32,
+        /// }
+        ///
+        /// let data = ENCODING.to_vec(&Person {
+        ///     name: "Aristotle".to_string(),
+        ///     age: 61,
+        /// })?;
+        ///
+        /// // Leave out the last byte.
+        /// if let Err(error) = ENCODING.from_slice_traced::<Person>(&data[..data.len() - 1]) {
+        ///     assert!(error.path().is_some());
+        ///     assert!(error.range().is_some());
+        ///     println!("{error}");
+        /// }
+        /// # Ok::<_, Error>(())
+        /// ```
+        ///
+        /// [`DefaultContext::with_trace`]: crate::context::DefaultContext::with_trace
+        /// [`DefaultContext::with_error`]: crate::context::DefaultContext::with_error
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+        #[inline]
+        pub fn from_slice_traced<'de, T>(self, bytes: &'de [u8]) -> Result<T, Error>
+        where
+            T: Decode<'de, $mode, Global>,
+        {
+            let cx = $crate::context::new().with_trace().with_error();
+            self.from_slice_with(&cx, bytes)
+        }
+
+        /// Decode the given type `T` from the given string using the current
+        /// [`Encoding`], recording where in the input an error is raised.
+        ///
+        /// This is the same as [`Encoding::from_str`], except that the
+        /// returned error includes the path to the value being decoded and the
+        /// position in the input, such as
+        /// `.field[2].name: Expected string (at byte 14)`. These are also
+        /// available through [`Error::path`] and [`Error::range`].
+        #[cfg(feature = "alloc")]
+        #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+        #[inline]
+        pub fn from_str_traced<'de, T>(self, string: &'de str) -> Result<T, Error>
+        where
+            T: Decode<'de, M, Global>,
+        {
+            let cx = $crate::context::new().with_trace().with_error();
             self.from_str_with(&cx, string)
         }
 
@@ -1146,6 +1295,44 @@ macro_rules! implement_error {
             err: Impl<A>,
         }
 
+        impl<A> $id<A>
+        where
+            A: $crate::Allocator,
+        {
+            /// The path to the value which was being decoded when the error
+            /// was raised, such as `.field[2].name`.
+            ///
+            /// This is only recorded if the error was produced through a
+            /// context which traces, such as the one used by the `*_traced`
+            /// methods on `Encoding` or one built with
+            /// [`DefaultContext::with_trace`]. The path is empty if the error
+            /// was raised outside of any field.
+            ///
+            /// [`DefaultContext::with_trace`]: crate::context::DefaultContext::with_trace
+            #[inline]
+            pub fn path(&self) -> Option<&str> {
+                match &self.err {
+                    Impl::Traced(Some(traced)) => Some(traced.path()),
+                    _ => None,
+                }
+            }
+
+            /// The range of bytes in the input the error was raised at.
+            ///
+            /// Like [`path`], this is only recorded if the error was produced
+            /// through a context which traces. The range is empty if the error
+            /// refers to a single position.
+            ///
+            #[doc = concat!("[`path`]: ", stringify!($id), "::path")]
+            #[inline]
+            pub fn range(&self) -> Option<core::ops::Range<usize>> {
+                match &self.err {
+                    Impl::Traced(Some(traced)) => Some(traced.range.clone()),
+                    _ => None,
+                }
+            }
+        }
+
         impl<A> core::fmt::Display for $id<A>
         where
             A: $crate::Allocator,
@@ -1171,8 +1358,40 @@ macro_rules! implement_error {
         where
             A: $crate::Allocator,
         {
-            Message(crate::alloc::String<A>),
-            Alloc(crate::alloc::AllocError),
+            Message($crate::alloc::String<A>),
+            // A traced error, or `None` if allocating the error failed.
+            //
+            // This is boxed and doubles as the allocation error so that the
+            // error stays as small as a string, since it is returned through
+            // every level of decoding.
+            Traced(Option<$crate::alloc::Box<Traced<A>, A>>),
+        }
+
+        /// An error decorated with the location it was raised at.
+        #[derive(PartialEq, Eq)]
+        struct Traced<A>
+        where
+            A: $crate::Allocator,
+        {
+            /// The path followed by the message, split at `split`.
+            text: $crate::alloc::String<A>,
+            split: usize,
+            range: core::ops::Range<usize>,
+        }
+
+        impl<A> Traced<A>
+        where
+            A: $crate::Allocator,
+        {
+            #[inline]
+            fn path(&self) -> &str {
+                &self.text.as_str()[..self.split]
+            }
+
+            #[inline]
+            fn message(&self) -> &str {
+                &self.text.as_str()[self.split..]
+            }
         }
 
         impl<A> core::fmt::Display for Impl<A>
@@ -1183,7 +1402,28 @@ macro_rules! implement_error {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
                     Impl::Message(message) => message.fmt(f),
-                    Impl::Alloc(error) => error.fmt(f),
+                    Impl::Traced(Some(traced)) => {
+                        let path = traced.path();
+
+                        if !path.is_empty() {
+                            write!(f, "{path}: ")?;
+                        }
+
+                        traced.message().fmt(f)?;
+
+                        let range = &traced.range;
+
+                        if range.start != 0 || range.end != 0 {
+                            if range.start == range.end {
+                                write!(f, " (at byte {})", range.start)?;
+                            } else {
+                                write!(f, " (at bytes {}-{})", range.start, range.end)?;
+                            }
+                        }
+
+                        Ok(())
+                    }
+                    Impl::Traced(None) => $crate::alloc::AllocError.fmt(f),
                 }
             }
         }
@@ -1198,8 +1438,14 @@ macro_rules! implement_error {
                     Impl::Message(message) => {
                         f.debug_tuple("Message").field(message).finish()
                     }
-                    Impl::Alloc(error) => {
-                        f.debug_tuple("Alloc").field(error).finish()
+                    Impl::Traced(Some(traced)) => f
+                        .debug_struct("Traced")
+                        .field("path", &traced.path())
+                        .field("message", &traced.message())
+                        .field("range", &traced.range)
+                        .finish(),
+                    Impl::Traced(None) => {
+                        f.debug_tuple("Alloc").field(&$crate::alloc::AllocError).finish()
                     }
                 }
             }
@@ -1235,10 +1481,61 @@ macro_rules! implement_error {
                 let err = if core::write!(s, "{message}").is_ok() {
                     Impl::Message(s)
                 } else {
-                    Impl::Alloc($crate::alloc::AllocError)
+                    Impl::Traced(None)
                 };
 
                 Self { err }
+            }
+
+            #[inline]
+            fn traced_message<T>(
+                alloc: A,
+                message: T,
+                location: &$crate::context::Location<'_, A>,
+            ) -> Self
+            where
+                T: core::fmt::Display,
+            {
+                use core::fmt::Write;
+
+                let mut text = $crate::alloc::String::new_in(alloc);
+
+                if core::write!(text, "{}", location.path()).is_err() {
+                    return Self::message(alloc, location.with_message(message));
+                }
+
+                let split = text.len();
+
+                if core::write!(text, "{message}").is_err() {
+                    return Self {
+                        err: Impl::Traced(None),
+                    };
+                }
+
+                let traced = Traced {
+                    text,
+                    split,
+                    range: location.range(),
+                };
+
+                let err = match $crate::alloc::Box::new_in(traced, alloc) {
+                    Ok(traced) => Impl::Traced(Some(traced)),
+                    Err(..) => return Self::message(alloc, location.with_message(message)),
+                };
+
+                Self { err }
+            }
+
+            #[inline]
+            fn traced_custom<T>(
+                alloc: A,
+                error: T,
+                location: &$crate::context::Location<'_, A>,
+            ) -> Self
+            where
+                T: 'static + Send + Sync + core::error::Error,
+            {
+                Self::traced_message(alloc, error, location)
             }
         }
 

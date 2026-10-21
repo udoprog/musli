@@ -140,6 +140,6 @@ pub use self::encoding::to_vec;
 pub use self::encoding::to_writer;
 #[cfg(feature = "alloc")]
 #[doc(inline)]
-pub use self::encoding::{decode, encode, from_slice, to_fixed_bytes, to_slice};
+pub use self::encoding::{decode, encode, from_slice, from_slice_traced, to_fixed_bytes, to_slice};
 #[doc(inline)]
 pub use self::error::Error;

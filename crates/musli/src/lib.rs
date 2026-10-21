@@ -242,6 +242,30 @@
 //!
 //! <br>
 //!
+//! ## Error diagnostics
+//!
+//! The plain decoding functions, such as `json::from_str` or
+//! `storage::from_slice`, report only what went wrong. To also learn *where*,
+//! use their traced counterparts such as [`json::from_str_traced`] or
+//! [`Encoding::from_slice_traced`]. Their error includes the path to the value
+//! being decoded and the position in the input, like
+//! `.people[1].age: Expected string, found <number> (at bytes 72-73)`, and the
+//! two are also available through `Error::path` and `Error::range`.
+//!
+//! Tracing costs some time while decoding, which is why the plain functions
+//! leave it out. The traced functions use a context built with
+//! [`DefaultContext::with_trace`] and [`DefaultContext::with_error`], and any
+//! context built that way decorates the errors it returns or captures, so the
+//! same works with the `*_with` functions, custom allocators and other error
+//! types.
+//!
+//! [`json::from_str_traced`]: <https://docs.rs/musli/latest/musli/json/fn.from_str_traced.html>
+//! [`Encoding::from_slice_traced`]: <https://docs.rs/musli/latest/musli/storage/struct.Encoding.html#method.from_slice_traced>
+//! [`DefaultContext::with_trace`]: <https://docs.rs/musli/latest/musli/context/struct.DefaultContext.html#method.with_trace>
+//! [`DefaultContext::with_error`]: <https://docs.rs/musli/latest/musli/context/struct.DefaultContext.html#method.with_error>
+//!
+//! <br>
+//!
 //! ## Upgrade stability
 //!
 //! The following is an example of *full upgrade stability* using

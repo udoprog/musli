@@ -7,7 +7,7 @@ use self::access::{Access, Shared};
 
 mod trace;
 #[doc(inline)]
-pub use self::trace::{Error, Errors, NoTrace, Report, Trace, TraceImpl, TraceMode};
+pub use self::trace::{Error, Errors, Location, NoTrace, Report, Trace, TraceImpl, TraceMode};
 
 mod capture;
 #[doc(inline)]

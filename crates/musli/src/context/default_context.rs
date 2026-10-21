@@ -488,7 +488,11 @@ where
         E: 'static + Send + Sync + Error,
     {
         self.trace.custom(self.alloc, &message);
-        self.capture.custom(self.alloc, message)
+
+        match self.trace.location(None) {
+            Some(location) => self.capture.traced_custom(self.alloc, message, &location),
+            None => self.capture.custom(self.alloc, message),
+        }
     }
 
     #[inline]
@@ -497,7 +501,11 @@ where
         M: fmt::Display,
     {
         self.trace.message(self.alloc, &message);
-        self.capture.message(self.alloc, message)
+
+        match self.trace.location(None) {
+            Some(location) => self.capture.traced_message(self.alloc, message, &location),
+            None => self.capture.message(self.alloc, message),
+        }
     }
 
     #[inline]
@@ -506,7 +514,11 @@ where
         M: fmt::Display,
     {
         self.trace.message_at(self.alloc, mark, &message);
-        self.capture.message(self.alloc, message)
+
+        match self.trace.location(Some(mark)) {
+            Some(location) => self.capture.traced_message(self.alloc, message, &location),
+            None => self.capture.message(self.alloc, message),
+        }
     }
 
     #[inline]
@@ -515,7 +527,11 @@ where
         E: 'static + Send + Sync + Error,
     {
         self.trace.custom_at(self.alloc, mark, &message);
-        self.capture.custom(self.alloc, message)
+
+        match self.trace.location(Some(mark)) {
+            Some(location) => self.capture.traced_custom(self.alloc, message, &location),
+            None => self.capture.custom(self.alloc, message),
+        }
     }
 
     #[inline]

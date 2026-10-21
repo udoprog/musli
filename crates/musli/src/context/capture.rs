@@ -3,7 +3,9 @@ use core::error::Error;
 use core::fmt;
 use core::marker::PhantomData;
 
-use super::{ContextError, ErrorMarker};
+use crate::Allocator;
+
+use super::{ContextError, ErrorMarker, Location};
 
 mod sealed {
     pub trait Sealed {}
@@ -34,6 +36,18 @@ pub trait ErrorMode<A>: self::sealed::Sealed {
     #[doc(hidden)]
     fn custom<T>(&self, alloc: A, error: T) -> Self::Error
     where
+        T: 'static + Send + Sync + Error;
+
+    #[doc(hidden)]
+    fn traced_message<T>(&self, alloc: A, message: T, location: &Location<'_, A>) -> Self::Error
+    where
+        A: Allocator,
+        T: fmt::Display;
+
+    #[doc(hidden)]
+    fn traced_custom<T>(&self, alloc: A, error: T, location: &Location<'_, A>) -> Self::Error
+    where
+        A: Allocator,
         T: 'static + Send + Sync + Error;
 }
 
@@ -80,6 +94,30 @@ impl<A> ErrorMode<A> for Ignore {
         _ = error;
         ErrorMarker
     }
+
+    #[inline]
+    fn traced_message<T>(&self, alloc: A, message: T, location: &Location<'_, A>) -> Self::Error
+    where
+        A: Allocator,
+        T: fmt::Display,
+    {
+        _ = alloc;
+        _ = message;
+        _ = location;
+        ErrorMarker
+    }
+
+    #[inline]
+    fn traced_custom<T>(&self, alloc: A, error: T, location: &Location<'_, A>) -> Self::Error
+    where
+        A: Allocator,
+        T: 'static + Send + Sync + Error,
+    {
+        _ = alloc;
+        _ = error;
+        _ = location;
+        ErrorMarker
+    }
 }
 
 /// Emit an error of the specified type `E`.
@@ -123,6 +161,24 @@ where
         T: 'static + Send + Sync + Error,
     {
         E::custom(alloc, error)
+    }
+
+    #[inline]
+    fn traced_message<T>(&self, alloc: A, message: T, location: &Location<'_, A>) -> Self::Error
+    where
+        A: Allocator,
+        T: fmt::Display,
+    {
+        E::traced_message(alloc, message, location)
+    }
+
+    #[inline]
+    fn traced_custom<T>(&self, alloc: A, error: T, location: &Location<'_, A>) -> Self::Error
+    where
+        A: Allocator,
+        T: 'static + Send + Sync + Error,
+    {
+        E::traced_custom(alloc, error, location)
     }
 }
 
@@ -208,6 +264,36 @@ where
         // safe.
         unsafe {
             (*self.error.get()) = Some(E::custom(alloc, error));
+        }
+
+        ErrorMarker
+    }
+
+    #[inline]
+    fn traced_message<T>(&self, alloc: A, message: T, location: &Location<'_, A>) -> Self::Error
+    where
+        A: Allocator,
+        T: fmt::Display,
+    {
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            (*self.error.get()) = Some(E::traced_message(alloc, message, location));
+        }
+
+        ErrorMarker
+    }
+
+    #[inline]
+    fn traced_custom<T>(&self, alloc: A, error: T, location: &Location<'_, A>) -> Self::Error
+    where
+        A: Allocator,
+        T: 'static + Send + Sync + Error,
+    {
+        // SAFETY: We're restricting access to the context, so that this is
+        // safe.
+        unsafe {
+            (*self.error.get()) = Some(E::traced_custom(alloc, error, location));
         }
 
         ErrorMarker

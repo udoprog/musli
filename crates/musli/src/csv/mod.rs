@@ -199,7 +199,9 @@ pub use self::encoding::to_writer;
 pub use self::encoding::{Encoding, Terminator};
 #[cfg(feature = "alloc")]
 #[doc(inline)]
-pub use self::encoding::{decode, encode, from_slice, from_str, to_fixed_bytes, to_slice};
+pub use self::encoding::{
+    decode, encode, from_slice, from_slice_traced, from_str, to_fixed_bytes, to_slice,
+};
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
 #[doc(inline)]

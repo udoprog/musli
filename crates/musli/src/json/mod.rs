@@ -131,7 +131,8 @@ pub use self::encoding::Encoding;
 #[cfg(feature = "alloc")]
 #[doc(inline)]
 pub use self::encoding::{
-    decode, encode, from_slice, from_str, to_fixed_bytes, to_slice, to_slice_pretty,
+    decode, encode, from_slice, from_slice_traced, from_str, from_str_traced, to_fixed_bytes,
+    to_slice, to_slice_pretty,
 };
 #[cfg(feature = "alloc")]
 #[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]

@@ -267,6 +267,39 @@ where
     DEFAULT.from_str(string)
 }
 
+/// Decode the given type `T` from the given string using the default
+/// [`Encoding`], recording where in the input an error is raised.
+///
+/// This is the same as [`from_str`], except that the returned error includes
+/// the path to the value being decoded and the position in the input. See
+/// [`Encoding::from_str_traced`].
+///
+/// # Examples
+///
+/// ```
+/// use musli::{Decode, Encode};
+/// use musli::json;
+///
+/// #[derive(Debug, Decode, Encode)]
+/// struct Person {
+///     name: String,
+///     age: u32,
+/// }
+///
+/// let error = json::from_str_traced::<Person>(r#"{"name": "Aristotle", "age": "61"}"#).unwrap_err();
+/// assert_eq!(error.path(), Some(".age"));
+/// assert_eq!(error.range(), Some(29..30));
+/// ```
+#[cfg(feature = "alloc")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "alloc")))]
+#[inline]
+pub fn from_str_traced<'de, T>(string: &'de str) -> Result<T, Error>
+where
+    T: Decode<'de, Text, Global>,
+{
+    DEFAULT.from_str_traced(string)
+}
+
 /// Setting up encoding with parameters.
 ///
 /// Pretty printing is off by default and is configured with

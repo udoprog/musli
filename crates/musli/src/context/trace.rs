@@ -118,6 +118,15 @@ pub trait TraceImpl<A>: self::sealed::Sealed {
 
     #[doc(hidden)]
     fn leave_map_key(&self);
+
+    /// The location in the input that an error raised now is reported at.
+    ///
+    /// If `start` is specified, the location spans from it to the current
+    /// position.
+    #[doc(hidden)]
+    fn location(&self, start: Option<&Self::Mark>) -> Option<Location<'_, A>>
+    where
+        A: Allocator;
 }
 
 /// Marker type indicating that tracing is enabled.
@@ -427,6 +436,22 @@ where
     fn leave_map_key(&self) {
         self.pop_path();
     }
+
+    #[inline]
+    fn location(&self, start: Option<&Self::Mark>) -> Option<Location<'_, A>> {
+        let access = self.access.shared();
+        let end = self.mark.get();
+        let start = start.copied().unwrap_or(end);
+
+        Some(Location {
+            // SAFETY: We hold shared access to the path while the location is
+            // alive.
+            path: unsafe { (*self.path.get()).as_slice() },
+            cap: self.cap.get(),
+            range: start..end,
+            _access: access,
+        })
+    }
 }
 
 #[non_exhaustive]
@@ -584,6 +609,12 @@ where
 
     #[inline]
     fn leave_map_key(&self) {}
+
+    #[inline]
+    fn location(&self, start: Option<&Self::Mark>) -> Option<Location<'_, A>> {
+        _ = start;
+        None
+    }
 }
 
 /// A line-separated report of all errors.
@@ -687,23 +718,193 @@ where
 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let path = FormatPath::new(self.path, self.cap);
+        format_traced(f, self.path, self.cap, &self.range, &self.error)
+    }
+}
+
+/// Format `message` as having been raised at the given path and range.
+///
+/// An empty path is left out, and so is a range of `0..0`, since decoders
+/// which do not read from a buffer of input never advance the position.
+fn format_traced<A>(
+    f: &mut fmt::Formatter<'_>,
+    path: &[Step<A>],
+    cap: usize,
+    range: &Range<usize>,
+    message: &dyn fmt::Display,
+) -> fmt::Result
+where
+    A: Allocator,
+{
+    if !path.is_empty() || cap > 0 {
+        write!(f, "{}: ", FormatPath::new(path, cap))?;
+    }
+
+    message.fmt(f)?;
+
+    if range.start != 0 || range.end != 0 {
+        if range.start == range.end {
+            write!(f, " (at byte {})", range.start)?;
+        } else {
+            write!(f, " (at bytes {}-{})", range.start, range.end)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Where in the input an error was raised, as recorded by a context which
+/// traces.
+///
+/// A context which traces, such as one built with
+/// [`DefaultContext::with_trace`], passes this to
+/// [`ContextError::traced_message`] and [`ContextError::traced_custom`] when it
+/// constructs an error, so that the error can carry the path of fields,
+/// variants and indexes which were being decoded, and the position in the input
+/// it was raised at.
+///
+/// [`DefaultContext::with_trace`]: super::DefaultContext::with_trace
+/// [`ContextError::traced_message`]: super::ContextError::traced_message
+/// [`ContextError::traced_custom`]: super::ContextError::traced_custom
+pub struct Location<'a, A>
+where
+    A: Allocator,
+{
+    path: &'a [Step<A>],
+    cap: usize,
+    range: Range<usize>,
+    _access: Shared<'a>,
+}
+
+impl<'a, A> Location<'a, A>
+where
+    A: Allocator,
+{
+    /// Test if the error was raised outside of any field, variant, sequence
+    /// index or map key, in which case [`Location::path`] formats as an empty
+    /// string.
+    #[inline]
+    pub fn is_root(&self) -> bool {
+        self.path.is_empty() && self.cap == 0
+    }
+
+    /// The path to the value which was being decoded, such as
+    /// `.field[2].name`.
+    ///
+    /// If the context includes types through [`DefaultContext::with_type`],
+    /// the path also names the structs and enums involved.
+    ///
+    /// [`DefaultContext::with_type`]: super::DefaultContext::with_type
+    #[inline]
+    pub fn path(&self) -> impl fmt::Display + 'a {
+        FormatPath::new(self.path, self.cap)
+    }
+
+    /// The range of bytes in the input the error was raised at.
+    ///
+    /// The range is empty when the error refers to a single position. It is
+    /// `0..0` when the decoder does not read from a buffer of input, such as
+    /// when decoding from a [`Value`].
+    ///
+    /// [`Value`]: crate::value::Value
+    #[inline]
+    pub fn range(&self) -> Range<usize> {
+        self.range.clone()
+    }
+
+    /// Format `message` decorated with this location, the same way
+    /// [`DefaultContext::report`] formats each error.
+    ///
+    /// This produces `path: message (at byte N)`, leaving out the path if
+    /// [`Location::is_root`] and the position if the range is `0..0`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::context::{self, ErrorMarker};
+    /// use musli::json::Encoding;
+    /// use musli::{Decode, Encode};
+    ///
+    /// #[derive(Debug, Decode, Encode)]
+    /// struct Person {
+    ///     name: String,
+    /// }
+    ///
+    /// const ENCODING: Encoding = Encoding::new();
+    ///
+    /// let cx = context::new().with_trace().with_error::<String>();
+    /// let error = ENCODING.from_str_with::<_, Person>(&cx, r#"{"name": 42}"#).unwrap_err();
+    /// assert_eq!(error, ".name: Expected string, found <number> (at bytes 8-9)");
+    /// ```
+    ///
+    /// [`DefaultContext::report`]: super::DefaultContext::report
+    #[inline]
+    pub fn with_message<M>(&self, message: M) -> impl fmt::Display
+    where
+        M: fmt::Display,
+    {
+        WithMessage {
+            location: self,
+            message,
+        }
+    }
+}
+
+impl<A> fmt::Display for Location<'_, A>
+where
+    A: Allocator,
+{
+    /// Formats the path, followed by the position if there is one.
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", FormatPath::new(self.path, self.cap))?;
 
         if self.range.start != 0 || self.range.end != 0 {
-            if self.range.start == self.range.end {
-                write!(f, "{path}: {} (at byte {})", self.error, self.range.start)?;
-            } else {
-                write!(
-                    f,
-                    "{path}: {} (at bytes {}-{})",
-                    self.error, self.range.start, self.range.end
-                )?;
+            if !self.is_root() {
+                write!(f, " ")?;
             }
-        } else {
-            write!(f, "{path}: {}", self.error)?;
+
+            if self.range.start == self.range.end {
+                write!(f, "(at byte {})", self.range.start)?;
+            } else {
+                write!(f, "(at bytes {}-{})", self.range.start, self.range.end)?;
+            }
         }
 
         Ok(())
+    }
+}
+
+impl<A> fmt::Debug for Location<'_, A>
+where
+    A: Allocator,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Location")
+            .field("path", &format_args!("{}", self.path()))
+            .field("range", &self.range)
+            .finish()
+    }
+}
+
+struct WithMessage<'a, 'b, A, M>
+where
+    A: Allocator,
+{
+    location: &'a Location<'b, A>,
+    message: M,
+}
+
+impl<A, M> fmt::Display for WithMessage<'_, '_, A, M>
+where
+    A: Allocator,
+    M: fmt::Display,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let l = self.location;
+        format_traced(f, l.path, l.cap, &l.range, &self.message)
     }
 }
 
