@@ -65,6 +65,39 @@
 //! # }
 //! ```
 //!
+//! # Sending headers with the handshake
+//!
+//! A server which authenticates the websocket upgrade, through a session
+//! cookie or a token, reads it from the headers of the HTTP request which opens
+//! the websocket. [`ServiceBuilder::header`] adds such a header, and it is sent
+//! again every time the service reconnects:
+//!
+//! ```no_run
+//! use musli_web::tungstenite029::prelude::*;
+//!
+//! # async fn example(token: &str) -> Result<(), Box<dyn core::error::Error>> {
+//! let mut service = ws::connect("ws://localhost:3000/ws")
+//!     .header("Cookie", "session=4b0c2d")
+//!     .header("Authorization", format!("Bearer {token}"))
+//!     .build();
+//!
+//! tokio::spawn(async move {
+//!     if let Err(error) = service.run().await {
+//!         tracing::error!("WebSocket service error: {error}");
+//!     }
+//! });
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! A header which cannot be sent, such as one with a line break in its value,
+//! fails [`Service::run`] and [`Service::try_connect`] right away rather than
+//! being retried, see [`Error::is_invalid_header`].
+//!
+//! [`ServiceBuilder::header`]: crate::client::ServiceBuilder::header
+//! [`Service::run`]: crate::client::Service::run
+//! [`Error::is_invalid_header`]: crate::client::Error::is_invalid_header
+//!
 //! # Connecting over any stream
 //!
 //! [`connect_with()`] establishes the websocket over a stream the caller

@@ -61,12 +61,20 @@ impl ClientImpl for MockImpl {
     type Error = MockError;
     type Socket = MockSocket;
     type Connector = Infallible;
+    type Headers = ();
 
-    async fn connect(_: &str) -> Result<Self::Socket, Self::Error> {
+    fn header(_: &mut Self::Headers, _: &str, _: &str) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn connect(_: &str, _: &Self::Headers) -> Result<Self::Socket, Self::Error> {
         Ok(MockSocket)
     }
 
-    async fn connect_with(connector: &mut Self::Connector) -> Result<Self::Socket, Self::Error> {
+    async fn connect_with(
+        connector: &mut Self::Connector,
+        _: &Self::Headers,
+    ) -> Result<Self::Socket, Self::Error> {
         match *connector {}
     }
 }

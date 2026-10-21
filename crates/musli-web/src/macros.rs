@@ -20,6 +20,10 @@ macro_rules! tungstenite_impl {
         use futures_sink03::Sink;
         use tokio::io::{AsyncRead, AsyncWrite};
         use tokio::net::TcpStream;
+        use $krate::tungstenite::client::IntoClientRequest;
+        use $krate::tungstenite::error::ProtocolError;
+        use $krate::tungstenite::handshake::client::Request;
+        use $krate::tungstenite::http::header::{HeaderMap, HeaderName, HeaderValue};
         use $krate::tungstenite::protocol::Message as WsMessage;
         use $krate::tungstenite::{Error, Utf8Bytes};
         use $krate::{MaybeTlsStream, WebSocketStream, client_async, connect_async};
@@ -176,26 +180,65 @@ macro_rules! tungstenite_impl {
 
         impl crate::client::sealed_client::Sealed for $impl_ty {}
 
+        /// The headers which make up the websocket handshake itself, which
+        /// the client sets and which cannot be added through
+        /// [`ServiceBuilder::header`].
+        ///
+        /// [`ServiceBuilder::header`]: crate::client::ServiceBuilder::header
+        const HANDSHAKE_HEADERS: [&str; 5] = [
+            "host",
+            "connection",
+            "upgrade",
+            "sec-websocket-key",
+            "sec-websocket-version",
+        ];
+
+        /// Build the handshake request for `url` with `headers` added to it.
+        fn request(url: &str, headers: &HeaderMap) -> Result<Request, Error> {
+            let mut request = url.into_client_request()?;
+
+            for (name, value) in headers {
+                request.headers_mut().append(name, value.clone());
+            }
+
+            Ok(request)
+        }
+
         impl ClientImpl for $impl_ty {
             type Error = Error;
             type Socket = Socket;
             type Connector = Connector;
+            type Headers = HeaderMap;
+
+            fn header(headers: &mut HeaderMap, name: &str, value: &str) -> Result<(), Error> {
+                let name = HeaderName::from_bytes(name.as_bytes())?;
+
+                if HANDSHAKE_HEADERS.contains(&name.as_str()) {
+                    return Err(Error::Protocol(ProtocolError::InvalidHeader(name.into())));
+                }
+
+                let value = HeaderValue::from_str(value)?;
+                headers.append(name, value);
+                Ok(())
+            }
 
             #[inline]
-            async fn connect(url: &str) -> Result<Self::Socket, Self::Error> {
-                let (socket, _) = connect_async(url).await?;
+            async fn connect(url: &str, headers: &HeaderMap) -> Result<Self::Socket, Self::Error> {
+                let (socket, _) = connect_async(request(url, headers)?).await?;
                 Ok(Socket::Url(Box::new(socket)))
             }
 
             #[inline]
-            fn connect_with(
-                connector: &mut Self::Connector,
-            ) -> impl Future<Output = Result<Self::Socket, Self::Error>> + Send + '_ {
+            fn connect_with<'a>(
+                connector: &'a mut Self::Connector,
+                headers: &'a HeaderMap,
+            ) -> impl Future<Output = Result<Self::Socket, Self::Error>> + Send + 'a {
                 let open = (connector.open)();
 
                 async move {
+                    let request = request(connector.url.as_str(), headers)?;
                     let stream = open.await.map_err(Error::Io)?;
-                    let (socket, _) = client_async(connector.url.as_str(), stream).await?;
+                    let (socket, _) = client_async(request, stream).await?;
                     Ok(Socket::Stream(Box::new(socket)))
                 }
             }

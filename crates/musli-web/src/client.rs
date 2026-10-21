@@ -169,13 +169,26 @@ where
     #[doc(hidden)]
     type Connector: 'static + Send;
 
+    /// The headers added to the websocket handshake, see
+    /// [`ServiceBuilder::header`].
     #[doc(hidden)]
-    fn connect(url: &str) -> impl Future<Output = Result<Self::Socket, Self::Error>> + Send;
+    type Headers: 'static + Send + Sync + Default;
+
+    /// Validate a header and add it to `headers`.
+    #[doc(hidden)]
+    fn header(headers: &mut Self::Headers, name: &str, value: &str) -> Result<(), Self::Error>;
 
     #[doc(hidden)]
-    fn connect_with(
-        connector: &mut Self::Connector,
-    ) -> impl Future<Output = Result<Self::Socket, Self::Error>> + Send + '_;
+    fn connect<'a>(
+        url: &'a str,
+        headers: &'a Self::Headers,
+    ) -> impl Future<Output = Result<Self::Socket, Self::Error>> + Send + 'a;
+
+    #[doc(hidden)]
+    fn connect_with<'a>(
+        connector: &'a mut Self::Connector,
+        headers: &'a Self::Headers,
+    ) -> impl Future<Output = Result<Self::Socket, Self::Error>> + Send + 'a;
 }
 
 /// Construct a new [`ServiceBuilder`] which will connect to `url`.
@@ -186,6 +199,8 @@ where
     ServiceBuilder {
         url: url.as_ref().to_string(),
         connector: None,
+        headers: T::Headers::default(),
+        invalid_header: None,
         on_error: EmptyCallback,
         reconnect: true,
         seed: DEFAULT_SEED,
@@ -399,6 +414,34 @@ impl Error {
         )
     }
 
+    /// Check if the error is caused by a header passed to
+    /// [`ServiceBuilder::header`] which cannot be sent, such as a name or a
+    /// value which is not valid in HTTP.
+    ///
+    /// This is what [`Service::run`] and [`Service::try_connect`] fail with
+    /// right away, without trying to connect, since every attempt would send
+    /// the same header. The underlying error is available through
+    /// [`core::error::Error::source`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::tungstenite030;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")] async fn main() {
+    /// let mut service = tungstenite030::connect("ws://127.0.0.1:8080/ws")
+    ///     .header("Cookie", "session=\nabc")
+    ///     .build();
+    ///
+    /// let error = service.try_connect().await.unwrap_err();
+    /// assert!(error.is_invalid_header());
+    /// # }
+    /// ```
+    #[inline]
+    pub fn is_invalid_header(&self) -> bool {
+        matches!(self.kind, ErrorKind::InvalidHeader(..))
+    }
+
     /// Check if the server states an application version other than the one
     /// this client states, see [`ServiceBuilder::app_version`].
     ///
@@ -541,6 +584,7 @@ enum ErrorKind {
     /// to display.
     ConnectionLost(&'static str),
     Cancelled,
+    InvalidHeader(InvalidHeader),
     UnknownFormat(u8),
     Incompatible {
         server: u32,
@@ -564,6 +608,9 @@ impl fmt::Display for Error {
             ErrorKind::NotConnected(message) => write!(f, "{message}"),
             ErrorKind::ConnectionLost(message) => write!(f, "{message}"),
             ErrorKind::Cancelled => write!(f, "Request cancelled"),
+            ErrorKind::InvalidHeader(header) => {
+                write!(f, "Invalid handshake header `{}`", header.name)
+            }
             ErrorKind::UnknownFormat(format) => write!(
                 f,
                 "Server used unknown format id {format} for a message body"
@@ -593,6 +640,7 @@ impl core::error::Error for Error {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match &self.kind {
             ErrorKind::Transport(error) => Some(&**error),
+            ErrorKind::InvalidHeader(header) => Some(&*header.error),
             ErrorKind::DecodeResponseHeader(error) => Some(error),
             ErrorKind::DecodeErrorMessage(error) => Some(error),
             ErrorKind::DecodePacket(error) => Some(error),
@@ -601,6 +649,15 @@ impl core::error::Error for Error {
             _ => None,
         }
     }
+}
+
+/// A header passed to [`ServiceBuilder::header`] which cannot be sent.
+#[derive(Debug, Clone)]
+struct InvalidHeader {
+    /// The name of the header, as it was given.
+    name: String,
+    /// Why it cannot be sent.
+    error: Arc<dyn core::error::Error + Send + Sync>,
 }
 
 /// An error response from the server, see [error
@@ -769,6 +826,10 @@ where
 {
     url: String,
     connector: Option<T::Connector>,
+    headers: T::Headers,
+    /// The first header which could not be added, see
+    /// [`ServiceBuilder::header`].
+    invalid_header: Option<InvalidHeader>,
     on_error: E,
     reconnect: bool,
     seed: u64,
@@ -796,6 +857,8 @@ where
         ServiceBuilder {
             url: self.url,
             connector: self.connector,
+            headers: self.headers,
+            invalid_header: self.invalid_header,
             on_error,
             reconnect: self.reconnect,
             seed: self.seed,
@@ -804,6 +867,64 @@ where
             app: self.app,
             _marker: self._marker,
         }
+    }
+
+    /// Add a header to the HTTP request which opens the websocket, the
+    /// handshake.
+    ///
+    /// This is how a client authenticates with a server which expects a
+    /// session cookie or a token, such as `Cookie` or `Authorization`. The
+    /// header is sent on every connection attempt, so it is sent again when the
+    /// service [reconnects], and it is sent whether the service connects to the
+    /// url or [over a stream of its own].
+    ///
+    /// Calling this again with the same name adds another value rather than
+    /// replacing the first one. Header names are case insensitive.
+    ///
+    /// # Errors
+    ///
+    /// The headers the handshake itself is made of, `Host`, `Connection`,
+    /// `Upgrade`, `Sec-WebSocket-Key` and `Sec-WebSocket-Version`, are set by
+    /// the client and cannot be added. Neither can a name or a value which is
+    /// not valid in HTTP, such as a value with a line break in it.
+    ///
+    /// Since every attempt would send the same header, such a header is not
+    /// retried. Instead [`Service::run`] and [`Service::try_connect`] return an
+    /// error for which [`Error::is_invalid_header`] holds, without trying to
+    /// connect.
+    ///
+    /// [reconnects]: Self::reconnect
+    /// [over a stream of its own]: crate::tungstenite030::connect_with
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use musli_web::tungstenite030;
+    ///
+    /// # async fn example(token: &str) -> anyhow::Result<()> {
+    /// let mut service = tungstenite030::connect("ws://127.0.0.1:8080/ws")
+    ///     .header("Cookie", "session=4b0c2d")
+    ///     .header("Authorization", format!("Bearer {token}"))
+    ///     .build();
+    ///
+    /// service.run().await?;
+    /// # Ok(()) }
+    /// ```
+    pub fn header(mut self, name: impl AsRef<str>, value: impl AsRef<str>) -> Self {
+        let name = name.as_ref();
+
+        if let Err(error) = T::header(&mut self.headers, name, value.as_ref()) {
+            // NB: The first one is reported, since it is the first one which
+            // has to be fixed.
+            if self.invalid_header.is_none() {
+                self.invalid_header = Some(InvalidHeader {
+                    name: name.to_string(),
+                    error: Arc::new(error),
+                });
+            }
+        }
+
+        self
     }
 
     /// Set the [`Format`] to use for message bodies.
@@ -950,6 +1071,8 @@ where
             rx,
             url: self.url,
             connector: self.connector,
+            headers: self.headers,
+            invalid_header: self.invalid_header,
             on_error: Box::new(self.on_error),
             reconnect: self.reconnect,
             socket: None,
@@ -979,6 +1102,11 @@ where
     rx: mpsc::UnboundedReceiver<Command>,
     url: String,
     connector: Option<T::Connector>,
+    /// The headers added to every handshake.
+    headers: T::Headers,
+    /// A header which cannot be sent, which fails the service before it
+    /// connects.
+    invalid_header: Option<InvalidHeader>,
     on_error: Box<dyn Callback<Error>>,
     reconnect: bool,
     socket: Option<T::Socket>,
@@ -1040,7 +1168,14 @@ where
     /// Errors if the server states another application version, see
     /// [`ServiceBuilder::app_version`]. The service has then stopped for good,
     /// and calling this again returns immediately.
+    ///
+    /// Errors right away, without connecting, if a header was passed to
+    /// [`ServiceBuilder::header`] which cannot be sent.
     pub async fn run(&mut self) -> Result<()> {
+        if let Some(header) = &self.invalid_header {
+            return Err(Error::new(ErrorKind::InvalidHeader(header.clone())));
+        }
+
         if let Some((server, client)) = self.incompatible {
             return Err(Error::incompatible(server, client));
         }
@@ -1174,7 +1309,15 @@ where
     /// The error is not reported through [`ServiceBuilder::on_error`]. The
     /// underlying transport error is available through
     /// [`core::error::Error::source`] on the returned error.
+    ///
+    /// Errors without connecting if a header was passed to
+    /// [`ServiceBuilder::header`] which cannot be sent, see
+    /// [`Error::is_invalid_header`].
     pub async fn try_connect(&mut self) -> Result<()> {
+        if let Some(header) = &self.invalid_header {
+            return Err(Error::new(ErrorKind::InvalidHeader(header.clone())));
+        }
+
         if self.socket.is_some() {
             return Ok(());
         }
@@ -1190,8 +1333,8 @@ where
         tracing::debug!(url = self.url.as_str(), "Connecting");
 
         match &mut self.connector {
-            Some(connector) => T::connect_with(connector).await,
-            None => T::connect(&self.url).await,
+            Some(connector) => T::connect_with(connector, &self.headers).await,
+            None => T::connect(&self.url, &self.headers).await,
         }
     }
 

@@ -3809,3 +3809,339 @@ mod routing {
         server.abort();
     }
 }
+
+/// Headers added to the websocket handshake through
+/// `ServiceBuilder::header`, checked by a server which reads them from the
+/// upgrade request.
+mod headers {
+    use super::*;
+
+    use axum::http::{HeaderMap, StatusCode};
+    use axum::response::IntoResponse;
+
+    /// The cookie the server requires on the upgrade.
+    const COOKIE: &str = "session=4b0c2d";
+
+    /// The authorization the server records next to the cookie.
+    const AUTHORIZATION: &str = "Bearer 1a2b3c";
+
+    /// The headers a server saw on one upgrade request.
+    #[derive(Debug, PartialEq, Eq)]
+    struct Seen {
+        cookie: Option<String>,
+        authorization: Option<String>,
+        repeated: Vec<String>,
+    }
+
+    #[derive(Clone)]
+    struct HeaderState {
+        seen: mpsc::UnboundedSender<Seen>,
+        handler: TestHandler,
+        shutdown: watch::Receiver<bool>,
+    }
+
+    fn header(headers: &HeaderMap, name: &str) -> Option<String> {
+        let value = headers.get(name)?;
+        Some(value.to_str().expect("Header is not a string").to_owned())
+    }
+
+    /// Record the headers of the upgrade, and refuse it unless it carries the
+    /// session cookie.
+    async fn upgrade(
+        ws: WebSocketUpgrade,
+        headers: HeaderMap,
+        State(state): State<HeaderState>,
+    ) -> Response {
+        let seen = Seen {
+            cookie: header(&headers, "cookie"),
+            authorization: header(&headers, "authorization"),
+            repeated: headers
+                .get_all("x-repeated")
+                .iter()
+                .map(|value| value.to_str().expect("Header is not a string").to_owned())
+                .collect(),
+        };
+
+        let authorized = seen.cookie.as_deref() == Some(COOKIE);
+        _ = state.seen.send(seen);
+
+        if !authorized {
+            return StatusCode::UNAUTHORIZED.into_response();
+        }
+
+        ws.on_upgrade(move |socket| async move {
+            let mut shutdown = state.shutdown.clone();
+
+            let Ok(mut server) = musli_web::axum08::server(socket, state.handler.clone())
+                .connect()
+                .await
+            else {
+                return;
+            };
+
+            tokio::select! {
+                _ = shutdown.changed() => {}
+                _ = server.run() => {}
+            }
+        })
+    }
+
+    /// A server which requires the session cookie on the upgrade.
+    struct HeaderServer {
+        addr: SocketAddr,
+        seen: mpsc::UnboundedReceiver<Seen>,
+        _events: mpsc::UnboundedReceiver<Event>,
+        shutdown: watch::Sender<bool>,
+        task: JoinHandle<()>,
+    }
+
+    impl HeaderServer {
+        async fn new() -> Self {
+            Self::bind(SocketAddr::from(([127, 0, 0, 1], 0))).await
+        }
+
+        async fn bind(addr: SocketAddr) -> Self {
+            let listener = TcpListener::bind(addr).await.expect("Failed to bind");
+            let addr = listener.local_addr().expect("Missing local address");
+
+            let (seen_tx, seen) = mpsc::unbounded_channel();
+            let (events_tx, events) = mpsc::unbounded_channel();
+            let (shutdown, shutdown_rx) = watch::channel(false);
+
+            let state = HeaderState {
+                seen: seen_tx,
+                handler: TestHandler { events: events_tx },
+                shutdown: shutdown_rx.clone(),
+            };
+
+            let app = Router::new().route("/ws", any(upgrade).with_state(state));
+
+            let task = tokio::spawn(async move {
+                let mut shutdown_rx = shutdown_rx;
+
+                let result = axum::serve(listener, app)
+                    .with_graceful_shutdown(async move {
+                        while !*shutdown_rx.borrow_and_update() {
+                            if shutdown_rx.changed().await.is_err() {
+                                break;
+                            }
+                        }
+                    })
+                    .await;
+
+                if let Err(error) = result {
+                    tracing::error!("Serve error: {error}");
+                }
+            });
+
+            Self {
+                addr,
+                seen,
+                _events: events,
+                shutdown,
+                task,
+            }
+        }
+
+        fn url(&self) -> String {
+            format!("ws://{}/ws", self.addr)
+        }
+
+        /// The headers of the next upgrade request.
+        async fn seen(&mut self) -> Seen {
+            timeout!(self.seen.recv()).expect("Server is gone")
+        }
+
+        async fn shutdown(self) {
+            _ = self.shutdown.send(true);
+            timeout!(self.task).expect("Server task panicked");
+        }
+    }
+
+    fn authorized() -> Seen {
+        Seen {
+            cookie: Some(COOKIE.to_owned()),
+            authorization: Some(AUTHORIZATION.to_owned()),
+            repeated: Vec::new(),
+        }
+    }
+
+    /// Drive `service` in the background until it is closed.
+    fn spawn(mut service: tungstenite030::prelude::ws::Service) -> (Handle, JoinHandle<()>) {
+        let handle = service.handle().clone();
+
+        let task = tokio::spawn(async move {
+            service.run().await.expect("Client service failed");
+        });
+
+        (handle, task)
+    }
+
+    /// The headers reach the server on the upgrade, which accepts it, and are
+    /// sent again when the service reconnects.
+    #[tokio::test]
+    async fn headers_are_sent_on_every_connect() {
+        let mut server = HeaderServer::new().await;
+        let addr = server.addr;
+
+        let service = tungstenite030::connect(server.url())
+            .header("Cookie", COOKIE)
+            .header("Authorization", AUTHORIZATION)
+            .build();
+
+        let (handle, task) = spawn(service);
+
+        timeout!(handle.wait_until_open()).expect("Failed to open connection");
+        assert_eq!(server.seen().await, authorized());
+
+        let (message, _) = hello(&handle, "Authorized").await;
+        assert_eq!(message, "Authorized");
+
+        let mut states = handle.on_state_change();
+        server.shutdown().await;
+        assert!(timeout!(states.wait_until(ClientState::Closed)));
+
+        let mut server = HeaderServer::bind(addr).await;
+        assert!(timeout!(states.wait_until(ClientState::Open)));
+        assert_eq!(server.seen().await, authorized());
+
+        let (message, _) = hello(&handle, "Reconnected").await;
+        assert_eq!(message, "Reconnected");
+
+        handle.close();
+        timeout!(task).expect("Client task panicked");
+        server.shutdown().await;
+    }
+
+    /// Headers are sent over a caller-supplied stream too, also across a
+    /// reconnect.
+    #[tokio::test]
+    async fn headers_are_sent_over_a_caller_supplied_stream() {
+        let mut server = HeaderServer::new().await;
+        let addr = server.addr;
+
+        let service =
+            tungstenite030::connect_with("ws://localhost/ws", move || TcpStream::connect(addr))
+                .header("Cookie", COOKIE)
+                .header("Authorization", AUTHORIZATION)
+                .build();
+
+        let (handle, task) = spawn(service);
+
+        timeout!(handle.wait_until_open()).expect("Failed to open connection");
+        assert_eq!(server.seen().await, authorized());
+
+        let mut states = handle.on_state_change();
+        server.shutdown().await;
+        assert!(timeout!(states.wait_until(ClientState::Closed)));
+
+        let mut server = HeaderServer::bind(addr).await;
+        assert!(timeout!(states.wait_until(ClientState::Open)));
+        assert_eq!(server.seen().await, authorized());
+
+        let (message, _) = hello(&handle, "Over a stream").await;
+        assert_eq!(message, "Over a stream");
+
+        handle.close();
+        timeout!(task).expect("Client task panicked");
+        server.shutdown().await;
+    }
+
+    /// Adding a header again adds another value instead of replacing it.
+    #[tokio::test]
+    async fn a_repeated_header_sends_every_value() {
+        let mut server = HeaderServer::new().await;
+
+        let mut service = tungstenite030::connect(server.url())
+            .header("Cookie", COOKIE)
+            .header("X-Repeated", "first")
+            .header("x-repeated", "second")
+            .reconnect(false)
+            .build();
+
+        timeout!(service.try_connect()).expect("Failed to connect");
+
+        let seen = server.seen().await;
+        assert_eq!(seen.repeated, ["first", "second"]);
+        assert_eq!(seen.authorization, None);
+
+        drop(service);
+        server.shutdown().await;
+    }
+
+    /// Without the cookie the server refuses the upgrade, which is a failure
+    /// to connect like any other.
+    #[tokio::test]
+    async fn the_upgrade_is_refused_without_the_cookie() {
+        let mut server = HeaderServer::new().await;
+
+        let mut service = tungstenite030::connect(server.url())
+            .header("Cookie", "session=wrong")
+            .reconnect(false)
+            .build();
+
+        let error =
+            timeout!(service.try_connect()).expect_err("Expected the upgrade to be refused");
+        assert!(!error.is_invalid_header());
+
+        let source = core::error::Error::source(&error).expect("Missing transport error");
+        assert!(source.to_string().contains("401"), "{source}");
+
+        assert_eq!(server.seen().await.cookie.as_deref(), Some("session=wrong"));
+
+        drop(service);
+        server.shutdown().await;
+    }
+
+    /// Assert that a service with the given header fails without connecting,
+    /// both through `try_connect` and `run`, and despite reconnecting being
+    /// enabled.
+    async fn assert_invalid_header(name: &str, value: &str) {
+        // NB: Nothing listens here, so connecting would be a transport error.
+        let mut service = tungstenite030::connect("ws://127.0.0.1:1/ws")
+            .header("Cookie", COOKIE)
+            .header(name, value)
+            .header("Authorization", "\0")
+            .build();
+
+        let error = timeout!(service.try_connect()).expect_err("Expected an invalid header");
+        assert!(error.is_invalid_header(), "{error}");
+        assert!(!error.is_not_connected());
+        // NB: The first invalid header is the one reported.
+        assert_eq!(
+            error.to_string(),
+            format!("Invalid handshake header `{name}`")
+        );
+        assert!(core::error::Error::source(&error).is_some());
+
+        let error = timeout!(service.run()).expect_err("Expected an invalid header");
+        assert!(error.is_invalid_header(), "{error}");
+        assert_eq!(service.handle().state(), ClientState::Closed);
+    }
+
+    #[tokio::test]
+    async fn an_invalid_header_value_fails_without_connecting() {
+        assert_invalid_header("Cookie", "session=4b0c2d\r\nX-Injected: yes").await;
+    }
+
+    #[tokio::test]
+    async fn an_invalid_header_name_fails_without_connecting() {
+        assert_invalid_header("Bad Name", "value").await;
+        assert_invalid_header("", "value").await;
+    }
+
+    /// The headers the handshake is made of are set by the client and cannot
+    /// be added, whatever their case.
+    #[tokio::test]
+    async fn a_handshake_header_cannot_be_added() {
+        for name in [
+            "Host",
+            "connection",
+            "UPGRADE",
+            "Sec-WebSocket-Key",
+            "Sec-WebSocket-Version",
+        ] {
+            assert_invalid_header(name, "value").await;
+        }
+    }
+}
