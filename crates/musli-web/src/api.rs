@@ -224,6 +224,7 @@
 
 use core::fmt;
 use core::num::NonZeroU16;
+use core::str::FromStr;
 use core::sync::atomic::{AtomicU16, Ordering};
 
 use musli::alloc::Global;
@@ -509,6 +510,65 @@ impl fmt::Display for Format {
     }
 }
 
+/// The error returned when parsing a [`Format`] from a string which is not the
+/// [`name`] of any format.
+///
+/// [`name`]: Format::name
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::api::Format;
+///
+/// let error = "yaml".parse::<Format>().unwrap_err();
+/// assert_eq!(error.to_string(), "unknown format, expected one of: packed, storage, wire, descriptive, json");
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ParseFormatError;
+
+impl fmt::Display for ParseFormatError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("unknown format, expected one of: packed, storage, wire, descriptive, json")
+    }
+}
+
+impl core::error::Error for ParseFormatError {}
+
+impl FromStr for Format {
+    type Err = ParseFormatError;
+
+    /// Parse a format from exactly what its [`Display`] implementation and
+    /// [`Format::name`] produce.
+    ///
+    /// Matching is case sensitive and does not trim whitespace.
+    ///
+    /// [`Display`]: fmt::Display
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Format;
+    ///
+    /// assert_eq!("wire".parse::<Format>(), Ok(Format::Wire));
+    /// assert!("Wire".parse::<Format>().is_err());
+    ///
+    /// for format in Format::ALL {
+    ///     assert_eq!(format.to_string().parse::<Format>(), Ok(*format));
+    /// }
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        for &format in Self::ALL {
+            if format.name() == s {
+                return Ok(format);
+            }
+        }
+
+        Err(ParseFormatError)
+    }
+}
+
 /// How a socket frames the messages it carries.
 ///
 /// This picks between the two shapes a message can have on the wire. It is
@@ -668,6 +728,65 @@ impl fmt::Display for Mode {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.name())
+    }
+}
+
+/// The error returned when parsing a [`Mode`] from a string which is not the
+/// [`name`] of any mode.
+///
+/// [`name`]: Mode::name
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::api::Mode;
+///
+/// let error = "both".parse::<Mode>().unwrap_err();
+/// assert_eq!(error.to_string(), "unknown mode, expected one of: binary, text");
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ParseModeError;
+
+impl fmt::Display for ParseModeError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("unknown mode, expected one of: binary, text")
+    }
+}
+
+impl core::error::Error for ParseModeError {}
+
+impl FromStr for Mode {
+    type Err = ParseModeError;
+
+    /// Parse a mode from exactly what its [`Display`] implementation and
+    /// [`Mode::name`] produce.
+    ///
+    /// Matching is case sensitive and does not trim whitespace.
+    ///
+    /// [`Display`]: fmt::Display
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::api::Mode;
+    ///
+    /// assert_eq!("text".parse::<Mode>(), Ok(Mode::Text));
+    /// assert!("Text".parse::<Mode>().is_err());
+    ///
+    /// for mode in Mode::ALL {
+    ///     assert_eq!(mode.to_string().parse::<Mode>(), Ok(*mode));
+    /// }
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        for &mode in Self::ALL {
+            if mode.name() == s {
+                return Ok(mode);
+            }
+        }
+
+        Err(ParseModeError)
     }
 }
 
@@ -1262,4 +1381,45 @@ pub struct RequestHeader {
     ///
     /// [application versions]: crate::api#application-versions
     pub app: u32,
+}
+
+#[cfg(test)]
+mod from_str_tests {
+    use crate::std::string::ToString;
+
+    use super::{Format, Mode, ParseFormatError, ParseModeError};
+
+    #[test]
+    fn format_round_trips() {
+        for &format in Format::ALL {
+            assert_eq!(format.name().parse::<Format>(), Ok(format));
+            assert_eq!(format.to_string().parse::<Format>(), Ok(format));
+        }
+    }
+
+    #[test]
+    fn mode_round_trips() {
+        for &mode in Mode::ALL {
+            assert_eq!(mode.name().parse::<Mode>(), Ok(mode));
+            assert_eq!(mode.to_string().parse::<Mode>(), Ok(mode));
+        }
+    }
+
+    #[test]
+    fn format_rejects() {
+        for s in [
+            "", " wire", "wire ", "Wire", "WIRE", "json\n", "binary", "w", "wire\0",
+        ] {
+            assert_eq!(s.parse::<Format>(), Err(ParseFormatError), "{s:?}");
+        }
+    }
+
+    #[test]
+    fn mode_rejects() {
+        for s in [
+            "", " text", "text ", "Text", "BINARY", "wire", "bin", "text\0",
+        ] {
+            assert_eq!(s.parse::<Mode>(), Err(ParseModeError), "{s:?}");
+        }
+    }
 }
