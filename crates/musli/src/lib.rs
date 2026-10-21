@@ -581,7 +581,7 @@ pub use musli_core::mode;
 pub use musli_core::Context;
 
 #[doc(inline)]
-pub use self::de::{Decode, Decoder};
+pub use self::de::{Decode, DecodeOwned, Decoder};
 
 #[doc(inline)]
 pub use self::en::{Encode, Encoder};

@@ -43,6 +43,14 @@ use super::Decoder;
 ///     }
 /// }
 /// ```
+///
+/// # Owned bounds
+///
+/// To require a value which doesn't borrow from its input, use
+/// [`DecodeOwned`] instead of writing `for<'de> Decode<'de, M, A>`. See its
+/// documentation for how to use it.
+///
+/// [`DecodeOwned`]: crate::de::DecodeOwned
 pub trait Decode<'de, M, A>: Sized
 where
     A: Allocator,
