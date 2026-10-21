@@ -495,20 +495,37 @@ fn send_hello(service: &Service<MockImpl>) -> (Outcomes, Request) {
     (outcomes, request)
 }
 
-/// Open a channel, recording what its callback is called with.
-fn open_channel(service: &Service<MockImpl>) -> (Outcomes, Request) {
-    let outcomes = Outcomes::default();
+/// Every event a channel has reported, spelled out.
+type Events = Rc<RefCell<Vec<String>>>;
 
-    let request = service
+/// Open a channel, recording every event it reports.
+fn open_channel(service: &Service<MockImpl>) -> (Events, Channel<MockImpl>) {
+    let events = Events::default();
+
+    let channel = service
         .handle()
         .channel()
-        .on_open({
-            let outcomes = outcomes.clone();
-            move |result: Result<Channel<MockImpl>>| outcomes.borrow_mut().push(outcome(result))
-        })
-        .send();
+        .on_change({
+            let events = events.clone();
 
-    (outcomes, request)
+            move |event: ChannelEvent| {
+                let event = match event {
+                    ChannelEvent::Opened(id) => format!("opened {}", id.raw()),
+                    ChannelEvent::Closed => String::from("closed"),
+                    ChannelEvent::Failed(error) => format!("failed: {error}"),
+                };
+
+                events.borrow_mut().push(event);
+            }
+        })
+        .open();
+
+    (events, channel)
+}
+
+/// Take every event recorded so far.
+fn take_events(events: &Events) -> Vec<String> {
+    mem::take(&mut *events.borrow_mut())
 }
 
 /// Whether any request is still waiting for a response.
@@ -542,9 +559,13 @@ fn send_error_fails_the_channel() {
 
     on_send(|| Err(Error::message("Send failed")));
 
-    let (outcomes, _request) = open_channel(&service);
+    let (events, channel) = open_channel(&service);
 
-    assert_eq!(*outcomes.borrow(), vec![Some(String::from("Send failed"))]);
+    assert_eq!(
+        take_events(&events),
+        vec![String::from("failed: Send failed")]
+    );
+    assert!(!channel.is_open());
     assert!(!has_pending(&service));
     assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
 }
@@ -586,7 +607,8 @@ fn send_error_after_pending_requests_were_failed() {
 }
 
 /// Like [`send_error_after_pending_requests_were_failed`], but for opening a
-/// channel.
+/// channel. A channel lost with the connection is not a failure, since it is
+/// opened again once the connection is back, so nothing is reported.
 #[test]
 fn channel_send_error_after_pending_requests_were_failed() {
     let (builder, errors) = builder(Connect::url(String::from(URL)));
@@ -594,12 +616,10 @@ fn channel_send_error_after_pending_requests_were_failed() {
     open_session(&service);
     fail_pending_on_send(&service);
 
-    let (outcomes, _request) = open_channel(&service);
+    let (events, channel) = open_channel(&service);
 
-    assert_eq!(
-        *outcomes.borrow(),
-        vec![Some(String::from("Connection closed"))]
-    );
+    assert!(take_events(&events).is_empty());
+    assert!(!channel.is_open());
     assert!(!has_pending(&service));
     assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
 }
@@ -708,11 +728,9 @@ fn request_over_closed_channel_is_not_connected() {
 
     let failures = Failures::default();
 
-    let channel = Channel {
-        handle: service.handle().clone(),
-        id: ChannelId::NONE,
-        generation: service.handle().generation(),
-    };
+    // NB: Not answered, so the channel never opens.
+    let channel = service.handle().channel().open();
+    take_ops();
 
     let _request = channel
         .request()
@@ -1112,22 +1130,24 @@ fn on_open_reports_each_open() {
     assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
 }
 
-/// Open a channel and answer the request with `id`, returning the channel.
-fn connect_channel(service: &Service<MockImpl>, id: u16) -> Channel<MockImpl> {
-    let channel = Rc::new(RefCell::new(None));
+/// Take the request to open a channel, which must be the last frame sent,
+/// returning its serial.
+fn take_connect() -> u32 {
+    let Some(Op::Send(mode, bytes)) = take_ops().pop() else {
+        panic!("Expected a request to open a channel");
+    };
 
-    let _request = service
-        .handle()
-        .channel()
-        .on_open({
-            let channel = channel.clone();
-            move |result: Result<Channel<MockImpl>>| *channel.borrow_mut() = Some(result.unwrap())
-        })
-        .send();
+    let mut at = 0;
+    let request: api::RequestHeader = format::decode_envelope(mode, &bytes, &mut at).unwrap();
+    assert_eq!(request.id, MessageId::CONNECT.get());
+    request.serial
+}
 
+/// Answer the request with `serial` to open a channel with `id`.
+fn answer_connect(service: &Service<MockImpl>, serial: u32, id: u16) {
     let response = api::ResponseHeader {
         version: api::VERSION,
-        serial: last_serial(),
+        serial,
         broadcast: 0,
         error: 0,
         format: Format::DEFAULT.to_u8(),
@@ -1135,8 +1155,25 @@ fn connect_channel(service: &Service<MockImpl>, id: u16) -> Channel<MockImpl> {
     };
 
     deliver(service, Mode::Binary, &response, b"");
-    let channel = channel.borrow_mut().take();
-    channel.expect("Channel was not opened")
+}
+
+/// Answer the request to open a channel which was sent last with `id`.
+fn accept_channel(service: &Service<MockImpl>, id: u16) {
+    let serial = take_connect();
+    answer_connect(service, serial, id);
+}
+
+/// Whether `ops` holds a request to open a channel.
+fn connects(ops: &[Op]) -> bool {
+    ops.iter().any(|op| {
+        let Op::Send(mode, bytes) = op else {
+            return false;
+        };
+
+        let mut at = 0;
+        let request: api::RequestHeader = format::decode_envelope(*mode, bytes, &mut at).unwrap();
+        request.id == MessageId::CONNECT.get()
+    })
 }
 
 /// Whether `ops` holds a disconnect of `channel`.
@@ -1152,32 +1189,11 @@ fn disconnects(ops: &[Op], channel: u16) -> bool {
     })
 }
 
-/// A channel remembers the generation it was opened in, and is closed for
-/// good once the connection has reopened.
-#[test]
-fn channel_from_earlier_connection_is_stale() {
-    let (builder, errors) = builder(Connect::url(String::from(URL)));
-    let service = builder.build();
-    take_ops();
-    open_session(&service);
-
-    let channel = connect_channel(&service, 7);
-    assert_eq!(channel.id(), ChannelId::from_u16(7));
-    assert_eq!(channel.generation(), 1);
-    assert!(channel.is_open());
-
-    service.shared.close_and_reconnect().unwrap();
-    assert!(!channel.is_open());
-    assert_eq!(fire_timers(), 1);
-    take_ops();
-    open_session(&service);
-
-    assert_eq!(channel.generation(), 1);
-    assert!(!channel.is_open());
-
+/// Send a [`Hello`] over `channel`, recording every error its callback gets.
+fn send_hello_over(channel: &Channel<MockImpl>) -> (Failures, Request) {
     let failures = Failures::default();
 
-    let _request = channel
+    let request = channel
         .request()
         .body(Hello)
         .on_raw_packet({
@@ -1191,36 +1207,429 @@ fn channel_from_earlier_connection_is_stale() {
         })
         .send();
 
-    let error = single(&failures);
-    assert_kind(&error, "not_connected");
+    (failures, request)
+}
+
+/// The channel of the request which was sent last.
+fn last_channel() -> ChannelId {
+    let Some(Op::Send(mode, bytes)) = take_ops().pop() else {
+        panic!("Expected a request to be sent");
+    };
+
+    let mut at = 0;
+    let request: api::RequestHeader = format::decode_envelope(mode, &bytes, &mut at).unwrap();
+    request.channel
+}
+
+/// A channel set up before the connection opens is opened once it does, is
+/// reported closed when the connection is lost, and is opened again by itself
+/// once the connection is back.
+#[test]
+fn channel_opens_closes_and_reopens() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    let (events, channel) = open_channel(&service);
+
+    // Nothing is asked for before the connection is open.
     assert!(take_ops().is_empty());
+    assert!(take_events(&events).is_empty());
+    assert!(!channel.is_open());
+    assert_eq!(channel.id(), ChannelId::NONE);
+    assert_eq!(channel.generation(), 0);
 
-    // The new connection may hand the same id to another channel, which
-    // dropping the stale one must leave alone.
-    let current = connect_channel(&service, 7);
-    assert_eq!(current.generation(), 2);
-    assert!(current.is_open());
+    open_session(&service);
+    accept_channel(&service, 7);
 
+    assert_eq!(take_events(&events), vec![String::from("opened 7")]);
+    assert!(channel.is_open());
+    assert_eq!(channel.id(), ChannelId::from_u16(7));
+    assert_eq!(channel.generation(), 1);
+
+    let (failures, _request) = send_hello_over(&channel);
+    assert!(failures.borrow().is_empty());
+    assert_eq!(last_channel(), ChannelId::from_u16(7));
+
+    // Losing the connection closes the channel.
+    service.shared.close_and_reconnect().unwrap();
+    assert_eq!(take_events(&events), vec![String::from("closed")]);
+    assert!(!channel.is_open());
+    assert_eq!(channel.id(), ChannelId::NONE);
+    assert_eq!(channel.generation(), 1);
+
+    // And reconnecting opens it again, with whatever id the server hands out.
+    assert_eq!(fire_timers(), 1);
+    take_ops();
+    open_session(&service);
+    assert!(!channel.is_open());
+    accept_channel(&service, 9);
+
+    assert_eq!(take_events(&events), vec![String::from("opened 9")]);
+    assert!(channel.is_open());
+    assert_eq!(channel.id(), ChannelId::from_u16(9));
+    assert_eq!(channel.generation(), 2);
+
+    let (failures, _request) = send_hello_over(&channel);
+    assert!(failures.borrow().is_empty());
+    assert_eq!(last_channel(), ChannelId::from_u16(9));
+
+    // An explicit close and open does the same.
+    service.close();
+    assert_eq!(take_events(&events), vec![String::from("closed")]);
+    service.open();
+    take_ops();
+    open_session(&service);
+    accept_channel(&service, 3);
+    assert_eq!(take_events(&events), vec![String::from("opened 3")]);
+    assert_eq!(channel.generation(), 3);
+
+    // Dropping the channel disconnects the current id only, and stops it from
+    // being opened again.
     drop(channel);
-    assert!(!disconnects(&take_ops(), 7));
-    assert!(current.is_open());
+    let ops = take_ops();
+    assert!(disconnects(&ops, 3));
+    assert!(!disconnects(&ops, 7));
+    assert!(!disconnects(&ops, 9));
 
-    drop(current);
-    assert!(disconnects(&take_ops(), 7));
+    reconnect(&service);
+    assert!(!connects(&take_ops()));
+    assert!(take_events(&events).is_empty());
     assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
 }
 
-/// A channel opened over the current connection is still disconnected when
-/// dropped.
+/// A channel set up while the connection is open is opened straight away.
 #[test]
-fn channel_is_disconnected_on_drop() {
+fn channel_opens_straight_away_when_connected() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+    open_session(&service);
+
+    let (events, channel) = open_channel(&service);
+    accept_channel(&service, 4);
+
+    assert_eq!(take_events(&events), vec![String::from("opened 4")]);
+    assert!(channel.is_open());
+    assert_eq!(channel.generation(), 1);
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// A request over a channel which is closed, or not open yet, fails as not
+/// connected without being sent, and works once it has opened again.
+#[test]
+fn channel_request_while_closed_is_not_connected() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    let (_events, channel) = open_channel(&service);
+
+    // Before the connection is open.
+    let (failures, _request) = send_hello_over(&channel);
+    assert_kind(&single(&failures), "not_connected");
+    assert!(take_ops().is_empty());
+
+    // While the server has not answered.
+    open_session(&service);
+    let serial = take_connect();
+    let (failures, _request) = send_hello_over(&channel);
+    assert_kind(&single(&failures), "not_connected");
+    assert!(take_ops().is_empty());
+
+    answer_connect(&service, serial, 5);
+
+    // After the connection was lost.
+    service.shared.close_and_reconnect().unwrap();
+    take_ops();
+    let (failures, _request) = send_hello_over(&channel);
+    assert_kind(&single(&failures), "not_connected");
+    assert!(take_ops().is_empty());
+
+    assert_eq!(fire_timers(), 1);
+    take_ops();
+    open_session(&service);
+    accept_channel(&service, 6);
+
+    let (failures, _request) = send_hello_over(&channel);
+    assert!(failures.borrow().is_empty());
+    assert_eq!(last_channel(), ChannelId::from_u16(6));
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// `when_open` runs straight away on an open channel, and otherwise waits for
+/// it to open, in order, before the channel reports it opened.
+#[test]
+fn channel_when_open_waits_for_the_channel() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    let order = Rc::new(RefCell::new(Vec::new()));
+
+    let channel = service
+        .handle()
+        .channel()
+        .on_change({
+            let order = order.clone();
+
+            move |event: ChannelEvent| {
+                if let ChannelEvent::Opened(..) = event {
+                    order.borrow_mut().push(String::from("opened"));
+                }
+            }
+        })
+        .open();
+
+    let queue = |name: &'static str| {
+        let order = order.clone();
+
+        channel.when_open(move |channel: &Channel<MockImpl>| {
+            assert!(channel.is_open());
+            order
+                .borrow_mut()
+                .push(format!("{name} {}", channel.id().raw()));
+        });
+    };
+
+    queue("first");
+    queue("second");
+    assert!(order.borrow().is_empty());
+
+    open_session(&service);
+    assert!(order.borrow().is_empty());
+    accept_channel(&service, 8);
+
+    assert_eq!(
+        mem::take(&mut *order.borrow_mut()),
+        vec![
+            String::from("first 8"),
+            String::from("second 8"),
+            String::from("opened"),
+        ]
+    );
+
+    // Straight away while open.
+    queue("now");
+    assert_eq!(
+        mem::take(&mut *order.borrow_mut()),
+        vec![String::from("now 8")]
+    );
+
+    // A request made while the connection is down goes out once the channel
+    // is open again.
+    service.shared.close_and_reconnect().unwrap();
+    take_ops();
+
+    let failures = Failures::default();
+    let sent = Rc::new(RefCell::new(Request::new()));
+
+    channel.when_open({
+        let failures = failures.clone();
+        let sent = sent.clone();
+
+        move |channel: &Channel<MockImpl>| {
+            *sent.borrow_mut() = channel
+                .request()
+                .body(Hello)
+                .on_raw_packet(move |result: Result<RawPacket>| {
+                    if let Err(error) = result {
+                        failures.borrow_mut().push(error);
+                    }
+                })
+                .send();
+        }
+    });
+
+    assert_eq!(fire_timers(), 1);
+    take_ops();
+    open_session(&service);
+    accept_channel(&service, 2);
+
+    assert_eq!(last_channel(), ChannelId::from_u16(2));
+    assert!(failures.borrow().is_empty());
+    assert!(sent.borrow().is_pending());
+
+    // Queued calls are dropped with the channel.
+    service.shared.close_and_reconnect().unwrap();
+    let dropped = Rc::new(Cell::new(false));
+
+    struct SetOnDrop(Rc<Cell<bool>>);
+
+    impl Drop for SetOnDrop {
+        fn drop(&mut self) {
+            self.0.set(true);
+        }
+    }
+
+    channel.when_open({
+        let guard = SetOnDrop(dropped.clone());
+
+        move |_: &Channel<MockImpl>| {
+            let _guard = guard;
+            panic!("Should never be called");
+        }
+    });
+
+    assert!(!dropped.get());
+    drop(channel);
+    assert!(dropped.get());
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// Losing the connection while the channel is being opened reports nothing
+/// but the channel opening once the connection is back.
+#[test]
+fn channel_lost_while_opening_is_opened_again() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    let (events, channel) = open_channel(&service);
+    open_session(&service);
+    let serial = take_connect();
+
+    service.shared.close_and_reconnect().unwrap();
+    assert!(take_events(&events).is_empty());
+    assert!(!has_pending(&service));
+
+    // A late answer for the lost connection is ignored.
+    answer_connect(&service, serial, 1);
+    assert!(take_events(&events).is_empty());
+    assert!(!channel.is_open());
+
+    assert_eq!(fire_timers(), 1);
+    take_ops();
+    open_session(&service);
+    accept_channel(&service, 2);
+    assert_eq!(take_events(&events), vec![String::from("opened 2")]);
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// A server which refuses to open the channel is reported as a failure, and
+/// the channel is tried again when the connection reopens.
+#[test]
+fn channel_refused_by_server_is_failed() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    let (events, channel) = open_channel(&service);
+    open_session(&service);
+    let serial = take_connect();
+
+    let response = api::ResponseHeader {
+        version: api::VERSION,
+        serial,
+        broadcast: 0,
+        error: MessageId::ERROR_MESSAGE.get(),
+        format: Format::DEFAULT.to_u8(),
+        channel: ChannelId::NONE,
+    };
+
+    deliver(
+        &service,
+        Mode::Binary,
+        &response,
+        &error_body("Out of channels"),
+    );
+
+    assert_eq!(
+        take_events(&events),
+        vec![String::from("failed: Server error: Out of channels")]
+    );
+    assert!(!channel.is_open());
+
+    reconnect(&service);
+    accept_channel(&service, 1);
+    assert_eq!(take_events(&events), vec![String::from("opened 1")]);
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// Clones refer to the same channel, which is disconnected once the last of
+/// them is dropped.
+#[test]
+fn channel_clones_share_the_channel() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+    open_session(&service);
+
+    let (_events, channel) = open_channel(&service);
+    let clone = channel.clone();
+    accept_channel(&service, 3);
+
+    assert!(clone.is_open());
+    assert_eq!(clone.id(), ChannelId::from_u16(3));
+    assert!(channel == clone);
+
+    drop(channel);
+    assert!(!disconnects(&take_ops(), 3));
+    assert!(clone.is_open());
+
+    drop(clone);
+    assert!(disconnects(&take_ops(), 3));
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// A channel dropped while the connection is down has nothing to disconnect,
+/// and sends nothing.
+#[test]
+fn channel_dropped_while_closed_sends_nothing() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+    open_session(&service);
+
+    let (_events, channel) = open_channel(&service);
+    accept_channel(&service, 3);
+
+    service.shared.close_and_reconnect().unwrap();
+    take_ops();
+    drop(channel);
+
+    assert!(take_ops().is_empty());
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// Dropping the service closes an open channel and cancels one which is
+/// still being opened, without touching the request table while it is in
+/// use.
+#[test]
+fn channel_outlives_the_service() {
     let (builder, _) = builder(Connect::url(String::from(URL)));
     let service = builder.build();
     take_ops();
     open_session(&service);
 
-    let channel = connect_channel(&service, 3);
-    take_ops();
-    drop(channel);
-    assert!(disconnects(&take_ops(), 3));
+    let (open_events, open) = open_channel(&service);
+    accept_channel(&service, 3);
+    take_events(&open_events);
+
+    let (opening_events, opening) = open_channel(&service);
+    take_connect();
+
+    drop(service);
+
+    assert_eq!(take_events(&open_events), vec![String::from("closed")]);
+    assert!(take_events(&opening_events).is_empty());
+    assert!(!open.is_open());
+    assert!(!opening.is_open());
+
+    // Neither has a service to send anything to.
+    drop(open);
+    drop(opening);
+}
+
+/// A default channel is not connected to anything and never opens.
+#[test]
+fn default_channel_never_opens() {
+    let channel = Channel::<MockImpl>::default();
+    assert!(!channel.is_open());
+    assert_eq!(channel.id(), ChannelId::NONE);
+    assert_eq!(channel.generation(), 0);
+
+    let (failures, _request) = send_hello_over(&channel);
+    assert_kind(&single(&failures), "not_connected");
+    assert_eq!(channel, Channel::default());
 }

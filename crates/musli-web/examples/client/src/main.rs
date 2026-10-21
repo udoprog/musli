@@ -25,8 +25,10 @@ enum Msg {
     HelloResponse(Result<ws::Packet<api::Hello>, ws::Error>),
     Tick(Result<ws::Packet<api::Tick>, ws::Error>),
     State(ws::State),
-    OnConnect1(Result<ws::Channel, ws::Error>),
-    OnConnect2(Result<ws::Channel, ws::Error>),
+    Channel1(ws::ChannelEvent),
+    Channel2(ws::ChannelEvent),
+    CloseChannel1,
+    CloseChannel2,
     Reconnect,
 }
 
@@ -41,9 +43,7 @@ struct App {
     responses: Vec<String>,
     messages: VecDeque<(usize, String)>,
     channel1: ws::Channel,
-    _channel1_connect: ws::Request,
     channel2: ws::Channel,
-    _channel2_connect: ws::Request,
     count: usize,
 }
 
@@ -65,6 +65,20 @@ impl Component for App {
             .handle()
             .on_state_change(ctx.link().callback(Msg::State));
 
+        // NB: Channels open once the connection does, and open again by
+        // themselves every time it reconnects.
+        let channel1 = service
+            .handle()
+            .channel()
+            .on_change(ctx.link().callback(Msg::Channel1))
+            .open();
+
+        let channel2 = service
+            .handle()
+            .channel()
+            .on_change(ctx.link().callback(Msg::Channel2))
+            .open();
+
         Self {
             state,
             service,
@@ -75,10 +89,8 @@ impl Component for App {
             tick: 0,
             responses: Vec::new(),
             messages: VecDeque::new(),
-            _channel1_connect: ws::Request::new(),
-            _channel2_connect: ws::Request::new(),
-            channel1: ws::Channel::default(),
-            channel2: ws::Channel::default(),
+            channel1,
+            channel2,
             count: 0,
         }
     }
@@ -148,33 +160,47 @@ impl Component for App {
                 tracing::debug!(?state);
 
                 self.state = state;
-                self.refresh(ctx);
+
+                if self.state.is_open() {
+                    self.count = 0;
+                    self.responses.clear();
+                    self.messages.clear();
+                }
+
                 true
             }
             Msg::Reconnect => {
-                self.refresh(ctx);
+                self.channel1 = self
+                    .service
+                    .handle()
+                    .channel()
+                    .on_change(ctx.link().callback(Msg::Channel1))
+                    .open();
+
+                self.channel2 = self
+                    .service
+                    .handle()
+                    .channel()
+                    .on_change(ctx.link().callback(Msg::Channel2))
+                    .open();
+
                 true
             }
-            Msg::OnConnect1(channel1) => {
-                tracing::info!(?channel1);
-
-                if let Ok(channel) = channel1 {
-                    self.channel1 = channel;
-                } else {
-                    self.channel1 = ws::Channel::default();
-                }
-
+            Msg::Channel1(event) => {
+                tracing::info!(channel1 = ?event);
                 true
             }
-            Msg::OnConnect2(channel2) => {
-                tracing::info!(?channel2);
-
-                if let Ok(channel) = channel2 {
-                    self.channel2 = channel;
-                } else {
-                    self.channel2 = ws::Channel::default();
-                }
-
+            Msg::Channel2(event) => {
+                tracing::info!(channel2 = ?event);
+                true
+            }
+            Msg::CloseChannel1 => {
+                // NB: Dropping the channel closes it for good.
+                self.channel1 = ws::Channel::default();
+                true
+            }
+            Msg::CloseChannel2 => {
+                self.channel2 = ws::Channel::default();
                 true
             }
         }
@@ -192,13 +218,8 @@ impl Component for App {
 
         let onclick = ctx.link().callback(|_: MouseEvent| Msg::Send);
 
-        let close_channel1 = ctx
-            .link()
-            .callback(|_: MouseEvent| Msg::OnConnect1(Err(ws::Error::message("channel closed"))));
-
-        let close_channel2 = ctx
-            .link()
-            .callback(|_: MouseEvent| Msg::OnConnect2(Err(ws::Error::message("channel closed"))));
+        let close_channel1 = ctx.link().callback(|_: MouseEvent| Msg::CloseChannel1);
+        let close_channel2 = ctx.link().callback(|_: MouseEvent| Msg::CloseChannel2);
 
         let reconnect_channels = ctx.link().callback(|_: MouseEvent| Msg::Reconnect);
 
@@ -237,33 +258,6 @@ impl Component for App {
                     {for self.messages.iter().map(|(count, message)| html!(<div key={format!("message-{count}")}>{format!("Message #{count}: {message}")}</div>))}
                 </div>
             </div>
-        }
-    }
-}
-
-impl App {
-    fn refresh(&mut self, ctx: &Context<Self>) {
-        if self.state.is_open() {
-            self._channel1_connect = self
-                .service
-                .handle()
-                .channel()
-                .on_open(ctx.link().callback(Msg::OnConnect1))
-                .send();
-
-            self._channel2_connect = self
-                .service
-                .handle()
-                .channel()
-                .on_open(ctx.link().callback(Msg::OnConnect2))
-                .send();
-
-            self.count = 0;
-            self.responses.clear();
-            self.messages.clear();
-        } else {
-            self.channel1 = ws::Channel::default();
-            self.channel2 = ws::Channel::default();
         }
     }
 }

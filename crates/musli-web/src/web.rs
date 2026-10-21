@@ -31,11 +31,11 @@
 //!   when it sees [`State::Open`], and pass the value down as a property, so
 //!   that a child refetches when the property changes.
 //!
-//! A [`Channel`] remembers the generation it was opened over in
-//! [`Channel::generation`]. Once the connection has reopened the channel is
-//! stale: [`Channel::is_open`] returns `false`, requests over it fail with
-//! [`Error::is_not_connected`], and it has to be opened again over the new
-//! connection.
+//! A [`Channel`] is opened again by itself every time the connection reopens,
+//! and tells about it through the callback set with
+//! [`ChannelBuilder::on_change`], see [`Handle::channel`]. A component which
+//! holds a channel can fetch again when it hears [`ChannelEvent::Opened`]
+//! instead of tracking the generation.
 //!
 //! ## Refetching after a reconnect
 //!
@@ -741,13 +741,17 @@ where
         // weak references to Shared and by virtue of this being dropped they
         // are all invalid.
         let state_listeners = mem::take(&mut *self.g.state_listeners.borrow_mut());
-        let mut requests = self.g.requests.borrow_mut();
 
+        // NB: Listeners are called before the requests are taken, since a
+        // listener can cancel a request of its own, such as a channel which
+        // was being opened.
         for (_, listener) in state_listeners {
             listener.call(State::Closed);
         }
 
-        for (_, p) in requests.drain() {
+        let requests = mem::take(&mut *self.g.requests.borrow_mut());
+
+        for (_, p) in requests {
             p.callback.error(Error::new(ErrorKind::ConnectionLost(
                 "Websocket service closed",
             )));
@@ -1616,13 +1620,11 @@ where
     }
 }
 
-/// A request builder .
+/// A builder for a [`Channel`], see [`Handle::channel`].
 ///
-/// Associate the callback to be used by using either
-/// [`RequestBuilder::on_packet`] or [`RequestBuilder::on_raw_packet`] depending
-/// on your needs.
-///
-/// Send the request with [`RequestBuilder::send`].
+/// Set the callback to tell about the channel opening and closing with
+/// [`ChannelBuilder::on_change`], and open the channel with
+/// [`ChannelBuilder::open`].
 pub struct ChannelBuilder<'a, H, C>
 where
     H: WebImpl,
@@ -1635,7 +1637,16 @@ impl<'a, H, C> ChannelBuilder<'a, H, C>
 where
     H: WebImpl,
 {
-    /// Define the handler to be called when a connection is established.
+    /// Set the callback which is told about the channel opening and closing.
+    ///
+    /// The callback is called with:
+    ///
+    /// * [`ChannelEvent::Opened`] every time the channel has been opened,
+    ///   whether for the first time or again after a reconnect. This is the
+    ///   point at which to send the requests which need the channel.
+    /// * [`ChannelEvent::Closed`] when an open channel has been lost with the
+    ///   connection.
+    /// * [`ChannelEvent::Failed`] when the server could not open the channel.
     ///
     /// # Examples
     ///
@@ -1670,7 +1681,7 @@ where
     ///
     /// enum Msg {
     ///     OnHello(Result<ws::Packet<api::Hello>, ws::Error>),
-    ///     OnChannel(Result<ws::Channel, ws::Error>),
+    ///     Channel(ws::ChannelEvent),
     /// }
     ///
     /// #[derive(Properties, PartialEq)]
@@ -1681,7 +1692,6 @@ where
     /// struct App {
     ///     message: String,
     ///     _hello: ws::Request,
-    ///     _channel_open: ws::Request,
     ///     channel: ws::Channel,
     /// }
     ///
@@ -1690,18 +1700,15 @@ where
     ///     type Properties = Props;
     ///
     ///     fn create(ctx: &Context<Self>) -> Self {
-    ///         let link = ctx.link().clone();
-    ///
-    ///         let _channel_open = ctx.props().ws
+    ///         let channel = ctx.props().ws
     ///             .channel()
-    ///             .on_open(ctx.link().callback(Msg::OnChannel))
-    ///             .send();
+    ///             .on_change(ctx.link().callback(Msg::Channel))
+    ///             .open();
     ///
     ///         Self {
     ///             message: String::from("No Message :("),
-    ///             _hello: ws::Request::default(),
-    ///             _channel_open: _channel_open,
-    ///             channel: ws::Channel::default(),
+    ///             _hello: ws::Request::new(),
+    ///             channel,
     ///         }
     ///     }
     ///
@@ -1718,11 +1725,7 @@ where
     ///
     ///                 true
     ///             }
-    ///             Msg::OnChannel(result) => {
-    ///                 if let Ok(channel) = result {
-    ///                     self.channel = channel;
-    ///                 }
-    ///
+    ///             Msg::Channel(ws::ChannelEvent::Opened(..)) => {
     ///                 self._hello = self.channel
     ///                     .request()
     ///                     .body(api::HelloRequest { message: "Hello!"})
@@ -1731,6 +1734,11 @@ where
     ///
     ///                 true
     ///             }
+    ///             Msg::Channel(ws::ChannelEvent::Failed(error)) => {
+    ///                 tracing::error!("Channel error: {error}");
+    ///                 true
+    ///             }
+    ///             Msg::Channel(..) => true,
     ///         }
     ///     }
     ///
@@ -1744,9 +1752,9 @@ where
     ///     }
     /// }
     /// ```
-    pub fn on_open<U>(self, callback: U) -> ChannelBuilder<'a, H, U>
+    pub fn on_change<U>(self, callback: U) -> ChannelBuilder<'a, H, U>
     where
-        U: Callback<Result<Channel<H>, Error>>,
+        U: Callback<ChannelEvent>,
     {
         ChannelBuilder {
             shared: self.shared,
@@ -1757,93 +1765,122 @@ where
 
 impl<'a, H, C> ChannelBuilder<'a, H, C>
 where
-    C: Callback<Result<Channel<H>, Error>>,
+    C: Callback<ChannelEvent>,
     H: WebImpl,
 {
-    /// Send the connection request.
-    pub fn send(self) -> Request {
-        struct RequestCallbackImpl<C>(C);
+    /// Open the channel.
+    ///
+    /// The channel is opened straight away if the connection is open, and
+    /// otherwise as soon as it opens. After that it is opened again every time
+    /// the connection reopens, until the returned [`Channel`] and every clone
+    /// of it has been dropped.
+    pub fn open(self) -> Channel<H> {
+        let inner = Rc::new(ChannelInner {
+            handle: Handle {
+                shared: self.shared.clone(),
+            },
+            id: Cell::new(ChannelId::NONE),
+            generation: Cell::new(0),
+            on_change: Box::new(self.callback),
+            queue: RefCell::new(VecDeque::new()),
+            connect: RefCell::new(Request::new()),
+            state: RefCell::new(StateListener::new()),
+        });
 
-        impl<C> RequestCallback for RequestCallbackImpl<C>
-        where
-            C: Fn(Result<ChannelId, Error>) + 'static,
-        {
-            #[inline]
-            fn as_channel(&self) -> Option<&(dyn Fn(Result<ChannelId, Error>) + 'static)> {
-                Some(&self.0)
+        let (state, listener) = inner.handle.on_state_change({
+            // NB: Weak, since the listener is owned by the channel.
+            let inner = Rc::downgrade(&inner);
+
+            move |state: State| {
+                if let Some(inner) = inner.upgrade() {
+                    inner.on_state(state);
+                }
             }
+        });
 
-            #[inline]
-            fn error(&self, error: Error) {
-                (self.0)(Err(error));
-            }
+        *inner.state.borrow_mut() = listener;
+
+        if state.is_open() {
+            inner.connect();
         }
 
-        let Some(shared) = self.shared.upgrade() else {
-            self.callback.call(Err(Error::new(ErrorKind::NotConnected(
-                "WebSocket service is down",
-            ))));
-            return Request::new();
-        };
+        Channel { inner }
+    }
+}
 
-        if shared.state.get() != State::Open {
-            self.callback.call(Err(Error::new(ErrorKind::NotConnected(
-                "WebSocket is not connected",
-            ))));
-            return Request::new();
+/// Ask the server for a new channel over the current connection.
+///
+/// The callback is called with the id the server allocated, or with the error
+/// which prevented it.
+fn connect_channel<H>(
+    shared: &Weak<Shared<H>>,
+    callback: impl Fn(Result<ChannelId, Error>) + 'static,
+) -> Request
+where
+    H: WebImpl,
+{
+    struct RequestCallbackImpl<C>(C);
+
+    impl<C> RequestCallback for RequestCallbackImpl<C>
+    where
+        C: Fn(Result<ChannelId, Error>) + 'static,
+    {
+        #[inline]
+        fn as_channel(&self) -> Option<&(dyn Fn(Result<ChannelId, Error>) + 'static)> {
+            Some(&self.0)
         }
 
-        let serial = shared.serial.get();
-        shared.serial.set(serial.wrapping_add(1));
-
-        let callback = {
-            let shared = Rc::downgrade(&shared);
-
-            move |result| {
-                let result = match result {
-                    Err(error) => Err(error),
-                    Ok(id) => Ok(Channel {
-                        generation: shared.upgrade().map_or(0, |s| s.g.generation.get()),
-                        handle: Handle {
-                            shared: shared.clone(),
-                        },
-                        id,
-                    }),
-                };
-
-                self.callback.call(result)
-            }
-        };
-
-        let pending = Pending {
-            id: MessageId::CONNECT,
-            serial,
-            callback: RequestCallbackImpl(callback),
-        };
-
-        let existing = shared
-            .g
-            .requests
-            .borrow_mut()
-            .insert(serial, Box::new(pending));
-
-        if let Some(p) = existing {
-            p.callback.error(Error::new(ErrorKind::Cancelled));
+        #[inline]
+        fn error(&self, error: Error) {
+            (self.0)(Err(error));
         }
+    }
 
-        if let Err(error) = shared.send_connect(serial) {
-            // NB: The request is registered before it is sent, since sending
-            // can observe synchronously that the peer has gone away and fail
-            // every pending request before it returns. If that did not already
-            // fail this request, it is failed here.
-            shared.fail_request(serial, error);
-            return Request::new();
-        }
+    let Some(shared) = shared.upgrade() else {
+        callback(Err(Error::new(ErrorKind::NotConnected(
+            "WebSocket service is down",
+        ))));
+        return Request::new();
+    };
 
-        Request {
-            serial,
-            g: Rc::downgrade(&shared.g),
-        }
+    if shared.state.get() != State::Open {
+        callback(Err(Error::new(ErrorKind::NotConnected(
+            "WebSocket is not connected",
+        ))));
+        return Request::new();
+    }
+
+    let serial = shared.serial.get();
+    shared.serial.set(serial.wrapping_add(1));
+
+    let pending = Pending {
+        id: MessageId::CONNECT,
+        serial,
+        callback: RequestCallbackImpl(callback),
+    };
+
+    let existing = shared
+        .g
+        .requests
+        .borrow_mut()
+        .insert(serial, Box::new(pending));
+
+    if let Some(p) = existing {
+        p.callback.error(Error::new(ErrorKind::Cancelled));
+    }
+
+    if let Err(error) = shared.send_connect(serial) {
+        // NB: The request is registered before it is sent, since sending
+        // can observe synchronously that the peer has gone away and fail
+        // every pending request before it returns. If that did not already
+        // fail this request, it is failed here.
+        shared.fail_request(serial, error);
+        return Request::new();
+    }
+
+    Request {
+        serial,
+        g: Rc::downgrade(&shared.g),
     }
 }
 
@@ -2961,87 +2998,6 @@ impl<H> Handle<H>
 where
     H: WebImpl,
 {
-    /// Open a new logical channel to the WebSocket server.
-    ///
-    /// A channel can be uniquely identified on the client and server side over
-    /// a single connection. This means that if you send a request over a
-    /// channel using [`Channel::request`], the server can access the
-    /// [`ChannelId`] to determine which channel sent the request and the client
-    /// has the ability to correlate any responses sent by the server by
-    /// inspecting [`Packet::channel`] or [`RawPacket::channel`].
-    ///
-    /// A broadcast caused by a request over a channel can name that channel as
-    /// its origin with [`ws::Server::broadcast_from`], which every listener
-    /// sees as [`Packet::channel`]. This lets a page skip the echo of its own
-    /// changes with [`Packet::is_from`], without carrying the [`ChannelId`] in
-    /// the body of the event.
-    ///
-    /// The maximum number of channels is implementation defined, but expect it
-    /// to be relatively low like `65535` (non-zero 16 bits) to reduce payload
-    /// sizes. Failure to allocate a channel is an error.
-    ///
-    /// [`ws::Server::broadcast_from`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html#method.broadcast_from
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate yew023 as yew;
-    /// use yew::prelude::*;
-    /// use musli_web::web03::prelude::*;
-    ///
-    /// enum Msg {
-    ///     OnChannel(Result<ws::Channel, ws::Error>),
-    /// }
-    ///
-    /// #[derive(Properties, PartialEq)]
-    /// struct Props {
-    ///     ws: ws::Handle,
-    /// }
-    ///
-    /// struct App {
-    ///     _channel_open: ws::Request,
-    ///     channel: ws::Channel,
-    /// }
-    ///
-    /// impl Component for App {
-    ///     type Message = Msg;
-    ///     type Properties = Props;
-    ///
-    ///     fn create(ctx: &Context<Self>) -> Self {
-    ///         let link = ctx.link().clone();
-    ///
-    ///         let _channel_open = ctx.props().ws
-    ///             .channel()
-    ///             .on_open(ctx.link().callback(Msg::OnChannel))
-    ///             .send();
-    ///
-    ///         Self {
-    ///             _channel_open: _channel_open,
-    ///             channel: ws::Channel::default(),
-    ///         }
-    ///     }
-    ///
-    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-    ///         match msg {
-    ///             Msg::OnChannel(result) => {
-    ///                 if let Ok(channel) = result {
-    ///                     self.channel = channel;
-    ///                 }
-    ///
-    ///                 true
-    ///             }
-    ///         }
-    ///     }
-    ///
-    ///     fn view(&self, ctx: &Context<Self>) -> Html {
-    ///         html! {
-    ///             <div>
-    ///                 <h1>{"WebSocket Example"}</h1>
-    ///             </div>
-    ///         }
-    ///     }
-    /// }
-    /// ```
     /// The [`Format`] currently in effect for message bodies.
     ///
     /// Before the connection has been opened this is the format which was
@@ -3102,6 +3058,113 @@ where
         shared.g.generation.get()
     }
 
+    /// Set up a new logical channel to the WebSocket server.
+    ///
+    /// A channel can be uniquely identified on the client and server side over
+    /// a single connection. This means that if you send a request over a
+    /// channel using [`Channel::request`], the server can access the
+    /// [`ChannelId`] to determine which channel sent the request and the client
+    /// has the ability to correlate any responses sent by the server by
+    /// inspecting [`Packet::channel`] or [`RawPacket::channel`].
+    ///
+    /// A broadcast caused by a request over a channel can name that channel as
+    /// its origin with [`ws::Server::broadcast_from`], which every listener
+    /// sees as [`Packet::channel`]. This lets a page skip the echo of its own
+    /// changes with [`Packet::is_from`], without carrying the [`ChannelId`] in
+    /// the body of the event.
+    ///
+    /// The maximum number of channels is implementation defined, but expect it
+    /// to be relatively low like `65535` (non-zero 16 bits) to reduce payload
+    /// sizes. Failure to allocate a channel is reported as
+    /// [`ChannelEvent::Failed`].
+    ///
+    /// [`ws::Server::broadcast_from`]: https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html#method.broadcast_from
+    ///
+    /// # Reconnecting
+    ///
+    /// The server forgets a channel when the connection it was opened over
+    /// closes. The [`Channel`] returned by [`ChannelBuilder::open`] takes care
+    /// of this: it opens itself again every time the connection reopens, so a
+    /// component holds the same [`Channel`] for its whole life. Every time it
+    /// opens the callback set with [`ChannelBuilder::on_change`] is told with
+    /// [`ChannelEvent::Opened`], which is when to send the requests the
+    /// component needs the channel for. It gets a new id each time, and
+    /// [`ChannelEvent::Closed`] is reported when it is lost.
+    ///
+    /// While the channel is not open [`Channel::is_open`] returns `false`, and
+    /// requests over it fail with [`Error::is_not_connected`] without being
+    /// sent, so there is no need to check before sending. A request which
+    /// should go out as soon as the channel is back can be queued with
+    /// [`Channel::when_open`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew023 as yew;
+    /// use yew::prelude::*;
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// enum Msg {
+    ///     Channel(ws::ChannelEvent),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct App {
+    ///     channel: ws::Channel,
+    /// }
+    ///
+    /// impl App {
+    ///     fn fetch(&mut self, ctx: &Context<Self>) {
+    ///         // Send the requests this component shows the result of over
+    ///         // `self.channel`.
+    ///     }
+    /// }
+    ///
+    /// impl Component for App {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         // The channel is opened once the connection is, and opened
+    ///         // again every time the connection reopens.
+    ///         let channel = ctx.props().ws
+    ///             .channel()
+    ///             .on_change(ctx.link().callback(Msg::Channel))
+    ///             .open();
+    ///
+    ///         Self { channel }
+    ///     }
+    ///
+    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::Channel(ws::ChannelEvent::Opened(..)) => {
+    ///                 // Opened for the first time or after a reconnect, so
+    ///                 // fetch everything again.
+    ///                 self.fetch(ctx);
+    ///                 true
+    ///             }
+    ///             Msg::Channel(ws::ChannelEvent::Failed(error)) => {
+    ///                 tracing::error!("Could not open channel: {error}");
+    ///                 true
+    ///             }
+    ///             Msg::Channel(..) => true,
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, ctx: &Context<Self>) -> Html {
+    ///         html! {
+    ///             <div>
+    ///                 <h1>{"WebSocket Example"}</h1>
+    ///                 <p>{format!("Channel open: {}", self.channel.is_open())}</p>
+    ///             </div>
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn channel(&self) -> ChannelBuilder<'_, H, EmptyCallback> {
         ChannelBuilder {
             shared: &self.shared,
@@ -3692,50 +3755,210 @@ where
     }
 }
 
-/// A channel to a WebSocket server.
+/// What happened to a [`Channel`], as told to the callback set with
+/// [`ChannelBuilder::on_change`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ChannelEvent {
+    /// The channel was opened over the current connection with the given
+    /// [`ChannelId`], and requests can be sent over it.
+    ///
+    /// This is reported every time the channel opens, including after a
+    /// reconnect, at which point the server has forgotten everything which
+    /// was sent over the channel before and the id is likely different.
+    Opened(ChannelId),
+    /// The channel was lost along with the connection it was opened over.
+    ///
+    /// It opens again by itself once the connection is back.
+    Closed,
+    /// The server could not open the channel, for example since it has run
+    /// out of channel ids or its handler refused it.
+    ///
+    /// The channel stays closed until the connection reopens, at which point
+    /// it is tried again.
+    Failed(Error),
+}
+
+/// A logical channel to a WebSocket server, which opens itself again every
+/// time the connection does.
 ///
-/// See [`Handle::channel`] for more details.
+/// A channel is set up with [`Handle::channel`], see it for more details.
+///
+/// Cloning a channel is cheap and every clone refers to the same channel. The
+/// channel is closed and stops reopening once the last clone has been dropped.
+///
+/// While the channel is not open, such as before the server has answered or
+/// while the connection is down, [`Channel::is_open`] returns `false`,
+/// [`Channel::id`] returns [`ChannelId::NONE`], and requests sent over it fail
+/// with [`Error::is_not_connected`] without being sent.
 pub struct Channel<H>
 where
     H: WebImpl,
 {
+    inner: Rc<ChannelInner<H>>,
+}
+
+/// The state of a channel shared by its clones.
+struct ChannelInner<H>
+where
+    H: WebImpl,
+{
     handle: Handle<H>,
-    id: ChannelId,
-    /// The generation of the connection the channel was opened over.
-    generation: u64,
+    /// The id of the channel while it is open, or [`ChannelId::NONE`].
+    id: Cell<ChannelId>,
+    /// The generation of the connection the channel was last opened over.
+    generation: Cell<u64>,
+    on_change: Box<dyn Callback<ChannelEvent>>,
+    /// Waiting to be called once the channel is open, see
+    /// [`Channel::when_open`].
+    queue: RefCell<VecDeque<Box<dyn FnOnce(&Channel<H>)>>>,
+    /// The pending request to open the channel.
+    connect: RefCell<Request>,
+    state: RefCell<StateListener>,
+}
+
+impl<H> ChannelInner<H>
+where
+    H: WebImpl,
+{
+    fn is_open(&self) -> bool {
+        let id = self.id.get();
+
+        if id == ChannelId::NONE {
+            return false;
+        }
+
+        let Some(shared) = self.handle.shared.upgrade() else {
+            return false;
+        };
+
+        shared.state.get().is_open() && shared.g.generation.get() == self.generation.get()
+    }
+
+    fn on_state(self: &Rc<Self>, state: State) {
+        match state {
+            State::Open => {
+                self.connect();
+            }
+            State::Closed => {
+                // NB: Dropped outside of the borrow, since dropping a request
+                // touches the shared request table.
+                let connect = mem::take(&mut *self.connect.borrow_mut());
+                drop(connect);
+
+                if self.id.replace(ChannelId::NONE) != ChannelId::NONE {
+                    self.on_change.call(ChannelEvent::Closed);
+                }
+            }
+        }
+    }
+
+    fn connect(self: &Rc<Self>) {
+        let request = connect_channel(&self.handle.shared, {
+            let inner = Rc::downgrade(self);
+
+            move |result| {
+                if let Some(inner) = inner.upgrade() {
+                    inner.connected(result);
+                }
+            }
+        });
+
+        let old = mem::replace(&mut *self.connect.borrow_mut(), request);
+        drop(old);
+    }
+
+    fn connected(self: &Rc<Self>, result: Result<ChannelId>) {
+        let id = match result {
+            Ok(id) => id,
+            Err(error) => {
+                // NB: These mean that the connection went away, in which case
+                // the channel is opened again once it is back.
+                if !(error.is_connection_lost() || error.is_not_connected() || error.is_cancelled())
+                {
+                    self.on_change.call(ChannelEvent::Failed(error));
+                }
+
+                return;
+            }
+        };
+
+        self.id.set(id);
+        self.generation.set(self.handle.generation());
+
+        let channel = Channel {
+            inner: self.clone(),
+        };
+
+        // NB: Each call can close the channel, in which case what remains in
+        // the queue waits for it to open again.
+        while channel.is_open() {
+            let Some(f) = self.queue.borrow_mut().pop_front() else {
+                break;
+            };
+
+            f(&channel);
+        }
+
+        if channel.is_open() && self.id.get() == id {
+            self.on_change.call(ChannelEvent::Opened(id));
+        }
+    }
+}
+
+impl<H> Drop for ChannelInner<H>
+where
+    H: WebImpl,
+{
+    #[inline]
+    fn drop(&mut self) {
+        // NB: A channel from an earlier connection was dropped by the server
+        // along with that connection, and its id may since have been handed
+        // to another channel over the current one.
+        if self.is_open() {
+            if let Some(shared) = self.handle.shared.upgrade() {
+                shared.remove_channel(self.id.get());
+            }
+        }
+    }
 }
 
 impl<H> Channel<H>
 where
     H: WebImpl,
 {
-    /// Get the connection identifier for this handle.
+    /// The id the server gave the channel.
+    ///
+    /// This is [`ChannelId::NONE`] while the channel is not [open], and
+    /// usually changes each time the channel opens again after a reconnect.
+    ///
+    /// [open]: Self::is_open
     #[inline]
     pub fn id(&self) -> ChannelId {
-        self.id
+        if self.inner.is_open() {
+            self.inner.id.get()
+        } else {
+            ChannelId::NONE
+        }
     }
 
-    /// The [generation] of the connection this channel was opened over.
+    /// The [generation] of the connection the channel was last opened over.
     ///
-    /// The server forgets a channel when the connection it was opened over
-    /// closes, so once the [generation] of the handle has moved past this one
-    /// the channel is stale and has to be opened again, see
-    /// [`Channel::is_open`].
+    /// This is `0` until the channel first opens.
     ///
     /// [generation]: Handle::generation
     #[inline]
     pub fn generation(&self) -> u64 {
-        self.generation
+        self.inner.generation.get()
     }
 
     /// Whether requests can be sent over this channel.
     ///
-    /// This is `true` while the connection the channel was opened over is
-    /// still open. It is `false` for a [default] channel, while the connection
-    /// is closed, and for good once the connection has reopened, since the
-    /// channel belongs to the connection that was lost. A request over a
-    /// channel which is not open fails with [`Error::is_not_connected`]
-    /// without being sent.
+    /// This is `true` from when the server has opened the channel until the
+    /// connection it was opened over closes. It is `false` for a [default]
+    /// channel, and while the channel is being opened again after a
+    /// reconnect. A request over a channel which is not open fails with
+    /// [`Error::is_not_connected`] without being sent.
     ///
     /// [default]: Channel::default
     ///
@@ -3747,150 +3970,96 @@ where
     /// let channel = ws::Channel::default();
     /// assert!(!channel.is_open());
     /// ```
+    #[inline]
     pub fn is_open(&self) -> bool {
-        if self.id == ChannelId::NONE {
-            return false;
-        }
-
-        let Some(shared) = self.handle.shared.upgrade() else {
-            return false;
-        };
-
-        shared.state.get().is_open() && shared.g.generation.get() == self.generation
+        self.inner.is_open()
     }
 
-    /// Get a handle for this channel.
+    /// Get the handle this channel was opened through.
     ///
     /// A handle sheds the channel information and allows for setting up things
     /// like broadcast listener.
+    #[inline]
     pub fn handle(&self) -> &Handle<H> {
-        &self.handle
+        &self.inner.handle
     }
 
-    /// Send a request of type `T` over the current channel.
+    /// Send a request of type `T` over the channel.
     ///
-    /// Returns a handle for the request.
+    /// Returns a handle for the request. If the handle is dropped, the request
+    /// is cancelled.
     ///
-    /// If the handle is dropped, the request is cancelled.
+    /// If the channel is not [open], the request fails with
+    /// [`Error::is_not_connected`] without being sent. Send it once the
+    /// channel has opened instead, as reported by [`ChannelEvent::Opened`], or
+    /// use [`Channel::when_open`]. See [`ChannelBuilder::on_change`] for an
+    /// example.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate yew023 as yew;
-    /// use yew::prelude::*;
-    /// use musli_web::web03::prelude::*;
-    ///
-    /// mod api {
-    ///     use musli::{Decode, Encode};
-    ///     use musli_web::api;
-    ///
-    ///     #[derive(Encode, Decode)]
-    ///     pub struct HelloRequest<'de> {
-    ///         pub message: &'de str,
-    ///     }
-    ///
-    ///     #[derive(Encode, Decode)]
-    ///     pub struct HelloResponse<'de> {
-    ///         pub message: &'de str,
-    ///     }
-    ///
-    ///     api::define! {
-    ///         pub type Hello;
-    ///
-    ///         impl Endpoint for Hello {
-    ///             impl<'de> Request for HelloRequest<'de>;
-    ///             type Response<'de> = HelloResponse<'de>;
-    ///         }
-    ///     }
-    /// }
-    ///
-    /// enum Msg {
-    ///     OnHello(Result<ws::Packet<api::Hello>, ws::Error>),
-    ///     OnChannel(Result<ws::Channel, ws::Error>),
-    /// }
-    ///
-    /// #[derive(Properties, PartialEq)]
-    /// struct Props {
-    ///     ws: ws::Handle,
-    /// }
-    ///
-    /// struct App {
-    ///     message: String,
-    ///     _hello: ws::Request,
-    ///     _channel_open: ws::Request,
-    ///     channel: ws::Channel,
-    /// }
-    ///
-    /// impl Component for App {
-    ///     type Message = Msg;
-    ///     type Properties = Props;
-    ///
-    ///     fn create(ctx: &Context<Self>) -> Self {
-    ///         let link = ctx.link().clone();
-    ///
-    ///         let _channel_open = ctx.props().ws
-    ///             .channel()
-    ///             .on_open(ctx.link().callback(Msg::OnChannel))
-    ///             .send();
-    ///
-    ///         Self {
-    ///             message: String::from("No Message :("),
-    ///             _hello: ws::Request::default(),
-    ///             _channel_open: _channel_open,
-    ///             channel: ws::Channel::default(),
-    ///         }
-    ///     }
-    ///
-    ///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
-    ///         match msg {
-    ///             Msg::OnHello(Err(error)) => {
-    ///                 tracing::error!("Request error: {:?}", error);
-    ///                 false
-    ///             }
-    ///             Msg::OnHello(Ok(packet)) => {
-    ///                 if let Ok(response) = packet.decode() {
-    ///                     self.message = response.message.to_owned();
-    ///                 }
-    ///
-    ///                 true
-    ///             }
-    ///             Msg::OnChannel(result) => {
-    ///                 if let Ok(channel) = result {
-    ///                     self.channel = channel;
-    ///                 }
-    ///
-    ///                 self._hello = self.channel
-    ///                     .request()
-    ///                     .body(api::HelloRequest { message: "Hello!"})
-    ///                     .on_packet(ctx.link().callback(Msg::OnHello))
-    ///                     .send();
-    ///
-    ///                 true
-    ///             }
-    ///         }
-    ///     }
-    ///
-    ///     fn view(&self, ctx: &Context<Self>) -> Html {
-    ///         html! {
-    ///             <div>
-    ///                 <h1>{"WebSocket Example"}</h1>
-    ///                 <p>{format!("Message: {}", self.message)}</p>
-    ///             </div>
-    ///         }
-    ///     }
-    /// }
-    /// ```
+    /// [open]: Self::is_open
     pub fn request(&self) -> RequestBuilder<'_, H, EmptyBody, EmptyCallback> {
         RequestBuilder {
-            shared: &self.handle.shared,
-            channel: self.is_open().then_some(self.id),
+            shared: &self.inner.handle.shared,
+            channel: self.inner.is_open().then(|| self.inner.id.get()),
             body: EmptyBody,
             callback: EmptyCallback,
         }
     }
+
+    /// Call `f` with the channel once it is open.
+    ///
+    /// If the channel is open, `f` is called straight away. Otherwise it is
+    /// queued and called as soon as the channel opens, before
+    /// [`ChannelEvent::Opened`] is reported. Queued calls are made in the order
+    /// they were queued, and are dropped without being called if the channel
+    /// is dropped first.
+    ///
+    /// This suits a request made in response to the user, which should be
+    /// sent even if the connection happens to be down at the time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::cell::Cell;
+    /// use std::rc::Rc;
+    ///
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// let channel = ws::Channel::default();
+    /// let called = Rc::new(Cell::new(false));
+    ///
+    /// channel.when_open({
+    ///     let called = called.clone();
+    ///     move |_: &ws::Channel| called.set(true)
+    /// });
+    ///
+    /// // A default channel never opens.
+    /// assert!(!called.get());
+    /// ```
+    pub fn when_open(&self, f: impl FnOnce(&Channel<H>) + 'static) {
+        if self.inner.is_open() {
+            f(self);
+            return;
+        }
+
+        self.inner.queue.borrow_mut().push_back(Box::new(f));
+    }
 }
 
-/// Construct a default connected handle.
+impl<H> Clone for Channel<H>
+where
+    H: WebImpl,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+/// Construct a channel which is not connected to a service and never opens.
+///
+/// This is a placeholder for a component which does not have a channel yet.
 ///
 /// # Examples
 ///
@@ -3898,6 +4067,7 @@ where
 /// use musli_web::web03::prelude::*;
 ///
 /// let channel = ws::Channel::default();
+/// assert!(!channel.is_open());
 /// assert_eq!(channel.id(), ws::ChannelId::NONE);
 /// ```
 impl<H> Default for Channel<H>
@@ -3907,37 +4077,32 @@ where
     #[inline]
     fn default() -> Self {
         Self {
-            handle: Handle::default(),
-            id: ChannelId::NONE,
-            generation: 0,
+            inner: Rc::new(ChannelInner {
+                handle: Handle::default(),
+                id: Cell::new(ChannelId::NONE),
+                generation: Cell::new(0),
+                on_change: Box::new(EmptyCallback),
+                queue: RefCell::new(VecDeque::new()),
+                connect: RefCell::new(Request::new()),
+                state: RefCell::new(StateListener::new()),
+            }),
         }
     }
 }
 
+/// Channels are equal if they are opened through the same service and are
+/// currently open with the same id, or are both closed.
+///
+/// So a property holding a channel changes when the channel opens, closes or
+/// opens again with a new id.
 impl<H> PartialEq for Channel<H>
 where
     H: WebImpl,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        Weak::ptr_eq(&self.handle.shared, &other.handle.shared) && self.id == other.id
-    }
-}
-
-impl<H> Drop for Channel<H>
-where
-    H: WebImpl,
-{
-    #[inline]
-    fn drop(&mut self) {
-        // NB: A channel from an earlier connection was dropped by the server
-        // along with that connection, and its id may since have been handed
-        // to another channel over the current one.
-        if let Some(shared) = self.handle.shared.upgrade() {
-            if self.generation == shared.g.generation.get() {
-                shared.remove_channel(self.id);
-            }
-        }
+        Weak::ptr_eq(&self.inner.handle.shared, &other.inner.handle.shared)
+            && self.id() == other.id()
     }
 }
 
@@ -3949,13 +4114,13 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = f.debug_struct("Channel");
 
-        if let Some(shared) = self.handle.shared.upgrade() {
+        if let Some(shared) = self.inner.handle.shared.upgrade() {
             f.field("connect", &shared.connect);
             f.field("state", &shared.state.get());
         }
 
-        f.field("id", &self.id);
-        f.field("generation", &self.generation);
+        f.field("id", &self.id());
+        f.field("generation", &self.generation());
         f.finish()
     }
 }
