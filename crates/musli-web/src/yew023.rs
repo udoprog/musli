@@ -14,6 +14,8 @@
 //! * [`use_handle`] gets the handle in a function component.
 //! * [`use_request`] keeps a [`ws::Request`] for as long as the component is
 //!   mounted, cancelling the previous one when a new one is stored.
+//! * [`use_requests`] keeps any number of [`ws::Request`]s in flight at once,
+//!   and [`use_keyed_requests`] keeps at most one for each key.
 //! * [`use_channel`] opens a [`ws::Channel`] for as long as the component is
 //!   mounted, and renders the component again whenever it opens or closes.
 //! * [`use_open`] follows whether the connection is open, so that what a

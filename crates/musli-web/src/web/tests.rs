@@ -1871,3 +1871,251 @@ fn default_channel_never_opens() {
     assert_kind(&single(&failures), "not_connected");
     assert_eq!(channel, Channel::default());
 }
+
+/// Answer the request with `serial` with an empty response.
+fn respond(service: &Service<MockImpl>, serial: u32) {
+    let header = api::ResponseHeader {
+        version: api::VERSION,
+        serial,
+        broadcast: 0,
+        error: 0,
+        format: Format::DEFAULT.to_u8(),
+        channel: ChannelId::NONE,
+    };
+
+    deliver(service, Mode::Binary, &header, b"");
+}
+
+/// Whether the request with `serial` is still waiting for a response.
+fn is_waiting(service: &Service<MockImpl>, serial: u32) -> bool {
+    service.shared.g.requests.borrow().contains_key(&serial)
+}
+
+/// Send a hello, returning what its callback is told, the request and its
+/// serial.
+fn send_hello_serial(service: &Service<MockImpl>) -> (Outcomes, Request, u32) {
+    let (outcomes, request) = send_hello(service);
+    (outcomes, request, last_serial())
+}
+
+/// Pushing a request leaves the requests pushed before it in flight, and a
+/// completed request is no longer counted.
+#[test]
+fn requests_keep_many_in_flight_and_forget_completed() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let mut requests = Requests::new();
+    assert!(requests.is_empty());
+
+    let (first, request, a) = send_hello_serial(&service);
+    requests.push(request);
+    let (second, request, b) = send_hello_serial(&service);
+    requests.push(request);
+
+    assert_eq!(requests.len(), 2);
+    assert!(is_waiting(&service, a));
+    assert!(is_waiting(&service, b));
+
+    respond(&service, a);
+
+    assert_eq!(*first.borrow(), [None]);
+    assert!(second.borrow().is_empty());
+    assert_eq!(requests.len(), 1);
+    assert!(!requests.is_empty());
+    assert!(is_waiting(&service, b));
+
+    respond(&service, b);
+
+    assert_eq!(*second.borrow(), [None]);
+    assert_eq!(requests.len(), 0);
+    assert!(requests.is_empty());
+}
+
+/// A request which could not be sent is not kept.
+#[test]
+fn requests_drop_requests_which_are_not_pending() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    let mut requests = Requests::new();
+    let (failures, request) = send_hello_failures(&service);
+    assert_kind(&single(&failures), "not_connected");
+
+    requests.push(request);
+    requests.push(Request::new());
+
+    assert!(requests.is_empty());
+    assert!(requests.requests.is_empty());
+}
+
+/// Completed requests are forgotten instead of growing the set.
+#[test]
+fn requests_prune_completed_before_growing() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let mut requests = Requests::new();
+
+    for _ in 0..64 {
+        let (_, request, serial) = send_hello_serial(&service);
+        requests.push(request);
+        respond(&service, serial);
+    }
+
+    assert!(requests.is_empty());
+    assert!(
+        requests.requests.capacity() <= 8,
+        "{}",
+        requests.requests.capacity()
+    );
+
+    // NB: One request stays in flight throughout, and is never pruned.
+    let (_, request, kept) = send_hello_serial(&service);
+    requests.push(request);
+
+    for _ in 0..64 {
+        let (_, request, serial) = send_hello_serial(&service);
+        requests.push(request);
+        respond(&service, serial);
+    }
+
+    assert_eq!(requests.len(), 1);
+    assert!(is_waiting(&service, kept));
+    assert!(requests.requests.len() <= 8, "{}", requests.requests.len());
+}
+
+/// Dropping or clearing the set cancels every request still in flight,
+/// without calling their callbacks.
+#[test]
+fn requests_drop_and_clear_cancel_all() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let mut requests = Requests::new();
+    let mut outcomes = Vec::new();
+
+    for _ in 0..3 {
+        let (o, request, _) = send_hello_serial(&service);
+        requests.push(request);
+        outcomes.push(o);
+    }
+
+    assert_eq!(requests.len(), 3);
+    drop(requests);
+    assert!(!has_pending(&service));
+
+    let mut requests = Requests::new();
+
+    for _ in 0..3 {
+        let (o, request, _) = send_hello_serial(&service);
+        requests.push(request);
+        outcomes.push(o);
+    }
+
+    requests.clear();
+    assert!(requests.is_empty());
+    assert!(!has_pending(&service));
+
+    for o in outcomes {
+        assert!(o.borrow().is_empty(), "{:?}", o.borrow());
+    }
+}
+
+/// Inserting under a key cancels the request stored under it before, and
+/// leaves other keys alone.
+#[test]
+fn keyed_requests_insert_replaces_by_key() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let mut requests = KeyedRequests::new();
+
+    let (_, request, a) = send_hello_serial(&service);
+    requests.insert("a", request);
+    let (_, request, b) = send_hello_serial(&service);
+    requests.insert("b", request);
+
+    assert_eq!(requests.len(), 2);
+
+    let (_, request, a2) = send_hello_serial(&service);
+    requests.insert("a", request);
+
+    assert_eq!(requests.len(), 2);
+    assert!(!is_waiting(&service, a));
+    assert!(is_waiting(&service, a2));
+    assert!(is_waiting(&service, b));
+    assert!(requests.is_pending("a"));
+    assert!(requests.is_pending("b"));
+
+    // A request which could not be sent still cancels the one before it.
+    requests.insert("b", Request::new());
+    assert!(!is_waiting(&service, b));
+    assert!(!requests.is_pending("b"));
+    assert_eq!(requests.len(), 1);
+
+    assert!(requests.remove("a"));
+    assert!(!is_waiting(&service, a2));
+    assert!(!requests.remove("a"));
+    assert!(requests.is_empty());
+}
+
+/// A key is forgotten once its request completes.
+#[test]
+fn keyed_requests_forget_completed() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let mut requests = KeyedRequests::new();
+
+    let (outcomes, request, a) = send_hello_serial(&service);
+    requests.insert(1u32, request);
+    let (_, request, _) = send_hello_serial(&service);
+    requests.insert(2u32, request);
+
+    respond(&service, a);
+
+    assert_eq!(*outcomes.borrow(), [None]);
+    assert!(!requests.is_pending(&1));
+    assert!(requests.is_pending(&2));
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests.keys().copied().collect::<Vec<_>>(), [2]);
+    // NB: Completed, so there is nothing to cancel.
+    assert!(!requests.remove(&1));
+}
+
+/// Dropping or clearing the set cancels every request still in flight.
+#[test]
+fn keyed_requests_drop_and_clear_cancel_all() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let mut requests = KeyedRequests::new();
+
+    for key in 0..3u32 {
+        let (_, request, _) = send_hello_serial(&service);
+        requests.insert(key, request);
+    }
+
+    assert_eq!(requests.len(), 3);
+    drop(requests);
+    assert!(!has_pending(&service));
+
+    let mut requests = KeyedRequests::new();
+
+    for key in 0..3u32 {
+        let (_, request, _) = send_hello_serial(&service);
+        requests.insert(key, request);
+    }
+
+    requests.clear();
+    assert!(requests.is_empty());
+    assert!(!has_pending(&service));
+}

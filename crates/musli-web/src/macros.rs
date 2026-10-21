@@ -326,7 +326,9 @@ macro_rules! yew_impl {
         };
         use $krate::{Callback, Component, Context, ContextProvider};
 
-        use crate::web03::prelude::ws::{Channel, ChannelEvent, Handle, Request, State};
+        use crate::web03::prelude::ws::{
+            Channel, ChannelEvent, Handle, KeyedRequests, Request, Requests, State,
+        };
 
         impl<I> crate::web::Callback<I> for Callback<I>
         where
@@ -536,6 +538,335 @@ macro_rules! yew_impl {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.debug_struct("UseRequestHandle")
                     .field("is_pending", &self.is_pending())
+                    .finish()
+            }
+        }
+
+        /// Keep a set of [`ws::Requests`] for as long as the component is
+        /// mounted.
+        ///
+        /// This is [`use_request`] for a component which keeps several
+        /// requests in flight at once: storing a request with
+        /// [`UseRequestsHandle::push`] leaves the requests stored before it
+        /// alone, and each one is forgotten once it completes. Every request
+        /// still pending is cancelled when the component is unmounted.
+        ///
+        /// [`ws::Requests`]: crate::web::Requests
+        ///
+        /// # Examples
+        ///
+        #[doc = concat!("```\n# extern crate ", stringify!($krate), " as yew;")]
+        /// use yew::prelude::*;
+        /// use musli_web::web03::prelude::*;
+        #[doc = concat!("use musli_web::", stringify!($krate), "::{use_handle, use_requests};")]
+        ///
+        /// mod api {
+        ///     use musli::{Decode, Encode};
+        ///     use musli_web::api;
+        ///
+        ///     #[derive(Encode, Decode)]
+        ///     pub struct LikeRequest {
+        ///         pub id: u32,
+        ///     }
+        ///
+        ///     api::define! {
+        ///         pub type Like;
+        ///
+        ///         impl Endpoint for Like {
+        ///             impl Request for LikeRequest;
+        ///             type Response<'de> = ();
+        ///         }
+        ///     }
+        /// }
+        ///
+        /// #[function_component(Like)]
+        /// fn like() -> Html {
+        ///     let handle = use_handle();
+        ///     let requests = use_requests();
+        ///
+        ///     let onclick = move |_: MouseEvent| {
+        ///         // Clicking again while an earlier like is in flight sends
+        ///         // another one, without cancelling the first.
+        ///         requests.push(
+        ///             handle
+        ///                 .request()
+        ///                 .body(api::LikeRequest { id: 42 })
+        ///                 .on_packet(|packet: Result<ws::Packet<api::Like>, ws::Error>| {
+        ///                     if let Err(error) = packet {
+        ///                         tracing::error!("Like failed: {error}");
+        ///                     }
+        ///                 })
+        ///                 .send(),
+        ///         );
+        ///     };
+        ///
+        ///     html! {
+        ///         <button {onclick}>{"Like"}</button>
+        ///     }
+        /// }
+        /// ```
+        pub fn use_requests() -> impl Hook<Output = UseRequestsHandle> {
+            struct HookProvider;
+
+            impl Hook for HookProvider {
+                type Output = UseRequestsHandle;
+
+                fn run(self, ctx: &mut HookContext) -> Self::Output {
+                    UseRequestsHandle {
+                        inner: use_mut_ref(Requests::new).run(ctx),
+                    }
+                }
+            }
+
+            HookProvider
+        }
+
+        /// The handle returned by [`use_requests`].
+        ///
+        /// Cloning it is cheap and every clone refers to the same set of
+        /// requests, so it can be moved into callbacks.
+        #[derive(Clone)]
+        pub struct UseRequestsHandle {
+            inner: Rc<RefCell<Requests>>,
+        }
+
+        impl UseRequestsHandle {
+            /// Keep `request` until it completes, see [`Requests::push`].
+            ///
+            /// [`Requests::push`]: crate::web::Requests::push
+            pub fn push(&self, request: Request) {
+                self.inner.borrow_mut().push(request);
+            }
+
+            /// Cancel every pending request.
+            pub fn clear(&self) {
+                let old = mem::take(&mut *self.inner.borrow_mut());
+                // NB: Dropped after the borrow ends, since cancelling the old
+                // requests drops their callbacks.
+                drop(old);
+            }
+
+            /// The number of requests which are still pending.
+            ///
+            /// This does not make the component render again by itself; keep
+            /// track of what the response callbacks were told for that.
+            pub fn len(&self) -> usize {
+                self.inner.borrow().len()
+            }
+
+            /// Whether no request is pending.
+            pub fn is_empty(&self) -> bool {
+                self.inner.borrow().is_empty()
+            }
+        }
+
+        /// Handles are equal if they refer to the same set of requests.
+        impl PartialEq for UseRequestsHandle {
+            #[inline]
+            fn eq(&self, other: &Self) -> bool {
+                Rc::ptr_eq(&self.inner, &other.inner)
+            }
+        }
+
+        impl fmt::Debug for UseRequestsHandle {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_struct("UseRequestsHandle")
+                    .field("len", &self.len())
+                    .finish()
+            }
+        }
+
+        /// Keep a set of [`ws::KeyedRequests`] for as long as the component
+        /// is mounted.
+        ///
+        /// This keeps at most one request in flight for each key: storing a
+        /// request with [`UseKeyedRequestsHandle::insert`] cancels the request
+        /// stored under the same key before it, and leaves the other keys
+        /// alone. Each request is forgotten once it completes, and every
+        /// request still pending is cancelled when the component is
+        /// unmounted.
+        ///
+        /// [`ws::KeyedRequests`]: crate::web::KeyedRequests
+        ///
+        /// # Examples
+        ///
+        #[doc = concat!("```\n# extern crate ", stringify!($krate), " as yew;")]
+        /// # extern crate web_sys03 as web_sys;
+        /// use web_sys::HtmlInputElement;
+        /// use yew::prelude::*;
+        /// use musli_web::web03::prelude::*;
+        #[doc = concat!("use musli_web::", stringify!($krate), "::{use_handle, use_keyed_requests};")]
+        ///
+        /// mod api {
+        ///     use musli::{Decode, Encode};
+        ///     use musli_web::api;
+        ///
+        ///     #[derive(Encode, Decode)]
+        ///     pub struct ToggleRequest {
+        ///         pub id: u32,
+        ///         pub on: bool,
+        ///     }
+        ///
+        ///     api::define! {
+        ///         pub type Toggle;
+        ///
+        ///         impl Endpoint for Toggle {
+        ///             impl Request for ToggleRequest;
+        ///             type Response<'de> = ();
+        ///         }
+        ///     }
+        /// }
+        ///
+        /// #[derive(Properties, PartialEq)]
+        /// struct Props {
+        ///     ids: Vec<u32>,
+        /// }
+        ///
+        /// #[function_component(Toggles)]
+        /// fn toggles(props: &Props) -> Html {
+        ///     let handle = use_handle();
+        ///     let requests = use_keyed_requests::<u32>();
+        ///
+        ///     let toggle = move |id: u32, on: bool| {
+        ///         // Toggling an id again cancels its earlier toggle, but a
+        ///         // toggle of another id stays in flight.
+        ///         requests.insert(
+        ///             id,
+        ///             handle
+        ///                 .request()
+        ///                 .body(api::ToggleRequest { id, on })
+        ///                 .on_packet(|packet: Result<ws::Packet<api::Toggle>, ws::Error>| {
+        ///                     if let Err(error) = packet {
+        ///                         tracing::error!("Toggle failed: {error}");
+        ///                     }
+        ///                 })
+        ///                 .send(),
+        ///         );
+        ///     };
+        ///
+        ///     html! {
+        ///         {for props.ids.iter().copied().map(|id| {
+        ///             let toggle = toggle.clone();
+        ///
+        ///             let onchange = move |e: Event| {
+        ///                 toggle(id, e.target_unchecked_into::<HtmlInputElement>().checked())
+        ///             };
+        ///
+        ///             html!(<input type="checkbox" {onchange} />)
+        ///         })}
+        ///     }
+        /// }
+        /// ```
+        pub fn use_keyed_requests<K>() -> impl Hook<Output = UseKeyedRequestsHandle<K>>
+        where
+            K: 'static,
+        {
+            struct HookProvider<K>(core::marker::PhantomData<K>);
+
+            impl<K> Hook for HookProvider<K>
+            where
+                K: 'static,
+            {
+                type Output = UseKeyedRequestsHandle<K>;
+
+                fn run(self, ctx: &mut HookContext) -> Self::Output {
+                    UseKeyedRequestsHandle {
+                        inner: use_mut_ref(KeyedRequests::new).run(ctx),
+                    }
+                }
+            }
+
+            HookProvider(core::marker::PhantomData)
+        }
+
+        /// The handle returned by [`use_keyed_requests`].
+        ///
+        /// Cloning it is cheap and every clone refers to the same set of
+        /// requests, so it can be moved into callbacks.
+        pub struct UseKeyedRequestsHandle<K> {
+            inner: Rc<RefCell<KeyedRequests<K>>>,
+        }
+
+        impl<K> UseKeyedRequestsHandle<K>
+        where
+            K: Eq + core::hash::Hash,
+        {
+            /// Keep `request` under `key` until it completes, cancelling the
+            /// request stored under `key` before it, see
+            /// [`KeyedRequests::insert`].
+            ///
+            /// [`KeyedRequests::insert`]: crate::web::KeyedRequests::insert
+            pub fn insert(&self, key: K, request: Request) {
+                self.inner.borrow_mut().insert(key, request);
+            }
+
+            /// Cancel the request stored under `key`, returning whether it
+            /// was still pending.
+            pub fn remove<Q>(&self, key: &Q) -> bool
+            where
+                K: core::borrow::Borrow<Q>,
+                Q: ?Sized + Eq + core::hash::Hash,
+            {
+                self.inner.borrow_mut().remove(key)
+            }
+
+            /// Whether the request stored under `key` is still pending.
+            ///
+            /// This does not make the component render again by itself; keep
+            /// track of what the response callbacks were told for that.
+            pub fn is_pending<Q>(&self, key: &Q) -> bool
+            where
+                K: core::borrow::Borrow<Q>,
+                Q: ?Sized + Eq + core::hash::Hash,
+            {
+                self.inner.borrow().is_pending(key)
+            }
+        }
+
+        impl<K> UseKeyedRequestsHandle<K> {
+            /// Cancel every pending request.
+            pub fn clear(&self) {
+                let old = mem::take(&mut *self.inner.borrow_mut());
+                // NB: Dropped after the borrow ends, since cancelling the old
+                // requests drops their callbacks.
+                drop(old);
+            }
+
+            /// The number of keys whose request is still pending.
+            pub fn len(&self) -> usize {
+                self.inner.borrow().len()
+            }
+
+            /// Whether no request is pending.
+            pub fn is_empty(&self) -> bool {
+                self.inner.borrow().is_empty()
+            }
+        }
+
+        impl<K> Clone for UseKeyedRequestsHandle<K> {
+            #[inline]
+            fn clone(&self) -> Self {
+                Self {
+                    inner: self.inner.clone(),
+                }
+            }
+        }
+
+        /// Handles are equal if they refer to the same set of requests.
+        impl<K> PartialEq for UseKeyedRequestsHandle<K> {
+            #[inline]
+            fn eq(&self, other: &Self) -> bool {
+                Rc::ptr_eq(&self.inner, &other.inner)
+            }
+        }
+
+        impl<K> fmt::Debug for UseKeyedRequestsHandle<K>
+        where
+            K: fmt::Debug,
+        {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_tuple("UseKeyedRequestsHandle")
+                    .field(&*self.inner.borrow())
                     .finish()
             }
         }

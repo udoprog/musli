@@ -136,6 +136,7 @@
 //! ```
 
 use core::cell::{Cell, RefCell};
+use core::hash::Hash;
 use core::marker::PhantomData;
 use core::mem;
 use core::ops::Deref;
@@ -210,7 +211,7 @@ type Broadcasts = HashMap<MessageId, Slab<Rc<dyn Callback<Result<RawPacket>>>>>;
 /// Queue of recycled buffers.
 type Buffers = VecDeque<Box<BufData>>;
 /// Pending requests.
-type Requests = HashMap<u32, Box<Pending<dyn RequestCallback>>>;
+type PendingRequests = HashMap<u32, Box<Pending<dyn RequestCallback>>>;
 
 /// Location information for WebSocket implementation.
 #[doc(hidden)]
@@ -774,7 +775,7 @@ struct Generic {
     /// The number of times the connection has opened, see
     /// [`Handle::generation`].
     generation: Cell<u64>,
-    requests: RefCell<Requests>,
+    requests: RefCell<PendingRequests>,
     broadcasts: RefCell<Broadcasts>,
     buffers: RefCell<Buffers>,
 }
@@ -1002,7 +1003,7 @@ where
                     state_listeners: RefCell::new(Slab::new()),
                     generation: Cell::new(0),
                     broadcasts: RefCell::new(HashMap::new()),
-                    requests: RefCell::new(Requests::new()),
+                    requests: RefCell::new(PendingRequests::new()),
                     buffers: RefCell::new(VecDeque::new()),
                 }),
             }
@@ -2414,6 +2415,419 @@ impl Drop for Request {
     #[inline]
     fn drop(&mut self) {
         self.clear();
+    }
+}
+
+/// A set of pending requests, kept alive until each completes.
+///
+/// Dropping a [`Request`] cancels it, so a component with several requests
+/// in flight at once has to keep every one of them somewhere. Push each one
+/// sent into a `Requests` with [`Requests::push`]. A request stays pending
+/// until it completes in any way, by its response, an error, or the
+/// connection being lost, and the set forgets it once it has.
+///
+/// Every request still pending is cancelled when the set is dropped or
+/// [`cleared`], so a component which keeps a set cancels what it sent once
+/// it goes away.
+///
+/// To keep at most one request for each of a number of things, such as one
+/// fetch per row, use [`KeyedRequests`] instead.
+///
+/// [`cleared`]: Requests::clear
+///
+/// # Examples
+///
+/// ```
+/// # extern crate yew023 as yew;
+/// use yew::prelude::*;
+/// use musli_web::web03::prelude::*;
+///
+/// mod api {
+///     use musli::{Decode, Encode};
+///     use musli_web::api;
+///
+///     #[derive(Encode, Decode)]
+///     pub struct SaveRequest<'de> {
+///         pub text: &'de str,
+///     }
+///
+///     api::define! {
+///         pub type Save;
+///
+///         impl Endpoint for Save {
+///             impl<'de> Request for SaveRequest<'de>;
+///             type Response<'de> = ();
+///         }
+///     }
+/// }
+///
+/// enum Msg {
+///     Save(String),
+///     Saved(Result<ws::Packet<api::Save>, ws::Error>),
+/// }
+///
+/// #[derive(Properties, PartialEq)]
+/// struct Props {
+///     ws: ws::Handle,
+/// }
+///
+/// struct Notes {
+///     // Every save sent which has not completed yet.
+///     saves: ws::Requests,
+/// }
+///
+/// impl Component for Notes {
+///     type Message = Msg;
+///     type Properties = Props;
+///
+///     fn create(_: &Context<Self>) -> Self {
+///         Self {
+///             saves: ws::Requests::new(),
+///         }
+///     }
+///
+///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+///         match msg {
+///             Msg::Save(text) => {
+///                 // Saving again does not cancel an earlier save.
+///                 self.saves.push(
+///                     ctx.props()
+///                         .ws
+///                         .request()
+///                         .body(api::SaveRequest { text: &text })
+///                         .on_packet(ctx.link().callback(Msg::Saved))
+///                         .send(),
+///                 );
+///
+///                 true
+///             }
+///             Msg::Saved(result) => {
+///                 if let Err(error) = result {
+///                     tracing::error!("Save failed: {error}");
+///                 }
+///
+///                 true
+///             }
+///         }
+///     }
+///
+///     fn view(&self, ctx: &Context<Self>) -> Html {
+///         let onclick = ctx.link().callback(|_: MouseEvent| Msg::Save(String::from("Hello")));
+///
+///         html! {
+///             <>
+///                 <button {onclick}>{"Save"}</button>
+///                 if !self.saves.is_empty() {
+///                     <p>{format!("Saving {}...", self.saves.len())}</p>
+///                 }
+///             </>
+///         }
+///     }
+/// }
+/// ```
+#[derive(Default)]
+pub struct Requests {
+    requests: Vec<Request>,
+}
+
+impl Requests {
+    /// Construct an empty set of requests.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// let requests = ws::Requests::new();
+    /// assert!(requests.is_empty());
+    /// ```
+    #[inline]
+    pub const fn new() -> Self {
+        Self {
+            requests: Vec::new(),
+        }
+    }
+
+    /// Keep `request` until it completes.
+    ///
+    /// A request which is not pending, such as one which could not be sent,
+    /// is dropped straight away.
+    pub fn push(&mut self, request: Request) {
+        if !request.is_pending() {
+            return;
+        }
+
+        // NB: Completed requests are only forgotten when the set would
+        // otherwise have to grow, which keeps pushing amortized constant time
+        // while holding at most twice as many requests as were ever pending
+        // at once.
+        if self.requests.len() == self.requests.capacity() {
+            self.requests.retain(Request::is_pending);
+        }
+
+        self.requests.push(request);
+    }
+
+    /// The number of requests which are still pending.
+    pub fn len(&self) -> usize {
+        self.requests.iter().filter(|r| r.is_pending()).count()
+    }
+
+    /// Whether no request is pending.
+    pub fn is_empty(&self) -> bool {
+        !self.requests.iter().any(Request::is_pending)
+    }
+
+    /// Cancel every pending request.
+    pub fn clear(&mut self) {
+        let requests = mem::take(&mut self.requests);
+        // NB: Dropped once the set is empty, since cancelling a request drops
+        // its callback.
+        drop(requests);
+    }
+}
+
+impl fmt::Debug for Requests {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Requests")
+            .field("len", &self.len())
+            .finish()
+    }
+}
+
+impl Extend<Request> for Requests {
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = Request>,
+    {
+        for request in iter {
+            self.push(request);
+        }
+    }
+}
+
+/// A set of pending requests with at most one for each key, kept alive until
+/// each completes.
+///
+/// This is like [`Requests`], except that each request is stored under a key
+/// with [`KeyedRequests::insert`]. Storing a request under a key which already
+/// has one cancels the request stored before it, so that what is fetched for
+/// a key is always the latest. Any number of keys can have a request in
+/// flight at once, and a key is forgotten once its request completes.
+///
+/// Every request still pending is cancelled when the set is dropped or
+/// [`cleared`].
+///
+/// [`cleared`]: KeyedRequests::clear
+///
+/// # Examples
+///
+/// ```
+/// # extern crate yew023 as yew;
+/// use yew::prelude::*;
+/// use musli_web::web03::prelude::*;
+///
+/// mod api {
+///     use musli::{Decode, Encode};
+///     use musli_web::api;
+///
+///     #[derive(Encode, Decode)]
+///     pub struct RenameRequest<'de> {
+///         pub id: u32,
+///         pub name: &'de str,
+///     }
+///
+///     api::define! {
+///         pub type Rename;
+///
+///         impl Endpoint for Rename {
+///             impl<'de> Request for RenameRequest<'de>;
+///             type Response<'de> = ();
+///         }
+///     }
+/// }
+///
+/// enum Msg {
+///     Rename(u32, String),
+///     Renamed(Result<ws::Packet<api::Rename>, ws::Error>),
+/// }
+///
+/// #[derive(Properties, PartialEq)]
+/// struct Props {
+///     ws: ws::Handle,
+///     rows: Vec<u32>,
+/// }
+///
+/// struct Rows {
+///     // At most one rename in flight for each row.
+///     renames: ws::KeyedRequests<u32>,
+/// }
+///
+/// impl Component for Rows {
+///     type Message = Msg;
+///     type Properties = Props;
+///
+///     fn create(_: &Context<Self>) -> Self {
+///         Self {
+///             renames: ws::KeyedRequests::new(),
+///         }
+///     }
+///
+///     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+///         match msg {
+///             Msg::Rename(id, name) => {
+///                 // Renaming a row again cancels its earlier rename, but
+///                 // leaves the renames of other rows alone.
+///                 self.renames.insert(
+///                     id,
+///                     ctx.props()
+///                         .ws
+///                         .request()
+///                         .body(api::RenameRequest { id, name: &name })
+///                         .on_packet(ctx.link().callback(Msg::Renamed))
+///                         .send(),
+///                 );
+///
+///                 true
+///             }
+///             Msg::Renamed(_) => true,
+///         }
+///     }
+///
+///     fn view(&self, ctx: &Context<Self>) -> Html {
+///         html! {
+///             {for ctx.props().rows.iter().copied().map(|id| {
+///                 let onclick = ctx.link().callback(move |_: MouseEvent| {
+///                     Msg::Rename(id, format!("Row {id}"))
+///                 });
+///
+///                 let label = if self.renames.is_pending(&id) {
+///                     String::from("Renaming...")
+///                 } else {
+///                     format!("Rename #{id}")
+///                 };
+///
+///                 html!(<button {onclick}>{label}</button>)
+///             })}
+///         }
+///     }
+/// }
+/// ```
+pub struct KeyedRequests<K> {
+    requests: HashMap<K, Request>,
+}
+
+impl<K> KeyedRequests<K> {
+    /// Construct an empty set of requests.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// let requests = ws::KeyedRequests::<u32>::new();
+    /// assert!(requests.is_empty());
+    /// ```
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            requests: HashMap::new(),
+        }
+    }
+
+    /// The number of keys whose request is still pending.
+    pub fn len(&self) -> usize {
+        self.requests.values().filter(|r| r.is_pending()).count()
+    }
+
+    /// Whether no request is pending.
+    pub fn is_empty(&self) -> bool {
+        !self.requests.values().any(Request::is_pending)
+    }
+
+    /// Iterate over the keys whose request is still pending, in no
+    /// particular order.
+    pub fn keys(&self) -> impl Iterator<Item = &K> {
+        self.requests
+            .iter()
+            .filter(|(_, r)| r.is_pending())
+            .map(|(k, _)| k)
+    }
+
+    /// Cancel every pending request.
+    pub fn clear(&mut self) {
+        let requests = mem::take(&mut self.requests);
+        // NB: Dropped once the set is empty, since cancelling a request drops
+        // its callback.
+        drop(requests);
+    }
+}
+
+impl<K> KeyedRequests<K>
+where
+    K: Eq + Hash,
+{
+    /// Keep `request` under `key` until it completes, cancelling the request
+    /// stored under `key` before it.
+    ///
+    /// A request which is not pending, such as one which could not be sent,
+    /// is dropped straight away, but still cancels the one before it.
+    pub fn insert(&mut self, key: K, request: Request) {
+        if !request.is_pending() {
+            let old = self.requests.remove(&key);
+            drop(old);
+            return;
+        }
+
+        // NB: Completed requests are only forgotten when the set would
+        // otherwise have to grow, see `Requests::push`.
+        if self.requests.len() == self.requests.capacity() {
+            self.requests.retain(|_, r| r.is_pending());
+        }
+
+        let old = self.requests.insert(key, request);
+        drop(old);
+    }
+
+    /// Cancel the request stored under `key`, returning whether it was still
+    /// pending.
+    pub fn remove<Q>(&mut self, key: &Q) -> bool
+    where
+        K: core::borrow::Borrow<Q>,
+        Q: ?Sized + Eq + Hash,
+    {
+        let Some(request) = self.requests.remove(key) else {
+            return false;
+        };
+
+        let pending = request.is_pending();
+        drop(request);
+        pending
+    }
+
+    /// Whether the request stored under `key` is still pending.
+    pub fn is_pending<Q>(&self, key: &Q) -> bool
+    where
+        K: core::borrow::Borrow<Q>,
+        Q: ?Sized + Eq + Hash,
+    {
+        self.requests.get(key).is_some_and(Request::is_pending)
+    }
+}
+
+impl<K> Default for KeyedRequests<K> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<K> fmt::Debug for KeyedRequests<K>
+where
+    K: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_set().entries(self.keys()).finish()
     }
 }
 
