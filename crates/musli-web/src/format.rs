@@ -991,7 +991,7 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "version: 1\nserial: 7\nid: 11\nformat: 5\nchannel: 3\n\n"
+            "version: 2\nserial: 7\nid: 11\nformat: 5\nchannel: 3\n\n"
         );
 
         let mut buf = Vec::new();
@@ -1009,7 +1009,7 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "version: 1\nserial: 0\nbroadcast: 13\nerror: 0\nformat: 5\nchannel: 0\n\n"
+            "version: 2\nserial: 0\nbroadcast: 13\nerror: 0\nformat: 5\nchannel: 0\n\n"
         );
     }
 
@@ -1099,7 +1099,7 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "version: 1\nserial: 1\nid: 2\nformat: 5\nchannel: 0\n\n{\"message\":\"hello\",\"tick\":42}"
+            "version: 2\nserial: 1\nid: 2\nformat: 5\nchannel: 0\n\n{\"message\":\"hello\",\"tick\":42}"
         );
 
         let mut at = 0;
@@ -1117,7 +1117,7 @@ mod tests {
     fn text_envelope_is_order_independent() {
         // Headers in a different order, one which is absent, and CRLF line
         // endings throughout.
-        let buf = b"channel: 3\r\nid: 11\r\nversion: 1\r\n\r\n";
+        let buf = b"channel: 3\r\nid: 11\r\nversion: 2\r\n\r\n";
 
         let mut at = 0;
         let header: RequestHeader = decode_envelope(Mode::Text, buf, &mut at).unwrap();
@@ -1149,13 +1149,18 @@ mod tests {
             buf,
             [
                 // `version` comes first and fits a byte.
-                0x01, 1, //
+                0x01,
+                VERSION as u8, //
                 // `serial` fits a byte, so it is written as one.
-                0x02, 7, //
+                0x02,
+                7, //
                 // `id` needs two, which the tag says.
-                0x43, 0x2c, 0x01, //
+                0x43,
+                0x2c,
+                0x01, //
                 // `format` fits a byte.
-                0x04, 5, //
+                0x04,
+                5, //
                 // `channel` is zero, so it is not written at all.
                 0x00,
             ]
@@ -1179,7 +1184,18 @@ mod tests {
     #[test]
     fn unknown_headers_are_rejected() {
         // A two byte header with id 63, which nothing is ever assigned.
-        let buf = [0x01, 1, 0x02, 7, 0x7f, 0xff, 0xff, 0x04, 5, 0x00];
+        let buf = [
+            0x01,
+            VERSION as u8,
+            0x02,
+            7,
+            0x7f,
+            0xff,
+            0xff,
+            0x04,
+            5,
+            0x00,
+        ];
 
         let mut at = 0;
         let error = decode_envelope::<RequestHeader>(Mode::Binary, &buf, &mut at).unwrap_err();
@@ -1191,7 +1207,7 @@ mod tests {
         );
         assert_eq!(at, 0, "a refused envelope must not advance the cursor");
 
-        let buf = b"version: 1\nserial: 7\nfuture: whatever\nid: 11\n\n";
+        let buf = b"version: 2\nserial: 7\nfuture: whatever\nid: 11\n\n";
 
         let mut at = 0;
         let error = decode_envelope::<RequestHeader>(Mode::Text, buf, &mut at).unwrap_err();
@@ -1212,7 +1228,10 @@ mod tests {
     fn binary_envelope_rejects_malformed_input() {
         // No end of headers marker.
         let mut at = 0;
-        assert!(decode_envelope::<RequestHeader>(Mode::Binary, &[0x01, 1], &mut at).is_err());
+        assert!(
+            decode_envelope::<RequestHeader>(Mode::Binary, &[0x01, VERSION as u8], &mut at)
+                .is_err()
+        );
 
         // A header whose value is cut short.
         let mut at = 0;
@@ -1228,7 +1247,7 @@ mod tests {
         assert!(
             decode_envelope::<RequestHeader>(
                 Mode::Binary,
-                &[0x01, 1, 0x83, 0, 0, 1, 0, 0x00],
+                &[0x01, VERSION as u8, 0x83, 0, 0, 1, 0, 0x00],
                 &mut at
             )
             .is_err()
@@ -1241,12 +1260,12 @@ mod tests {
     fn text_envelope_rejects_malformed_input() {
         // No empty line, so the envelope never ends.
         let mut at = 0;
-        assert!(decode_envelope::<RequestHeader>(Mode::Text, b"version: 1\n", &mut at).is_err());
+        assert!(decode_envelope::<RequestHeader>(Mode::Text, b"version: 2\n", &mut at).is_err());
 
         // A value which does not fit the header it is written to.
         let mut at = 0;
         assert!(
-            decode_envelope::<RequestHeader>(Mode::Text, b"version: 1\nid: 65536\n\n", &mut at)
+            decode_envelope::<RequestHeader>(Mode::Text, b"version: 2\nid: 65536\n\n", &mut at)
                 .is_err()
         );
 
@@ -1257,7 +1276,7 @@ mod tests {
         // A field whose value is not a number.
         let mut at = 0;
         assert!(
-            decode_envelope::<RequestHeader>(Mode::Text, b"version: 1\nid: none\n\n", &mut at)
+            decode_envelope::<RequestHeader>(Mode::Text, b"version: 2\nid: none\n\n", &mut at)
                 .is_err()
         );
 
@@ -1279,12 +1298,13 @@ mod tests {
         assert_eq!(error.unsupported_version(), Some(VERSION + 1));
         assert_eq!(at, 0, "a refused envelope must not advance the cursor");
 
-        let buf = b"version: 2\nserial: 7\n\n";
+        let buf = alloc::format!("version: {}\nserial: 7\n\n", VERSION + 1);
 
         let mut at = 0;
-        let error = decode_envelope::<RequestHeader>(Mode::Text, buf, &mut at).unwrap_err();
+        let error =
+            decode_envelope::<RequestHeader>(Mode::Text, buf.as_bytes(), &mut at).unwrap_err();
 
-        assert_eq!(error.unsupported_version(), Some(2));
+        assert_eq!(error.unsupported_version(), Some(VERSION + 1));
         assert_eq!(at, 0, "a refused envelope must not advance the cursor");
     }
 

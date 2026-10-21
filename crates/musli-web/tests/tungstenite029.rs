@@ -77,6 +77,29 @@ mod api {
     #[derive(Debug, Encode, Decode)]
     pub struct SilentRequest;
 
+    /// A typed error the server fails requests with.
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    pub enum Refusal {
+        NotFound,
+        Forbidden { reason: String },
+    }
+
+    /// A type which is not what the server fails with, to decode a typed
+    /// error as.
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    pub struct Unrelated {
+        pub a: u64,
+        pub b: u64,
+        pub c: u64,
+    }
+
+    /// A request which fails in the way it asks for, see the `REFUSE_*`
+    /// constants.
+    #[derive(Debug, Encode, Decode)]
+    pub struct RefuseRequest {
+        pub how: u8,
+    }
+
     #[derive(Debug, Encode, Decode)]
     pub struct TickEvent<'de> {
         pub message: &'de str,
@@ -98,6 +121,14 @@ mod api {
 
         impl Endpoint for Fail {
             impl<'de> Request for FailRequest<'de>;
+            type Response<'de> = Empty;
+        }
+
+        /// An endpoint which always fails with a typed error.
+        pub type Refuse;
+
+        impl Endpoint for Refuse {
+            impl Request for RefuseRequest;
             type Response<'de> = Empty;
         }
 
@@ -149,6 +180,71 @@ struct Tick {
     channel: ChannelId,
 }
 
+impl core::fmt::Display for api::Refusal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            api::Refusal::NotFound => write!(f, "Not found"),
+            api::Refusal::Forbidden { reason } => write!(f, "Forbidden: {reason}"),
+        }
+    }
+}
+
+/// Fail with [`api::Refusal::NotFound`] through a hand written
+/// [`ws::ResponseError`].
+const REFUSE_NOT_FOUND: u8 = 0;
+/// Fail with [`api::Refusal::Forbidden`] through [`ws::TypedError`].
+const REFUSE_FORBIDDEN: u8 = 1;
+/// Fail with a typed error which cannot be encoded.
+const REFUSE_UNENCODABLE: u8 = 2;
+
+/// A value whose encoding always fails.
+struct Unencodable;
+
+impl<M> musli::Encode<M> for Unencodable {
+    type Encode = Self;
+
+    fn encode<E>(&self, encoder: E) -> Result<(), E::Error>
+    where
+        E: musli::Encoder<Mode = M>,
+    {
+        use musli::Context;
+        Err(encoder.cx().message("Unencodable"))
+    }
+
+    fn as_encode(&self) -> &Self::Encode {
+        self
+    }
+}
+
+/// The error the test handler fails with, which mixes text and typed errors
+/// the way an application would.
+enum TestError {
+    Text(String),
+    NotFound,
+    Typed(ws::TypedError<api::Refusal>),
+    Unencodable,
+}
+
+impl ws::ResponseError for TestError {
+    fn fmt_message(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TestError::Text(message) => write!(f, "{message}"),
+            TestError::NotFound => write!(f, "{}", api::Refusal::NotFound),
+            TestError::Typed(error) => error.fmt_message(f),
+            TestError::Unencodable => write!(f, "Cannot be encoded"),
+        }
+    }
+
+    fn encode_payload(&self, payload: ws::ErrorPayload<'_>) -> Result<(), ws::Error> {
+        match self {
+            TestError::Text(..) => Ok(()),
+            TestError::NotFound => payload.encode(&api::Refusal::NotFound),
+            TestError::Typed(error) => error.encode_payload(payload),
+            TestError::Unencodable => payload.encode(&Unencodable),
+        }
+    }
+}
+
 #[derive(Clone)]
 struct TestHandler {
     events: mpsc::UnboundedSender<Event>,
@@ -156,7 +252,7 @@ struct TestHandler {
 
 impl ws::Handler for TestHandler {
     type Id = api::Request;
-    type Response = Result<bool, String>;
+    type Response = Result<bool, TestError>;
 
     async fn open_channel(&self, channel: ChannelId) {
         _ = self.events.send(Event::OpenChannel(channel));
@@ -191,7 +287,21 @@ impl ws::Handler for TestHandler {
                     return Ok(false);
                 };
 
-                Err(request.reason.to_owned())
+                Err(TestError::Text(request.reason.to_owned()))
+            }
+            api::Request::Refuse => {
+                let Some(request) = incoming.read::<api::RefuseRequest>() else {
+                    return Ok(false);
+                };
+
+                Err(match request.how {
+                    REFUSE_NOT_FOUND => TestError::NotFound,
+                    REFUSE_FORBIDDEN => TestError::Typed(ws::TypedError(api::Refusal::Forbidden {
+                        reason: String::from("Read only"),
+                    })),
+                    REFUSE_UNENCODABLE => TestError::Unencodable,
+                    how => TestError::Text(format!("Unknown refusal {how}")),
+                })
             }
             api::Request::Hang => {
                 // Never completes, so the request stays pending until the
@@ -574,6 +684,166 @@ async fn server_error_is_propagated() {
 
     client.close().await;
     server.shutdown().await;
+}
+
+/// Send a refuse request, returning the error it failed with.
+async fn refuse(handle: &Handle, how: u8) -> client::Error {
+    timeout!(handle.request().body(api::RefuseRequest { how }).send())
+        .expect_err("Expected the request to fail")
+}
+
+/// A handler which fails with a typed error is seen by the client as a server
+/// error which decodes back into the type it was sent as, and still carries
+/// the message.
+#[tokio::test]
+async fn typed_error_round_trip() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    // Through a hand written `ResponseError`.
+    let error = refuse(handle, REFUSE_NOT_FOUND).await;
+    assert_eq!(error.as_server_error(), Some("Not found"));
+    assert_eq!(error.to_string(), "Server error: Not found");
+    assert_eq!(
+        error.server_error::<api::Refusal>().unwrap(),
+        Some(api::Refusal::NotFound)
+    );
+
+    // Through `TypedError`.
+    let error = refuse(handle, REFUSE_FORBIDDEN).await;
+    assert_eq!(error.as_server_error(), Some("Forbidden: Read only"));
+    assert_eq!(
+        error.server_error::<api::Refusal>().unwrap(),
+        Some(api::Refusal::Forbidden {
+            reason: String::from("Read only")
+        })
+    );
+
+    // Decoding it as something it is not fails, and leaves the error intact.
+    assert!(error.server_error::<api::Unrelated>().is_err());
+    assert_eq!(error.as_server_error(), Some("Forbidden: Read only"));
+
+    // A text error from the same handler carries no typed error.
+    let error = timeout!(
+        handle
+            .request()
+            .body(api::FailRequest { reason: "plain" })
+            .send()
+    )
+    .expect_err("Expected the request to fail");
+
+    assert_eq!(error.as_server_error(), Some("plain"));
+    assert_eq!(error.server_error::<api::Refusal>().unwrap(), None);
+
+    // Neither does an error the server produced on its own.
+    let error = timeout!(handle.request().body(api::Empty).send())
+        .expect_err("Expected the request to fail");
+
+    assert!(error.as_server_error().is_some());
+    assert_eq!(error.server_error::<api::Refusal>().unwrap(), None);
+
+    // The connection is still usable after typed errors.
+    let (message, _) = hello(handle, "Still here").await;
+    assert_eq!(message, "Still here");
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+/// A typed error which cannot be encoded still reaches the client as its
+/// message, rather than taking the connection down.
+#[tokio::test]
+async fn unencodable_typed_error_sends_its_message() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    let error = refuse(handle, REFUSE_UNENCODABLE).await;
+    assert_eq!(error.as_server_error(), Some("Cannot be encoded"));
+    assert_eq!(error.server_error::<api::Refusal>().unwrap(), None);
+
+    let (message, _) = hello(handle, "Still here").await;
+    assert_eq!(message, "Still here");
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+/// A server which fails a request with a typed error whose body is
+/// `body`, returning the error the client saw.
+async fn fail_with_raw_typed_error(body: Vec<u8>) -> client::Error {
+    let server = raw_server::RawServer::bind().await;
+    let client = TestClient::builder(&server.url(), false, Format::DEFAULT, Mode::DEFAULT);
+
+    let (mut peer, handle) = tokio::join!(server.accept(), client.open());
+
+    let request = handle
+        .request()
+        .body(api::HelloRequest { message: "Hello" })
+        .send();
+
+    let respond = async {
+        let serial = peer.request_serial().await;
+        peer.typed_error(serial, &body).await;
+    };
+
+    let (result, ()) = timeout!(async { tokio::join!(request, respond) });
+    let error = result.expect_err("Expected the request to fail");
+
+    drop(peer);
+    client.close().await;
+    error
+}
+
+/// The body of an error response, which is an error message followed by a
+/// payload, encoded with the default format.
+fn raw_error_body(message: &str, payload: &[u8]) -> Vec<u8> {
+    #[derive(musli::Encode)]
+    #[musli(packed)]
+    struct ErrorMessage<'a> {
+        message: &'a str,
+    }
+
+    let mut body = musli::wire::to_vec(&ErrorMessage { message }).expect("Failed to encode");
+    body.extend_from_slice(payload);
+    body
+}
+
+/// A typed error whose payload is garbage, or missing entirely, is a server
+/// error whose message is intact and whose payload fails to decode.
+#[tokio::test]
+async fn typed_error_with_malformed_payload() {
+    let valid = musli::wire::to_vec(&api::Refusal::NotFound).expect("Failed to encode");
+
+    // A well formed payload decodes, which is what makes the cases below
+    // meaningful.
+    let error = fail_with_raw_typed_error(raw_error_body("Not found", &valid)).await;
+    assert_eq!(
+        error.server_error::<api::Refusal>().unwrap(),
+        Some(api::Refusal::NotFound)
+    );
+
+    for payload in [&[0xff; 4][..], &[][..], &valid[..valid.len() - 1]] {
+        let error = fail_with_raw_typed_error(raw_error_body("Broken", payload)).await;
+        assert_eq!(error.as_server_error(), Some("Broken"), "{payload:?}");
+        assert!(
+            error.server_error::<api::Refusal>().is_err(),
+            "{payload:?} decoded"
+        );
+    }
+}
+
+/// A typed error whose message cannot be decoded fails the request, rather
+/// than leaving it to find out that its reply went missing.
+#[tokio::test]
+async fn typed_error_with_malformed_message_fails_the_request() {
+    let error = fail_with_raw_typed_error(vec![0xff; 4]).await;
+    assert!(error.as_server_error().is_none(), "{error}");
+    assert_eq!(
+        error.to_string(),
+        "Encoding error when decoding error response"
+    );
 }
 
 #[tokio::test]
@@ -1102,6 +1372,17 @@ async fn exercise(format: Format, mode: Mode) {
     .expect_err("Expected the request to fail");
 
     assert_eq!(error.as_server_error(), Some("nope"));
+    assert!(error.server_error::<api::Refusal>().unwrap().is_none());
+
+    // Typed errors are encoded with a format the client can read.
+    let error = refuse(handle, REFUSE_FORBIDDEN).await;
+    assert_eq!(error.as_server_error(), Some("Forbidden: Read only"));
+    assert_eq!(
+        error.server_error::<api::Refusal>().unwrap(),
+        Some(api::Refusal::Forbidden {
+            reason: String::from("Read only")
+        })
+    );
 
     // Broadcasts are encoded with the negotiated format, since the server
     // originates them without a request to take the format from.
@@ -1697,6 +1978,162 @@ mod raw {
                     message => panic!("Expected a close, got {message:?}"),
                 }
             }
+        }
+    }
+}
+
+/// A websocket server which speaks the wire protocol by hand, so a test can
+/// send the client something the crate never would.
+mod raw_server {
+    use core::future::poll_fn;
+    use core::pin::Pin;
+
+    use bytes::Bytes;
+    use futures_core03::Stream;
+    use futures_sink03::Sink;
+    use musli_web::api::{Format, MessageId, VERSION};
+    use tokio::net::{TcpListener, TcpStream};
+    use tokio_tungstenite029::WebSocketStream;
+    use tokio_tungstenite029::tungstenite::Message as WsMessage;
+
+    use crate::TIMEOUT;
+    use crate::raw::{END_OF_HEADERS, ids, write_header};
+
+    pub(crate) struct RawServer {
+        listener: TcpListener,
+    }
+
+    impl RawServer {
+        pub(crate) async fn bind() -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("Failed to bind");
+            Self { listener }
+        }
+
+        pub(crate) fn url(&self) -> String {
+            let addr = self.listener.local_addr().expect("No local address");
+            format!("ws://{addr}/ws")
+        }
+
+        /// Accept one connection and take it through the hello and the format
+        /// negotiation, accepting whatever format the client asks for.
+        pub(crate) async fn accept(&self) -> RawPeer {
+            let (stream, _) = timeout!(self.listener.accept()).expect("Failed to accept");
+            let socket =
+                timeout!(tokio_tungstenite029::accept_async(stream)).expect("Failed handshake");
+            let mut peer = RawPeer { socket };
+
+            let mut hello = Vec::new();
+            write_header(&mut hello, ids::VERSION, VERSION);
+            write_header(
+                &mut hello,
+                ids::RESPONSE_BROADCAST,
+                u32::from(MessageId::SERVER_HELLO.get()),
+            );
+            hello.push(END_OF_HEADERS);
+            peer.send(hello).await;
+
+            let (serial, id, format) = peer.request().await;
+            assert_eq!(id, u32::from(MessageId::NEGOTIATE.get()));
+
+            let mut ack = Vec::new();
+            write_header(&mut ack, ids::VERSION, VERSION);
+            write_header(&mut ack, ids::RESPONSE_SERIAL, serial);
+            write_header(&mut ack, ids::RESPONSE_FORMAT, format);
+            ack.push(END_OF_HEADERS);
+            peer.send(ack).await;
+            peer
+        }
+    }
+
+    pub(crate) struct RawPeer {
+        socket: WebSocketStream<TcpStream>,
+    }
+
+    impl RawPeer {
+        /// Receive the next request and return its serial.
+        pub(crate) async fn request_serial(&mut self) -> u32 {
+            self.request().await.0
+        }
+
+        /// Answer `serial` with a typed error whose body is `body`.
+        pub(crate) async fn typed_error(&mut self, serial: u32, body: &[u8]) {
+            let mut data = Vec::new();
+            write_header(&mut data, ids::VERSION, VERSION);
+            write_header(&mut data, ids::RESPONSE_SERIAL, serial);
+            write_header(
+                &mut data,
+                ids::RESPONSE_ERROR,
+                u32::from(MessageId::TYPED_ERROR_MESSAGE.get()),
+            );
+            write_header(
+                &mut data,
+                ids::RESPONSE_FORMAT,
+                u32::from(Format::DEFAULT.to_u8()),
+            );
+            data.push(END_OF_HEADERS);
+            data.extend_from_slice(body);
+            self.send(data).await;
+        }
+
+        /// Receive the next binary request, returning its serial, id and
+        /// format.
+        async fn request(&mut self) -> (u32, u32, u32) {
+            let bytes = loop {
+                let message = timeout!(poll_fn(|cx| Pin::new(&mut self.socket).poll_next(cx)))
+                    .expect("Connection closed")
+                    .expect("Socket error");
+
+                match message {
+                    WsMessage::Binary(bytes) => break bytes,
+                    WsMessage::Ping(..) | WsMessage::Pong(..) => continue,
+                    message => panic!("Unexpected message: {message:?}"),
+                }
+            };
+
+            let (mut serial, mut id, mut format) = (0, 0, 0);
+            let mut at = 0;
+
+            loop {
+                let tag = bytes[at];
+                at += 1;
+
+                if tag == END_OF_HEADERS {
+                    break;
+                }
+
+                let width = [1, 2, 4][usize::from(tag >> 6)];
+                let mut value = [0; 4];
+                value[..width].copy_from_slice(&bytes[at..at + width]);
+                at += width;
+                let value = u32::from_le_bytes(value);
+
+                match tag & 0b0011_1111 {
+                    ids::SERIAL => serial = value,
+                    ids::ID => id = value,
+                    ids::FORMAT => format = value,
+                    _ => {}
+                }
+            }
+
+            (serial, id, format)
+        }
+
+        async fn send(&mut self, data: Vec<u8>) {
+            let message = WsMessage::Binary(Bytes::from(data));
+
+            poll_fn(|cx| Pin::new(&mut self.socket).poll_ready(cx))
+                .await
+                .expect("Socket is not ready");
+
+            Pin::new(&mut self.socket)
+                .start_send(message)
+                .expect("Failed to send");
+
+            poll_fn(|cx| Pin::new(&mut self.socket).poll_flush(cx))
+                .await
+                .expect("Failed to flush");
         }
     }
 }

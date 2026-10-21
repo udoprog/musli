@@ -367,7 +367,8 @@ impl State {
 /// * [`is_cancelled`] - the request was replaced by another one before it was
 ///   answered.
 /// * [`as_server_error`] - the server answered with an error, such as one
-///   returned by its handler.
+///   returned by its handler. If the handler failed with a typed error,
+///   [`server_error`] decodes it.
 /// * [`is_decode`] - something received could not be decoded, such as a
 ///   response which does not match the expected type.
 ///
@@ -400,6 +401,7 @@ impl State {
 /// [`is_connection_lost`]: Self::is_connection_lost
 /// [`is_cancelled`]: Self::is_cancelled
 /// [`as_server_error`]: Self::as_server_error
+/// [`server_error`]: Self::server_error
 /// [`is_decode`]: Self::is_decode
 #[derive(Debug)]
 pub struct Error {
@@ -485,21 +487,88 @@ impl Error {
     ///
     /// [`Display`]: core::fmt::Display
     /// [`Handler`]: <https://docs.rs/musli-web/latest/musli_web/ws/trait.Handler.html>
+    ///
+    /// This is the message of a [typed error](Self::server_error) too.
     #[inline]
     pub fn as_server_error(&self) -> Option<&str> {
         match &self.kind {
-            ErrorKind::Server(message) => Some(message),
+            ErrorKind::Server(error) => Some(&error.message),
             _ => None,
         }
+    }
+
+    /// Decode the typed error the server answered with.
+    ///
+    /// A handler which fails with a `ws::TypedError<E>` sends `E` encoded in
+    /// the body format of the connection, see [Errors]. This decodes it back
+    /// as `T`, which should be the same type as `E` or one which is
+    /// compatible with it, typically from an API crate shared with the server.
+    ///
+    /// Returns `Ok(None)` if this is not a server error, or if it is one which
+    /// carries no typed error, such as a handler error which is plain text or
+    /// an error the server produced on its own for a request it does not
+    /// support. Those still have a message, see [`as_server_error`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if the typed error does not decode as `T`. The returned error is
+    /// a [decode error](Self::is_decode).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Decode, Encode};
+    /// use musli_web::web::Error;
+    ///
+    /// #[derive(Debug, PartialEq, Encode, Decode)]
+    /// enum ServerError {
+    ///     NotFound,
+    ///     Forbidden,
+    /// }
+    ///
+    /// fn describe(error: &Error) -> String {
+    ///     match error.server_error::<ServerError>() {
+    ///         Ok(Some(ServerError::NotFound)) => String::from("No such thing"),
+    ///         Ok(Some(ServerError::Forbidden)) => String::from("Not allowed"),
+    ///         // NB: Not a typed error, or not one we understand.
+    ///         Ok(None) | Err(..) => error.to_string(),
+    ///     }
+    /// }
+    ///
+    /// let error = Error::message("Something else");
+    /// assert_eq!(error.server_error::<ServerError>().unwrap(), None);
+    /// assert_eq!(describe(&error), "Something else");
+    /// ```
+    ///
+    /// [Errors]: <https://docs.rs/musli-web/latest/musli_web/ws/index.html#errors>
+    /// [`as_server_error`]: Self::as_server_error
+    pub fn server_error<'de, T>(&'de self) -> Result<Option<T>>
+    where
+        T: DecodeBody<'de>,
+    {
+        let ErrorKind::Server(error) = &self.kind else {
+            return Ok(None);
+        };
+
+        let Some((format, payload)) = &error.payload else {
+            return Ok(None);
+        };
+
+        let value = format
+            .decode(payload, &mut 0)
+            .map_err(Error::decode_error_message)?;
+
+        Ok(Some(value))
     }
 
     /// Check if the error is caused by something received which could not be
     /// decoded.
     ///
     /// This covers a response or broadcast whose body does not decode as the
-    /// requested type, an [empty packet](Self::is_empty_packet), and a frame
-    /// from the server whose header, error message or format could not be
-    /// decoded.
+    /// requested type, an [empty packet](Self::is_empty_packet), a frame from
+    /// the server whose header, error message or format could not be decoded,
+    /// and a [typed error](Self::server_error) which does not decode as the
+    /// requested type.
     ///
     /// # Examples
     ///
@@ -532,8 +601,8 @@ impl Error {
     }
 
     #[inline]
-    fn server(message: impl fmt::Display) -> Self {
-        Self::new(ErrorKind::Server(message.to_string()))
+    fn server(error: ServerError) -> Self {
+        Self::new(ErrorKind::Server(error))
     }
 
     #[inline]
@@ -572,7 +641,7 @@ enum ErrorKind {
     ConnectionLost(&'static str),
     Cancelled,
     Message(String),
-    Server(String),
+    Server(ServerError),
     UnknownFormat(u8),
     DecodeResponseHeader(format::Error),
     DecodeErrorMessage(format::Error),
@@ -590,7 +659,7 @@ impl fmt::Display for Error {
             ErrorKind::ConnectionLost(message) => write!(f, "{message}"),
             ErrorKind::Cancelled => write!(f, "Request cancelled"),
             ErrorKind::Message(message) => write!(f, "{message}"),
-            ErrorKind::Server(message) => write!(f, "Server error: {message}"),
+            ErrorKind::Server(error) => write!(f, "Server error: {}", error.message),
             ErrorKind::UnknownFormat(format) => write!(
                 f,
                 "Server used unknown format id {format} for a message body"
@@ -627,6 +696,27 @@ impl From<wasm_bindgen02::JsValue> for Error {
     #[inline]
     fn from(error: wasm_bindgen02::JsValue) -> Self {
         Self::new(ErrorKind::Message(format!("{error:?}")))
+    }
+}
+
+/// An error response from the server, see [error
+/// responses](crate::api#error-responses).
+#[derive(Debug, Clone)]
+struct ServerError {
+    /// The human readable message.
+    message: String,
+    /// The typed payload, and the format it is encoded with.
+    payload: Option<(Format, Box<[u8]>)>,
+}
+
+impl ServerError {
+    /// A server error without a payload.
+    #[inline]
+    fn message(message: &str) -> Self {
+        Self {
+            message: String::from(message),
+            payload: None,
+        }
     }
 }
 
@@ -1200,6 +1290,42 @@ where
         Ok(format)
     }
 
+    /// Decode the body of an error response, whose `error` header is `id`.
+    ///
+    /// An error id which carries no message is reported with `unsupported`.
+    fn server_error(
+        id: MessageId,
+        header: &api::ResponseHeader,
+        buf: &[u8],
+        mut at: usize,
+        unsupported: &str,
+    ) -> Result<ServerError> {
+        let typed = match id {
+            MessageId::ERROR_MESSAGE => false,
+            MessageId::TYPED_ERROR_MESSAGE => true,
+            _ => return Ok(ServerError::message(unsupported)),
+        };
+
+        let format = Self::body_format(header)?;
+
+        let error: api::ErrorMessage<'_> = format
+            .decode(buf, &mut at)
+            .map_err(Error::decode_error_message)?;
+
+        // NB: The payload is only decoded once the caller says what type it
+        // is, see `Error::server_error`.
+        let payload = if typed {
+            Some((format, Box::from(buf.get(at..).unwrap_or_default())))
+        } else {
+            None
+        };
+
+        Ok(ServerError {
+            message: String::from(error.message),
+            payload,
+        })
+    }
+
     pub(crate) fn message(self: &Rc<Self>, mode: Mode, buf: Box<BufData>) -> Result<()> {
         // Wrap the buffer in a simple shared reference-counted container.
         let buf = BufRc::new(buf);
@@ -1236,18 +1362,11 @@ where
             };
 
             if let Some(id) = MessageId::new(header.error) {
-                let error = match id {
-                    MessageId::ERROR_MESSAGE => Self::body_format(&header)?
-                        .decode(&buf, &mut at)
-                        .map_err(Error::decode_error_message)?,
-                    _ => api::ErrorMessage {
-                        message: "Unsupported broadcast",
-                    },
-                };
+                let error = Self::server_error(id, &header, &buf, at, "Unsupported broadcast")?;
 
                 while let Some(callback) = self.defer_broadcasts.borrow_mut().pop_front() {
                     if let Some(callback) = callback.upgrade() {
-                        callback.call(Err(Error::server(error.message)));
+                        callback.call(Err(Error::server(error.clone())));
                     }
                 }
 
@@ -1275,14 +1394,17 @@ where
 
             if let Some(p) = p {
                 if let Some(id) = MessageId::new(header.error) {
-                    let error = match id {
-                        MessageId::ERROR_MESSAGE => Self::body_format(&header)?
-                            .decode(&buf, &mut at)
-                            .map_err(Error::decode_error_message)?,
-                        _ => api::ErrorMessage {
-                            message: "Unsupported request",
-                        },
-                    };
+                    let error =
+                        match Self::server_error(id, &header, &buf, at, "Unsupported request") {
+                            Ok(error) => error,
+                            // NB: Fail the request rather than leave it waiting
+                            // for a response which has already arrived.
+                            Err(error) if p.callback.as_negotiate().is_none() => {
+                                p.callback.error(error);
+                                return Ok(());
+                            }
+                            Err(error) => return Err(error),
+                        };
 
                     if let Some((format, requested)) = p.callback.as_negotiate() {
                         // NB: The server cannot speak the requested format, or
@@ -1303,7 +1425,7 @@ where
                         return Ok(());
                     }
 
-                    p.callback.error(Error::server(error.message));
+                    p.callback.error(Error::server(error));
                     return Ok(());
                 }
 

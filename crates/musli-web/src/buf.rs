@@ -86,6 +86,13 @@ impl Writer<'_> {
         format.encode(&mut self.buf.buffer, value)
     }
 
+    /// Write bytes which have already been encoded to the current frame.
+    #[inline]
+    #[cfg(feature = "ws")]
+    pub(crate) fn raw(&mut self, bytes: &[u8]) {
+        self.buf.buffer.extend_from_slice(bytes);
+    }
+
     /// Finalize the current frame.
     #[inline]
     pub(crate) fn flush(self) {

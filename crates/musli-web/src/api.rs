@@ -82,7 +82,7 @@
 //! terminated by an empty line, carried in a text frame:
 //!
 //! ```text
-//! version: 1
+//! version: 2
 //! serial: 1
 //! id: 1
 //! format: 5
@@ -154,8 +154,33 @@
 //! Since formats are gated behind [features], a server may genuinely be unable
 //! to speak a format a client asks for, which is why step 3 can fail.
 //!
+//! # Error responses
+//!
+//! A request which fails is answered with a response whose `error` header is
+//! non-zero, and whose body is encoded with the format the connection
+//! negotiated (rather than the one the request declared, since the request
+//! might have failed precisely because its format is not supported):
+//!
+//! * [`MessageId::ERROR_MESSAGE`] - the body is an [`ErrorMessage`], which
+//!   carries a human readable message and nothing else. This is what the server
+//!   sends when it fails a request on its own, such as one it does not support,
+//!   and for a handler error which is plain text.
+//! * [`MessageId::TYPED_ERROR_MESSAGE`] - the body is an [`ErrorMessage`]
+//!   followed by a second value, the *payload*, which is the error the handler
+//!   returned encoded the same way a response body would be. The message is
+//!   still there so that a client which does not know the type of the payload
+//!   can show something.
+//!
+//! Any other non-zero value is an error the client has no message for, which
+//! it reports as an unsupported request (or broadcast).
+//!
+//! On the server a handler opts into the typed form by failing with a
+//! [`ws::TypedError`]. A client reads the payload back with
+//! `web::Error::server_error` or `client::Error::server_error`.
+//!
 //! [features]: <https://docs.rs/musli-web/latest/musli_web/#features>
 //! [`ws::Connect::connect`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Connect.html#method.connect>
+//! [`ws::TypedError`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.TypedError.html>
 //! [`ws::Server`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html>
 
 use core::fmt;
@@ -177,14 +202,21 @@ pub use musli_web_macros::define;
 ///
 /// [the protocol version]: crate::api#the-protocol-version
 ///
+/// # History
+///
+/// * `2` - a request may fail with a typed error, see [error responses].
+/// * `1` - the first versioned protocol.
+///
+/// [error responses]: crate::api#error-responses
+///
 /// # Examples
 ///
 /// ```
 /// use musli_web::api::VERSION;
 ///
-/// assert_eq!(VERSION, 1);
+/// assert_eq!(VERSION, 2);
 /// ```
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
 
 /// The serialization format used for message bodies.
 ///
@@ -951,7 +983,9 @@ impl fmt::Display for MessageId {
 }
 
 impl MessageId {
-    /// The message id for [`ErrorMessage`].
+    /// The error id of a response whose body is an [`ErrorMessage`].
+    ///
+    /// See [error responses](crate::api#error-responses).
     pub const ERROR_MESSAGE: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 1) };
 
     /// A connect of a channel.
@@ -968,6 +1002,12 @@ impl MessageId {
     ///
     /// See the [negotiation protocol] for how this is used.
     pub const NEGOTIATE: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 5) };
+
+    /// The error id of a response whose body is an [`ErrorMessage`] followed by
+    /// a typed payload.
+    ///
+    /// See [error responses](crate::api#error-responses).
+    pub const TYPED_ERROR_MESSAGE: Self = unsafe { Self::new_unchecked((i16::MAX as u16) + 6) };
 
     /// The message id for an empty packet constructed using [`Packet::empty`]
     /// or [`RawPacket::empty`].
@@ -1125,7 +1165,8 @@ pub struct ResponseHeader {
     /// This is a broadcast over the specified type. If this is non-empty the
     /// serial is 0.
     pub broadcast: u16,
-    /// If non-zero, the response contains an error of the given type.
+    /// If non-zero, the response is an error and this says what its body
+    /// carries, see [error responses](crate::api#error-responses).
     pub error: u16,
     /// The [`Format`] the body of this response is encoded with, as given by
     /// [`Format::to_u8`]. Zero if the response carries no body.
@@ -1134,7 +1175,11 @@ pub struct ResponseHeader {
     pub channel: ChannelId,
 }
 
-/// An error response.
+/// The body of an error response.
+///
+/// When the response carries [`MessageId::TYPED_ERROR_MESSAGE`] the typed
+/// payload follows it in the same body, see [error
+/// responses](crate::api#error-responses).
 #[derive(Debug, Clone, Encode, Decode)]
 #[doc(hidden)]
 #[musli(packed)]

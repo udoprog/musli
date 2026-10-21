@@ -13,8 +13,8 @@
 //! is primarily implemented for `bool`, where returning `false` indicates that
 //! the given request kind is not supported.
 //!
-//! You can also return custom error for a handler by having it return anything
-//! that implements [`fmt::Display`]:
+//! A handler can also fail a request by returning an error, see
+//! [Errors](#errors) below.
 //!
 //! ```
 //! use musli_web::api::MessageId;
@@ -94,6 +94,114 @@
 //!     }
 //! }
 //! ```
+//!
+//! # Errors
+//!
+//! A handler whose [`Handler::Response`] is a `Result<T, E>` fails the request
+//! it is handling by returning `Err(E)`. What reaches the client depends on
+//! `E`, see [`ResponseError`]:
+//!
+//! * Anything which implements [`fmt::Display`], such as a `String` or an
+//!   `anyhow::Error`, is sent as *text*. The client sees the message through
+//!   `web::Error::as_server_error`.
+//! * A [`TypedError<E>`] is sent as a *typed error*. The value it wraps is
+//!   encoded in the body format of the connection, just like a response, so
+//!   the client can decode it back into `E` with `web::Error::server_error`
+//!   instead of parsing a message. Its [`fmt::Display`] text is sent along as
+//!   the message, so code which only looks at the message keeps working.
+//! * An error type which implements [`ResponseError`] by hand decides for each
+//!   error whether it is typed, which keeps internal failures out of what the
+//!   client is told. See [`ResponseError`] for an example.
+//!
+//! Putting the error type in the API crate shared by the server and the client
+//! keeps the two in agreement:
+//!
+//! ```
+//! use core::fmt;
+//!
+//! use musli_web::ws::{self, TypedError};
+//!
+//! mod api {
+//!     use musli::{Decode, Encode};
+//!     use musli_web::api;
+//!
+//!     /// Why the server refused a request.
+//!     #[derive(Debug, PartialEq, Encode, Decode)]
+//!     pub enum ServerError {
+//!         NotFound,
+//!         Forbidden { reason: String },
+//!     }
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct DeleteRequest {
+//!         pub id: u32,
+//!     }
+//!
+//!     #[derive(Encode, Decode)]
+//!     pub struct DeleteResponse;
+//!
+//!     api::define! {
+//!         pub type Delete;
+//!
+//!         impl Endpoint for Delete {
+//!             impl Request for DeleteRequest;
+//!             type Response<'de> = DeleteResponse;
+//!         }
+//!     }
+//! }
+//!
+//! impl fmt::Display for api::ServerError {
+//!     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//!         match self {
+//!             Self::NotFound => write!(f, "Not found"),
+//!             Self::Forbidden { reason } => write!(f, "Forbidden: {reason}"),
+//!         }
+//!     }
+//! }
+//!
+//! #[derive(Clone)]
+//! struct MyHandler;
+//!
+//! impl ws::Handler for MyHandler {
+//!     type Id = api::Request;
+//!     type Response = Result<bool, TypedError<api::ServerError>>;
+//!
+//!     async fn handle(
+//!         &self,
+//!         id: Self::Id,
+//!         incoming: &mut ws::Incoming<'_>,
+//!         outgoing: &mut ws::Outgoing<'_>,
+//!     ) -> Self::Response {
+//!         match id {
+//!             api::Request::Delete => {
+//!                 let Some(request) = incoming.read::<api::DeleteRequest>() else {
+//!                     return Ok(false);
+//!                 };
+//!
+//!                 if request.id == 0 {
+//!                     // `?` converts into a `TypedError` too.
+//!                     return Err(TypedError(api::ServerError::Forbidden {
+//!                         reason: String::from("The root cannot be deleted"),
+//!                     }));
+//!                 }
+//!
+//!                 outgoing.write(api::DeleteResponse);
+//!                 Ok(true)
+//!             }
+//!             api::Request::Unknown(..) => Ok(false),
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! On the client, the error such a request fails with decodes back with
+//! `error.server_error::<api::ServerError>()`, which returns `Ok(None)` for an
+//! error which is not typed. See `web::Error::server_error` and
+//! `client::Error::server_error`.
+//!
+//! Errors the server produces on its own, such as for a request no handler
+//! supports or one which could not be decoded, are always text, so a client
+//! should be prepared for a server error which carries no payload.
 //!
 //! # Broadcast origin
 //!
@@ -373,6 +481,9 @@ enum ErrorKind {
     ErrorMessage {
         error: format::Error,
     },
+    EncodeErrorPayload {
+        error: format::Error,
+    },
     OutOfBounds {
         offset: usize,
         len: usize,
@@ -468,6 +579,9 @@ impl fmt::Display for Error {
             ErrorKind::ErrorMessage { .. } => {
                 write!(f, "Encoding error when encoding error message")
             }
+            ErrorKind::EncodeErrorPayload { .. } => {
+                write!(f, "Encoding error when encoding typed error")
+            }
             ErrorKind::OutOfBounds { offset, len } => {
                 write!(
                     f,
@@ -510,6 +624,7 @@ impl core::error::Error for Error {
             ErrorKind::EncodeConnectHeader { error } => Some(error),
             ErrorKind::ErrorMessageHeader { error } => Some(error),
             ErrorKind::ErrorMessage { error } => Some(error),
+            ErrorKind::EncodeErrorPayload { error } => Some(error),
             ErrorKind::NegotiateHeader { error } => Some(error),
             ErrorKind::UnknownHeader { error } => Some(error),
             ErrorKind::UnsupportedVersion { error } => Some(error),
@@ -547,13 +662,242 @@ pub struct Response {
     handled: bool,
 }
 
+/// An error a handler can fail a request with.
+///
+/// This decides what the client receives, see [Errors](self#errors). It is
+/// implemented for:
+///
+/// * Every type which implements [`fmt::Display`], which is sent as text. The
+///   client sees it through `web::Error::as_server_error`.
+/// * [`TypedError<E>`], which is sent as a typed error. The client can decode
+///   it back into `E` with `web::Error::server_error`.
+///
+/// It can also be implemented by hand for an error type which does not
+/// implement [`fmt::Display`], to decide per error whether it is typed. This is
+/// useful to keep internal failures out of the typed error the client sees.
+///
+/// # Examples
+///
+/// ```
+/// use core::fmt;
+///
+/// use musli::{Decode, Encode};
+/// use musli_web::ws::{self, ErrorPayload, ResponseError};
+///
+/// /// The error the client is told about, shared through the API crate.
+/// #[derive(Debug, Encode, Decode)]
+/// pub enum AuthError {
+///     Expired,
+///     Denied,
+/// }
+///
+/// /// What the handler fails with.
+/// enum HandlerError {
+///     Auth(AuthError),
+///     Internal(String),
+/// }
+///
+/// impl ResponseError for HandlerError {
+///     fn fmt_message(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+///         match self {
+///             HandlerError::Auth(AuthError::Expired) => write!(f, "Session expired"),
+///             HandlerError::Auth(AuthError::Denied) => write!(f, "Access denied"),
+///             // NB: The details stay on the server.
+///             HandlerError::Internal(..) => write!(f, "Internal error"),
+///         }
+///     }
+///
+///     fn encode_payload(&self, payload: ErrorPayload<'_>) -> Result<(), ws::Error> {
+///         match self {
+///             HandlerError::Auth(error) => payload.encode(error),
+///             // Not encoding anything sends the message alone.
+///             HandlerError::Internal(..) => Ok(()),
+///         }
+///     }
+/// }
+/// ```
+pub trait ResponseError
+where
+    Self: 'static + Send,
+{
+    /// Write the human readable message of the error.
+    ///
+    /// This is sent for every error, typed or not. The client shows it in the
+    /// [`fmt::Display`] of its error and returns it from
+    /// `web::Error::as_server_error`.
+    fn fmt_message(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
+
+    /// Encode the typed payload of the error, if it has one, by calling
+    /// [`ErrorPayload::encode`].
+    ///
+    /// Returning without encoding anything, which is what the default
+    /// implementation does, sends the message alone. If this errors the
+    /// message is sent alone as well, since the client is better served by
+    /// the message than by no response at all.
+    #[inline]
+    fn encode_payload(&self, payload: ErrorPayload<'_>) -> Result<(), Error> {
+        _ = payload;
+        Ok(())
+    }
+}
+
+impl<E> ResponseError for E
+where
+    E: 'static + Send + fmt::Display,
+{
+    #[inline]
+    fn fmt_message(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
+impl<E> ResponseError for TypedError<E>
+where
+    E: 'static + Send + fmt::Display + EncodeBody,
+{
+    #[inline]
+    fn fmt_message(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+
+    #[inline]
+    fn encode_payload(&self, payload: ErrorPayload<'_>) -> Result<(), Error> {
+        payload.encode(&self.0)
+    }
+}
+
+/// Where [`ResponseError::encode_payload`] writes the typed payload of an
+/// error.
+pub struct ErrorPayload<'a> {
+    format: Format,
+    out: &'a mut Vec<u8>,
+    encoded: &'a mut bool,
+}
+
+impl ErrorPayload<'_> {
+    /// The format the payload is encoded with, which is the format of the
+    /// connection.
+    #[inline]
+    pub fn format(&self) -> Format {
+        self.format
+    }
+
+    /// Encode `value` as the typed payload of the error.
+    ///
+    /// The client decodes it with `web::Error::server_error`.
+    ///
+    /// # Errors
+    ///
+    /// Errors if `value` cannot be encoded.
+    pub fn encode<T>(self, value: &T) -> Result<(), Error>
+    where
+        T: ?Sized + EncodeBody,
+    {
+        self.out.clear();
+
+        if let Err(error) = self.format.encode(self.out, value) {
+            self.out.clear();
+            return Err(Error::new(ErrorKind::EncodeErrorPayload { error }));
+        }
+
+        *self.encoded = true;
+        Ok(())
+    }
+}
+
+/// Display adapter for the message of a [`ResponseError`].
+struct ErrorMessageDisplay<'a, E>(&'a E)
+where
+    E: ?Sized;
+
+impl<E> fmt::Display for ErrorMessageDisplay<'_, E>
+where
+    E: ?Sized + ResponseError,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt_message(f)
+    }
+}
+
+/// A handler error which reaches the client as a typed value.
+///
+/// The wrapped error is encoded in the body format of the connection, and the
+/// client decodes it back with `web::Error::server_error` (or
+/// `client::Error::server_error`). Its [`fmt::Display`] text is sent along as
+/// the message of the error, which is what a client that does not decode the
+/// payload sees. See [Errors](self#errors) for an example.
+///
+/// If the error cannot be encoded the client receives the message alone, as
+/// if it was a plain text error.
+///
+/// This deliberately does not implement [`fmt::Display`] itself, since that
+/// would make it a text error. Use [`TypedError::get`] or the public field to
+/// get at the error.
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::ws::TypedError;
+///
+/// fn check(value: u32) -> Result<u32, TypedError<String>> {
+///     if value == 0 {
+///         // Converted with `From` by the question mark operator.
+///         Err::<(), _>(String::from("Zero is not allowed"))?;
+///     }
+///
+///     Ok(value)
+/// }
+///
+/// let error = check(0).unwrap_err();
+/// assert_eq!(error.get(), "Zero is not allowed");
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct TypedError<E>(pub E);
+
+impl<E> TypedError<E> {
+    /// Wrap an error.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::ws::TypedError;
+    ///
+    /// let error = TypedError::new(42u32);
+    /// assert_eq!(error.into_inner(), 42);
+    /// ```
+    #[inline]
+    pub const fn new(error: E) -> Self {
+        Self(error)
+    }
+
+    /// Get a reference to the wrapped error.
+    #[inline]
+    pub const fn get(&self) -> &E {
+        &self.0
+    }
+
+    /// Unwrap the error.
+    #[inline]
+    pub fn into_inner(self) -> E {
+        self.0
+    }
+}
+
+impl<E> From<E> for TypedError<E> {
+    #[inline]
+    fn from(error: E) -> Self {
+        Self(error)
+    }
+}
+
 /// Trait governing how something can be converted into a response.
 pub trait IntoResponse
 where
     Self: 'static + Send,
 {
-    /// The error variant being produced.
-    type Error: fmt::Display;
+    /// The error variant being produced, see [`ResponseError`].
+    type Error: ResponseError;
 
     /// Convert self into a response.
     fn into_response(self) -> Result<Response, Self::Error>;
@@ -586,15 +930,15 @@ impl IntoResponse for bool {
 
 /// Implement [`IntoResponse`] for [`Result`] types.
 ///
-/// Note that this allows anything that implements [`fmt::Display`] to be used
-/// as an [`Err`] variant. The exact message it's being formatted into will be
-/// forwarded as an error to the client.
+/// The [`Err`] variant fails the request, and is sent to the client as
+/// described by [`ResponseError`]: anything which implements [`fmt::Display`]
+/// as a text message, and a [`TypedError`] as a typed error.
 ///
 /// [`Result`]: core::result::Result
 impl<T, E> IntoResponse for Result<T, E>
 where
     T: IntoResponse<Error = Infallible>,
-    E: 'static + Send + fmt::Display,
+    E: ResponseError,
 {
     type Error = E;
 
@@ -1189,6 +1533,8 @@ where
             max_in_flight: self.max_in_flight,
             max_outbound: self.max_outbound,
             error: String::new(),
+            error_payload: Vec::new(),
+            error_typed: false,
             last_ping: None,
             rng: SmallRng::seed_from_u64(self.seed),
             out: VecDeque::new(),
@@ -1245,7 +1591,13 @@ where
     max_in_flight: usize,
     /// Reading stops while this many bytes are queued in `outbound`.
     max_outbound: usize,
+    /// The message of the error response being sent.
     error: String,
+    /// The typed payload of the error response being sent, which is only
+    /// valid if `error_typed` is set.
+    error_payload: Vec<u8>,
+    /// Whether the error response being sent carries `error_payload`.
+    error_typed: bool,
     last_ping: Option<[u8; 4]>,
     rng: SmallRng,
     out: VecDeque<S::Message>,
@@ -1659,7 +2011,7 @@ where
                         let res = match res.into_response() {
                             Ok(res) => res,
                             Err(error) => {
-                                self.format_error_message(error)?;
+                                self.format_response_error(&error)?;
                                 break 'err true;
                             }
                         };
@@ -1815,8 +2167,43 @@ where
         Ok(())
     }
 
+    /// Prepare the error response for an error returned by a handler.
+    fn format_response_error<E>(&mut self, error: &E) -> Result<(), Error>
+    where
+        E: ResponseError,
+    {
+        self.format_error_message(ErrorMessageDisplay(error))?;
+
+        let mut encoded = false;
+
+        // NB: Encoded with the connection format, since that is what
+        // `send_error` writes the rest of the error with.
+        let payload = ErrorPayload {
+            format: self.format,
+            out: &mut self.error_payload,
+            encoded: &mut encoded,
+        };
+
+        match error.encode_payload(payload) {
+            Ok(()) => {
+                self.error_typed = encoded;
+            }
+            Err(error) => {
+                // NB: The message still reaches the client, which is better
+                // than failing the connection over an error it could not see.
+                tracing::warn!(
+                    ?error,
+                    "Failed to encode typed error, sending its message only"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     fn format_error_message(&mut self, error: impl fmt::Display) -> Result<(), Error> {
         self.error.clear();
+        self.error_typed = false;
 
         if write!(self.error, "{error}").is_err() {
             self.error.clear();
@@ -1828,6 +2215,7 @@ where
 
     fn format_error(&mut self, error: impl core::error::Error) -> Result<(), Error> {
         self.error.clear();
+        self.error_typed = false;
 
         if write!(self.error, "{error:#}").is_err() {
             self.error.clear();
@@ -2006,6 +2394,15 @@ where
         let format = self.format;
         let mode = self.mode;
 
+        // NB: Taken so that a later error is never sent with this payload.
+        let typed = mem::take(&mut self.error_typed);
+
+        let error = if typed {
+            MessageId::TYPED_ERROR_MESSAGE
+        } else {
+            MessageId::ERROR_MESSAGE
+        };
+
         let buf = self.pool.with(|buf| {
             // Reset the buffer to the previous start point.
             let mut writer = buf.writer();
@@ -2016,7 +2413,7 @@ where
                     version: VERSION,
                     serial: header.serial,
                     broadcast: 0,
-                    error: MessageId::ERROR_MESSAGE.get(),
+                    error: error.get(),
                     format: format.to_u8(),
                     channel: header.channel,
                 },
@@ -2032,6 +2429,13 @@ where
             );
 
             result.map_err(Error::encode_error_message)?;
+
+            // NB: The payload was already encoded with `format`, see
+            // `format_response_error`.
+            if typed {
+                writer.raw(&self.error_payload);
+            }
+
             writer.flush();
             Ok::<_, Error>(())
         })?;
@@ -2949,6 +3353,8 @@ mod tests {
             max_in_flight: DEFAULT_MAX_IN_FLIGHT,
             max_outbound: DEFAULT_MAX_OUTBOUND,
             error: String::new(),
+            error_payload: Vec::new(),
+            error_typed: false,
             last_ping: None,
             rng: SmallRng::seed_from_u64(DEFAULT_SEED),
             out: VecDeque::new(),

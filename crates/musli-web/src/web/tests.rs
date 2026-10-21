@@ -911,6 +911,244 @@ fn error_broadcast_is_server_error() {
     assert_eq!(error.as_server_error(), Some("Overloaded"));
 }
 
+/// A typed error, the way an application would define one in its API crate.
+#[derive(Debug, PartialEq, musli::Encode, musli::Decode)]
+enum Refusal {
+    NotFound,
+    Forbidden { reason: String },
+}
+
+/// A type which is not what the server sent, to decode a payload as.
+#[derive(Debug, PartialEq, musli::Encode, musli::Decode)]
+struct Unrelated {
+    a: u64,
+    b: u64,
+    c: u64,
+}
+
+/// The body of a typed error response carrying `message` followed by an
+/// already encoded `payload`.
+fn typed_error_body(format: Format, message: &str, payload: &[u8]) -> Vec<u8> {
+    let mut body = Vec::new();
+    format
+        .encode(&mut body, &api::ErrorMessage { message })
+        .unwrap();
+    body.extend_from_slice(payload);
+    body
+}
+
+fn encode_payload(format: Format, value: &impl api::EncodeBody) -> Vec<u8> {
+    let mut out = Vec::new();
+    format.encode(&mut out, value).unwrap();
+    out
+}
+
+/// The header of a response to `serial` which carries `error`.
+fn error_header(serial: u32, error: MessageId, format: Format) -> api::ResponseHeader {
+    api::ResponseHeader {
+        version: api::VERSION,
+        serial,
+        broadcast: 0,
+        error: error.get(),
+        format: format.to_u8(),
+        channel: ChannelId::NONE,
+    }
+}
+
+/// Fail a fresh request with a typed error response whose body is `body`, and
+/// return the error the request saw.
+fn fail_typed(mode: Mode, format: Format, body: &[u8]) -> Error {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let (failures, _request) = send_hello_failures(&service);
+    let serial = last_serial();
+
+    let header = error_header(serial, MessageId::TYPED_ERROR_MESSAGE, format);
+    deliver(&service, mode, &header, body);
+
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+    single(&failures)
+}
+
+/// A typed error response is a server error which decodes back into the type
+/// the server sent, and still has its message.
+#[test]
+fn typed_error_response_is_decoded() {
+    let refusal = Refusal::Forbidden {
+        reason: String::from("Read only"),
+    };
+
+    let format = Format::DEFAULT;
+    let payload = encode_payload(format, &refusal);
+    let error = fail_typed(
+        Mode::Binary,
+        format,
+        &typed_error_body(format, "Forbidden: Read only", &payload),
+    );
+
+    assert_kind(&error, "server");
+    assert_eq!(error.as_server_error(), Some("Forbidden: Read only"));
+    assert_eq!(error.to_string(), "Server error: Forbidden: Read only");
+    assert_eq!(error.server_error::<Refusal>().unwrap(), Some(refusal));
+
+    // NB: Decoding does not consume the payload.
+    assert!(error.server_error::<Refusal>().unwrap().is_some());
+}
+
+/// A typed error is decoded with the format its envelope declares, which is
+/// how a text mode connection carries one.
+#[test]
+fn typed_error_response_in_text_mode() {
+    let format = Format::Json;
+    let payload = encode_payload(format, &Refusal::NotFound);
+    let body = typed_error_body(format, "Not found", &payload);
+
+    let error = fail_typed(Mode::Text, format, &body);
+
+    assert_kind(&error, "server");
+    assert_eq!(error.as_server_error(), Some("Not found"));
+    assert_eq!(
+        error.server_error::<Refusal>().unwrap(),
+        Some(Refusal::NotFound)
+    );
+}
+
+/// A plain error message carries no typed error.
+#[test]
+fn error_message_has_no_typed_error() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let (failures, _request) = send_hello_failures(&service);
+    let serial = last_serial();
+
+    let header = error_header(serial, MessageId::ERROR_MESSAGE, Format::DEFAULT);
+    deliver(&service, Mode::Binary, &header, &error_body("No such user"));
+
+    let error = single(&failures);
+    assert_eq!(error.server_error::<Refusal>().unwrap(), None);
+
+    // Neither does anything which is not a server error.
+    assert_eq!(
+        Error::message("Something else")
+            .server_error::<Refusal>()
+            .unwrap(),
+        None
+    );
+}
+
+/// A typed error which does not decode as the requested type is a decode
+/// error, while the message is still available.
+#[test]
+fn typed_error_of_another_type_is_decode() {
+    let format = Format::DEFAULT;
+    let payload = encode_payload(format, &Refusal::NotFound);
+    let error = fail_typed(
+        Mode::Binary,
+        format,
+        &typed_error_body(format, "Not found", &payload),
+    );
+
+    let decode = error.server_error::<Unrelated>().unwrap_err();
+    assert_kind(&decode, "decode");
+    assert_eq!(error.as_server_error(), Some("Not found"));
+}
+
+/// A typed error whose payload is garbage, or missing, is a decode error when
+/// it is decoded.
+#[test]
+fn malformed_typed_error_payload_is_decode() {
+    let format = Format::DEFAULT;
+
+    for payload in [&[0xff; 4][..], &[][..]] {
+        let error = fail_typed(
+            Mode::Binary,
+            format,
+            &typed_error_body(format, "Broken", payload),
+        );
+
+        assert_kind(&error, "server");
+        assert_eq!(error.as_server_error(), Some("Broken"));
+
+        let decode = error.server_error::<Refusal>().unwrap_err();
+        assert_kind(&decode, "decode");
+    }
+}
+
+/// A typed error whose message cannot be decoded fails the request with a
+/// decode error, rather than leaving it waiting.
+#[test]
+fn malformed_typed_error_message_fails_the_request() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let (failures, _request) = send_hello_failures(&service);
+    let serial = last_serial();
+
+    let header = error_header(serial, MessageId::TYPED_ERROR_MESSAGE, Format::DEFAULT);
+    deliver(&service, Mode::Binary, &header, &[0xff; 4]);
+
+    let error = single(&failures);
+    assert_kind(&error, "decode");
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+    assert!(!has_pending(&service));
+}
+
+/// A typed error broadcast reaches every listener with its payload.
+#[test]
+fn typed_error_broadcast_is_decoded() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+
+    let failures = Failures::default();
+
+    let listener = |failures: &Failures| {
+        let failures = failures.clone();
+
+        move |result: Result<RawPacket>| {
+            if let Err(error) = result {
+                failures.borrow_mut().push(error);
+            }
+        }
+    };
+
+    let _first = service
+        .handle()
+        .on_raw_broadcast::<Ping>(listener(&failures));
+    let _second = service
+        .handle()
+        .on_raw_broadcast::<Ping>(listener(&failures));
+
+    let header = api::ResponseHeader {
+        error: MessageId::TYPED_ERROR_MESSAGE.get(),
+        ..broadcast_header(Ping::ID)
+    };
+
+    let format = Format::DEFAULT;
+    let payload = encode_payload(format, &Refusal::NotFound);
+    deliver(
+        &service,
+        Mode::Binary,
+        &header,
+        &typed_error_body(format, "Not found", &payload),
+    );
+
+    let failures = failures.borrow();
+    assert_eq!(failures.len(), 2);
+
+    for error in failures.iter() {
+        assert_kind(error, "server");
+        assert_eq!(
+            error.server_error::<Refusal>().unwrap(),
+            Some(Refusal::NotFound)
+        );
+    }
+}
+
 /// A response which does not decode as the requested type is a decode error.
 #[test]
 fn undecodable_packet_is_decode() {

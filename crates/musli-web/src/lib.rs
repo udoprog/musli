@@ -35,6 +35,8 @@
 //!   request-reply and broadcasts.
 //! * [Channel support] allowing the server to identify the source of a message
 //!   and clients to correlate messages.
+//! * [Typed request errors]. A handler can fail a request with an error the
+//!   client decodes back into its type, rather than a message it has to parse.
 //! * A [negotiable body format], so a client can pick how much schema evolution
 //!   it needs and the server adapts to it. Message envelopes never depend on
 //!   the outcome, so negotiation itself is always readable.
@@ -56,6 +58,7 @@
 //! [negotiable body format]: https://docs.rs/musli-web/latest/musli_web/api/index.html#wire-format
 //! [selectable socket mode]: https://docs.rs/musli-web/latest/musli_web/api/index.html#the-text-envelope
 //! [explicitly versioned]: https://docs.rs/musli-web/latest/musli_web/api/index.html#the-protocol-version
+//! [Typed request errors]: https://docs.rs/musli-web/latest/musli_web/ws/index.html#errors
 //!
 //! <br>
 //!

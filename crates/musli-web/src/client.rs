@@ -315,13 +315,68 @@ impl Error {
     /// Server errors are produced by a [`Handler`] which returns an error or
     /// which indicates that it does not support the request being made.
     ///
+    /// This is the message of a [typed error](Self::server_error) too.
+    ///
     /// [`Handler`]: <https://docs.rs/musli-web/latest/musli_web/ws/trait.Handler.html>
     #[inline]
     pub fn as_server_error(&self) -> Option<&str> {
         match &self.kind {
-            ErrorKind::Server(message) => Some(message),
+            ErrorKind::Server(error) => Some(&error.message),
             _ => None,
         }
+    }
+
+    /// Decode the typed error the server answered with.
+    ///
+    /// A handler which fails with a [`ws::TypedError<E>`] sends `E` encoded in
+    /// the body format of the connection, see [Errors]. This decodes it back
+    /// as `T`, which should be the same type as `E` or one which is
+    /// compatible with it, typically from an API crate shared with the server.
+    ///
+    /// Returns `Ok(None)` if this is not a server error, or if it is one which
+    /// carries no typed error, such as a handler error which is plain text or
+    /// an error the server produced on its own for a request it does not
+    /// support. Those still have a message, see [`as_server_error`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if the typed error does not decode as `T`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::{Decode, Encode};
+    /// use musli_web::client::Error;
+    ///
+    /// #[derive(Debug, PartialEq, Encode, Decode)]
+    /// enum ServerError {
+    ///     NotFound,
+    /// }
+    ///
+    /// let error = Error::message("Something else");
+    /// assert_eq!(error.server_error::<ServerError>().unwrap(), None);
+    /// ```
+    ///
+    /// [`ws::TypedError<E>`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.TypedError.html>
+    /// [Errors]: <https://docs.rs/musli-web/latest/musli_web/ws/index.html#errors>
+    /// [`as_server_error`]: Self::as_server_error
+    pub fn server_error<'de, T>(&'de self) -> Result<Option<T>>
+    where
+        T: DecodeBody<'de>,
+    {
+        let ErrorKind::Server(error) = &self.kind else {
+            return Ok(None);
+        };
+
+        let Some((format, payload)) = &error.payload else {
+            return Ok(None);
+        };
+
+        let value = format
+            .decode(payload, &mut 0)
+            .map_err(Error::decode_error_message)?;
+
+        Ok(Some(value))
     }
 
     /// Format a client error consisting of a message.
@@ -331,8 +386,8 @@ impl Error {
     }
 
     #[inline]
-    fn server(message: impl fmt::Display) -> Self {
-        Self::new(ErrorKind::Server(message.to_string()))
+    fn server(error: ServerError) -> Self {
+        Self::new(ErrorKind::Server(error))
     }
 
     #[inline]
@@ -374,7 +429,7 @@ enum ErrorKind {
     EmptyPacket,
     NotConnected,
     Message(String),
-    Server(String),
+    Server(ServerError),
     Transport(Box<dyn core::error::Error + Send + Sync>),
     DecodeResponseHeader(format::Error),
     DecodeErrorMessage(format::Error),
@@ -390,7 +445,7 @@ impl fmt::Display for Error {
             ErrorKind::EmptyPacket => write!(f, "Packet is empty"),
             ErrorKind::NotConnected => write!(f, "Client is not connected"),
             ErrorKind::Message(message) => write!(f, "{message}"),
-            ErrorKind::Server(message) => write!(f, "Server error: {message}"),
+            ErrorKind::Server(error) => write!(f, "Server error: {}", error.message),
             ErrorKind::Transport(..) => write!(f, "Error in underlying transport"),
             ErrorKind::DecodeResponseHeader(..) => {
                 write!(f, "Encoding error when decoding response header")
@@ -416,6 +471,27 @@ impl core::error::Error for Error {
             ErrorKind::EncodingHeader(error) => Some(error),
             ErrorKind::EncodingBody(error) => Some(error),
             _ => None,
+        }
+    }
+}
+
+/// An error response from the server, see [error
+/// responses](crate::api#error-responses).
+#[derive(Debug, Clone)]
+struct ServerError {
+    /// The human readable message.
+    message: String,
+    /// The typed payload, and the format it is encoded with.
+    payload: Option<(Format, Bytes)>,
+}
+
+impl ServerError {
+    /// A server error without a payload.
+    #[inline]
+    fn message(message: &str) -> Self {
+        Self {
+            message: String::from(message),
+            payload: None,
         }
     }
 }
@@ -1060,6 +1136,42 @@ where
         Ok(format)
     }
 
+    /// Decode the body of an error response, whose `error` header is `id`.
+    ///
+    /// An error id which carries no message is reported with `unsupported`.
+    fn server_error(
+        id: MessageId,
+        header: &api::ResponseHeader,
+        bytes: &Bytes,
+        mut at: usize,
+        unsupported: &str,
+    ) -> Result<ServerError> {
+        let typed = match id {
+            MessageId::ERROR_MESSAGE => false,
+            MessageId::TYPED_ERROR_MESSAGE => true,
+            _ => return Ok(ServerError::message(unsupported)),
+        };
+
+        let format = Self::body_format(header)?;
+
+        let error: api::ErrorMessage<'_> = format
+            .decode(bytes, &mut at)
+            .map_err(Error::decode_error_message)?;
+
+        // NB: The payload is only decoded once the caller says what type it
+        // is, see `Error::server_error`.
+        let payload = if typed {
+            Some((format, bytes.slice(at.min(bytes.len())..)))
+        } else {
+            None
+        };
+
+        Ok(ServerError {
+            message: String::from(error.message),
+            payload,
+        })
+    }
+
     /// Process an incoming message which arrived in the given mode.
     fn message(&mut self, mode: Mode, bytes: Bytes) -> Result<Post> {
         let mut at = 0;
@@ -1088,16 +1200,8 @@ where
             }
 
             if let Some(id) = MessageId::new(header.error) {
-                let error = match id {
-                    MessageId::ERROR_MESSAGE => Self::body_format(&header)?
-                        .decode(&bytes, &mut at)
-                        .map_err(Error::decode_error_message)?,
-                    _ => api::ErrorMessage {
-                        message: "Unsupported broadcast",
-                    },
-                };
-
-                self.dispatch(broadcast, || Err(Error::server(error.message)));
+                let error = Self::server_error(id, &header, &bytes, at, "Unsupported broadcast")?;
+                self.dispatch(broadcast, || Err(Error::server(error.clone())));
                 return Ok(Post::None);
             }
 
@@ -1125,12 +1229,16 @@ where
         };
 
         if let Some(id) = MessageId::new(header.error) {
-            let error = match id {
-                MessageId::ERROR_MESSAGE => Self::body_format(&header)?
-                    .decode(&bytes, &mut at)
-                    .map_err(Error::decode_error_message)?,
-                _ => api::ErrorMessage {
-                    message: "Unsupported request",
+            let error = match Self::server_error(id, &header, &bytes, at, "Unsupported request") {
+                Ok(error) => error,
+                Err(error) => match pending {
+                    Pending::Negotiate { .. } => return Err(error),
+                    // NB: Fail the request rather than leave it to find out
+                    // that its reply was dropped.
+                    pending => {
+                        pending.error(error);
+                        return Ok(Post::None);
+                    }
                 },
             };
 
@@ -1157,7 +1265,7 @@ where
                     self.emit_state(State::Open);
                 }
                 pending => {
-                    pending.error(Error::server(error.message));
+                    pending.error(Error::server(error));
                 }
             }
 
