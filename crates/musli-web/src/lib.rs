@@ -57,6 +57,58 @@
 //! the least capable one which is fully upgrade safe), [`Format::Descriptive`]
 //! and [`Format::Json`]. Each is gated behind a `format-*` feature.
 //!
+//! <br>
+//!
+//! ## Choosing a format
+//!
+//! The body of every message is encoded with one format per connection. The
+//! envelope around it never depends on the choice, so the two sides can always
+//! talk long enough to settle it.
+//!
+//! * The client asks. Call `format` on the service builder (`ServiceBuilder`
+//!   in the browser and `client::ServiceBuilder` for native clients) with a
+//!   `Format`. A client which says nothing speaks `Format::Wire`, which tolerates
+//!   fields being added, removed and unknown, so client and server can be
+//!   deployed separately. `Format` implements `FromStr` and `Display`, so a
+//!   choice can come from a configuration value or a query string, as in
+//!   `"json".parse::<Format>()`.
+//! * The server accepts. By default it accepts every format it was built with.
+//!   Call `with_formats` on the server to narrow that to a list, such as
+//!   `.with_formats(&[Format::Wire, Format::Json])`. This can never add a format
+//!   which was not built in.
+//! * A request for a format the server does not accept is reported to the client
+//!   through its `on_error` callback and the connection continues with
+//!   `Format::Wire`. The format in use can be read back with `format()` on the
+//!   client's handle. Typed request errors are encoded in the connection's
+//!   format too.
+//! * A client that requests `Format::Json` can also ask for text frames with
+//!   `mode(Mode::Text)`, which makes the whole conversation readable in a
+//!   browser inspector. Text frames require a human readable format.
+//! * The application version of the handshake is independent of the format. It
+//!   is what tells an old page that the server has moved on.
+//!
+//! A format is only available if its `format-*` feature is enabled, in the
+//! crate that performs the encoding. `format-wire` is on wherever `api` is, so
+//! `Format::Wire` is always available.
+//!
+//! | Role | Features to enable | Notes |
+//! |-|-|-|
+//! | Shared api crate | `api` | Enables `format-wire`. Nothing else is needed to define requests and broadcasts. |
+//! | Server | `axum08` | Enables `format-storage` and `format-wire`. Add `format-descriptive`, `format-json` or `format-packed` for each further format it should accept. |
+//! | Browser client | `yew022`, `yew023` or `web03` | Enables `format-storage` and `format-wire`. Add the `format-*` feature of any other format it selects. |
+//! | Native client | `tungstenite029` or `tungstenite030` | Enables `format-storage` and `format-wire`. Add the `format-*` feature of any other format it selects. |
+//!
+//! Only enable what is used. A browser client which never calls `format` speaks
+//! `Format::Wire` and needs no `format-*` feature of its own, and a server which
+//! only serves such clients does not need `format-descriptive` or `format-json`.
+//! Cargo unifies features across a build, so in a workspace a `format-*` feature
+//! enabled by one crate is on for every crate that uses `musli-web`. Check what
+//! each crate really selects.
+//!
+//! The `json` feature is unrelated: it provides the `Json` extractor for `axum`
+//! and does not enable `format-json`. The `formats` feature enables every
+//! `format-*` feature at once.
+//!
 //! [Channel support]: https://docs.rs/musli-web/latest/musli_web/web/struct.Handle.html#method.channel
 //! [negotiable body format]: https://docs.rs/musli-web/latest/musli_web/api/index.html#wire-format
 //! [selectable socket mode]: https://docs.rs/musli-web/latest/musli_web/api/index.html#the-text-envelope
