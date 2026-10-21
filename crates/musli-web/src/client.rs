@@ -311,6 +311,11 @@ impl Error {
         Self { kind }
     }
 
+    #[inline]
+    const fn not_connected() -> Self {
+        Self::new(ErrorKind::NotConnected("Client is not connected"))
+    }
+
     /// Check if the error is caused by an empty packet.
     ///
     /// # Examples
@@ -322,20 +327,76 @@ impl Error {
     /// let e = packet.decode::<u32>().unwrap_err();
     ///
     /// assert!(e.is_empty_packet());
+    /// assert!(e.is_decode());
     /// ```
     #[inline]
     pub fn is_empty_packet(&self) -> bool {
         matches!(self.kind, ErrorKind::EmptyPacket)
     }
 
-    /// Check if the error is caused by the connection not being open.
+    /// Check if the request was never sent, since there was no open
+    /// connection to send it over.
     ///
     /// This is the error which is produced if a request is performed while the
-    /// service is not connected. See [`Handle::wait_until_open`] for how to
-    /// wait until the connection is available.
+    /// service is not connected or after it has been dropped. Since the server
+    /// never saw the request, it is safe to send it again once the connection
+    /// is open. See [`Handle::wait_until_open`] for how to wait until the
+    /// connection is available.
     #[inline]
     pub fn is_not_connected(&self) -> bool {
-        matches!(self.kind, ErrorKind::NotConnected)
+        matches!(self.kind, ErrorKind::NotConnected(..))
+    }
+
+    /// Check if the connection closed before a response to the request
+    /// arrived.
+    ///
+    /// Unlike [`is_not_connected`], the request was sent, or was being sent,
+    /// so the server may or may not have handled it. This is the error every
+    /// pending request gets when the connection closes or when the service is
+    /// dropped or closed.
+    ///
+    /// [`is_not_connected`]: Self::is_not_connected
+    #[inline]
+    pub fn is_connection_lost(&self) -> bool {
+        matches!(self.kind, ErrorKind::ConnectionLost(..))
+    }
+
+    /// Check if the request was cancelled before it was answered, since
+    /// another request took its place.
+    #[inline]
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self.kind, ErrorKind::Cancelled)
+    }
+
+    /// Check if the error is caused by something received which could not be
+    /// decoded.
+    ///
+    /// This covers a response or broadcast whose body does not decode as the
+    /// requested type, an [empty packet](Self::is_empty_packet), a frame from
+    /// the server whose header or error message could not be decoded, and a
+    /// message body in an unknown format. Failing to decode a
+    /// [typed error](Self::server_error) is one too.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::client::RawPacket;
+    ///
+    /// let packet = RawPacket::empty();
+    /// let e = packet.decode::<u32>().unwrap_err();
+    ///
+    /// assert!(e.is_decode());
+    /// ```
+    #[inline]
+    pub fn is_decode(&self) -> bool {
+        matches!(
+            self.kind,
+            ErrorKind::EmptyPacket
+                | ErrorKind::UnknownFormat(..)
+                | ErrorKind::DecodeResponseHeader(..)
+                | ErrorKind::DecodeErrorMessage(..)
+                | ErrorKind::DecodePacket(..)
+        )
     }
 
     /// Check if the server states an application version other than the one
@@ -425,6 +486,8 @@ impl Error {
     }
 
     /// Format a client error consisting of a message.
+    ///
+    /// None of the accessors on [`Error`] match an error constructed this way.
     #[inline]
     pub fn message(message: impl fmt::Display) -> Self {
         Self::new(ErrorKind::Message(message.to_string()))
@@ -472,8 +535,17 @@ impl Error {
 #[derive(Debug)]
 enum ErrorKind {
     EmptyPacket,
-    NotConnected,
-    Incompatible { server: u32, client: u32 },
+    /// The request was never sent. Carries the text to display.
+    NotConnected(&'static str),
+    /// The connection closed while the request was pending. Carries the text
+    /// to display.
+    ConnectionLost(&'static str),
+    Cancelled,
+    UnknownFormat(u8),
+    Incompatible {
+        server: u32,
+        client: u32,
+    },
     Message(String),
     Server(ServerError),
     Transport(Box<dyn core::error::Error + Send + Sync>),
@@ -489,7 +561,13 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             ErrorKind::EmptyPacket => write!(f, "Packet is empty"),
-            ErrorKind::NotConnected => write!(f, "Client is not connected"),
+            ErrorKind::NotConnected(message) => write!(f, "{message}"),
+            ErrorKind::ConnectionLost(message) => write!(f, "{message}"),
+            ErrorKind::Cancelled => write!(f, "Request cancelled"),
+            ErrorKind::UnknownFormat(format) => write!(
+                f,
+                "Server used unknown format id {format} for a message body"
+            ),
             ErrorKind::Incompatible { server, client } => write!(
                 f,
                 "Server states application version {server}, this client states {client}"
@@ -673,7 +751,9 @@ impl Shared {
     #[inline]
     fn send(&self, command: Command) -> Result<()> {
         if self.tx.send(command).is_err() {
-            return Err(Error::message("Client service is down"));
+            return Err(Error::new(ErrorKind::NotConnected(
+                "Client service is down",
+            )));
         }
 
         Ok(())
@@ -1143,7 +1223,7 @@ where
         }
 
         self.emit_state(State::Closed);
-        self.close_pending(|| Error::message("Connection closed"));
+        self.close_pending(|| Error::new(ErrorKind::ConnectionLost("Connection closed")));
         self.schedule_reconnect();
     }
 
@@ -1158,7 +1238,7 @@ where
             self.emit_state(State::Closed);
         }
 
-        self.close_pending(|| Error::message("Client service closed"));
+        self.close_pending(|| Error::new(ErrorKind::ConnectionLost("Client service closed")));
     }
 
     fn schedule_reconnect(&mut self) {
@@ -1209,7 +1289,7 @@ where
                 pending,
             } => {
                 let Some(socket) = self.socket.as_mut() else {
-                    pending.error(Error::new(ErrorKind::NotConnected));
+                    pending.error(Error::not_connected());
                     return;
                 };
 
@@ -1220,7 +1300,7 @@ where
                 }
 
                 if let Some(existing) = self.pending.insert(serial, pending) {
-                    existing.error(Error::message("Request cancelled"));
+                    existing.error(Error::new(ErrorKind::Cancelled));
                 }
             }
             Command::Disconnect { channel } => {
@@ -1289,10 +1369,7 @@ where
     /// Resolve the format a message body is encoded with from its envelope.
     fn body_format(header: &api::ResponseHeader) -> Result<Format> {
         let Some(format) = Format::from_u8(header.format) else {
-            return Err(Error::message(format_args!(
-                "Server used unknown format id {} for a message body",
-                header.format
-            )));
+            return Err(Error::new(ErrorKind::UnknownFormat(header.format)));
         };
 
         Ok(format)
@@ -1535,7 +1612,9 @@ where
         self.shared.set_gone();
 
         for (_, pending) in self.pending.drain() {
-            pending.error(Error::message("Client service closed"));
+            pending.error(Error::new(ErrorKind::ConnectionLost(
+                "Client service closed",
+            )));
         }
 
         self.shared
@@ -1641,7 +1720,9 @@ impl Handle {
             }
 
             if self.shared.is_gone() || rx.changed().await.is_err() {
-                return Err(Error::message("Client service is down"));
+                return Err(Error::new(ErrorKind::NotConnected(
+                    "Client service is down",
+                )));
             }
         }
     }
@@ -1664,7 +1745,7 @@ impl Handle {
     /// old connection is stale and has to be opened again.
     pub async fn channel(&self) -> Result<Channel> {
         if !self.shared.is_open() {
-            return Err(Error::new(ErrorKind::NotConnected));
+            return Err(Error::not_connected());
         }
 
         let serial = self.shared.next_serial();
@@ -1693,7 +1774,9 @@ impl Handle {
         })?;
 
         let Ok(result) = rx.await else {
-            return Err(Error::message("Client service is down"));
+            return Err(Error::new(ErrorKind::ConnectionLost(
+                "Client service is down",
+            )));
         };
 
         Ok(Channel {
@@ -1993,7 +2076,7 @@ where
         let id = <B::Endpoint as api::Endpoint>::ID;
 
         if !self.shared.is_open() {
-            return Err(Error::new(ErrorKind::NotConnected));
+            return Err(Error::not_connected());
         }
 
         let serial = self.shared.next_serial();
@@ -2034,7 +2117,9 @@ where
         })?;
 
         let Ok(result) = rx.await else {
-            return Err(Error::message("Client service is down"));
+            return Err(Error::new(ErrorKind::ConnectionLost(
+                "Client service is down",
+            )));
         };
 
         result
@@ -2641,3 +2726,6 @@ impl<T> fmt::Debug for Packet<T> {
             .finish()
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -1136,6 +1136,7 @@ async fn request_while_not_connected() {
         .expect_err("Expected the request to fail");
 
     assert!(error.is_not_connected());
+    assert!(!error.is_connection_lost());
 
     let error = handle
         .channel()
@@ -1143,10 +1144,15 @@ async fn request_while_not_connected() {
         .expect_err("Expected opening a channel to fail");
 
     assert!(error.is_not_connected());
+    assert!(!error.is_connection_lost());
 
     // Dropping the service invalidates every handle associated with it.
     drop(service);
-    assert!(handle.wait_until_open().await.is_err());
+    let error = handle
+        .wait_until_open()
+        .await
+        .expect_err("Expected waiting to fail");
+    assert!(error.is_not_connected());
 
     server.shutdown().await;
 }
@@ -1424,6 +1430,7 @@ async fn reconnects_when_the_server_comes_back() {
         .expect_err("Expected the request to fail while disconnected");
 
     assert!(error.is_not_connected());
+    assert!(!error.is_connection_lost());
 
     // Bring the server back up on the same address.
     let server = TestServer::bind(addr).await;
@@ -1498,8 +1505,44 @@ async fn pending_requests_fail_when_the_connection_is_lost() {
         None,
         "The failure must come from the connection being lost, not the server"
     );
+    assert!(error.is_connection_lost(), "{error}");
+    assert!(!error.is_not_connected(), "{error}");
+    assert!(!error.is_cancelled(), "{error}");
+    assert!(!error.is_decode(), "{error}");
+    assert_eq!(error.to_string(), "Connection closed");
 
     client.close().await;
+}
+
+/// A response which does not decode as the requested type is a decode error,
+/// and nothing else.
+#[tokio::test]
+async fn undecodable_response_is_a_decode_error() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    let packet = timeout!(
+        handle
+            .request()
+            .body(api::HelloRequest { message: "Hello!" })
+            .send_raw()
+    )
+    .expect("Hello request failed");
+
+    let error = packet
+        .decode::<u32>()
+        .expect_err("The response is not a number");
+
+    assert!(error.is_decode(), "{error}");
+    assert!(!error.is_empty_packet(), "{error}");
+    assert!(!error.is_not_connected(), "{error}");
+    assert!(!error.is_connection_lost(), "{error}");
+    assert!(!error.is_cancelled(), "{error}");
+    assert_eq!(error.as_server_error(), None);
+
+    client.close().await;
+    server.shutdown().await;
 }
 
 #[tokio::test]
