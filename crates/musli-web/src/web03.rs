@@ -88,7 +88,7 @@ pub mod prelude {
 
         pub use crate::api::ChannelId;
         pub use crate::web::{
-            ChannelEvent, Connect, EmptyCallback, Error, KeyedRequests, Listener, Packet,
+            Call, ChannelEvent, Connect, EmptyCallback, Error, KeyedRequests, Listener, Packet,
             RawPacket, Request, Requests, State, StateListener,
         };
 

@@ -60,6 +60,23 @@ mod api {
     }
 
     #[derive(Debug, Encode, Decode)]
+    pub struct EchoRequest<'de> {
+        pub message: &'de str,
+    }
+
+    /// An owned response, which can be decoded by a typed call.
+    #[derive(Debug, PartialEq, Encode, Decode)]
+    pub struct EchoResponse {
+        pub message: String,
+        pub channel: ChannelId,
+    }
+
+    /// A request which the server answers with something other than its
+    /// response type.
+    #[derive(Debug, Encode, Decode)]
+    pub struct GarbledRequest;
+
+    #[derive(Debug, Encode, Decode)]
     pub struct FailRequest<'de> {
         pub reason: &'de str,
     }
@@ -114,6 +131,24 @@ mod api {
         impl Endpoint for Hello {
             impl<'de> Request for HelloRequest<'de>;
             type Response<'de> = HelloResponse<'de>;
+        }
+
+        /// An endpoint which echoes the message it is given in an owned
+        /// response.
+        pub type Echo;
+
+        impl Endpoint for Echo {
+            impl<'de> Request for EchoRequest<'de>;
+            type Response<'de> = EchoResponse;
+        }
+
+        /// An endpoint which the server answers with a body that does not
+        /// decode as its response.
+        pub type Garbled;
+
+        impl Endpoint for Garbled {
+            impl Request for GarbledRequest;
+            type Response<'de> = Unrelated;
         }
 
         /// An endpoint which always fails with the reason it is given.
@@ -280,6 +315,27 @@ impl ws::Handler for TestHandler {
                     format: incoming.format().to_u8(),
                 });
 
+                Ok(true)
+            }
+            api::Request::Echo => {
+                let Some(request) = incoming.read::<api::EchoRequest<'_>>() else {
+                    return Ok(false);
+                };
+
+                outgoing.write(api::EchoResponse {
+                    message: request.message.to_owned(),
+                    channel: incoming.channel(),
+                });
+
+                Ok(true)
+            }
+            api::Request::Garbled => {
+                if incoming.read::<api::GarbledRequest>().is_none() {
+                    return Ok(false);
+                }
+
+                // NB: A string where a struct is expected.
+                outgoing.write("Not a struct");
                 Ok(true)
             }
             api::Request::Fail => {
@@ -855,6 +911,161 @@ async fn typed_error_with_malformed_message_fails_the_request() {
         error.to_string(),
         "Encoding error when decoding error response"
     );
+}
+
+/// A typed call decodes the response as an owned value, which outlives the
+/// packet it was decoded from.
+#[tokio::test]
+async fn call_decodes_owned_response() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    let response =
+        timeout!(handle.call(api::EchoRequest { message: "Hello!" })).expect("Echo call failed");
+
+    assert_eq!(
+        response,
+        api::EchoResponse {
+            message: String::from("Hello!"),
+            channel: ChannelId::NONE,
+        }
+    );
+
+    // Over a channel, the server sees the channel the call was made over.
+    let channel = timeout!(handle.channel()).expect("Failed to open channel");
+
+    let response = timeout!(channel.call(api::EchoRequest { message: "Channel" }))
+        .expect("Echo call over channel failed");
+
+    assert_eq!(response.message, "Channel");
+    assert_eq!(response.channel, channel.id());
+
+    drop(channel);
+    client.close().await;
+    server.shutdown().await;
+}
+
+/// A typed call which the handler fails is a server error, and the connection
+/// is still usable afterwards.
+#[tokio::test]
+async fn call_server_error() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    let error = timeout!(handle.call(api::FailRequest {
+        reason: "not today"
+    }))
+    .expect_err("Expected the call to fail");
+
+    assert_eq!(error.as_server_error(), Some("not today"));
+    assert_eq!(error.server_error::<api::Refusal>().unwrap(), None);
+
+    let response = timeout!(handle.call(api::EchoRequest {
+        message: "Still here"
+    }))
+    .expect("Echo call failed");
+    assert_eq!(response.message, "Still here");
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+/// A typed call which the handler fails with a typed error decodes it back.
+#[tokio::test]
+async fn call_typed_error() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    let error = timeout!(handle.call(api::RefuseRequest {
+        how: REFUSE_FORBIDDEN
+    }))
+    .expect_err("Expected the call to fail");
+
+    assert_eq!(error.as_server_error(), Some("Forbidden: Read only"));
+    assert_eq!(
+        error.server_error::<api::Refusal>().unwrap(),
+        Some(api::Refusal::Forbidden {
+            reason: String::from("Read only")
+        })
+    );
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+/// A response which does not decode as the response type of the endpoint
+/// fails the call with a decoding error, not a server error.
+#[tokio::test]
+async fn call_decode_failure() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await;
+
+    let error = timeout!(handle.call(api::GarbledRequest)).expect_err("Expected the call to fail");
+
+    assert_eq!(error.as_server_error(), None, "{error}");
+    assert!(!error.is_not_connected());
+    assert_eq!(error.to_string(), "Encoding error when decoding packet");
+    assert!(core::error::Error::source(&error).is_some());
+
+    // Only the call failed, not the connection.
+    let response = timeout!(handle.call(api::EchoRequest {
+        message: "Still here"
+    }))
+    .expect("Echo call failed");
+    assert_eq!(response.message, "Still here");
+
+    client.close().await;
+    server.shutdown().await;
+}
+
+/// A typed call which is in flight when the connection is lost fails, and
+/// the failure does not come from the server.
+#[tokio::test]
+async fn call_disconnect_mid_call() {
+    let server = TestServer::new().await;
+    let client = TestClient::new(&server.url());
+    let handle = client.open().await.clone();
+
+    let mut states = handle.on_state_change();
+
+    // NB: Spawning also checks that the call can be moved between threads.
+    let call = tokio::spawn(async move { handle.call(api::HangRequest).await });
+
+    server.shutdown().await;
+    assert!(timeout!(states.wait_until(ClientState::Closed)));
+
+    let error = timeout!(call)
+        .expect("Call task panicked")
+        .expect_err("Pending call must be failed");
+
+    assert_eq!(error.as_server_error(), None, "{error}");
+    assert!(!error.is_not_connected(), "{error}");
+
+    client.close().await;
+}
+
+/// A typed call made while not connected is never sent.
+#[tokio::test]
+async fn call_while_not_connected() {
+    let server = TestServer::new().await;
+
+    // NB: The service is deliberately never driven.
+    let service = tungstenite029::connect(server.url()).build();
+    let handle = service.handle().clone();
+
+    let error = handle
+        .call(api::EchoRequest { message: "Hello!" })
+        .await
+        .expect_err("Expected the call to fail");
+
+    assert!(error.is_not_connected());
+
+    drop(service);
+    server.shutdown().await;
 }
 
 #[tokio::test]

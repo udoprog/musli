@@ -1714,6 +1714,103 @@ impl Handle {
         }
     }
 
+    /// Send a request over the default channel and decode its response.
+    ///
+    /// This sends `body`, waits for the response and decodes it as the
+    /// response of the endpoint `body` is a request for. It is the same as
+    /// [`request`] followed by [`RequestBuilder::send`] and
+    /// [`Packet::decode_response`], except that the response is returned as
+    /// an owned value which does not borrow from the packet it was decoded
+    /// from.
+    ///
+    /// The response type of the endpoint must therefore be owned, which is
+    /// what the `for<'de> ...: DecodeBody<'de>` bound says: it decodes from
+    /// any buffer, so it holds on to none of them. A response declared as
+    /// `type Response<'de> = User;` qualifies, one which borrows such as
+    /// `type Response<'de> = UserRef<'de>;` does not compile here. For those
+    /// keep the [`Packet`] around through [`RequestBuilder::send`] and decode
+    /// from it instead.
+    ///
+    /// See [`Channel::call`] to call over a channel.
+    ///
+    /// [`request`]: Self::request
+    ///
+    /// # Errors
+    ///
+    /// The request fails with an [`Error`] which tells what went wrong:
+    ///
+    /// * [`Error::is_not_connected`] if the connection is not open, so the
+    ///   request was never sent. See [`Handle::wait_until_open`].
+    /// * [`Error::as_server_error`] if the handler on the server failed, and
+    ///   [`Error::server_error`] to decode the typed error it failed with.
+    /// * A decoding error if the response does not decode as the response
+    ///   type, for instance since the server is built from another version of
+    ///   the API.
+    /// * Any other error if the connection is lost or the [`Service`] is
+    ///   gone before the response arrives.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::client::{Error, Handle};
+    ///
+    /// mod api {
+    ///     use musli::{Decode, Encode};
+    ///     use musli_web::api;
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct UserRequest<'de> {
+    ///         pub name: &'de str,
+    ///     }
+    ///
+    ///     #[derive(Debug, Encode, Decode)]
+    ///     pub struct UserResponse {
+    ///         pub name: String,
+    ///         pub age: u32,
+    ///     }
+    ///
+    ///     /// The typed error the server fails with.
+    ///     #[derive(Debug, Encode, Decode)]
+    ///     pub enum UserError {
+    ///         NotFound,
+    ///     }
+    ///
+    ///     api::define! {
+    ///         pub type User;
+    ///
+    ///         impl Endpoint for User {
+    ///             impl<'de> Request for UserRequest<'de>;
+    ///             type Response<'de> = UserResponse;
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// /// Look up the age of a user, or `None` if there is no such user.
+    /// async fn age(handle: &Handle, name: &str) -> Result<Option<u32>, Error> {
+    ///     match handle.call(api::UserRequest { name }).await {
+    ///         Ok(user) => Ok(Some(user.age)),
+    ///         Err(error) => match error.server_error::<api::UserError>()? {
+    ///             Some(api::UserError::NotFound) => Ok(None),
+    ///             None => Err(error),
+    ///         },
+    ///     }
+    /// }
+    /// ```
+    pub async fn call<B>(
+        &self,
+        body: B,
+    ) -> Result<<B::Endpoint as api::Endpoint>::Response<'static>>
+    where
+        B: api::Request,
+        for<'de> <B::Endpoint as api::Endpoint>::Response<'static>: DecodeBody<'de>,
+    {
+        self.request()
+            .body(body)
+            .send()
+            .await?
+            .decode_any_response()
+    }
+
     /// Listen for broadcasts of type `T`.
     ///
     /// Broadcasts are buffered in the returned listener until they are received
@@ -1817,6 +1914,26 @@ impl Channel {
             channel: self.id,
             body: EmptyBody,
         }
+    }
+
+    /// Send a request over the current channel and decode its response.
+    ///
+    /// This is the same as [`Handle::call`] except that the request is sent
+    /// over this channel, see it for how the response is decoded and the
+    /// errors it fails with.
+    pub async fn call<B>(
+        &self,
+        body: B,
+    ) -> Result<<B::Endpoint as api::Endpoint>::Response<'static>>
+    where
+        B: api::Request,
+        for<'de> <B::Endpoint as api::Endpoint>::Response<'static>: DecodeBody<'de>,
+    {
+        self.request()
+            .body(body)
+            .send()
+            .await?
+            .decode_any_response()
     }
 }
 

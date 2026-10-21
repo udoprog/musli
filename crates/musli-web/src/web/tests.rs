@@ -2287,3 +2287,260 @@ fn incompatible_keeps_channels_closed() {
     assert!(channel.is_open());
     assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
 }
+
+/// A request whose response is owned, so that it can be awaited with
+/// [`Handle::call`].
+#[derive(musli::Encode, musli::Decode)]
+struct Fetch;
+
+enum FetchEndpoint {}
+
+impl api::Decodable for FetchEndpoint {
+    type Type<'de> = Unrelated;
+
+    fn __do_not_implement_decodable() {}
+}
+
+impl api::Endpoint for FetchEndpoint {
+    const ID: MessageId = match MessageId::new(3) {
+        Some(id) => id,
+        None => panic!("Invalid message id"),
+    };
+
+    type Response<'de> = Unrelated;
+
+    fn __do_not_implement_endpoint() {}
+}
+
+impl api::Request for Fetch {
+    type Endpoint = FetchEndpoint;
+
+    fn __do_not_implement_request() {}
+}
+
+/// A waker which counts how many times it is woken.
+#[derive(Default)]
+struct CountingWaker(std::sync::atomic::AtomicUsize);
+
+impl std::task::Wake for CountingWaker {
+    fn wake(self: alloc::sync::Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    fn wake_by_ref(self: &alloc::sync::Arc<Self>) {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+impl CountingWaker {
+    fn new() -> (alloc::sync::Arc<Self>, Waker) {
+        let counter = alloc::sync::Arc::new(Self::default());
+        let waker = Waker::from(counter.clone());
+        (counter, waker)
+    }
+
+    fn count(&self) -> usize {
+        self.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+fn poll_call<T>(call: &mut Call<T>, waker: &Waker) -> Poll<Result<T>>
+where
+    for<'de> T: DecodeBody<'de>,
+{
+    Pin::new(call).poll(&mut Context::from_waker(waker))
+}
+
+/// Poll a call which is expected to have resolved already.
+#[track_caller]
+fn ready<T>(call: &mut Call<T>) -> Result<T>
+where
+    for<'de> T: DecodeBody<'de>,
+{
+    let (_, waker) = CountingWaker::new();
+
+    match poll_call(call, &waker) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("Expected the call to have resolved"),
+    }
+}
+
+/// The header of a successful response to `serial`.
+fn response_header(serial: u32) -> api::ResponseHeader {
+    api::ResponseHeader {
+        version: api::VERSION,
+        serial,
+        broadcast: 0,
+        error: 0,
+        format: Format::DEFAULT.to_u8(),
+        channel: ChannelId::NONE,
+        app: 0,
+    }
+}
+
+const FETCHED: Unrelated = Unrelated { a: 1, b: 2, c: 3 };
+
+/// A call waits for its response, wakes the task once it arrives, and
+/// resolves to the response decoded as an owned value.
+#[test]
+fn call_resolves_to_decoded_response() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let mut call = service.handle().call(Fetch);
+    let serial = last_serial();
+    assert!(call.is_pending());
+
+    let (counter, waker) = CountingWaker::new();
+    assert!(poll_call(&mut call, &waker).is_pending());
+    assert_eq!(counter.count(), 0);
+
+    let body = encode_payload(Format::DEFAULT, &FETCHED);
+    deliver(&service, Mode::Binary, &response_header(serial), &body);
+
+    assert_eq!(counter.count(), 1);
+    assert!(!call.is_pending());
+
+    let Poll::Ready(result) = poll_call(&mut call, &waker) else {
+        panic!("Expected the call to resolve");
+    };
+
+    // NB: The response outlives the call and the packet it came in.
+    drop(call);
+    assert_eq!(result.unwrap(), FETCHED);
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// A call made before the connection is open resolves straight away to an
+/// error saying that it was never sent.
+#[test]
+fn call_before_open_is_not_connected() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    let mut call = service.handle().call(Fetch);
+    assert!(!call.is_pending());
+
+    let error = ready(&mut call).unwrap_err();
+    assert_kind(&error, "not_connected");
+    assert!(take_ops().is_empty());
+}
+
+/// A call over a channel which is not open is never sent.
+#[test]
+fn call_over_closed_channel_is_not_connected() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    // NB: Not answered, so the channel never opens.
+    let channel = service.handle().channel().open();
+    take_ops();
+
+    let error = ready(&mut channel.call(Fetch)).unwrap_err();
+    assert_kind(&error, "not_connected");
+    assert_eq!(error.to_string(), "WebSocket request over closed channel");
+    assert!(take_ops().is_empty());
+}
+
+/// A call which the server fails resolves to its server error, including a
+/// typed one.
+#[test]
+fn call_resolves_to_server_error() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let mut call = service.handle().call(Fetch);
+    let serial = last_serial();
+
+    let header = error_header(serial, MessageId::ERROR_MESSAGE, Format::DEFAULT);
+    deliver(&service, Mode::Binary, &header, &error_body("No such user"));
+
+    let error = ready(&mut call).unwrap_err();
+    assert_kind(&error, "server");
+    assert_eq!(error.as_server_error(), Some("No such user"));
+    assert_eq!(error.server_error::<Refusal>().unwrap(), None);
+
+    let mut call = service.handle().call(Fetch);
+    let serial = last_serial();
+
+    let format = Format::DEFAULT;
+    let payload = encode_payload(format, &Refusal::NotFound);
+    let header = error_header(serial, MessageId::TYPED_ERROR_MESSAGE, format);
+    deliver(
+        &service,
+        Mode::Binary,
+        &header,
+        &typed_error_body(format, "Not found", &payload),
+    );
+
+    let error = ready(&mut call).unwrap_err();
+    assert_kind(&error, "server");
+    assert_eq!(
+        error.server_error::<Refusal>().unwrap(),
+        Some(Refusal::NotFound)
+    );
+}
+
+/// A response which does not decode as the response type is a decode error.
+#[test]
+fn call_with_malformed_response_is_decode_error() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let valid = encode_payload(Format::DEFAULT, &FETCHED);
+
+    for body in [&[][..], &valid[..valid.len() - 1]] {
+        let mut call = service.handle().call(Fetch);
+        let serial = last_serial();
+
+        deliver(&service, Mode::Binary, &response_header(serial), body);
+
+        let error = ready(&mut call).unwrap_err();
+        assert_kind(&error, "decode");
+    }
+}
+
+/// A call pending when the connection closes resolves to the connection
+/// being lost, and wakes the task waiting for it.
+#[test]
+fn call_is_lost_on_close() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let mut call = service.handle().call(Fetch);
+
+    let (counter, waker) = CountingWaker::new();
+    assert!(poll_call(&mut call, &waker).is_pending());
+
+    service.shared.close_pending();
+    assert_eq!(counter.count(), 1);
+
+    let error = ready(&mut call).unwrap_err();
+    assert_kind(&error, "connection_lost");
+}
+
+/// Dropping a call cancels the request, and a response arriving later is not
+/// mistaken for the response to anything else.
+#[test]
+fn dropping_call_cancels_the_request() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    open_session(&service);
+
+    let call = service.handle().call(Fetch);
+    let serial = last_serial();
+    assert!(has_pending(&service));
+
+    drop(call);
+    assert!(!has_pending(&service));
+
+    let body = encode_payload(Format::DEFAULT, &FETCHED);
+    deliver(&service, Mode::Binary, &response_header(serial), &body);
+    assert!(!has_pending(&service));
+}

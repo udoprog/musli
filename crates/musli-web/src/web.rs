@@ -141,11 +141,14 @@
 //! ```
 
 use core::cell::{Cell, RefCell};
+use core::future::Future;
 use core::hash::Hash;
 use core::marker::PhantomData;
 use core::mem;
 use core::ops::Deref;
+use core::pin::Pin;
 use core::ptr::NonNull;
+use core::task::{Context, Poll, Waker};
 use core::{any, fmt};
 use std::collections::VecDeque;
 
@@ -2556,6 +2559,96 @@ impl Drop for Request {
     }
 }
 
+/// A request in flight which resolves to its decoded response, see
+/// [`Handle::call`].
+///
+/// Dropping it cancels the request, the same way as dropping a [`Request`]
+/// does.
+#[must_use = "Futures do nothing unless polled, and dropping this cancels the request"]
+pub struct Call<T> {
+    slot: Rc<CallSlot>,
+    request: Request,
+    _marker: PhantomData<fn() -> T>,
+}
+
+/// Where the callback of a [`Call`] leaves the outcome of the request.
+#[derive(Default)]
+struct CallSlot {
+    result: Cell<Option<Result<RawPacket>>>,
+    waker: Cell<Option<Waker>>,
+}
+
+impl<T> Call<T> {
+    /// Send a request through `builder`, keeping the outcome for the
+    /// returned future.
+    fn send<H, B>(builder: RequestBuilder<'_, H, B, EmptyCallback>) -> Self
+    where
+        H: WebImpl,
+        B: api::Request,
+    {
+        let slot = Rc::new(CallSlot::default());
+
+        // NB: The callback can be called before `send` returns, such as when
+        // the request is not connected. The slot then already has the outcome
+        // when the future is first polled.
+        let request = builder
+            .on_raw_packet({
+                let slot = slot.clone();
+
+                move |result: Result<RawPacket>| {
+                    slot.result.set(Some(result));
+
+                    if let Some(waker) = slot.waker.take() {
+                        waker.wake();
+                    }
+                }
+            })
+            .send();
+
+        Self {
+            slot,
+            request,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Indicates if the request is still waiting for its response.
+    ///
+    /// Once this is `false`, polling the future no longer has to wait.
+    #[inline]
+    pub fn is_pending(&self) -> bool {
+        self.request.is_pending()
+    }
+}
+
+impl<T> Future for Call<T>
+where
+    for<'de> T: DecodeBody<'de>,
+{
+    type Output = Result<T>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
+        let Some(result) = this.slot.result.take() else {
+            this.slot.waker.set(Some(cx.waker().clone()));
+            return Poll::Pending;
+        };
+
+        Poll::Ready(result.and_then(|packet| packet.decode()))
+    }
+}
+
+impl<T> fmt::Debug for Call<T> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Call")
+            .field("type", &any::type_name::<T>())
+            .field("is_pending", &self.is_pending())
+            .finish()
+    }
+}
+
 /// A set of pending requests, kept alive until each completes.
 ///
 /// Dropping a [`Request`] cancels it, so a component with several requests
@@ -3949,6 +4042,138 @@ where
         }
     }
 
+    /// Send a request over the default channel and get a future which
+    /// resolves to its decoded response.
+    ///
+    /// This is an asynchronous alternative to building the request with
+    /// [`request`] and handling the response with a callback. The returned
+    /// [`Call`] resolves to the response of the endpoint `body` is a request
+    /// for, decoded as an owned value. Dropping it before it resolves cancels
+    /// the request.
+    ///
+    /// The request is sent straight away, the future only waits for the
+    /// response. It has to be driven by something which polls futures, such as
+    /// [`Scope::send_future`] in yew or `wasm_bindgen_futures::spawn_local`.
+    /// Note that a future handed to either of them is not dropped when the
+    /// component goes away, so the request is not cancelled with it.
+    ///
+    /// The response type of the endpoint must be owned, which is what the
+    /// `for<'de> ...: DecodeBody<'de>` bound says: it decodes from any buffer,
+    /// so it holds on to none of them. A response declared as `type
+    /// Response<'de> = User;` qualifies, one which borrows such as `type
+    /// Response<'de> = UserRef<'de>;` does not compile here. For those use
+    /// [`RequestBuilder::on_packet`] and decode from the [`Packet`] instead.
+    ///
+    /// See [`Channel::call`] to call over a channel.
+    ///
+    /// [`request`]: Self::request
+    /// [`Scope::send_future`]: <https://docs.rs/yew/latest/yew/html/struct.Scope.html#method.send_future>
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to an [`Error`] which tells what went wrong, the
+    /// same as the one a callback would get:
+    ///
+    /// * [`Error::is_not_connected`] if the request was never sent since the
+    ///   connection is not open.
+    /// * [`Error::is_connection_lost`] if the connection closed before the
+    ///   response arrived.
+    /// * [`Error::is_cancelled`] if another request took its place.
+    /// * [`Error::as_server_error`] if the handler on the server failed, and
+    ///   [`Error::server_error`] to decode the typed error it failed with.
+    /// * [`Error::is_decode`] if the response does not decode as the response
+    ///   type, for instance since the server is built from another version of
+    ///   the API.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # extern crate yew023 as yew;
+    /// use yew::prelude::*;
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// mod api {
+    ///     use musli::{Decode, Encode};
+    ///     use musli_web::api;
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct UserRequest<'de> {
+    ///         pub name: &'de str,
+    ///     }
+    ///
+    ///     #[derive(Encode, Decode)]
+    ///     pub struct UserResponse {
+    ///         pub name: String,
+    ///         pub age: u32,
+    ///     }
+    ///
+    ///     api::define! {
+    ///         pub type User;
+    ///
+    ///         impl Endpoint for User {
+    ///             impl<'de> Request for UserRequest<'de>;
+    ///             type Response<'de> = UserResponse;
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// enum Msg {
+    ///     Age(Result<u32, ws::Error>),
+    /// }
+    ///
+    /// #[derive(Properties, PartialEq)]
+    /// struct Props {
+    ///     ws: ws::Handle,
+    /// }
+    ///
+    /// struct Age {
+    ///     age: Option<u32>,
+    /// }
+    ///
+    /// impl Component for Age {
+    ///     type Message = Msg;
+    ///     type Properties = Props;
+    ///
+    ///     fn create(ctx: &Context<Self>) -> Self {
+    ///         let call = ctx.props().ws.call(api::UserRequest { name: "Alice" });
+    ///
+    ///         ctx.link().send_future(async move {
+    ///             Msg::Age(call.await.map(|user| user.age))
+    ///         });
+    ///
+    ///         Self { age: None }
+    ///     }
+    ///
+    ///     fn update(&mut self, _: &Context<Self>, msg: Self::Message) -> bool {
+    ///         match msg {
+    ///             Msg::Age(Ok(age)) => {
+    ///                 self.age = Some(age);
+    ///                 true
+    ///             }
+    ///             Msg::Age(Err(error)) => {
+    ///                 tracing::error!("Failed to get age: {error}");
+    ///                 false
+    ///             }
+    ///         }
+    ///     }
+    ///
+    ///     fn view(&self, _: &Context<Self>) -> Html {
+    ///         html! {
+    ///             if let Some(age) = self.age {
+    ///                 <p>{format!("Alice is {age}")}</p>
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn call<B>(&self, body: B) -> Call<<B::Endpoint as api::Endpoint>::Response<'static>>
+    where
+        B: api::Request,
+        for<'de> <B::Endpoint as api::Endpoint>::Response<'static>: DecodeBody<'de>,
+    {
+        Call::send(self.request().body(body))
+    }
+
     /// Listen for broadcasts of type `T`.
     ///
     /// Returns a handle for the listener that will cancel the listener if
@@ -4679,6 +4904,24 @@ where
             body: EmptyBody,
             callback: EmptyCallback,
         }
+    }
+
+    /// Send a request over the current channel and get a future which
+    /// resolves to its decoded response.
+    ///
+    /// This is the same as [`Handle::call`] except that the request is sent
+    /// over this channel, see it for how the response is decoded and the
+    /// errors it resolves to. Like [`request`], it fails with
+    /// [`Error::is_not_connected`] without being sent if the channel is not
+    /// open.
+    ///
+    /// [`request`]: Self::request
+    pub fn call<B>(&self, body: B) -> Call<<B::Endpoint as api::Endpoint>::Response<'static>>
+    where
+        B: api::Request,
+        for<'de> <B::Endpoint as api::Endpoint>::Response<'static>: DecodeBody<'de>,
+    {
+        Call::send(self.request().body(body))
     }
 
     /// Call `f` with the channel once it is open.
