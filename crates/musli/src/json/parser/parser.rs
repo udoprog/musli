@@ -46,10 +46,17 @@ pub trait Parser<'de>: private::Sealed {
     where
         C: Context,
     {
+        // Skip whitespace first so the mark points at the value itself.
+        self.skip_whitespace(cx);
         let start = cx.mark();
         let actual = self.lex(cx);
 
         if !matches!(actual, Token::String) {
+            // Cover the first byte of the offending value in the range.
+            if !matches!(actual, Token::Eof) {
+                _ = self.skip(cx, 1);
+            }
+
             return Err(cx.message_at(&start, format_args!("Expected string, found {actual}")));
         }
 

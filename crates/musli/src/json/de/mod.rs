@@ -80,6 +80,7 @@ where
         let mut first;
 
         'value: loop {
+            self.parser.skip_whitespace(cx);
             let start = cx.mark();
 
             match self.parser.lex(cx) {
@@ -281,6 +282,7 @@ where
 
     #[inline]
     fn decode_char(mut self) -> Result<char, Self::Error> {
+        self.parser.skip_whitespace(self.cx);
         let start = self.cx.mark();
         let mut scratch = Vec::new_in(self.cx.alloc());
 
@@ -373,9 +375,11 @@ where
     #[inline]
     fn decode_array<const N: usize>(self) -> Result<[u8; N], Self::Error> {
         let cx = self.cx;
+        let mut this = self;
+        this.parser.skip_whitespace(cx);
         let mark = cx.mark();
 
-        self.decode_sequence(|seq| {
+        this.decode_sequence(|seq| {
             let mut bytes = [0; N];
             let mut index = 0;
 

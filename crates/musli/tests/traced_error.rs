@@ -59,17 +59,17 @@ fn json_traced_display() {
 
     assert_eq!(
         error.to_string(),
-        ".people[1].age: Expected string, found <number> (at bytes 72-73)"
+        ".people[1].age: Expected string, found <number> (at bytes 73-74)"
     );
     assert_eq!(error.path(), Some(".people[1].age"));
-    assert_eq!(error.range(), Some(72..73));
+    assert_eq!(error.range(), Some(73..74));
 }
 
 #[test]
 fn json_traced_methods() {
     const ENCODING: musli::json::Encoding = musli::json::Encoding::new();
 
-    let expected = ".people[1].age: Expected string, found <number> (at bytes 72-73)";
+    let expected = ".people[1].age: Expected string, found <number> (at bytes 73-74)";
 
     let error = ENCODING
         .from_str_traced::<PeopleTo>(JSON_MISMATCH)
@@ -199,7 +199,7 @@ fn wire_traced_mismatch() {
 fn traced_string_and_capture() {
     const ENCODING: musli::json::Encoding = musli::json::Encoding::new();
 
-    let expected = ".people[1].age: Expected string, found <number> (at bytes 72-73)";
+    let expected = ".people[1].age: Expected string, found <number> (at bytes 73-74)";
 
     let cx = context::new().with_trace().with_error::<String>();
     let error = ENCODING
@@ -232,7 +232,7 @@ fn traced_slice_allocator() {
         .unwrap_err();
     assert_eq!(
         error.to_string(),
-        ".people[1].age: Expected string, found <number> (at bytes 72-73)"
+        ".people[1].age: Expected string, found <number> (at bytes 73-74)"
     );
 
     let mut buf = ArrayBuffer::<8>::with_size();
@@ -278,4 +278,64 @@ fn error_size() {
     assert_eq!(size_of::<musli::wire::Error>(), string);
     assert_eq!(size_of::<musli::packed::Error>(), string);
     assert_eq!(size_of::<musli::descriptive::Error>(), string);
+}
+
+#[derive(Debug, Decode)]
+struct AgeString {
+    #[allow(unused)]
+    age: String,
+}
+
+#[derive(Debug, Decode)]
+struct Nested {
+    #[allow(unused)]
+    inner: AgeString,
+}
+
+fn json_range<'de, T>(input: &'de str) -> core::ops::Range<usize>
+where
+    T: fmt::Debug + Decode<'de, musli::mode::Text, Global>,
+{
+    musli::json::from_str_traced::<T>(input)
+        .unwrap_err()
+        .range()
+        .unwrap()
+}
+
+#[test]
+fn json_trace_range_skips_leading_whitespace() {
+    // The range starts at the offending value, not at the whitespace before it.
+    let input = r#"{"age": 1}"#;
+    assert_eq!(&input[8..9], "1");
+    assert_eq!(json_range::<AgeString>(input).start, 8);
+
+    let input = r#"{"age":1}"#;
+    assert_eq!(&input[7..8], "1");
+    assert_eq!(json_range::<AgeString>(input).start, 7);
+
+    let input = "{\"age\" \n\t :   1}";
+    let at = input.find('1').unwrap();
+    assert_eq!(json_range::<AgeString>(input).start, at);
+}
+
+#[test]
+fn json_trace_range_nested() {
+    let input = r#"{ "inner" : { "age" :   true } }"#;
+    let at = input.find("true").unwrap();
+    assert_eq!(json_range::<Nested>(input).start, at);
+}
+
+#[test]
+fn json_trace_range_array() {
+    let input = "[\"a\",  \"b\",   2]";
+    let at = input.find('2').unwrap();
+    let error = musli::json::from_str_traced::<Vec<String>>(input).unwrap_err();
+    assert_eq!(error.range().unwrap().start, at);
+}
+
+#[test]
+fn json_trace_range_char() {
+    let input = "   \"ab\"";
+    let error = musli::json::from_str_traced::<char>(input).unwrap_err();
+    assert_eq!(error.range().unwrap().start, 3);
 }

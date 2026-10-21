@@ -64,7 +64,7 @@ fn trace_complex() {
             if let Some(error) = cx.errors().next() {
                 assert_eq!(
                     error.to_string(),
-                    ".field[hello] = Variant2 { .vector[0] }: Expected string, found <number> (at byte 49)"
+                    ".field[hello] = Variant2 { .vector[0] }: Expected string, found <number> (at bytes 49-50)"
                 );
                 return;
             }

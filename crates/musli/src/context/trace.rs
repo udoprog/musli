@@ -834,7 +834,7 @@ where
     ///
     /// let cx = context::new().with_trace().with_error::<String>();
     /// let error = ENCODING.from_str_with::<_, Person>(&cx, r#"{"name": 42}"#).unwrap_err();
-    /// assert_eq!(error, ".name: Expected string, found <number> (at bytes 8-9)");
+    /// assert_eq!(error, ".name: Expected string, found <number> (at bytes 9-10)");
     /// ```
     ///
     /// [`DefaultContext::report`]: super::DefaultContext::report
