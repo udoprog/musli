@@ -99,6 +99,10 @@ axum08 = { package = "axum", version = "0.8.0", features = ["ws"] }
 musli = { path = "../musli", version = "0.1.9" }
 tokio = { version = "1.37.0", features = ["rt-multi-thread", "macros", "net", "sync", "time", "io-util"] }
 tracing = "0.1.40"
+# Server side rendering lets the yew integration tests render components
+# without a browser.
+yew022 = { package = "yew", version = "0.22.0", features = ["ssr"] }
+yew023 = { package = "yew", version = "0.23.0", features = ["ssr"] }
 
 # This cfg cannot be enabled, but it still forces Cargo to keep
 # musli-web-macros's version in lockstep with musli-web's, even if someone

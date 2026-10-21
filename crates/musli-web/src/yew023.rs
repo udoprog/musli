@@ -1,8 +1,75 @@
 //! Integration with yew `0.23.x`.
 //!
-//! # Examples
+//! [`Callback`] can be used wherever this crate takes a callback, and the
+//! [`ws::Handle`] of a service can be provided to every component in an
+//! application.
 //!
-//! This example uses [`yew023`]:
+//! # Providing the handle
+//!
+//! Build and connect the [`ws::Service`] in the root component and keep it for
+//! as long as the application runs. Wrap the component tree in a
+//! [`HandleProvider`] with its handle, and the components below it can get the
+//! handle without it being passed through their properties:
+//!
+//! * [`use_handle`] gets the handle in a function component.
+//! * [`use_request`] keeps a [`ws::Request`] for as long as the component is
+//!   mounted, cancelling the previous one when a new one is stored.
+//! * [`use_channel`] opens a [`ws::Channel`] for as long as the component is
+//!   mounted, and renders the component again whenever it opens or closes.
+//! * [`use_open`] follows whether the connection is open, so that what a
+//!   component shows can be fetched again after a reconnect.
+//! * [`ContextExt::handle`] gets the handle in a struct component.
+//!
+//! The hooks and [`ContextExt::handle`] panic with a message naming
+//! [`HandleProvider`] if the component is not below one.
+//!
+//! [`Callback`]: yew023::Callback
+//! [`ws::Handle`]: crate::web::Handle
+//! [`ws::Service`]: crate::web::Service
+//! [`ws::Request`]: crate::web::Request
+//! [`ws::Channel`]: crate::web::Channel
+//!
+//! ```
+//! # extern crate yew023 as yew;
+//! use yew::prelude::*;
+//! use musli_web::web03::prelude::*;
+//! use musli_web::yew023::{HandleProvider, use_handle, use_open};
+//!
+//! #[function_component(App)]
+//! fn app() -> Html {
+//!     // The service is built once and kept for as long as the app runs.
+//!     let service = use_memo((), |_| {
+//!         let service = ws::connect(ws::Connect::location("ws"))
+//!             .on_error(|error| tracing::error!("WebSocket error: {error}"))
+//!             .build();
+//!
+//!         service.connect();
+//!         service
+//!     });
+//!
+//!     html! {
+//!         <HandleProvider context={service.handle().clone()}>
+//!             <Status />
+//!         </HandleProvider>
+//!     }
+//! }
+//!
+//! #[function_component(Status)]
+//! fn status() -> Html {
+//!     let handle = use_handle();
+//!     let open = use_open();
+//!
+//!     match open {
+//!         Some(generation) => html!(<p>{format!("Connection #{generation} uses {:?}", handle.format())}</p>),
+//!         None => html!(<p>{"Disconnected"}</p>),
+//!     }
+//! }
+//! ```
+//!
+//! # Struct components
+//!
+//! This example uses [`yew023`] with a struct component which owns the
+//! service itself:
 //!
 //! [`yew023`]: crate::yew023
 //!
