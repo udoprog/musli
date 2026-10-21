@@ -1,0 +1,23 @@
+error: `crate` is specified more than once
+ --> tests/ui/crate-error.rs:4:9
+  |
+4 |         #![musli(crate = other)]
+  |         ^
+
+error: Unsupported attribute, expected `crate`
+  --> tests/ui/crate-error.rs:10:18
+   |
+10 |         #![musli(path = renamed)]
+   |                  ^^^^
+
+error: Unsupported inner attribute, expected `#![musli(crate = <path>)]`
+  --> tests/ui/crate-error.rs:16:9
+   |
+16 |         #![allow(unused)]
+   |         ^
+
+error: expected square brackets
+  --> tests/ui/crate-error.rs:24:10
+   |
+24 |         #![musli(crate = renamed)]
+   |          ^

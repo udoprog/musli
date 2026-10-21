@@ -9,6 +9,52 @@ use syn::parse::{ParseStream, Parser};
 use syn::spanned::Spanned;
 use syn::{Attribute, Generics, Ident, LitInt, Path, Token, Type, Visibility};
 
+/// Split the leading `#![musli(crate = <path>)]` inner attribute off the input.
+///
+/// Returns the path of the crate the generated code refers to (`::musli_web` if
+/// none was specified) and the remaining input.
+pub(super) fn split_crate(input: TokenStream) -> Result<(Path, TokenStream), syn::Error> {
+    let parser = |input: ParseStream| {
+        let mut path = None::<Path>;
+
+        for attr in input.call(Attribute::parse_inner)? {
+            if !attr.path().is_ident("musli") {
+                return Err(syn::Error::new(
+                    attr.span(),
+                    "Unsupported inner attribute, expected `#![musli(crate = <path>)]`",
+                ));
+            }
+
+            let found = attr.parse_args_with(|input: ParseStream| {
+                if !input.peek(Token![crate]) {
+                    return Err(syn::Error::new(
+                        input.span(),
+                        "Unsupported attribute, expected `crate`",
+                    ));
+                }
+
+                input.parse::<Token![crate]>()?;
+                input.parse::<Token![=]>()?;
+                input.parse::<Path>()
+            })?;
+
+            if path.replace(found).is_some() {
+                return Err(syn::Error::new(
+                    attr.span(),
+                    "`crate` is specified more than once",
+                ));
+            }
+        }
+
+        let rest = input.parse::<TokenStream>()?;
+        Ok((path, rest))
+    };
+
+    let (path, rest) = parser.parse2(input)?;
+    let path = path.unwrap_or_else(|| syn::parse_quote!(::musli_web));
+    Ok((path, rest))
+}
+
 pub(super) fn cx(base: &Path) -> Context<'_> {
     let errors = Vec::new();
 
