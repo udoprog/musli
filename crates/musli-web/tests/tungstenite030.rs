@@ -1007,7 +1007,9 @@ async fn call_decode_failure() {
     let error = timeout!(handle.call(api::GarbledRequest)).expect_err("Expected the call to fail");
 
     assert_eq!(error.as_server_error(), None, "{error}");
+    assert!(error.is_decode(), "{error}");
     assert!(!error.is_not_connected());
+    assert!(!error.is_connection_lost());
     assert_eq!(error.to_string(), "Encoding error when decoding packet");
     assert!(core::error::Error::source(&error).is_some());
 
@@ -1042,8 +1044,10 @@ async fn call_disconnect_mid_call() {
         .expect("Call task panicked")
         .expect_err("Pending call must be failed");
 
+    assert!(error.is_connection_lost(), "{error}");
     assert_eq!(error.as_server_error(), None, "{error}");
     assert!(!error.is_not_connected(), "{error}");
+    assert!(!error.is_decode(), "{error}");
 
     client.close().await;
 }
