@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 use core::ptr::NonNull;
 
-use super::{Alloc, AllocError, Allocator};
+use super::{Alloc, AllocError, Allocator, FromAllocator};
 
 /// An empty buffer.
 pub struct EmptyBuf<T> {
@@ -57,6 +57,13 @@ impl Default for Disabled {
     #[inline]
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl FromAllocator<Disabled> for Disabled {
+    #[inline]
+    fn from_allocator(alloc: Disabled) -> Self {
+        alloc
     }
 }
 

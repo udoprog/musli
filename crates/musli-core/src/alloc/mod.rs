@@ -14,7 +14,7 @@ pub use self::to_owned::ToOwned;
 
 mod allocator;
 #[doc(inline)]
-pub use self::allocator::{Allocator, GlobalAllocator};
+pub use self::allocator::{Allocator, FromAllocator, GlobalAllocator};
 
 #[cfg(feature = "alloc")]
 mod global;

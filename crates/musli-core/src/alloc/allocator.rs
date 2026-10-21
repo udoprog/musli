@@ -51,6 +51,48 @@ where
     unsafe fn slice_from_raw_parts<T>(ptr: NonNull<T>, len: usize) -> Self::Alloc<T>;
 }
 
+/// An allocator which can be obtained from the allocator `A`.
+///
+/// Every [`Allocator`] can be obtained from itself, and the [`Global`]
+/// allocator can be obtained from any allocator since it carries no state.
+///
+/// This is used when decoding a container which is tied to a particular
+/// allocator. A decoder hands out its own allocator `A`, which the container
+/// converts into the allocator it stores its data in. This is what allows a
+/// field of type `Value<Global>` to be decoded by a decoder using any
+/// allocator.
+///
+/// This is implemented for every allocator provided by Müsli, and only Müsli
+/// can implement [`Allocator`], so it does not need to be implemented
+/// manually.
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::{Allocator, FromAllocator, Global, Vec};
+///
+/// fn copy_to<A, B>(alloc: A, bytes: &[u8]) -> Vec<u8, B>
+/// where
+///     A: Allocator,
+///     B: Allocator + FromAllocator<A>,
+/// {
+///     let mut out = Vec::new_in(B::from_allocator(alloc));
+///     out.extend_from_slice(bytes).unwrap();
+///     out
+/// }
+///
+/// musli::alloc::default(|alloc| {
+///     let bytes: Vec<u8, Global> = copy_to(alloc, b"hello");
+///     assert_eq!(bytes.as_slice(), b"hello");
+/// });
+/// ```
+///
+/// [`Global`]: super::Global
+pub trait FromAllocator<A> {
+    /// Obtain this allocator from the allocator `alloc`.
+    fn from_allocator(alloc: A) -> Self;
+}
+
 /// An allocator that can be used in combination with a context.
 ///
 /// # Safety
@@ -60,7 +102,7 @@ where
 /// not.
 pub unsafe trait Allocator
 where
-    Self: Copy,
+    Self: Copy + FromAllocator<Self>,
 {
     /// Do not implement this trait. It is internal to Musli and will change.
     fn __do_not_implement();

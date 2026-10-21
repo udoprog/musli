@@ -5,7 +5,9 @@ use core::str;
 
 use musli_core::internal::size_hint::cautious;
 
-use crate::alloc::{AllocError, Box, GlobalAllocator, String, Vec};
+#[cfg(feature = "alloc")]
+use crate::alloc::Global;
+use crate::alloc::{AllocError, Box, FromAllocator, GlobalAllocator, String, Vec};
 use crate::de::{AsDecoder, Decode, Decoder, Visitor};
 use crate::de::{
     EntryDecoder, MapDecoder, SequenceDecoder, SizeHint, UnsizedVisitor, VariantDecoder,
@@ -70,6 +72,81 @@ use super::type_hint::{FloatKind, IntegerKind, NumberHint, TypeHint};
 /// let value: Value<Global> = Value::new_map_in([(Value::from(1u32), Value::from(2u32))], alloc)?;
 /// # Ok::<_, musli::alloc::AllocError>(())
 /// ```
+///
+/// # Reading a value
+///
+/// The accessors such as [`Value::as_str`], [`Value::as_u64`] or
+/// [`Value::as_map`] read a value without decoding it, returning `None` if
+/// the value is of a different kind.
+///
+/// ```
+/// use musli::value::Value;
+///
+/// let value: Value = musli::json::from_str(r#"{"name": "Alice", "age": 30}"#)?;
+///
+/// let map = value.as_map().unwrap();
+/// assert_eq!(map[0].0.as_str(), Some("name"));
+/// assert_eq!(map[0].1.as_str(), Some("Alice"));
+/// assert_eq!(map[1].1.as_u64(), Some(30));
+/// assert_eq!(map[1].1.as_f64(), Some(30.0));
+/// assert_eq!(map[1].1.as_str(), None);
+/// # Ok::<_, Box<dyn core::error::Error>>(())
+/// ```
+///
+/// # Allocators
+///
+/// A value stores its data in the allocator `A`, which defaults to [`Global`]
+/// when the `alloc` feature is enabled, so `Value` is the same as
+/// `Value<Global>`.
+///
+/// A `Value<Global>` can be decoded by any decoder, whichever allocator the
+/// decoder uses, so a type holding one can derive [`Decode`] without further
+/// attributes. Other allocators such as [`Slice`] can only be obtained from a
+/// decoder using that same allocator, so a type holding a value in them has to
+/// be generic over the allocator or pin it with `#[musli(allocator = <type>)]`.
+///
+/// Since a value can be decoded into more than one allocator, the allocator
+/// cannot be inferred from the decoder, so decoding into `Value<_>` does not
+/// compile. Write `Value` to decode into the [`Global`] allocator, or name the
+/// allocator of the decoder such as `Value<&Slice<'_>>`.
+///
+/// ```
+/// use musli::{Decode, Encode};
+/// use musli::value::Value;
+///
+/// #[derive(Encode, Decode)]
+/// struct Request {
+///     method: String,
+///     params: Value,
+/// }
+///
+/// let request: Request = musli::json::from_str(r#"{"method": "add", "params": [1, 2]}"#)?;
+/// assert_eq!(request.method, "add");
+///
+/// let params = request.params.as_sequence().unwrap();
+/// assert_eq!(params[0].as_i64(), Some(1));
+/// assert_eq!(params[1].as_i64(), Some(2));
+/// # Ok::<_, Box<dyn core::error::Error>>(())
+/// ```
+///
+/// [`Global`]: crate::alloc::Global
+/// [`Slice`]: crate::alloc::Slice
+#[cfg(feature = "alloc")]
+pub struct Value<A = Global>
+where
+    A: Allocator,
+{
+    pub(super) kind: ValueKind<A>,
+}
+
+/// This is a type-erased value which can be deserialized from any [Müsli]
+/// supported type.
+///
+/// See the documentation of this type when the `alloc` feature is enabled for
+/// more details.
+///
+/// [Müsli]: https://github.com/udoprog/musli
+#[cfg(not(feature = "alloc"))]
 pub struct Value<A>
 where
     A: Allocator,
@@ -253,6 +330,243 @@ where
     );
     number!(f32, Float, FloatKind::F32, f64, f32, is_f32, "3.14");
     number!(f64, Float, FloatKind::F64, f64, f64, is_f64, "3.14");
+
+    /// Get the value as a boolean.
+    ///
+    /// Returns `None` if the value is not a boolean.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::Global;
+    /// use musli::value::Value;
+    ///
+    /// assert_eq!(Value::<Global>::bool(true).as_bool(), Some(true));
+    /// assert_eq!(Value::<Global>::u32(1).as_bool(), None);
+    /// ```
+    #[inline]
+    pub fn as_bool(&self) -> Option<bool> {
+        match self.kind {
+            ValueKind::Bool(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Get the value as a character.
+    ///
+    /// Returns `None` if the value is not a character. A single character
+    /// string is not a character.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::Global;
+    /// use musli::value::Value;
+    ///
+    /// assert_eq!(Value::<Global>::char('a').as_char(), Some('a'));
+    /// assert_eq!(Value::<Global>::try_from("a")?.as_char(), None);
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    #[inline]
+    pub fn as_char(&self) -> Option<char> {
+        match self.kind {
+            ValueKind::Char(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Get the value as a signed 64-bit integer.
+    ///
+    /// Integers of every width and signedness are accepted as long as their
+    /// value fits in an `i64`. Returns `None` for integers outside of that
+    /// range, for floats even when they have no fractional part, and for
+    /// values which are not numbers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::Global;
+    /// use musli::value::Value;
+    ///
+    /// assert_eq!(Value::<Global>::i8(-42).as_i64(), Some(-42));
+    /// assert_eq!(Value::<Global>::u64(42).as_i64(), Some(42));
+    /// assert_eq!(Value::<Global>::u64(u64::MAX).as_i64(), None);
+    /// assert_eq!(Value::<Global>::f64(42.0).as_i64(), None);
+    /// ```
+    #[inline]
+    pub fn as_i64(&self) -> Option<i64> {
+        match self.kind {
+            ValueKind::Number(Number::Integer(kind, bits)) if kind.is_signed() => {
+                i64::try_from(bits as i128).ok()
+            }
+            ValueKind::Number(Number::Integer(_, bits)) => i64::try_from(bits).ok(),
+            _ => None,
+        }
+    }
+
+    /// Get the value as an unsigned 64-bit integer.
+    ///
+    /// Integers of every width and signedness are accepted as long as their
+    /// value fits in a `u64`, so negative integers are rejected. Returns
+    /// `None` for integers outside of that range, for floats even when they
+    /// have no fractional part, and for values which are not numbers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::Global;
+    /// use musli::value::Value;
+    ///
+    /// assert_eq!(Value::<Global>::u8(42).as_u64(), Some(42));
+    /// assert_eq!(Value::<Global>::i64(42).as_u64(), Some(42));
+    /// assert_eq!(Value::<Global>::i64(-1).as_u64(), None);
+    /// assert_eq!(Value::<Global>::u128(u128::MAX).as_u64(), None);
+    /// assert_eq!(Value::<Global>::f64(42.0).as_u64(), None);
+    /// ```
+    #[inline]
+    pub fn as_u64(&self) -> Option<u64> {
+        match self.kind {
+            ValueKind::Number(Number::Integer(kind, bits)) if kind.is_signed() => {
+                u64::try_from(bits as i128).ok()
+            }
+            ValueKind::Number(Number::Integer(_, bits)) => u64::try_from(bits).ok(),
+            _ => None,
+        }
+    }
+
+    /// Get the value as a 64-bit float.
+    ///
+    /// Floats are returned as they are, an `f32` widens to an `f64` without
+    /// losing precision. Integers of every width are converted to the nearest
+    /// `f64`, which is exact for integers whose magnitude is at most 2^53 and
+    /// rounds beyond that. Returns `None` for values which are not numbers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::alloc::Global;
+    /// use musli::value::Value;
+    ///
+    /// assert_eq!(Value::<Global>::f32(1.5).as_f64(), Some(1.5));
+    /// assert_eq!(Value::<Global>::f64(1.5).as_f64(), Some(1.5));
+    /// assert_eq!(Value::<Global>::i32(-42).as_f64(), Some(-42.0));
+    /// assert_eq!(Value::<Global>::bool(true).as_f64(), None);
+    /// ```
+    #[inline]
+    pub fn as_f64(&self) -> Option<f64> {
+        match self.kind {
+            ValueKind::Number(Number::Float(_, value)) => Some(value),
+            ValueKind::Number(Number::Integer(kind, bits)) if kind.is_signed() => {
+                Some(bits as i128 as f64)
+            }
+            ValueKind::Number(Number::Integer(_, bits)) => Some(bits as f64),
+            _ => None,
+        }
+    }
+
+    /// Get the value as a string.
+    ///
+    /// Returns `None` if the value is not a string, which includes byte
+    /// values even when they are valid UTF-8.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::Value;
+    ///
+    /// let value: Value = Value::try_from("hello")?;
+    /// assert_eq!(value.as_str(), Some("hello"));
+    ///
+    /// let value: Value = Value::try_from(b"hello")?;
+    /// assert_eq!(value.as_str(), None);
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    #[inline]
+    pub fn as_str(&self) -> Option<&str> {
+        match &self.kind {
+            ValueKind::String(string) => Some(string.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Get the value as bytes.
+    ///
+    /// Returns `None` if the value is not a byte value, which includes
+    /// strings and sequences of numbers.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::Value;
+    ///
+    /// let value: Value = Value::try_from(b"hello")?;
+    /// assert_eq!(value.as_bytes(), Some(&b"hello"[..]));
+    ///
+    /// let value: Value = Value::try_from("hello")?;
+    /// assert_eq!(value.as_bytes(), None);
+    /// # Ok::<_, musli::alloc::AllocError>(())
+    /// ```
+    #[inline]
+    pub fn as_bytes(&self) -> Option<&[u8]> {
+        match &self.kind {
+            ValueKind::Bytes(bytes) => Some(bytes.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Get the value as a sequence of values.
+    ///
+    /// Returns `None` if the value is not a sequence.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::{self, Value};
+    ///
+    /// let value: Value = value::encode([1u32, 2, 3])?;
+    ///
+    /// let items = value.as_sequence().unwrap();
+    /// assert_eq!(items.len(), 3);
+    /// assert_eq!(items[0].as_u64(), Some(1));
+    /// # Ok::<_, value::Error>(())
+    /// ```
+    #[inline]
+    pub fn as_sequence(&self) -> Option<&[Value<A>]> {
+        match &self.kind {
+            ValueKind::Sequence(values) => Some(values.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Get the value as the entries of a map.
+    ///
+    /// The entries are in the order they were decoded or constructed in, and
+    /// may contain duplicate keys. Returns `None` if the value is not a map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::Value;
+    ///
+    /// let value: Value = musli::json::from_str(r#"{"a": 1, "b": 2}"#)?;
+    ///
+    /// let b = value
+    ///     .as_map()
+    ///     .unwrap()
+    ///     .iter()
+    ///     .find(|(key, _)| key.as_str() == Some("b"))
+    ///     .map(|(_, value)| value);
+    ///
+    /// assert_eq!(b.and_then(Value::as_u64), Some(2));
+    /// # Ok::<_, Box<dyn core::error::Error>>(())
+    /// ```
+    #[inline]
+    pub fn as_map(&self) -> Option<&[(Value<A>, Value<A>)]> {
+        match &self.kind {
+            ValueKind::Map(entries) => Some(entries.as_slice()),
+            _ => None,
+        }
+    }
 
     /// Construct a map out of entries in the given iterator.
     ///
@@ -615,17 +929,23 @@ impl Number {
 /// Decoding a value recurses once per level of nesting. Decoders bound this
 /// through [`Context::enter_nesting`], which is called for every nested
 /// container they decode.
+///
+/// The decoded value is allocated in `B`, which is not necessarily the
+/// allocator of the decoder.
 #[derive(Clone, Copy)]
-struct AnyVisitor;
+struct AnyVisitor<B> {
+    alloc: B,
+}
 
 #[crate::trait_defaults(crate)]
-impl<'de, C> Visitor<'de, C> for AnyVisitor
+impl<'de, C, B> Visitor<'de, C> for AnyVisitor<B>
 where
     C: Context,
+    B: Allocator,
 {
-    type Ok = Value<C::Allocator>;
-    type String = StringVisitor;
-    type Bytes = BytesVisitor;
+    type Ok = Value<B>;
+    type String = StringVisitor<B>;
+    type Bytes = BytesVisitor<B>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -771,7 +1091,7 @@ where
     {
         let cx = decoder.cx();
         let value = decoder.decode_any(self)?;
-        let value = Box::new_in(value, cx.alloc()).map_err(cx.map())?;
+        let value = Box::new_in(value, self.alloc).map_err(cx.map())?;
         Ok(Value::new(ValueKind::Option(Some(value))))
     }
 
@@ -782,8 +1102,8 @@ where
     {
         let cx = seq.cx();
 
-        let size = cautious::<Value<C::Allocator>>(seq.size_hint());
-        let mut out = Vec::with_capacity_in(size, cx.alloc()).map_err(cx.map())?;
+        let size = cautious::<Value<B>>(seq.size_hint());
+        let mut out = Vec::with_capacity_in(size, self.alloc).map_err(cx.map())?;
 
         while let Some(item) = seq.try_decode_next()? {
             let item = item.decode_any(self)?;
@@ -800,8 +1120,8 @@ where
     {
         let cx = map.cx();
 
-        let size = cautious::<(Value<C::Allocator>, Value<C::Allocator>)>(map.size_hint());
-        let mut out = Vec::with_capacity_in(size, cx.alloc()).map_err(cx.map())?;
+        let size = cautious::<(Value<B>, Value<B>)>(map.size_hint());
+        let mut out = Vec::with_capacity_in(size, self.alloc).map_err(cx.map())?;
 
         while let Some(mut entry) = map.decode_entry()? {
             let first = entry.decode_key()?.decode_any(self)?;
@@ -814,12 +1134,12 @@ where
 
     #[inline]
     fn visit_bytes(self, _: C, _: SizeHint) -> Result<Self::Bytes, Self::Error> {
-        Ok(BytesVisitor)
+        Ok(BytesVisitor { alloc: self.alloc })
     }
 
     #[inline]
     fn visit_string(self, _: C, _: SizeHint) -> Result<Self::String, Self::Error> {
-        Ok(StringVisitor)
+        Ok(StringVisitor { alloc: self.alloc })
     }
 
     #[inline]
@@ -829,15 +1149,21 @@ where
     {
         let first = variant.decode_tag()?.decode_any(self)?;
         let second = variant.decode_value()?.decode_any(self)?;
-        let value =
-            Box::new_in((first, second), variant.cx().alloc()).map_err(variant.cx().map())?;
+        let value = Box::new_in((first, second), self.alloc).map_err(variant.cx().map())?;
         Ok(Value::new(ValueKind::Variant(value)))
     }
 }
 
-impl<'de, M, A> Decode<'de, M, A> for Value<A>
+/// Decode a value allocated in `B` using a decoder with the allocator `A`.
+///
+/// This is implemented for any `B` which can be obtained from `A` through
+/// [`FromAllocator`]. So a [`Value`] can always be decoded into the allocator
+/// of the decoder, and a `Value<Global>` can be decoded by a decoder using any
+/// allocator.
+impl<'de, M, A, B> Decode<'de, M, A> for Value<B>
 where
     A: Allocator,
+    B: Allocator + FromAllocator<A>,
 {
     const IS_BITWISE_DECODE: bool = false;
 
@@ -846,18 +1172,22 @@ where
     where
         D: Decoder<'de, Mode = M, Allocator = A>,
     {
-        decoder.decode_any(AnyVisitor)
+        let alloc = B::from_allocator(decoder.cx().alloc());
+        decoder.decode_any(AnyVisitor { alloc })
     }
 }
 
-struct BytesVisitor;
+struct BytesVisitor<B> {
+    alloc: B,
+}
 
 #[crate::trait_defaults(crate)]
-impl<C> UnsizedVisitor<'_, C, [u8]> for BytesVisitor
+impl<C, B> UnsizedVisitor<'_, C, [u8]> for BytesVisitor<B>
 where
     C: Context,
+    B: Allocator,
 {
-    type Ok = Value<C::Allocator>;
+    type Ok = Value<B>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -866,20 +1196,23 @@ where
 
     #[inline]
     fn visit_ref(self, cx: C, b: &[u8]) -> Result<Self::Ok, Self::Error> {
-        let mut bytes = Vec::with_capacity_in(b.len(), cx.alloc()).map_err(cx.map())?;
+        let mut bytes = Vec::with_capacity_in(b.len(), self.alloc).map_err(cx.map())?;
         bytes.extend_from_slice(b).map_err(cx.map())?;
         Ok(Value::new(ValueKind::Bytes(bytes)))
     }
 }
 
-struct StringVisitor;
+struct StringVisitor<B> {
+    alloc: B,
+}
 
 #[crate::trait_defaults(crate)]
-impl<C> UnsizedVisitor<'_, C, str> for StringVisitor
+impl<C, B> UnsizedVisitor<'_, C, str> for StringVisitor<B>
 where
     C: Context,
+    B: Allocator,
 {
-    type Ok = Value<C::Allocator>;
+    type Ok = Value<B>;
 
     #[inline]
     fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -888,7 +1221,7 @@ where
 
     #[inline]
     fn visit_ref(self, cx: C, s: &str) -> Result<Self::Ok, Self::Error> {
-        let mut string = String::new_in(cx.alloc());
+        let mut string = String::new_in(self.alloc);
         string.push_str(s).map_err(cx.map())?;
         Ok(Value::new(ValueKind::String(string)))
     }

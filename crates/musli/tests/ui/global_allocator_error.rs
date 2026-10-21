@@ -1,11 +1,14 @@
-//! Tests for fields which use a concrete allocator, such as `Value<Global>`.
+//! Tests for fields which use a concrete allocator, such as `String<Global>`.
 //!
 //! Without `#[musli(allocator = <type>)]` or `#[musli(global)]` the `Decode`
 //! derive introduces its own generic allocator parameter and emits `impl<'de,
-//! A> Decode<'de, M, A> for ..  where A: Allocator`, while `Value<A>` and
-//! `String<A>` only implement `Decode<'de, M, A>` for the allocator they are
-//! allocated in. So the bound `Value<Global>: Decode<'de, M, A>` cannot be
-//! satisfied for a generic `A`.
+//! A> Decode<'de, M, A> for ..  where A: Allocator`, while `String<A>` only
+//! implements `Decode<'de, M, A>` for the allocator it is allocated in. So the
+//! bound `String<Global>: Decode<'de, M, A>` cannot be satisfied for a generic
+//! `A`.
+//!
+//! `Value<Global>` is not affected, since it can be decoded by a decoder using
+//! any allocator.
 //!
 //! Note that `Encode` is unaffected, since `Encode<M>` is not parameterized
 //! over the allocator.
@@ -13,11 +16,6 @@
 use musli::alloc::{Global, String};
 use musli::value::Value;
 use musli::{Allocator, Decode, Encode};
-
-#[derive(Encode, Decode)]
-struct GlobalValue {
-    value: Value<Global>,
-}
 
 #[derive(Encode, Decode)]
 struct GlobalString {

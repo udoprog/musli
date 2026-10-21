@@ -5,7 +5,7 @@ use core::ptr::NonNull;
 
 use rust_alloc::alloc;
 
-use super::{Alloc, AllocError, Allocator, GlobalAllocator};
+use super::{Alloc, AllocError, Allocator, FromAllocator, GlobalAllocator};
 
 /// Global buffer that can be used in combination with an [`Allocator`].
 ///
@@ -97,6 +97,15 @@ unsafe impl GlobalAllocator for Global {
             data: ptr,
             size: len,
         }
+    }
+}
+
+/// The [`Global`] allocator carries no state, so it can be obtained from any
+/// allocator.
+impl<A> FromAllocator<A> for Global {
+    #[inline]
+    fn from_allocator(_: A) -> Self {
+        Self
     }
 }
 

@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 #[cfg(feature = "alloc")]
 use core::ptr::NonNull;
 
-use super::{Alloc, AllocError, Allocator};
+use super::{Alloc, AllocError, Allocator, FromAllocator};
 #[cfg(feature = "alloc")]
 use super::{Global, GlobalAlloc, GlobalAllocator};
 #[cfg(not(feature = "alloc"))]
@@ -91,6 +91,15 @@ unsafe impl<const BUF: usize> GlobalAllocator for &DefaultAllocator<'_, BUF> {
             inner: unsafe { Global::slice_from_raw_parts(ptr, len) },
             _marker: PhantomData,
         }
+    }
+}
+
+impl<'a, 'buf, const BUF: usize> FromAllocator<&'a DefaultAllocator<'buf, BUF>>
+    for &'a DefaultAllocator<'buf, BUF>
+{
+    #[inline]
+    fn from_allocator(alloc: &'a DefaultAllocator<'buf, BUF>) -> Self {
+        alloc
     }
 }
 

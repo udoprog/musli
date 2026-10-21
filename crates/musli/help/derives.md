@@ -625,22 +625,34 @@ where
 ```
 
 This is a problem for fields whose type is tied to a *specific* allocator, such
-as [`Value<Global>`] or [`String<Global>`]. These only implement [`Decode`] for
-the allocator they are allocated in, so the bound `Value<Global>: Decode<'de,
-Binary, A>` can never be satisfied for a generic `A`.
+as [`String<Global>`]. It only implements [`Decode`] for the allocator it is
+allocated in, so the bound `String<Global>: Decode<'de, Binary, A>` can never be
+satisfied for a generic `A`.
+
+[`Value<Global>`] is not affected. It can be decoded by a decoder using any
+allocator, so a type holding one needs none of the attributes below:
+
+```rust
+use musli::value::Value;
+use musli::{Decode, Encode};
+
+#[derive(Encode, Decode)]
+struct Struct {
+    value: Value,
+}
+```
 
 `#[musli(allocator = <type>)]` pins the allocator of the generated [`Decode`]
 implementation to a concrete type instead, so that such fields can be used:
 
 ```rust
-use musli::alloc::Global;
-use musli::value::Value;
+use musli::alloc::{Global, String};
 use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
 #[musli(allocator = Global)]
 struct Struct {
-    value: Value<Global>,
+    string: String<Global>,
 }
 ```
 
@@ -648,14 +660,13 @@ struct Struct {
 allocator, so the following is equivalent to the above:
 
 ```rust
-use musli::alloc::Global;
-use musli::value::Value;
+use musli::alloc::{Global, String};
 use musli::{Decode, Encode};
 
 #[derive(Encode, Decode)]
 #[musli(global)]
 struct Struct {
-    value: Value<Global>,
+    string: String<Global>,
 }
 ```
 
@@ -664,8 +675,7 @@ allocator. The alternative is to make the container generic over the allocator,
 which keeps it usable with any of them:
 
 ```rust
-use musli::alloc::Global;
-use musli::value::Value;
+use musli::alloc::{Global, String};
 use musli::{Allocator, Decode, Encode};
 
 #[derive(Encode, Decode)]
@@ -673,7 +683,7 @@ struct Struct<A = Global>
 where
     A: Allocator,
 {
-    value: Value<A>,
+    string: String<A>,
 }
 ```
 

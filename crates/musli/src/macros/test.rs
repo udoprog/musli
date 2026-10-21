@@ -141,7 +141,7 @@ macro_rules! test_fns {
                 $($(#[$option])*)* =>
                 let value_encoding = crate::value::Encoding::new().with_mode::<M>();
 
-                let value_decode: $crate::value::Value<_> = match encoding.from_slice_with(&cx, out.as_slice()) {
+                let value_decode: $crate::value::Value<$crate::alloc::Global> = match encoding.from_slice_with(&cx, out.as_slice()) {
                     Ok(decoded) => decoded,
                     Err(..) => {
                         let out = $crate::macros::FormatBytes::new(&out);

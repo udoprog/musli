@@ -340,10 +340,10 @@ where
     /// let input = format!("{}{}", "[".repeat(200), "]".repeat(200));
     ///
     /// let cx = context::new();
-    /// assert!(ENCODING.from_str_with::<_, Value<_>>(&cx, &input).is_err());
+    /// assert!(ENCODING.from_str_with::<_, Value>(&cx, &input).is_err());
     ///
     /// let cx = context::new().without_nesting_limit();
-    /// let value: Value<_> = ENCODING.from_str_with(&cx, &input)?;
+    /// let value: Value = ENCODING.from_str_with(&cx, &input)?;
     /// # Ok::<_, musli::context::ErrorMarker>(())
     /// ```
     #[inline]
@@ -390,7 +390,7 @@ where
     ///
     /// let cx = context::new().with_trace();
     ///
-    /// let ErrorMarker = ENCODING.from_str_with::<_, Value<_>>(&cx, "not json").unwrap_err();
+    /// let ErrorMarker = ENCODING.from_str_with::<_, Value>(&cx, "not json").unwrap_err();
     /// let report = cx.report();
     /// println!("{report}");
     /// ```
@@ -412,7 +412,7 @@ where
     ///
     /// let cx = context::new().with_trace();
     ///
-    /// let ErrorMarker = ENCODING.from_str_with::<_, Value<_>>(&cx, "not json").unwrap_err();
+    /// let ErrorMarker = ENCODING.from_str_with::<_, Value>(&cx, "not json").unwrap_err();
     /// assert!(cx.errors().count() > 0);
     /// ```
     #[inline]

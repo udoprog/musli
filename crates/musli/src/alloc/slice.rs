@@ -5,7 +5,7 @@ use core::num::NonZeroU16;
 use core::ops::{Deref, DerefMut};
 use core::ptr;
 
-use super::{Alloc, AllocError, Allocator, SliceBuffer};
+use super::{Alloc, AllocError, Allocator, FromAllocator, SliceBuffer};
 
 #[cfg(test)]
 mod tests;
@@ -183,6 +183,13 @@ impl<'a> Slice<'a> {
             }),
             _marker: PhantomData,
         }
+    }
+}
+
+impl<'a, 'buf> FromAllocator<&'a Slice<'buf>> for &'a Slice<'buf> {
+    #[inline]
+    fn from_allocator(alloc: &'a Slice<'buf>) -> Self {
+        alloc
     }
 }
 
