@@ -186,6 +186,134 @@ mod define;
 ///
 /// <br>
 ///
+/// # Including other lists
+///
+/// A list can include the list of another `define!` invocation, such as one
+/// shipped by a library, so that the two can be carried on the same
+/// connection:
+///
+/// ```text
+/// include <path> as <Name>;
+/// ```
+///
+/// `<path>` is the module the other `define!` was invoked in, and `<Name>`
+/// names the variant it is included as in the `Request` and `Event` enums,
+/// which wraps the `Request` and `Event` enums of the included list. The
+/// marker types of the included list keep their ids and are used as they
+/// are, by the client and the server alike. The variants are documented by
+/// any doc comments on the `include`.
+///
+/// Every id of every list on a connection must be unique, since it is all
+/// the client and the server use to tell messages apart. This is checked at
+/// compile time: an id of the list which is also used by a list it includes,
+/// or an id shared by two included lists, fails the build. Since a list
+/// cannot see the ids of the lists which include it, a library list which is
+/// meant to be included should pin its ids with `#[musli(id = ..)]` to a band
+/// applications leave alone, since implicit ids count up from 1.
+///
+/// On the server, the composed `Request` enum is used as the [`ws::Handler::Id`]
+/// as usual, and the requests of the included list are routed by matching on
+/// its variant, such as by passing them on to a handler shipped with the
+/// included list. A handler for the included list can instead be combined
+/// with one for an application's own list (which does not include it) with
+/// [`ws::Handler::or`].
+///
+/// ```
+/// use musli::{Decode, Encode};
+/// use musli_web::api::{self, Id};
+///
+/// /// A list shipped by a library.
+/// mod auth {
+///     use musli::{Decode, Encode};
+///     use musli_web::api;
+///
+///     #[derive(Encode, Decode)]
+///     pub struct LoginRequest;
+///
+///     #[derive(Encode, Decode)]
+///     pub struct SessionEvent;
+///
+///     api::define! {
+///         #[musli(id = 32000)]
+///         pub type Login;
+///
+///         impl Endpoint for Login {
+///             impl Request for LoginRequest;
+///             type Response<'de> = bool;
+///         }
+///
+///         #[musli(id = 32100)]
+///         pub type Session;
+///
+///         impl Broadcast for Session {
+///             impl Event for SessionEvent;
+///         }
+///     }
+/// }
+///
+/// #[derive(Encode, Decode)]
+/// pub struct HelloRequest;
+///
+/// api::define! {
+///     pub type Hello;
+///
+///     impl Endpoint for Hello {
+///         impl Request for HelloRequest;
+///         type Response<'de> = ();
+///     }
+///
+///     /// The endpoints and broadcasts of the `auth` library.
+///     include auth as Auth;
+/// }
+///
+/// assert_eq!(Request::from_id(Hello::ID), Request::Hello);
+/// assert_eq!(Request::from_id(auth::Login::ID), Request::Auth(auth::Request::Login));
+/// assert_eq!(Event::from_id(auth::Session::ID), Event::Auth(auth::Event::Session));
+/// assert_eq!(Request::Auth(auth::Request::Login).id(), auth::Login::ID);
+///
+/// assert!(Request::IDS.contains(auth::Login::ID));
+/// assert_eq!(format!("{:?}", debug_id(auth::Login::ID)), "Auth(Login)");
+/// ```
+///
+/// An id used by both lists fails to compile:
+///
+/// ```compile_fail
+/// use musli::{Decode, Encode};
+/// use musli_web::api;
+///
+/// mod auth {
+///     # use musli::{Decode, Encode};
+///     # use musli_web::api;
+///     # #[derive(Encode, Decode)]
+///     # pub struct LoginRequest;
+///     api::define! {
+///         // Implicitly `1`, just like `Hello` below.
+///         pub type Login;
+///
+///         impl Endpoint for Login {
+///             impl Request for LoginRequest;
+///             type Response<'de> = bool;
+///         }
+///     }
+/// }
+///
+/// #[derive(Encode, Decode)]
+/// pub struct HelloRequest;
+///
+/// api::define! {
+///     pub type Hello;
+///
+///     impl Endpoint for Hello {
+///         impl Request for HelloRequest;
+///         type Response<'de> = ();
+///     }
+///
+///     include auth as Auth;
+/// }
+/// ```
+///
+/// <br>
+///
 /// # Examples
 ///
 /// ```
@@ -236,6 +364,8 @@ mod define;
 /// ```
 ///
 /// [`api::Id`]: <https://docs.rs/musli-web/latest/musli_web/api/trait.Id.html>
+/// [`ws::Handler::Id`]: <https://docs.rs/musli-web/latest/musli_web/ws/trait.Handler.html#associatedtype.Id>
+/// [`ws::Handler::or`]: <https://docs.rs/musli-web/latest/musli_web/ws/trait.Handler.html#method.or>
 /// [`api::Broadcast`]: <https://docs.rs/musli-web/latest/musli_web/api/trait.Broadcast.html>
 /// [`api::Endpoint`]: <https://docs.rs/musli-web/latest/musli_web/api/trait.Endpoint.html>
 /// [`musli::Decode`]: <https://docs.rs/musli/latest/musli/trait.Decode.html>

@@ -3398,3 +3398,367 @@ async fn the_client_states_its_app_version() {
 
     peer.expect_closed().await;
 }
+
+/// Endpoint lists from several `define!` blocks on one connection, routed to
+/// the handler which knows them.
+mod routing {
+    use super::*;
+
+    use musli_web::api::Id;
+    use musli_web::ws::Handler;
+
+    /// Which handler answered a request.
+    const BY_APP: u8 = 1;
+    const BY_AUTH: u8 = 2;
+
+    /// A list shipped by a library, which pins its ids to a band the
+    /// application does not use.
+    pub mod auth {
+        use musli::{Decode, Encode};
+        use musli_web::{api, ws};
+
+        #[derive(Debug, Encode, Decode)]
+        pub struct LoginRequest<'de> {
+            pub user: &'de str,
+        }
+
+        #[derive(Debug, Encode, Decode)]
+        pub struct LoginResponse {
+            pub ok: bool,
+            pub by: u8,
+        }
+
+        api::define! {
+            #[musli(id = 32000)]
+            pub type Login;
+
+            impl Endpoint for Login {
+                impl<'de> Request for LoginRequest<'de>;
+                type Response<'de> = LoginResponse;
+            }
+        }
+
+        /// The handler the library ships for its list.
+        #[derive(Clone)]
+        pub struct AuthHandler {
+            pub channels: tokio::sync::mpsc::UnboundedSender<(u8, api::ChannelId)>,
+        }
+
+        impl ws::Handler for AuthHandler {
+            type Id = Request;
+            type Response = Result<bool, String>;
+
+            async fn open_channel(&self, channel: api::ChannelId) {
+                _ = self.channels.send((super::BY_AUTH, channel));
+            }
+
+            async fn handle(
+                &self,
+                id: Self::Id,
+                incoming: &mut ws::Incoming<'_>,
+                outgoing: &mut ws::Outgoing<'_>,
+            ) -> Self::Response {
+                match id {
+                    Request::Login => {
+                        let Some(request) = incoming.read::<LoginRequest<'_>>() else {
+                            return Ok(false);
+                        };
+
+                        if request.user == "intruder" {
+                            return Err(String::from("Go away"));
+                        }
+
+                        outgoing.write(LoginResponse {
+                            ok: request.user == "admin",
+                            by: super::BY_AUTH,
+                        });
+
+                        Ok(true)
+                    }
+                    Request::Unknown(..) => Ok(false),
+                }
+            }
+        }
+    }
+
+    /// The application's own list.
+    pub mod app {
+        use musli::{Decode, Encode};
+        use musli_web::api;
+
+        #[derive(Debug, Encode, Decode)]
+        pub struct PingRequest;
+
+        #[derive(Debug, Encode, Decode)]
+        pub struct PingResponse {
+            pub by: u8,
+        }
+
+        api::define! {
+            pub type Ping;
+
+            impl Endpoint for Ping {
+                impl Request for PingRequest;
+                type Response<'de> = PingResponse;
+            }
+        }
+    }
+
+    /// The application's list, including the library's.
+    pub mod composed {
+        use musli::{Decode, Encode};
+        use musli_web::api;
+
+        #[derive(Debug, Encode, Decode)]
+        pub struct PingRequest;
+
+        #[derive(Debug, Encode, Decode)]
+        pub struct PingResponse {
+            pub by: u8,
+        }
+
+        api::define! {
+            pub type Ping;
+
+            impl Endpoint for Ping {
+                impl Request for PingRequest;
+                type Response<'de> = PingResponse;
+            }
+
+            include super::auth as Auth;
+        }
+    }
+
+    /// A list the server knows nothing about.
+    pub mod stray {
+        use musli::{Decode, Encode};
+        use musli_web::api;
+
+        #[derive(Debug, Encode, Decode)]
+        pub struct StrayRequest;
+
+        api::define! {
+            #[musli(id = 31000)]
+            pub type Stray;
+
+            impl Endpoint for Stray {
+                impl Request for StrayRequest;
+                type Response<'de> = ();
+            }
+        }
+    }
+
+    /// The application's handler for its own list only, combined with the
+    /// library's handler through `ws::Handler::or`.
+    #[derive(Clone)]
+    struct AppHandler {
+        channels: mpsc::UnboundedSender<(u8, ChannelId)>,
+    }
+
+    impl ws::Handler for AppHandler {
+        type Id = app::Request;
+        type Response = Result<bool, String>;
+
+        async fn open_channel(&self, channel: ChannelId) {
+            _ = self.channels.send((BY_APP, channel));
+        }
+
+        async fn handle(
+            &self,
+            id: Self::Id,
+            _: &mut ws::Incoming<'_>,
+            outgoing: &mut ws::Outgoing<'_>,
+        ) -> Self::Response {
+            match id {
+                app::Request::Ping => {
+                    outgoing.write(app::PingResponse { by: BY_APP });
+                    Ok(true)
+                }
+                app::Request::Unknown(..) => Ok(false),
+            }
+        }
+    }
+
+    /// The application's handler for the composed list, which passes the
+    /// requests of the included list on to the library's handler.
+    #[derive(Clone)]
+    struct ComposedHandler {
+        auth: auth::AuthHandler,
+    }
+
+    impl ws::Handler for ComposedHandler {
+        type Id = composed::Request;
+        type Response = Result<bool, String>;
+
+        async fn handle(
+            &self,
+            id: Self::Id,
+            incoming: &mut ws::Incoming<'_>,
+            outgoing: &mut ws::Outgoing<'_>,
+        ) -> Self::Response {
+            match id {
+                composed::Request::Ping => {
+                    outgoing.write(composed::PingResponse { by: BY_APP });
+                    Ok(true)
+                }
+                composed::Request::Auth(id) => self.auth.handle(id, incoming, outgoing).await,
+                composed::Request::Unknown(..) => Ok(false),
+            }
+        }
+    }
+
+    /// Serve `handler` on a random local port, returning the websocket url.
+    async fn serve<H>(handler: H) -> (String, JoinHandle<()>)
+    where
+        H: ws::Handler + Sync,
+    {
+        async fn upgrade<H>(ws: WebSocketUpgrade, State(handler): State<H>) -> Response
+        where
+            H: ws::Handler + Sync,
+        {
+            ws.on_upgrade(move |socket| async move {
+                let Ok(mut server) = musli_web::axum08::server(socket, handler).connect().await
+                else {
+                    return;
+                };
+
+                _ = server.run().await;
+            })
+        }
+
+        let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
+            .await
+            .expect("Failed to bind");
+        let addr = listener.local_addr().expect("Missing local address");
+
+        let app = Router::new().route("/ws", any(upgrade::<H>).with_state(handler));
+
+        let task = tokio::spawn(async move {
+            _ = axum::serve(listener, app).await;
+        });
+
+        (format!("ws://{addr}/ws"), task)
+    }
+
+    async fn login(handle: &Handle, user: &str) -> Result<auth::LoginResponse, client::Error> {
+        let packet = timeout!(handle.request().body(auth::LoginRequest { user }).send())?;
+        packet.decode()
+    }
+
+    async fn ping(handle: &Handle) -> app::PingResponse {
+        let packet =
+            timeout!(handle.request().body(app::PingRequest).send()).expect("Ping request failed");
+        packet.decode().expect("Failed to decode ping")
+    }
+
+    async fn stray(handle: &Handle) -> String {
+        let error = timeout!(handle.request().body(stray::StrayRequest).send())
+            .expect_err("Expected the stray request to fail");
+
+        error
+            .as_server_error()
+            .expect("Expected a server reported error")
+            .to_owned()
+    }
+
+    #[test]
+    fn ids_route_to_the_handler_whose_list_knows_them() {
+        type Routed = <ws::Or<AppHandler, auth::AuthHandler> as Handler>::Id;
+
+        assert_eq!(
+            Routed::from_id(app::Ping::ID),
+            ws::Either::First(app::Request::Ping)
+        );
+        assert_eq!(
+            Routed::from_id(auth::Login::ID),
+            ws::Either::Second(auth::Request::Login)
+        );
+        assert_eq!(
+            Routed::from_id(stray::Stray::ID),
+            ws::Either::First(app::Request::Unknown(stray::Stray::ID))
+        );
+        assert_eq!(Routed::try_from_id(stray::Stray::ID), None);
+        assert_eq!(Routed::from_id(auth::Login::ID).id(), auth::Login::ID);
+
+        assert_eq!(
+            composed::Request::from_id(auth::Login::ID),
+            composed::Request::Auth(auth::Request::Login)
+        );
+        assert_eq!(
+            composed::Request::from_id(stray::Stray::ID),
+            composed::Request::Unknown(stray::Stray::ID)
+        );
+    }
+
+    #[tokio::test]
+    async fn or_routes_requests_to_the_handler_whose_list_knows_them() {
+        let (channels, mut opened) = mpsc::unbounded_channel();
+
+        let handler = AppHandler {
+            channels: channels.clone(),
+        }
+        .or(auth::AuthHandler { channels });
+
+        let (url, server) = serve(handler).await;
+        let client = TestClient::new(&url);
+        let handle = client.open().await;
+
+        assert_eq!(ping(handle).await.by, BY_APP);
+
+        let response = login(handle, "admin").await.expect("Login failed");
+        assert!(response.ok);
+        assert_eq!(response.by, BY_AUTH);
+
+        // An error of the second handler reaches the client.
+        let error = login(handle, "intruder")
+            .await
+            .expect_err("Expected the login to fail");
+        assert_eq!(error.as_server_error(), Some("Go away"));
+
+        // An id neither list knows is unsupported.
+        let message = stray(handle).await;
+        assert!(
+            message.contains("No support for request"),
+            "Unexpected error message: {message}"
+        );
+
+        // Both handlers are told about a channel, the first one first.
+        let channel = timeout!(handle.channel()).expect("Failed to open channel");
+        assert_eq!(timeout!(opened.recv()), Some((BY_APP, channel.id())));
+        assert_eq!(timeout!(opened.recv()), Some((BY_AUTH, channel.id())));
+
+        client.close().await;
+        server.abort();
+    }
+
+    #[tokio::test]
+    async fn composed_list_routes_included_requests() {
+        let (channels, _opened) = mpsc::unbounded_channel();
+
+        let handler = ComposedHandler {
+            auth: auth::AuthHandler { channels },
+        };
+
+        let (url, server) = serve(handler).await;
+        let client = TestClient::new(&url);
+        let handle = client.open().await;
+
+        let packet = timeout!(handle.request().body(composed::PingRequest).send())
+            .expect("Ping request failed");
+        let response = packet.decode().expect("Failed to decode ping");
+        assert_eq!(response.by, BY_APP);
+
+        let response = login(handle, "guest").await.expect("Login failed");
+        assert!(!response.ok);
+        assert_eq!(response.by, BY_AUTH);
+
+        let message = stray(handle).await;
+        assert!(
+            message.contains("No support for request"),
+            "Unexpected error message: {message}"
+        );
+
+        client.close().await;
+        server.abort();
+    }
+}

@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::parse::{ParseStream, Parser};
 use syn::spanned::Spanned;
 use syn::{Attribute, Generics, Ident, LitInt, Path, Token, Type, Visibility};
@@ -28,6 +28,8 @@ pub(super) fn cx(base: &Path) -> Context<'_> {
         t: Tokens {
             api: path!(api),
             message_id: path!(api::MessageId),
+            id: path!(api::Id),
+            id_set: path!(api::IdSet),
             fmt: path!(__macros::fmt),
             brace: syn::token::Brace::default(),
             colon_colon: <Token![::]>::default(),
@@ -111,6 +113,62 @@ impl ImplType {
             ty,
             semi,
         })
+    }
+}
+
+mod kw {
+    syn::custom_keyword!(include);
+}
+
+/// An `include <path> as <Name>;` declaration.
+struct Include {
+    attrs: Vec<Attribute>,
+    path: Path,
+    name: Ident,
+}
+
+impl Include {
+    fn parse(
+        cx: &Context,
+        parsed_attrs: ParsedAttrs,
+        attrs: Vec<Attribute>,
+        input: ParseStream,
+    ) -> syn::Result<Self> {
+        parsed_attrs.deny(cx);
+
+        input.parse::<kw::include>()?;
+        let path = Path::parse_mod_style(input)?;
+        input.parse::<Token![as]>()?;
+        let name = input.parse::<Ident>()?;
+        input.parse::<Token![;]>()?;
+
+        if is_illegal(&name) || name == "Unknown" {
+            cx.errors.borrow_mut().push(syn::Error::new(
+                name.span(),
+                "Unsupported include name, this is used by generated enums",
+            ));
+        }
+
+        Ok(Self { attrs, path, name })
+    }
+
+    /// The path of the included list as it is written, for diagnostics.
+    fn path_string(&self) -> String {
+        let mut out = String::new();
+
+        if self.path.leading_colon.is_some() {
+            out.push_str("::");
+        }
+
+        for (n, segment) in self.path.segments.iter().enumerate() {
+            if n > 0 {
+                out.push_str("::");
+            }
+
+            out.push_str(&segment.ident.to_string());
+        }
+
+        out
     }
 }
 
@@ -596,6 +654,7 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
     let mut builders = Vec::new();
     let mut endpoints = Vec::new();
     let mut broadcasts = Vec::new();
+    let mut includes = Vec::<Include>::new();
 
     let parser = |input: ParseStream| {
         while !input.is_empty() {
@@ -631,6 +690,18 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
             }
 
             let vis = input.parse::<Visibility>()?;
+
+            if input.peek(kw::include) {
+                if !matches!(vis, Visibility::Inherited) {
+                    return Err(syn::Error::new(
+                        vis.span(),
+                        "`include` cannot be preceded by visibility",
+                    ));
+                }
+
+                includes.push(Include::parse(cx, parsed_attrs, attrs, input)?);
+                continue;
+            }
 
             if let Some(type_) = input.parse::<Option<Token![type]>>()? {
                 let result = TypeDeclBuilder::parse(parsed_attrs, attrs, vis, type_, input);
@@ -688,7 +759,10 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
                 ));
             }
 
-            return Err(syn::Error::new(input.span(), "Expected `type` or `impl`"));
+            return Err(syn::Error::new(
+                input.span(),
+                "Expected `type`, `impl` or `include`",
+            ));
         }
 
         Ok(())
@@ -758,9 +832,24 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
         broadcast.implement(cx, &mut types, &mut tokens);
     }
 
+    for (n, include) in includes.iter().enumerate() {
+        let clashes_type = types.iter().any(|ty| ty.name == include.name);
+        let clashes_include = includes[..n].iter().any(|i| i.name == include.name);
+
+        if clashes_type || clashes_include {
+            cx.errors.borrow_mut().push(syn::Error::new(
+                include.name.span(),
+                format_args!(
+                    "The name `{}` is already used by another `type` or `include`",
+                    include.name
+                ),
+            ));
+        }
+    }
+
     let message_id = &cx.t.message_id;
     let fmt = &cx.t.fmt;
-    let api = &cx.t.api;
+    let id = &cx.t.id;
 
     let requests = types
         .iter()
@@ -768,35 +857,13 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
         .map(|ty| &ty.name)
         .collect::<Vec<_>>();
 
-    tokens.extend(quote! {
-        /// Enum of request types used in this protocol.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub enum Request {
-            #(#requests,)*
-            Unknown(#message_id),
-        }
-
-        impl #api::Id for Request {
-            #[inline]
-            fn id(&self) -> #message_id {
-                match *self {
-                    #(Self::#requests => #requests::ID,)*
-                    Self::Unknown(id) => id,
-                }
-            }
-
-            #[inline]
-            fn from_id(id: #message_id) -> Self {
-                match id {
-                    #(#requests::ID => Self::#requests,)*
-                    id => Self::Unknown(id),
-                }
-            }
-
-            #[doc(hidden)]
-            fn __do_not_implement_id() {}
-        }
-    });
+    tokens.extend(id_enum(
+        cx,
+        quote!(Request),
+        "Enum of request types used in this protocol.",
+        &requests,
+        &includes,
+    ));
 
     let events = types
         .iter()
@@ -804,37 +871,94 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
         .map(|ty| &ty.name)
         .collect::<Vec<_>>();
 
-    tokens.extend(quote! {
-        /// Enum of event types used in this protocol.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub enum Event {
-            #(#events,)*
-            Unknown(#message_id),
+    tokens.extend(id_enum(
+        cx,
+        quote!(Event),
+        "Enum of event types used in this protocol.",
+        &events,
+        &includes,
+    ));
+
+    // Every id this list declares must be unused by the lists it includes,
+    // and the lists it includes must not share an id with each other. Both
+    // are checked when the constant is evaluated, since the ids of an
+    // included list are only known to the compiler.
+    //
+    // Each check is its own constant spanned to the offending `include`, so
+    // that is where the error is reported.
+    for ty in types.iter().filter(|ty| is_valid_id(ty.id.0)) {
+        let name = &ty.name;
+
+        for include in &includes {
+            let path = &include.path;
+            let message = format!(
+                "The message id of `{name}` is also used by the included `{}`",
+                include.path_string()
+            );
+
+            tokens.extend(quote_spanned! { path.span() =>
+                const _: () = {
+                    if <#path::Request as #id>::IDS.contains(#name::ID)
+                        || <#path::Event as #id>::IDS.contains(#name::ID)
+                    {
+                        ::core::panic!(#message);
+                    }
+                };
+            });
         }
+    }
 
-        impl #api::Id for Event {
-            #[inline]
-            fn id(&self) -> #message_id {
-                match *self {
-                    #(Self::#events => #events::ID,)*
-                    Self::Unknown(id) => id,
-                }
-            }
+    for (n, a) in includes.iter().enumerate() {
+        for b in &includes[n + 1..] {
+            let message = format!(
+                "The included `{}` and `{}` use the same message id",
+                a.path_string(),
+                b.path_string()
+            );
 
-            #[inline]
-            fn from_id(id: #message_id) -> Self {
-                match id {
-                    #(#events::ID => Self::#events,)*
-                    id => Self::Unknown(id),
-                }
-            }
+            let (a, b) = (&a.path, &b.path);
 
-            #[doc(hidden)]
-            fn __do_not_implement_id() {}
+            tokens.extend(quote_spanned! { b.span() =>
+                const _: () = {
+                    if !(<#a::Request as #id>::IDS.is_disjoint(&<#b::Request as #id>::IDS)
+                        && <#a::Request as #id>::IDS.is_disjoint(&<#b::Event as #id>::IDS)
+                        && <#a::Event as #id>::IDS.is_disjoint(&<#b::Request as #id>::IDS)
+                        && <#a::Event as #id>::IDS.is_disjoint(&<#b::Event as #id>::IDS))
+                    {
+                        ::core::panic!(#message);
+                    }
+                };
+            });
         }
-    });
+    }
 
     let idents = types.iter().map(|ty| &ty.name).collect::<Vec<_>>();
+
+    // Ids of included lists are debugged through the composed enums, which
+    // name the list and the endpoint or broadcast, like `Auth(Login)`.
+    let (included_variants, included_fmt, included_lookup) = if includes.is_empty() {
+        (quote!(), quote!(), quote!())
+    } else {
+        (
+            quote! {
+                Request(Request),
+                Event(Event),
+            },
+            quote! {
+                Debug::Request(ref id) => #fmt::Debug::fmt(id, f),
+                Debug::Event(ref id) => #fmt::Debug::fmt(id, f),
+            },
+            quote! {
+                if let ::core::option::Option::Some(id) = <Request as #id>::try_from_id(id) {
+                    return Debug::Request(id);
+                }
+
+                if let ::core::option::Option::Some(id) = <Event as #id>::try_from_id(id) {
+                    return Debug::Event(id);
+                }
+            },
+        )
+    };
 
     tokens.extend(quote! {
         /// Debug a message id.
@@ -845,6 +969,7 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
         pub fn debug_id(id: #message_id) -> impl #fmt::Debug {
             enum Debug {
                 Known(&'static str),
+                #included_variants
                 Unknown(#message_id),
             }
 
@@ -852,6 +977,7 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
                 fn fmt(&self, f: &mut #fmt::Formatter<'_>) -> #fmt::Result {
                     match *self {
                         Debug::Known(name) => f.write_str(name),
+                        #included_fmt
                         Debug::Unknown(id) => f.debug_tuple("Unknown").field(&id.get()).finish(),
                     }
                 }
@@ -859,7 +985,10 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
 
             match id {
                 #(#idents::ID => Debug::Known(stringify!(#idents)),)*
-                id => Debug::Unknown(id),
+                id => {
+                    #included_lookup
+                    Debug::Unknown(id)
+                }
             }
         }
     });
@@ -867,9 +996,87 @@ pub(super) fn expand(cx: &Context, input: TokenStream) -> TokenStream {
     tokens
 }
 
+/// Generate one of the `Request` or `Event` enums, with a variant for each of
+/// `names` and for each included list.
+fn id_enum(
+    cx: &Context,
+    ty: TokenStream,
+    doc: &str,
+    names: &[&Ident],
+    includes: &[Include],
+) -> TokenStream {
+    let message_id = &cx.t.message_id;
+    let id = &cx.t.id;
+    let id_set = &cx.t.id_set;
+
+    let include_attrs = includes.iter().map(|i| i.attrs.as_slice());
+    let include_names = includes.iter().map(|i| &i.name).collect::<Vec<_>>();
+    let include_paths = includes.iter().map(|i| &i.path).collect::<Vec<_>>();
+
+    quote! {
+        #[doc = #doc]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum #ty {
+            #(#names,)*
+            #(#(#include_attrs)* #include_names(#include_paths::#ty),)*
+            /// A message id which is not part of this protocol.
+            Unknown(#message_id),
+        }
+
+        impl #id for #ty {
+            const IDS: #id_set = #id_set {
+                __ids: &[#(#names::ID,)*],
+                __includes: &[#(&<#include_paths::#ty as #id>::IDS,)*],
+            };
+
+            #[inline]
+            fn id(&self) -> #message_id {
+                match *self {
+                    #(Self::#names => #names::ID,)*
+                    #(Self::#include_names(ref id) => <#include_paths::#ty as #id>::id(id),)*
+                    Self::Unknown(id) => id,
+                }
+            }
+
+            #[inline]
+            fn from_id(id: #message_id) -> Self {
+                match <Self as #id>::try_from_id(id) {
+                    ::core::option::Option::Some(id) => id,
+                    ::core::option::Option::None => Self::Unknown(id),
+                }
+            }
+
+            #[inline]
+            fn try_from_id(id: #message_id) -> ::core::option::Option<Self> {
+                match id {
+                    #(#names::ID => ::core::option::Option::Some(Self::#names),)*
+                    _ => {
+                        #(
+                            if let ::core::option::Option::Some(id) = <#include_paths::#ty as #id>::try_from_id(id) {
+                                return ::core::option::Option::Some(Self::#include_names(id));
+                            }
+                        )*
+
+                        ::core::option::Option::None
+                    }
+                }
+            }
+
+            #[doc(hidden)]
+            fn __do_not_implement_id() {}
+        }
+    }
+}
+
+fn is_valid_id(value: u16) -> bool {
+    value != 0 && value < i16::MAX as u16
+}
+
 struct Tokens<'a> {
     api: TraitPath<'a>,
     message_id: TraitPath<'a>,
+    id: TraitPath<'a>,
+    id_set: TraitPath<'a>,
     fmt: TraitPath<'a>,
     brace: syn::token::Brace,
     colon_colon: Token![::],
@@ -911,7 +1118,7 @@ impl Context<'_> {
     }
 
     fn define_id(&self, name: &str, (value, span): (u16, Span), t: &mut TokenStream) {
-        if value == 0 || value >= i16::MAX as u16 {
+        if !is_valid_id(value) {
             self.errors.borrow_mut().push(syn::Error::new(
                 span,
                 format_args!("Message id `{value}` not in range 1-{}", i16::MAX as u16),

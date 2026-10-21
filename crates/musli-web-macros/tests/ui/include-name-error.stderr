@@ -1,0 +1,29 @@
+error: Unsupported include name, this is used by generated enums
+ --> tests/ui/include-name-error.rs:9:29
+  |
+9 |         include super::a as Request;
+  |                             ^^^^^^^
+
+error: Unsupported include name, this is used by generated enums
+  --> tests/ui/include-name-error.rs:10:29
+   |
+10 |         include super::a as Unknown;
+   |                             ^^^^^^^
+
+error: The name `Hello` is already used by another `type` or `include`
+  --> tests/ui/include-name-error.rs:11:29
+   |
+11 |         include super::a as Hello;
+   |                             ^^^^^
+
+error: The name `A` is already used by another `type` or `include`
+  --> tests/ui/include-name-error.rs:13:29
+   |
+13 |         include super::a as A;
+   |                             ^
+
+error: `include` cannot be preceded by visibility
+  --> tests/ui/include-name-error.rs:19:9
+   |
+19 |         pub include super::a as A;
+   |         ^^^

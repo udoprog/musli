@@ -1,0 +1,11 @@
+error[E0080]: evaluation panicked: The included `super::a` and `super::b` use the same message id
+  --> tests/ui/include-clash-error.rs:49:17
+   |
+49 |         include super::b as B;
+   |                 ^^^^^ evaluation of `ab::_` failed here
+
+error[E0080]: evaluation panicked: The message id of `Own` is also used by the included `super::c`
+  --> tests/ui/include-clash-error.rs:67:17
+   |
+67 |         include super::c as C;
+   |                 ^^^^^ evaluation of `own::_` failed here
