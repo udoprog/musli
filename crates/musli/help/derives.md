@@ -1251,6 +1251,86 @@ fn default_meaning() -> u32 {
 }
 ```
 
+To also leave the field out when encoding if it is equal to its default, use
+[`#[musli(skip_default)]`](#musliskip_default).
+
+<br>
+
+#### `#[musli(skip_default)]`
+
+This is a shorthand for a field which is decoded as its default value when it
+is absent, and which is left out when encoding if it is equal to that default
+value. It implies [`#[musli(default)]`](#muslidefault--path), and replaces
+pairing it with a matching [`#[musli(skip_encoding_if = <path>)]`][skip-if]
+predicate.
+
+If it is used alone, the default value is constructed using
+[`Default::default`]. If it is combined with `#[musli(default = <path>)]`, the
+default value is constructed by calling the function at `<path>` both when
+decoding an absent field and when checking whether to skip encoding it, so the
+two always agree.
+
+The field type must implement [`PartialEq`], and [`Default`] unless a
+`default = <path>` function is given. The default value is constructed every
+time the field is encoded to compare against it, so the default function
+should be cheap.
+
+`#[musli(skip_default)]` cannot be combined with
+[`#[musli(skip_encoding_if = <path>)]`][skip-if] or
+[`#[musli(skip)]`](#musliskip), and it cannot be used in
+[`#[musli(packed)]`](#muslipacked) or
+[`#[musli(transparent)]`](#muslitransparent) containers since their fields are
+identified by position or always present. Like other field attributes it can
+be limited to one mode, such as `#[musli(Text, skip_default)]`.
+
+<br>
+
+##### Examples
+
+```rust
+use musli::{Encode, Decode};
+
+#[derive(Debug, PartialEq, Encode, Decode)]
+struct Layout {
+    name: String,
+    // Left out if it is `0`, and decoded as `0` if absent.
+    #[musli(skip_default)]
+    offset: u32,
+    // Left out if it is empty, and decoded as empty if absent.
+    #[musli(skip_default)]
+    tags: Vec<String>,
+    // Left out if it is `3`, and decoded as `3` if absent. Note that `0` is
+    // encoded, since it is not the default.
+    #[musli(skip_default, default = default_columns)]
+    columns: u32,
+}
+
+fn default_columns() -> u32 {
+    3
+}
+
+let layout = Layout {
+    name: String::from("main"),
+    offset: 0,
+    tags: Vec::new(),
+    columns: 3,
+};
+
+let json = musli::json::to_string(&layout)?;
+assert_eq!(json, r#"{"name":"main"}"#);
+assert_eq!(musli::json::from_str::<Layout>(&json)?, layout);
+
+let layout = Layout {
+    columns: 0,
+    ..layout
+};
+
+let json = musli::json::to_string(&layout)?;
+assert_eq!(json, r#"{"name":"main","columns":0}"#);
+assert_eq!(musli::json::from_str::<Layout>(&json)?, layout);
+# Ok::<_, musli::json::Error>(())
+```
+
 <br>
 
 #### `#[musli(name = ..)]`
@@ -1695,6 +1775,11 @@ mod example {
 This adds a condition to skip encoding a field entirely if the condition is
 true. This is very commonly used to skip over encoding `Option<T>` fields.
 
+A skipped field is absent when decoding, so it is usually combined with
+[`#[musli(default)]`](#muslidefault--path). If the condition is that the field
+is equal to its default value, use
+[`#[musli(skip_default)]`](#musliskip_default) instead, which does both.
+
 <br>
 
 ##### Examples
@@ -1897,6 +1982,7 @@ which decoder implementation to call.
 
 [`Binary`]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
 [`Decode`]: <https://docs.rs/musli/latest/musli/trait.Decode.html>
+[`Default`]: <https://doc.rust-lang.org/core/default/trait.Default.html>
 [`DecodeBytes`]: <https://docs.rs/musli/latest/musli/de/trait.DecodeBytes.html>
 [`DecodePacked`]: <https://docs.rs/musli/latest/musli/de/trait.DecodePacked.html>
 [`Decoder::decode_buffer`]: <https://docs.rs/musli/latest/musli/trait.Decoder.html#method.decode_buffer>
@@ -1914,6 +2000,7 @@ which decoder implementation to call.
 [`Encoder`]: <https://docs.rs/musli/latest/musli/trait.Encoder.html>
 [`EncodeTrace`]: <https://docs.rs/musli/latest/musli/en/trait.EncodeTrace.html>
 [`FromStr`]: <https://doc.rust-lang.org/core/str/trait.FromStr.html>
+[`PartialEq`]: <https://doc.rust-lang.org/core/cmp/trait.PartialEq.html>
 [`musli::display`]: <https://docs.rs/musli/latest/musli/display/index.html>
 [`musli::display::option`]: <https://docs.rs/musli/latest/musli/display/option/index.html>
 [`musli::is_bitwise_decode`]: https://docs.rs/musli/latest/musli/fn.is_bitwise_decode.html
@@ -1922,4 +2009,5 @@ which decoder implementation to call.
 [`Text`]: <https://docs.rs/musli/latest/musli/mode/enum.Text.html>
 [`Value<Global>`]: <https://docs.rs/musli/latest/musli/value/struct.Value.html>
 [default mode]: <https://docs.rs/musli/latest/musli/mode/enum.Binary.html>
+[skip-if]: #musliskip_encoding_if--path
 [repr-rust]: <https://doc.rust-lang.org/nomicon/repr-rust.html>

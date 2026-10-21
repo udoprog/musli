@@ -207,7 +207,7 @@ fn encode_default(cx: Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
             encode = quote!(#encode_path(#access, #encoder_var)?);
         }
         (_, Packing::Packed) => {
-            let decls = st.field_tests();
+            let decls = st.field_tests(b.tokens);
             let encoders = make_encoders(cx, b, st)?;
 
             encode = quote! {
@@ -219,17 +219,21 @@ fn encode_default(cx: Ctxt<'_>, b: &Build<'_>, st: &Body<'_>) -> Result<TokenStr
             };
         }
         (_, Packing::Tagged) => {
-            let decls = st.field_tests();
+            let decls = st.field_tests(b.tokens);
             let encoders = make_encoders(cx, b, st)?;
 
             let len = length_test(st.unskipped_fields());
-            let (build_hint, hint) = len.build_hint(b);
+
+            // The length hint is computed from the field tests of this body
+            // rather than through `self`, since `self` might be an enum where
+            // this is the body of one of its variants.
+            let (build_hint, hint) = len.build_inline_hint(b);
 
             encode = quote! {{
+                #(#decls)*
                 #build_hint
 
                 #encoder_t::encode_map_fn(#encoder_var, #hint, move |#encoder_var| {
-                    #(#decls)*
                     #(#encoders)*
                     #result::Ok(())
                 })?
@@ -266,7 +270,7 @@ fn default_size_hint(b: &Build<'_>, st: &Body<'_>) -> Result<TokenStream> {
         }
         (_, Packing::Tagged) => {
             let len = length_test(st.unskipped_fields());
-            let decls = st.field_tests();
+            let decls = st.field_tests(b.tokens);
 
             size_hint = quote! {{
                 #(#decls)*
@@ -654,7 +658,7 @@ fn encode_internal_variant(
                 len = length_test(v.st.unskipped_fields());
                 len.expressions.push(quote!(1));
 
-                let decls = v.st.field_tests();
+                let decls = v.st.field_tests(b.tokens);
                 let encoders = make_encoders(cx, b, &v.st)?;
 
                 inner_encode = quote! {
@@ -662,7 +666,7 @@ fn encode_internal_variant(
                     #(#encoders)*
                 };
 
-                let decls = v.st.field_tests();
+                let decls = v.st.field_tests(b.tokens);
 
                 size_hint = quote! {{
                     #(#decls)*
@@ -779,6 +783,23 @@ impl ToTokens for LengthTest {
 }
 
 impl LengthTest {
+    /// Build a length hint from the length expressions, which requires the
+    /// field tests to be in scope.
+    fn build_inline_hint(&self, b: &Build<'_>) -> (TokenStream, syn::Ident) {
+        let LengthTestKind::Dynamic = self.kind else {
+            return self.build_hint(b);
+        };
+
+        let len = &self.expressions;
+        let hint = b.cx.ident("hint");
+
+        let item = quote! {
+            let #hint: usize = #len;
+        };
+
+        (item, hint)
+    }
+
     fn build_hint(&self, b: &Build<'_>) -> (TokenStream, syn::Ident) {
         let Tokens { map_hint, .. } = b.tokens;
 

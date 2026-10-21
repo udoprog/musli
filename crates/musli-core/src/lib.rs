@@ -240,6 +240,26 @@ pub mod __priv {
         ::core::default::Default::default()
     }
 
+    /// Test if a value is equal to its [`Default`] value, used by
+    /// `#[musli(skip_default)]`.
+    #[inline]
+    pub fn is_default<T>(value: &T) -> bool
+    where
+        T: ::core::default::Default + ::core::cmp::PartialEq,
+    {
+        *value == T::default()
+    }
+
+    /// Test if a value is equal to the value constructed by `default`, used
+    /// by `#[musli(skip_default, default = <path>)]`.
+    #[inline]
+    pub fn is_default_with<T>(value: &T, default: impl FnOnce() -> T) -> bool
+    where
+        T: ::core::cmp::PartialEq,
+    {
+        *value == default()
+    }
+
     /// Note that this returns `true` if skipping was unsupported.
     #[inline]
     pub fn skip<'de, D>(decoder: D) -> Result<bool, D::Error>

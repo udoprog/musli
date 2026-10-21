@@ -192,7 +192,10 @@ impl<'a> Body<'a> {
 
     /// Construct field tests.
     #[inline]
-    pub(crate) fn field_tests(&self) -> impl Iterator<Item = impl ToTokens> + '_ {
+    pub(crate) fn field_tests<'b>(
+        &'b self,
+        tokens: &'b Tokens<'_>,
+    ) -> impl Iterator<Item = impl ToTokens> + 'b {
         self.unskipped_fields().flat_map(|f| {
             let Field {
                 skip_encoding_if,
@@ -201,10 +204,20 @@ impl<'a> Body<'a> {
                 ..
             } = f;
 
-            let (_, path) = skip_encoding_if.as_ref()?;
+            let (span, skip_encoding_if) = skip_encoding_if.as_ref()?;
 
-            Some(quote! {
-                let #var = !#path(#access);
+            Some(match skip_encoding_if {
+                SkipEncodingIf::Path(path) => quote! {
+                    let #var = !#path(#access);
+                },
+                SkipEncodingIf::Default(None) => {
+                    let is_default = respan(&tokens.is_default, *span);
+                    quote_spanned! { *span => let #var = !#is_default(#access); }
+                }
+                SkipEncodingIf::Default(Some(path)) => {
+                    let is_default_with = respan(&tokens.is_default_with, *span);
+                    quote_spanned! { *span => let #var = !#is_default_with(#access, #path); }
+                }
             })
         })
     }
@@ -233,6 +246,15 @@ impl<'a> Body<'a> {
                 let mut last_default = None;
 
                 for f in self.unskipped_fields() {
+                    if let Some((span, SkipEncodingIf::Default(..))) = f.skip_encoding_if {
+                        cx.error_span(
+                            span,
+                            format_args!(
+                                "In {mode} #[{ATTR}(skip_default)] cannot be used in a #[{ATTR}(packed)] {singular}, since packed fields are identified by their position"
+                            ),
+                        );
+                    }
+
                     if let Some((span, _)) = f.default_attr {
                         last_default = Some(span);
                     } else if let Some(span) = last_default {
@@ -315,7 +337,7 @@ impl<'a> Body<'a> {
 
         if matches!(self.packing, (_, Packing::Transparent)) {
             for f in &self.all_fields {
-                if let Some(&(span, _)) = f.skip_encoding_if {
+                if let Some((span, _)) = f.skip_encoding_if {
                     cx.error_span(
                         span,
                         format_args!(
@@ -357,13 +379,22 @@ pub(crate) struct Field<'a> {
     /// Skip field entirely and always initialize with the specified expresion,
     /// or default value through `default_attr`.
     pub(crate) skip: Option<Span>,
-    pub(crate) skip_encoding_if: Option<&'a (Span, syn::Path)>,
+    pub(crate) skip_encoding_if: Option<(Span, SkipEncodingIf<'a>)>,
     /// Fill with default value, if missing.
     pub(crate) default_attr: Option<(Span, Option<&'a syn::Path>)>,
     pub(crate) access: syn::Expr,
     pub(crate) member: syn::Member,
     pub(crate) var: syn::Ident,
     pub(crate) ty: &'a syn::Type,
+}
+
+/// The condition under which encoding of a field is skipped.
+pub(crate) enum SkipEncodingIf<'a> {
+    /// `#[musli(skip_encoding_if = <path>)]`.
+    Path(&'a syn::Path),
+    /// `#[musli(skip_default)]`, compared to the value constructed by the
+    /// optional `#[musli(default = <path>)]` function or `Default::default`.
+    Default(Option<&'a syn::Path>),
 }
 
 impl Field<'_> {
@@ -645,11 +676,40 @@ fn setup_field<'a>(
     let pattern = data.attr.pattern(mode);
 
     let skip = data.attr.skip(mode).map(|&(s, ())| s);
-    let skip_encoding_if = data.attr.skip_encoding_if(mode);
-    let default_attr = data
+    let skip_default = data.attr.skip_default(mode).map(|&(s, ())| s);
+
+    let mut default_attr = data
         .attr
         .is_default(mode)
         .map(|(s, path)| (*s, path.as_ref()));
+
+    let mut skip_encoding_if = data
+        .attr
+        .skip_encoding_if(mode)
+        .map(|(s, path)| (*s, SkipEncodingIf::Path(path)));
+
+    if let Some(span) = skip_default {
+        if let Some((_, SkipEncodingIf::Path(..))) = skip_encoding_if {
+            e.cx.error_span(
+                span,
+                format_args!(
+                    "#[{ATTR}(skip_default)] cannot be combined with #[{ATTR}(skip_encoding_if = <path>)], since it already skips encoding the field when it is equal to its default"
+                ),
+            );
+        }
+
+        if skip.is_some() {
+            e.cx.error_span(
+                span,
+                format_args!(
+                    "#[{ATTR}(skip_default)] cannot be combined with #[{ATTR}(skip)], since a skipped field is never encoded or decoded"
+                ),
+            );
+        }
+
+        let default_attr = *default_attr.get_or_insert((span, None));
+        skip_encoding_if = Some((span, SkipEncodingIf::Default(default_attr.1)));
+    }
 
     let member = match data.ident {
         Some(ident) => syn::Member::Named(ident.clone()),
@@ -858,4 +918,17 @@ pub(crate) fn existing_bounds<'a>(
     }
 
     idents
+}
+
+/// Set the span of every token in `tokens`, so that errors in a generated call
+/// to a helper function point to the attribute which caused it.
+fn respan(tokens: &impl ToTokens, span: Span) -> TokenStream {
+    tokens
+        .to_token_stream()
+        .into_iter()
+        .map(|mut tt| {
+            tt.set_span(span);
+            tt
+        })
+        .collect()
 }

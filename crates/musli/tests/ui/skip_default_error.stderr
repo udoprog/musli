@@ -1,0 +1,53 @@
+error: #[musli(skip_default)] cannot be combined with #[musli(skip_encoding_if = <path>)], since it already skips encoding the field when it is equal to its default
+ --> tests/ui/skip_default_error.rs:5:13
+  |
+5 |     #[musli(skip_default, skip_encoding_if = Option::is_none)]
+  |             ^^^^^^^^^^^^
+
+error: #[musli(skip_default)] cannot be combined with #[musli(skip)], since a skipped field is never encoded or decoded
+  --> tests/ui/skip_default_error.rs:11:19
+   |
+11 |     #[musli(skip, skip_default)]
+   |                   ^^^^^^^^^^^^
+
+error: #[musli(skip_default)] takes no value, use #[musli(skip_default, default = <path>)] to specify the default
+  --> tests/ui/skip_default_error.rs:17:13
+   |
+17 |     #[musli(skip_default = default_field)]
+   |             ^^^^^^^^^^^^
+
+error: In #[musli(Binary | Text, ..)] #[musli(skip_default)] cannot be used in a #[musli(packed)] struct, since packed fields are identified by their position
+  --> tests/ui/skip_default_error.rs:29:13
+   |
+29 |     #[musli(skip_default)]
+   |             ^^^^^^^^^^^^
+
+error: A #[musli(transparent)] struct cannot have an optional field
+  --> tests/ui/skip_default_error.rs:36:13
+   |
+36 |     #[musli(skip_default)]
+   |             ^^^^^^^^^^^^
+
+error[E0277]: can't compare `NotPartialEq` with `NotPartialEq`
+  --> tests/ui/skip_default_error.rs:43:10
+   |
+43 | #[derive(Encode, Decode)]
+   |          ^^^^^^ no implementation for `NotPartialEq == NotPartialEq`
+44 | struct MissingPartialEq {
+45 |     #[musli(skip_default)]
+   |             ------------ required by a bound introduced by this call
+   |
+   = help: the trait `PartialEq` is not implemented for `NotPartialEq`
+note: required by a bound in `musli::__priv::is_default`
+  --> $WORKSPACE/crates/musli-core/src/lib.rs
+   |
+   |     pub fn is_default<T>(value: &T) -> bool
+   |            ---------- required by a bound in this function
+   |     where
+   |         T: ::core::default::Default + ::core::cmp::PartialEq,
+   |                                       ^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `is_default`
+help: consider annotating `NotPartialEq` with `#[derive(PartialEq)]`
+   |
+41 + #[derive(PartialEq)]
+42 | struct NotPartialEq;
+   |

@@ -843,6 +843,9 @@ layer! {
         decode_path: syn::Path,
         /// Method to check if we want to skip encoding.
         skip_encoding_if: syn::Path,
+        /// Use a default value for the field if it's not available, and skip
+        /// encoding it if it is equal to that default.
+        skip_default: (),
         /// Rename a field to the given literal.
         name: syn::Expr,
         /// Pattern used to match the given field when decoding.
@@ -989,6 +992,18 @@ pub(crate) fn field_attrs(cx: &Ctxt, attrs: &[syn::Attribute]) -> Field {
                 reject_string_lit(meta.input, "skip_encoding_if")?;
                 new.skip_encoding_if
                     .push((meta.path.span(), meta.input.parse()?));
+                return Ok(());
+            }
+
+            if meta.path.is_ident("skip_default") {
+                if meta.input.peek(Token![=]) {
+                    return Err(syn::Error::new_spanned(
+                        meta.path,
+                        format_args!("#[{ATTR}(skip_default)] takes no value, use #[{ATTR}(skip_default, default = <path>)] to specify the default"),
+                    ));
+                }
+
+                new.skip_default.push((meta.path.span(), ()));
                 return Ok(());
             }
 
