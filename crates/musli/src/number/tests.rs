@@ -311,7 +311,8 @@ fn diagnostics() {
 }
 
 /// A number read without a type in mind lands on the narrowest thing which
-/// holds it, and falls back to a float when nothing does.
+/// holds it, and falls back to a float when nothing does. One written with a
+/// fraction or an exponent is a float.
 #[test]
 fn decode_any() {
     assert!(matches!(
@@ -343,6 +344,23 @@ fn decode_any() {
         parse_any::<Json5>(b"0x1f").unwrap(),
         (Any::Unsigned(31), 4)
     ));
+    assert!(matches!(
+        parse_any::<Json>(b"5.0").unwrap(),
+        (Any::Float(5.0), 3)
+    ));
+    assert!(matches!(
+        parse_any::<Json>(b"-5.0").unwrap(),
+        (Any::Float(-5.0), 4)
+    ));
+    assert!(matches!(
+        parse_any::<Json>(b"1e3").unwrap(),
+        (Any::Float(1000.0), 3)
+    ));
+    assert!(matches!(
+        parse_any::<Json>(b"1.5e1").unwrap(),
+        (Any::Float(15.0), 5)
+    ));
+    assert!(parse_any::<Json>(b"5e").is_err());
 }
 
 /// Every byte a digit could be, since the translation works on the bits of a

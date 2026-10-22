@@ -171,8 +171,11 @@ where
     }
 }
 
-/// Parse a number without being told which type it is wanted as, preferring the
-/// widest integer which holds it exactly and falling back to a float.
+/// Parse a number without being told which type it is wanted as.
+///
+/// A number written with a fraction or an exponent is a float, even when it is
+/// whole. Otherwise this prefers the widest integer which holds it exactly and
+/// falls back to a float.
 #[inline]
 pub(crate) fn parse_any<S>(input: &[u8]) -> Result<(Any, usize), Error>
 where
@@ -180,29 +183,21 @@ where
 {
     let mut s = Scan::new(input);
     let head = head::<S, u128, true>(&mut s)?;
-    let negative = head.negative;
 
-    // Reading the fraction and the exponent can fail on a malformed number,
-    // which no amount of falling back makes into a number. Combining them into
-    // a whole number is what may legitimately fail.
-    let value = if head.more {
-        let tail = tail::<u128>(&mut s, head.len)?;
-        combine(head, tail)
+    let any = if head.more {
+        // Read the fraction and the exponent so that a malformed number is
+        // reported as such.
+        tail::<u128>(&mut s, head.len)?;
+        None
     } else if head.overflow {
-        Err(Error::new(0, ErrorKind::Overflow))
+        None
+    } else if head.negative {
+        head.value.negate().map(Any::Signed)
     } else {
-        Ok(head.value)
+        Some(Any::Unsigned(head.value))
     };
 
     let len = s.at;
-
-    let any = match value {
-        Ok(value) if negative => value.negate().map(Any::Signed),
-        Ok(value) => Some(Any::Unsigned(value)),
-        // The number is not whole, or is one no integer holds, both of which a
-        // float can still represent.
-        Err(..) => None,
-    };
 
     if let Some(any) = any {
         return Ok((any, len));

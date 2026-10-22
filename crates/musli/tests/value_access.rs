@@ -321,6 +321,30 @@ fn as_any() -> Result<()> {
     Ok(())
 }
 
+/// A JSON number written with a fraction or an exponent is a float, even when
+/// it is whole, so it roundtrips as written.
+#[test]
+fn json_whole_floats() -> Result<()> {
+    let value: Value = musli::json::from_str(r#"[5, 5.0, -5.0, 1e3]"#)?;
+    let items = value.as_sequence().expect("sequence");
+
+    assert!(matches!(items[0].as_any(), Any::Number(n) if !n.is_float()));
+    assert!(matches!(items[1].as_any(), Any::Number(n) if n.is_float()));
+    assert!(matches!(items[2].as_any(), Any::Number(n) if n.is_float()));
+    assert!(matches!(items[3].as_any(), Any::Number(n) if n.is_float()));
+
+    assert_eq!(items[1].as_i64(), None);
+    assert_eq!(items[1].as_f64(), Some(5.0));
+    assert_eq!(items[3].as_f64(), Some(1000.0));
+
+    assert_eq!(musli::json::to_string(&value)?, "[5,5.0,-5.0,1000.0]");
+
+    // A typed integer is still read from a whole number written as a float.
+    #[cfg(feature = "parse-full")]
+    assert_eq!(musli::json::from_str::<u32>("5.0")?, 5);
+    Ok(())
+}
+
 /// A type holding a `Value` derives `Decode` without `#[musli(global)]`.
 #[derive(Debug, PartialEq, Encode, Decode)]
 struct Request {
