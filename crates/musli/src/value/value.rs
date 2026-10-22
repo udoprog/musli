@@ -171,7 +171,7 @@ macro_rules! number {
         /// assert_ne!(value, value2);
         /// ```
         pub const fn $constructor(value: $ty) -> Self {
-            Self::new(ValueKind::Number(Number::$variant($kind, value as $as)))
+            Self::new(ValueKind::Number(NumberKind::$variant($kind, value as $as)))
         }
 
         #[doc = concat!(" Check if the value is a `", stringify!($ty), "`.")]
@@ -186,7 +186,7 @@ macro_rules! number {
         #[doc = concat!(" assert!(value.", stringify!($test), "());")]
         /// ```
         pub fn $test(&self) -> bool {
-            matches!(self.kind, ValueKind::Number(Number::$variant($kind, _)))
+            matches!(self.kind, ValueKind::Number(NumberKind::$variant($kind, _)))
         }
     }
 }
@@ -396,10 +396,7 @@ where
     #[inline]
     pub fn as_i64(&self) -> Option<i64> {
         match self.kind {
-            ValueKind::Number(Number::Integer(kind, bits)) if kind.is_signed() => {
-                i64::try_from(bits as i128).ok()
-            }
-            ValueKind::Number(Number::Integer(_, bits)) => i64::try_from(bits).ok(),
+            ValueKind::Number(kind) => Number(kind).as_i64(),
             _ => None,
         }
     }
@@ -426,10 +423,7 @@ where
     #[inline]
     pub fn as_u64(&self) -> Option<u64> {
         match self.kind {
-            ValueKind::Number(Number::Integer(kind, bits)) if kind.is_signed() => {
-                u64::try_from(bits as i128).ok()
-            }
-            ValueKind::Number(Number::Integer(_, bits)) => u64::try_from(bits).ok(),
+            ValueKind::Number(kind) => Number(kind).as_u64(),
             _ => None,
         }
     }
@@ -455,11 +449,7 @@ where
     #[inline]
     pub fn as_f64(&self) -> Option<f64> {
         match self.kind {
-            ValueKind::Number(Number::Float(_, value)) => Some(value),
-            ValueKind::Number(Number::Integer(kind, bits)) if kind.is_signed() => {
-                Some(bits as i128 as f64)
-            }
-            ValueKind::Number(Number::Integer(_, bits)) => Some(bits as f64),
+            ValueKind::Number(kind) => Number(kind).as_f64(),
             _ => None,
         }
     }
@@ -565,6 +555,45 @@ where
         match &self.kind {
             ValueKind::Map(entries) => Some(entries.as_slice()),
             _ => None,
+        }
+    }
+
+    /// Get a view of the value to pattern match over.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli::value::{Any, Value};
+    ///
+    /// let value: Value = musli::json::from_str(r#"[1, "two", 3.5]"#)?;
+    ///
+    /// let Any::Sequence(items) = value.as_any() else {
+    ///     panic!("expected a sequence");
+    /// };
+    ///
+    /// for item in items {
+    ///     match item.as_any() {
+    ///         Any::Number(n) if n.is_float() => assert_eq!(n.as_f64(), Some(3.5)),
+    ///         Any::Number(n) => assert_eq!(n.as_u64(), Some(1)),
+    ///         Any::String(s) => assert_eq!(s, "two"),
+    ///         _ => panic!("unexpected value"),
+    ///     }
+    /// }
+    /// # Ok::<_, Box<dyn core::error::Error>>(())
+    /// ```
+    #[inline]
+    pub fn as_any(&self) -> Any<'_, A> {
+        match &self.kind {
+            ValueKind::Empty => Any::Empty,
+            ValueKind::Bool(b) => Any::Bool(*b),
+            ValueKind::Char(c) => Any::Char(*c),
+            ValueKind::Number(kind) => Any::Number(Number(*kind)),
+            ValueKind::Bytes(bytes) => Any::Bytes(bytes.as_slice()),
+            ValueKind::String(string) => Any::String(string.as_str()),
+            ValueKind::Sequence(values) => Any::Sequence(values.as_slice()),
+            ValueKind::Map(entries) => Any::Map(entries.as_slice()),
+            ValueKind::Variant(variant) => Any::Variant(&variant.0, &variant.1),
+            ValueKind::Option(option) => Any::Option(option.as_deref()),
         }
     }
 
@@ -798,7 +827,7 @@ where
     /// A character.
     Char(char),
     /// A number.
-    Number(Number),
+    Number(NumberKind),
     /// An array.
     Bytes(Vec<u8, A>),
     /// A string in a value.
@@ -843,7 +872,7 @@ where
 /// other number type on demand.
 #[derive(Clone, Copy, PartialEq)]
 #[non_exhaustive]
-pub(crate) enum Number {
+pub(crate) enum NumberKind {
     /// An integer. Signed integers are stored sign extended, so their value is
     /// recovered by casting the bits to an `i128`.
     Integer(IntegerKind, u128),
@@ -852,38 +881,38 @@ pub(crate) enum Number {
     Float(FloatKind, f64),
 }
 
-impl fmt::Debug for Number {
+impl fmt::Debug for NumberKind {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Number::Integer(kind, bits) if kind.is_signed() => (*bits as i128).fmt(f),
-            Number::Integer(_, bits) => bits.fmt(f),
-            Number::Float(FloatKind::F32, n) => (*n as f32).fmt(f),
-            Number::Float(_, n) => n.fmt(f),
+            NumberKind::Integer(kind, bits) if kind.is_signed() => (*bits as i128).fmt(f),
+            NumberKind::Integer(_, bits) => bits.fmt(f),
+            NumberKind::Float(FloatKind::F32, n) => (*n as f32).fmt(f),
+            NumberKind::Float(_, n) => n.fmt(f),
         }
     }
 }
 
-impl PartialOrd for Number {
+impl PartialOrd for NumberKind {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
-            (Number::Integer(lhs, a), Number::Integer(rhs, b)) => match lhs.cmp(rhs) {
+            (NumberKind::Integer(lhs, a), NumberKind::Integer(rhs, b)) => match lhs.cmp(rhs) {
                 Ordering::Equal if lhs.is_signed() => (*a as i128).partial_cmp(&(*b as i128)),
                 Ordering::Equal => a.partial_cmp(b),
                 ordering => Some(ordering),
             },
-            (Number::Float(lhs, a), Number::Float(rhs, b)) => match lhs.cmp(rhs) {
+            (NumberKind::Float(lhs, a), NumberKind::Float(rhs, b)) => match lhs.cmp(rhs) {
                 Ordering::Equal => a.partial_cmp(b),
                 ordering => Some(ordering),
             },
-            (Number::Integer(..), Number::Float(..)) => Some(Ordering::Less),
-            (Number::Float(..), Number::Integer(..)) => Some(Ordering::Greater),
+            (NumberKind::Integer(..), NumberKind::Float(..)) => Some(Ordering::Less),
+            (NumberKind::Float(..), NumberKind::Integer(..)) => Some(Ordering::Greater),
         }
     }
 }
 
-impl<M> Encode<M> for Number {
+impl<M> Encode<M> for NumberKind {
     type Encode = Self;
 
     const IS_BITWISE_ENCODE: bool = false;
@@ -893,18 +922,18 @@ impl<M> Encode<M> for Number {
         E: Encoder<Mode = M>,
     {
         match self {
-            Number::Integer(IntegerKind::U8, n) => encoder.encode_u8(*n as u8),
-            Number::Integer(IntegerKind::U16, n) => encoder.encode_u16(*n as u16),
-            Number::Integer(IntegerKind::U32, n) => encoder.encode_u32(*n as u32),
-            Number::Integer(IntegerKind::U64, n) => encoder.encode_u64(*n as u64),
-            Number::Integer(IntegerKind::U128, n) => encoder.encode_u128(*n),
-            Number::Integer(IntegerKind::I8, n) => encoder.encode_i8(*n as i8),
-            Number::Integer(IntegerKind::I16, n) => encoder.encode_i16(*n as i16),
-            Number::Integer(IntegerKind::I32, n) => encoder.encode_i32(*n as i32),
-            Number::Integer(IntegerKind::I64, n) => encoder.encode_i64(*n as i64),
-            Number::Integer(IntegerKind::I128, n) => encoder.encode_i128(*n as i128),
-            Number::Float(FloatKind::F32, n) => encoder.encode_f32(*n as f32),
-            Number::Float(FloatKind::F64, n) => encoder.encode_f64(*n),
+            NumberKind::Integer(IntegerKind::U8, n) => encoder.encode_u8(*n as u8),
+            NumberKind::Integer(IntegerKind::U16, n) => encoder.encode_u16(*n as u16),
+            NumberKind::Integer(IntegerKind::U32, n) => encoder.encode_u32(*n as u32),
+            NumberKind::Integer(IntegerKind::U64, n) => encoder.encode_u64(*n as u64),
+            NumberKind::Integer(IntegerKind::U128, n) => encoder.encode_u128(*n),
+            NumberKind::Integer(IntegerKind::I8, n) => encoder.encode_i8(*n as i8),
+            NumberKind::Integer(IntegerKind::I16, n) => encoder.encode_i16(*n as i16),
+            NumberKind::Integer(IntegerKind::I32, n) => encoder.encode_i32(*n as i32),
+            NumberKind::Integer(IntegerKind::I64, n) => encoder.encode_i64(*n as i64),
+            NumberKind::Integer(IntegerKind::I128, n) => encoder.encode_i128(*n as i128),
+            NumberKind::Float(FloatKind::F32, n) => encoder.encode_f32(*n as f32),
+            NumberKind::Float(FloatKind::F64, n) => encoder.encode_f64(*n),
         }
     }
 
@@ -914,12 +943,113 @@ impl<M> Encode<M> for Number {
     }
 }
 
+/// A borrowed view of a [`Value`], returned by [`Value::as_any`].
+#[non_exhaustive]
+pub enum Any<'a, A>
+where
+    A: Allocator,
+{
+    /// The empty value.
+    Empty,
+    /// A boolean.
+    Bool(bool),
+    /// A character.
+    Char(char),
+    /// A number.
+    Number(Number),
+    /// Bytes.
+    Bytes(&'a [u8]),
+    /// A string.
+    String(&'a str),
+    /// A sequence of values.
+    Sequence(&'a [Value<A>]),
+    /// The entries of a map, which may contain duplicate keys.
+    Map(&'a [(Value<A>, Value<A>)]),
+    /// A variant, as a tag and its value.
+    Variant(&'a Value<A>, &'a Value<A>),
+    /// An optional value.
+    Option(Option<&'a Value<A>>),
+}
+
+/// A number stored in a [`Value`].
+///
+/// # Examples
+///
+/// ```
+/// use musli::alloc::Global;
+/// use musli::value::{Any, Value};
+///
+/// let Any::Number(n) = Value::<Global>::f32(1.5).as_any() else {
+///     panic!("expected a number");
+/// };
+///
+/// assert!(n.is_float());
+/// assert_eq!(n.as_f64(), Some(1.5));
+/// assert_eq!(n.as_i64(), None);
+/// ```
+#[derive(Clone, Copy, PartialEq)]
+pub struct Number(NumberKind);
+
 impl Number {
+    /// Get the number as a signed 64-bit integer.
+    ///
+    /// Returns `None` for floats and for integers which do not fit in an
+    /// `i64`.
+    #[inline]
+    pub fn as_i64(&self) -> Option<i64> {
+        match self.0 {
+            NumberKind::Integer(kind, bits) if kind.is_signed() => i64::try_from(bits as i128).ok(),
+            NumberKind::Integer(_, bits) => i64::try_from(bits).ok(),
+            NumberKind::Float(..) => None,
+        }
+    }
+
+    /// Get the number as an unsigned 64-bit integer.
+    ///
+    /// Returns `None` for floats and for integers which do not fit in a
+    /// `u64`.
+    #[inline]
+    pub fn as_u64(&self) -> Option<u64> {
+        match self.0 {
+            NumberKind::Integer(kind, bits) if kind.is_signed() => u64::try_from(bits as i128).ok(),
+            NumberKind::Integer(_, bits) => u64::try_from(bits).ok(),
+            NumberKind::Float(..) => None,
+        }
+    }
+
+    /// Get the number as a 64-bit float.
+    ///
+    /// Integers are converted to the nearest `f64`, which rounds those whose
+    /// magnitude is above 2^53.
+    #[inline]
+    pub fn as_f64(&self) -> Option<f64> {
+        match self.0 {
+            NumberKind::Float(_, value) => Some(value),
+            NumberKind::Integer(kind, bits) if kind.is_signed() => Some(bits as i128 as f64),
+            NumberKind::Integer(_, bits) => Some(bits as f64),
+        }
+    }
+
+    /// Test if the number is a float.
+    #[inline]
+    pub fn is_float(&self) -> bool {
+        matches!(self.0, NumberKind::Float(..))
+    }
+}
+
+impl fmt::Debug for Number {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl NumberKind {
     /// Get the type hint for the number.
     pub(crate) fn type_hint(&self) -> NumberHint {
         match self {
-            Number::Integer(kind, _) => NumberHint::Integer(*kind),
-            Number::Float(kind, _) => NumberHint::Float(*kind),
+            NumberKind::Integer(kind, _) => NumberHint::Integer(*kind),
+            NumberKind::Float(kind, _) => NumberHint::Float(*kind),
         }
     }
 }
@@ -969,7 +1099,7 @@ where
 
     #[inline]
     fn visit_u8(self, _: C, value: u8) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::U8,
             value as u128,
         ))))
@@ -977,7 +1107,7 @@ where
 
     #[inline]
     fn visit_u16(self, _: C, value: u16) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::U16,
             value as u128,
         ))))
@@ -985,7 +1115,7 @@ where
 
     #[inline]
     fn visit_u32(self, _: C, value: u32) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::U32,
             value as u128,
         ))))
@@ -993,7 +1123,7 @@ where
 
     #[inline]
     fn visit_u64(self, _: C, value: u64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::U64,
             value as u128,
         ))))
@@ -1001,7 +1131,7 @@ where
 
     #[inline]
     fn visit_u128(self, _: C, value: u128) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::U128,
             value,
         ))))
@@ -1009,7 +1139,7 @@ where
 
     #[inline]
     fn visit_i8(self, _: C, value: i8) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::I8,
             value as u128,
         ))))
@@ -1017,7 +1147,7 @@ where
 
     #[inline]
     fn visit_i16(self, _: C, value: i16) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::I16,
             value as u128,
         ))))
@@ -1025,7 +1155,7 @@ where
 
     #[inline]
     fn visit_i32(self, _: C, value: i32) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::I32,
             value as u128,
         ))))
@@ -1033,7 +1163,7 @@ where
 
     #[inline]
     fn visit_i64(self, _: C, value: i64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::I64,
             value as u128,
         ))))
@@ -1041,7 +1171,7 @@ where
 
     #[inline]
     fn visit_i128(self, _: C, value: i128) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::I128,
             value as u128,
         ))))
@@ -1049,7 +1179,7 @@ where
 
     #[inline]
     fn visit_usize(self, _: C, value: usize) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::USIZE,
             value as u128,
         ))))
@@ -1057,7 +1187,7 @@ where
 
     #[inline]
     fn visit_isize(self, _: C, value: isize) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Integer(
+        Ok(Value::new(ValueKind::Number(NumberKind::Integer(
             IntegerKind::ISIZE,
             value as u128,
         ))))
@@ -1065,7 +1195,7 @@ where
 
     #[inline]
     fn visit_f32(self, _: C, value: f32) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Float(
+        Ok(Value::new(ValueKind::Number(NumberKind::Float(
             FloatKind::F32,
             value as f64,
         ))))
@@ -1073,7 +1203,7 @@ where
 
     #[inline]
     fn visit_f64(self, _: C, value: f64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::new(ValueKind::Number(Number::Float(
+        Ok(Value::new(ValueKind::Number(NumberKind::Float(
             FloatKind::F64,
             value,
         ))))
@@ -1669,7 +1799,7 @@ macro_rules! number_from {
             {
                 #[inline]
                 fn from(value: $ty) -> Self {
-                    Value::new(ValueKind::Number(Number::$variant($kind, value as $as)))
+                    Value::new(ValueKind::Number(NumberKind::$variant($kind, value as $as)))
                 }
             }
         )*

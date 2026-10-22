@@ -22,8 +22,8 @@ use core::marker;
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[doc(inline)]
-pub use self::value::{AsValueDecoder, IntoValueDecoder, Value};
-use self::value::{Number, ValueKind};
+pub use self::value::{Any, AsValueDecoder, IntoValueDecoder, Number, Value};
+use self::value::{NumberKind, ValueKind};
 #[doc(inline)]
 pub use error::Error;
 

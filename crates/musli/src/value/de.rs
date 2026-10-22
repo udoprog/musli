@@ -18,7 +18,7 @@ use crate::{Context, Options};
 
 use super::error::ErrorMessage;
 use super::type_hint::{FloatKind, IntegerKind, NumberHint, TypeHint};
-use super::{AsValueDecoder, Number, Value, ValueKind};
+use super::{AsValueDecoder, NumberKind, Value, ValueKind};
 
 /// Encoder for a single value.
 pub struct ValueDecoder<'de, const OPT: Options, C, A, M>
@@ -345,18 +345,20 @@ where
             ValueKind::Bool(value) => visitor.visit_bool(self.cx, *value),
             ValueKind::Char(value) => visitor.visit_char(self.cx, *value),
             ValueKind::Number(number) => match number {
-                Number::Integer(IntegerKind::U8, n) => visitor.visit_u8(self.cx, *n as u8),
-                Number::Integer(IntegerKind::U16, n) => visitor.visit_u16(self.cx, *n as u16),
-                Number::Integer(IntegerKind::U32, n) => visitor.visit_u32(self.cx, *n as u32),
-                Number::Integer(IntegerKind::U64, n) => visitor.visit_u64(self.cx, *n as u64),
-                Number::Integer(IntegerKind::U128, n) => visitor.visit_u128(self.cx, *n),
-                Number::Integer(IntegerKind::I8, n) => visitor.visit_i8(self.cx, *n as i8),
-                Number::Integer(IntegerKind::I16, n) => visitor.visit_i16(self.cx, *n as i16),
-                Number::Integer(IntegerKind::I32, n) => visitor.visit_i32(self.cx, *n as i32),
-                Number::Integer(IntegerKind::I64, n) => visitor.visit_i64(self.cx, *n as i64),
-                Number::Integer(IntegerKind::I128, n) => visitor.visit_i128(self.cx, *n as i128),
-                Number::Float(FloatKind::F32, n) => visitor.visit_f32(self.cx, *n as f32),
-                Number::Float(FloatKind::F64, n) => visitor.visit_f64(self.cx, *n),
+                NumberKind::Integer(IntegerKind::U8, n) => visitor.visit_u8(self.cx, *n as u8),
+                NumberKind::Integer(IntegerKind::U16, n) => visitor.visit_u16(self.cx, *n as u16),
+                NumberKind::Integer(IntegerKind::U32, n) => visitor.visit_u32(self.cx, *n as u32),
+                NumberKind::Integer(IntegerKind::U64, n) => visitor.visit_u64(self.cx, *n as u64),
+                NumberKind::Integer(IntegerKind::U128, n) => visitor.visit_u128(self.cx, *n),
+                NumberKind::Integer(IntegerKind::I8, n) => visitor.visit_i8(self.cx, *n as i8),
+                NumberKind::Integer(IntegerKind::I16, n) => visitor.visit_i16(self.cx, *n as i16),
+                NumberKind::Integer(IntegerKind::I32, n) => visitor.visit_i32(self.cx, *n as i32),
+                NumberKind::Integer(IntegerKind::I64, n) => visitor.visit_i64(self.cx, *n as i64),
+                NumberKind::Integer(IntegerKind::I128, n) => {
+                    visitor.visit_i128(self.cx, *n as i128)
+                }
+                NumberKind::Float(FloatKind::F32, n) => visitor.visit_f32(self.cx, *n as f32),
+                NumberKind::Float(FloatKind::F64, n) => visitor.visit_f64(self.cx, *n),
             },
             ValueKind::Bytes(bytes) => {
                 let visitor = visitor.visit_bytes(self.cx, SizeHint::exact(bytes.len()))?;
@@ -729,7 +731,7 @@ where
 trait FromNumber: Sized {
     const NUMBER_HINT: NumberHint;
 
-    fn from_number(number: &Number) -> Result<Self, ErrorMessage>;
+    fn from_number(number: &NumberKind) -> Result<Self, ErrorMessage>;
 
     fn parse_number(string: &str) -> Option<Self>;
 }
@@ -740,13 +742,13 @@ macro_rules! integer_from {
             const NUMBER_HINT: NumberHint = NumberHint::Integer(IntegerKind::$kind);
 
             #[inline]
-            fn from_number(number: &Number) -> Result<Self, ErrorMessage> {
+            fn from_number(number: &NumberKind) -> Result<Self, ErrorMessage> {
                 let out = match number {
-                    Number::Integer(kind, bits) if kind.is_signed() => {
+                    NumberKind::Integer(kind, bits) if kind.is_signed() => {
                         Self::try_from(*bits as i128).ok()
                     }
-                    Number::Integer(_, bits) => Self::try_from(*bits).ok(),
-                    Number::Float(_, value) => {
+                    NumberKind::Integer(_, bits) => Self::try_from(*bits).ok(),
+                    NumberKind::Float(_, value) => {
                         // Casting a float to an integer truncates towards zero
                         // but saturates when out of range, so the range has to
                         // be checked to avoid silently coercing an out of range
@@ -783,11 +785,11 @@ macro_rules! float_from {
             const NUMBER_HINT: NumberHint = NumberHint::Float(FloatKind::$kind);
 
             #[inline]
-            fn from_number(number: &Number) -> Result<Self, ErrorMessage> {
+            fn from_number(number: &NumberKind) -> Result<Self, ErrorMessage> {
                 Ok(match number {
-                    Number::Integer(kind, bits) if kind.is_signed() => *bits as i128 as $ty,
-                    Number::Integer(_, bits) => *bits as $ty,
-                    Number::Float(_, value) => *value as $ty,
+                    NumberKind::Integer(kind, bits) if kind.is_signed() => *bits as i128 as $ty,
+                    NumberKind::Integer(_, bits) => *bits as $ty,
+                    NumberKind::Float(_, value) => *value as $ty,
                 })
             }
 

@@ -11,7 +11,7 @@ use crate::writer::BufWriter;
 use crate::{Allocator, Context, Options};
 
 use super::type_hint::{FloatKind, IntegerKind};
-use super::{Number, Value, ValueKind};
+use super::{NumberKind, Value, ValueKind};
 
 /// Insert a value into the given receiver.
 trait ValueOutput<A>
@@ -150,7 +150,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::U8, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::U8, n as u128)),
         )?;
         Ok(())
     }
@@ -160,7 +160,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::U16, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::U16, n as u128)),
         )?;
         Ok(())
     }
@@ -170,7 +170,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::U32, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::U32, n as u128)),
         )?;
         Ok(())
     }
@@ -180,7 +180,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::U64, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::U64, n as u128)),
         )?;
         Ok(())
     }
@@ -190,7 +190,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::U128, n)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::U128, n)),
         )?;
         Ok(())
     }
@@ -200,7 +200,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::I8, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::I8, n as u128)),
         )?;
         Ok(())
     }
@@ -210,7 +210,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::I16, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::I16, n as u128)),
         )?;
         Ok(())
     }
@@ -220,7 +220,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::I32, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::I32, n as u128)),
         )?;
         Ok(())
     }
@@ -230,7 +230,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::I64, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::I64, n as u128)),
         )?;
         Ok(())
     }
@@ -240,7 +240,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::I128, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::I128, n as u128)),
         )?;
         Ok(())
     }
@@ -250,7 +250,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Float(FloatKind::F32, n as f64)),
+            ValueKind::Number(NumberKind::Float(FloatKind::F32, n as f64)),
         )?;
         Ok(())
     }
@@ -260,7 +260,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Float(FloatKind::F64, n)),
+            ValueKind::Number(NumberKind::Float(FloatKind::F64, n)),
         )?;
         Ok(())
     }
@@ -270,7 +270,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::USIZE, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::USIZE, n as u128)),
         )?;
         Ok(())
     }
@@ -280,7 +280,7 @@ where
         self.output.write(
             self.cx,
             self.some,
-            ValueKind::Number(Number::Integer(IntegerKind::ISIZE, n as u128)),
+            ValueKind::Number(NumberKind::Integer(IntegerKind::ISIZE, n as u128)),
         )?;
         Ok(())
     }

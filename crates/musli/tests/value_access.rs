@@ -4,7 +4,7 @@
 use anyhow::Result;
 use musli::alloc::{ArrayBuffer, Disabled, Global, Slice};
 use musli::context;
-use musli::value::{self, Value};
+use musli::value::{self, Any, Value};
 use musli::{Decode, Encode};
 
 /// `Value` names `Value<Global>`.
@@ -232,6 +232,92 @@ fn json_numbers() -> Result<()> {
 
     assert_eq!(items[4].as_u64(), None);
     assert_eq!(items[4].as_i64(), Some(i64::MIN));
+    Ok(())
+}
+
+/// Every kind of value is told apart by matching on `as_any`.
+#[test]
+fn as_any() -> Result<()> {
+    assert!(matches!(Value::<Global>::empty().as_any(), Any::Empty));
+    assert!(matches!(
+        Value::<Global>::from(true).as_any(),
+        Any::Bool(true)
+    ));
+    assert!(matches!(
+        Value::<Global>::from('a').as_any(),
+        Any::Char('a')
+    ));
+
+    let Any::Number(n) = Value::<Global>::i8(-42).as_any() else {
+        panic!("expected a number");
+    };
+    assert!(!n.is_float());
+    assert_eq!(n.as_i64(), Some(-42));
+    assert_eq!(n.as_u64(), None);
+    assert_eq!(n.as_f64(), Some(-42.0));
+
+    let Any::Number(n) = Value::<Global>::u64(u64::MAX).as_any() else {
+        panic!("expected a number");
+    };
+    assert!(!n.is_float());
+    assert_eq!(n.as_i64(), None);
+    assert_eq!(n.as_u64(), Some(u64::MAX));
+
+    let Any::Number(n) = Value::<Global>::f64(42.0).as_any() else {
+        panic!("expected a number");
+    };
+    assert!(n.is_float());
+    assert_eq!(n.as_i64(), None);
+    assert_eq!(n.as_u64(), None);
+    assert_eq!(n.as_f64(), Some(42.0));
+
+    let value = Value::<Global>::try_from(b"hello")?;
+    assert!(matches!(value.as_any(), Any::Bytes(b"hello")));
+
+    let value = Value::<Global>::try_from("hello")?;
+    assert!(matches!(value.as_any(), Any::String("hello")));
+
+    let value: Value = value::encode([1u32, 2])?;
+    let Any::Sequence(items) = value.as_any() else {
+        panic!("expected a sequence");
+    };
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[1].as_u64(), Some(2));
+
+    let value = Value::new_map_in([(Value::try_from("a")?, Value::from(1u8))], Global::new())?;
+    let Any::Map(entries) = value.as_any() else {
+        panic!("expected a map");
+    };
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].0.as_str(), Some("a"));
+    assert_eq!(entries[0].1.as_u64(), Some(1));
+
+    let value: Value = value::encode(Event::Payload(Value::from(7u8)))?;
+    let Any::Variant(tag, payload) = value.as_any() else {
+        panic!("expected a variant, got {value:?}");
+    };
+    assert_eq!(tag.as_u64(), Some(1));
+    // Tuple fields are encoded as a map indexed by position.
+    let Any::Map(fields) = payload.as_any() else {
+        panic!("expected tuple fields, got {payload:?}");
+    };
+    assert_eq!(fields[0].0.as_u64(), Some(0));
+    assert_eq!(fields[0].1.as_u64(), Some(7));
+
+    let value: Value = value::encode(Some(42u32))?;
+    let Any::Option(Some(inner)) = value.as_any() else {
+        panic!("expected some, got {value:?}");
+    };
+    assert_eq!(inner.as_u64(), Some(42));
+
+    let value: Value = value::encode(None::<u32>)?;
+    assert!(matches!(value.as_any(), Any::Option(None)));
+
+    // JSON floats are floats, while integers are not.
+    let value: Value = musli::json::from_str(r#"[1, 1.5]"#)?;
+    let items = value.as_sequence().expect("sequence");
+    assert!(matches!(items[0].as_any(), Any::Number(n) if !n.is_float()));
+    assert!(matches!(items[1].as_any(), Any::Number(n) if n.is_float()));
     Ok(())
 }
 
