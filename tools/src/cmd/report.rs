@@ -754,7 +754,8 @@ where
         RefreshKind::nothing()
             .with_memory(MemoryRefreshKind::everything())
             .with_cpu(CpuRefreshKind::everything()),
-    );
+    )
+    .context("Reading system information")?;
 
     writeln!(o, "## System Information")?;
     writeln!(o)?;
