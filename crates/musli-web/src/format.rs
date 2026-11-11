@@ -333,8 +333,7 @@ where
 /// [connection metadata].
 ///
 /// [connection metadata]: crate::api#connection-metadata
-// NB: The clients do not state metadata yet.
-#[allow(dead_code)]
+#[cfg_attr(not(any(feature = "client", feature = "web03")), allow(dead_code))]
 pub(crate) fn encode_metadata(
     mode: Mode,
     out: &mut Vec<u8>,
@@ -364,10 +363,7 @@ pub(crate) fn encode_metadata(
 }
 
 /// Decode a [`Metadata`] block, which is everything in `buf`.
-#[cfg_attr(
-    not(any(feature = "ws", feature = "client", feature = "web03")),
-    allow(dead_code)
-)]
+#[cfg_attr(not(feature = "ws"), allow(dead_code))]
 pub(crate) fn decode_metadata(mode: Mode, buf: &[u8]) -> Result<Metadata, Error> {
     let mut metadata = Metadata::new();
 

@@ -241,6 +241,12 @@
 //! it, or refuse the connection, which closes it with a code in `4000..=4999`
 //! and a reason, see [`ws::Refuse`].
 //!
+//! A client states its metadata with `ServiceBuilder::metadata`, in [`web`] or
+//! in [`client`], as a closure which is called for every negotiation, so a
+//! reconnect states what holds then. A refusal is reported as
+//! `State::Refused` with the code and reason, and the client does not
+//! reconnect, since stating the same metadata again would be refused again.
+//!
 //! [`ws::Handler::connect`]: <https://docs.rs/musli-web/latest/musli_web/ws/trait.Handler.html#method.connect>
 //! [`ws::Refuse`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Refuse.html>
 //!
@@ -1671,6 +1677,7 @@ pub(crate) const METADATA_ENTRY_OVERHEAD: usize = 3;
 
 /// Why a [`Metadata`] block is invalid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(not(feature = "ws"), allow(dead_code))]
 pub(crate) enum InvalidMetadata {
     Name,
     Value,
@@ -1819,6 +1826,7 @@ impl Metadata {
 
     /// Add an entry read off the wire, refusing anything a valid block cannot
     /// contain.
+    #[cfg_attr(not(feature = "ws"), allow(dead_code))]
     pub(crate) fn push_decoded(
         &mut self,
         name: &[u8],
