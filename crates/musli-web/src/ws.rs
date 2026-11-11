@@ -361,7 +361,7 @@ use tokio::time::{Duration, Instant, Sleep};
 use crate::Buf;
 use crate::api::{
     Broadcast, ChannelId, DecodeBody, EncodeBody, ErrorMessage, Event, Format, Id, IdSet,
-    MessageId, Mode, RequestHeader, ResponseHeader, VERSION,
+    MessageId, Metadata, Mode, RequestHeader, ResponseHeader, VERSION,
 };
 use crate::buf::{BufPool, InvalidFrame};
 use crate::format;
@@ -525,6 +525,15 @@ enum ErrorKind {
         server: u32,
         client: u32,
     },
+    /// The client sent invalid connection metadata.
+    InvalidMetadata {
+        error: format::Error,
+    },
+    /// [`Handler::connect`] refused the connection.
+    Refused {
+        code: u16,
+        reason: String,
+    },
 }
 
 /// The error produced by the server side of the websocket protocol
@@ -578,6 +587,15 @@ impl Error {
     #[inline]
     pub fn is_incompatible(&self) -> bool {
         matches!(self.kind, ErrorKind::Incompatible { .. })
+    }
+
+    /// Test if the connection was refused by [`Handler::connect`].
+    ///
+    /// This is what [`Connect::connect`] fails with once the close frame
+    /// carrying the [`Refuse`] has been sent.
+    #[inline]
+    pub fn is_refused(&self) -> bool {
+        matches!(self.kind, ErrorKind::Refused { .. })
     }
 }
 
@@ -644,6 +662,12 @@ impl fmt::Display for Error {
                     "Client states application version {client}, this server states {server}"
                 )
             }
+            ErrorKind::InvalidMetadata { error } => {
+                write!(f, "Client sent invalid connection metadata: {error}")
+            }
+            ErrorKind::Refused { code, reason } => {
+                write!(f, "Connection refused with code {code}: {reason}")
+            }
         }
     }
 }
@@ -665,6 +689,7 @@ impl core::error::Error for Error {
             ErrorKind::NegotiateHeader { error } => Some(error),
             ErrorKind::UnknownHeader { error } => Some(error),
             ErrorKind::UnsupportedVersion { error } => Some(error),
+            ErrorKind::InvalidMetadata { error } => Some(error),
             _ => None,
         }
     }
@@ -693,6 +718,85 @@ impl From<InvalidFrame> for Error {
 }
 
 type Result<T, E = Error> = core::result::Result<T, E>;
+
+/// The refusal of a connection by [`Handler::connect`].
+///
+/// The connection is closed with a close frame carrying the code and reason,
+/// and [`Connect::connect`] fails with an error for which
+/// [`Error::is_refused`] holds.
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::ws::Refuse;
+///
+/// let refuse = Refuse::new("Impersonation has ended");
+/// assert_eq!(refuse.code(), Refuse::CODE);
+///
+/// let refuse = Refuse::with_code(4401, "Unauthorized");
+/// assert_eq!(refuse.code(), 4401);
+/// assert_eq!(refuse.reason(), "Unauthorized");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Refuse {
+    code: u16,
+    reason: String,
+}
+
+impl Refuse {
+    /// The close code used by [`Refuse::new`].
+    pub const CODE: u16 = 4000;
+
+    /// The most bytes of a reason a close frame carries.
+    const MAX_REASON: usize = 123;
+
+    /// Refuse with [`Refuse::CODE`] and `reason`.
+    ///
+    /// The reason is cut to the 123 bytes a close frame can carry.
+    #[inline]
+    pub fn new(reason: impl AsRef<str>) -> Self {
+        Self::with_code(Self::CODE, reason)
+    }
+
+    /// Refuse with `code` and `reason`.
+    ///
+    /// The reason is cut to the 123 bytes a close frame can carry.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `code` is outside of `4000..=4999`, the range RFC 6455 leaves
+    /// to applications.
+    pub fn with_code(code: u16, reason: impl AsRef<str>) -> Self {
+        assert!(
+            (4000..=4999).contains(&code),
+            "Refusal close code {code} is outside of 4000..=4999"
+        );
+
+        let reason = reason.as_ref();
+        let mut end = reason.len().min(Self::MAX_REASON);
+
+        while !reason.is_char_boundary(end) {
+            end -= 1;
+        }
+
+        Self {
+            code,
+            reason: reason[..end].into(),
+        }
+    }
+
+    /// The close code.
+    #[inline]
+    pub fn code(&self) -> u16 {
+        self.code
+    }
+
+    /// The reason, as sent in the close frame.
+    #[inline]
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+}
 
 /// The response meta from handling a request.
 pub struct Response {
@@ -1060,6 +1164,30 @@ where
         }
     }
 
+    /// Accept or refuse a connection given the [`Metadata`] the client
+    /// stated, see [connection metadata].
+    ///
+    /// This is called exactly once per connection from [`Connect::connect`],
+    /// after the protocol and application versions have been checked and
+    /// before the negotiation is answered, so it can set up or replace the
+    /// per-connection state held by the handler before any request reaches
+    /// [`Handler::handle`]. Returning [`Refuse`] closes the connection.
+    ///
+    /// Keepalive is not serviced while this runs, so it should not take long.
+    ///
+    /// By default every connection is accepted.
+    ///
+    /// [connection metadata]: crate::api#connection-metadata
+    fn connect<'this>(
+        &'this mut self,
+        metadata: &'this Metadata,
+    ) -> impl Future<Output = Result<(), Refuse>> + Send + 'this {
+        async {
+            _ = metadata;
+            Ok(())
+        }
+    }
+
     /// Handle a request.
     ///
     /// A response which reports the request as handled (such as `()`, `true`
@@ -1370,6 +1498,14 @@ where
 
     // NB: Handlers are not `Sync`, so the futures of the inner handlers are
     // constructed up front rather than holding on to `&self` across an await.
+
+    /// Calls the hook of the first handler and then the second, and the first
+    /// refusal wins.
+    #[inline]
+    async fn connect(&mut self, metadata: &Metadata) -> Result<(), Refuse> {
+        self.first.connect(metadata).await?;
+        self.second.connect(metadata).await
+    }
 
     #[inline]
     fn open_channel<'this>(
@@ -2078,6 +2214,9 @@ where
     /// its first message. Both tear the connection down, since a peer which
     /// does not negotiate cannot be talked to safely.
     ///
+    /// Errors with [`Error::is_refused`] if [`Handler::connect`] refused the
+    /// connection, once the close frame saying so has been flushed.
+    ///
     /// [negotiation protocol]: crate::api#negotiating-the-format
     pub async fn connect(self) -> Result<Server<S, H, C>, Error> {
         let now = Instant::now();
@@ -2255,8 +2394,9 @@ where
     ///
     /// This is the connection step every peer is forced through, see
     /// [`Connect::connect`]. It deliberately understands nothing but
-    /// [`MessageId::NEGOTIATE`] and the keepalive machinery, so no handler is
-    /// ever invoked and nothing the user could write is in flight yet.
+    /// [`MessageId::NEGOTIATE`] and the keepalive machinery, so no handler
+    /// other than [`Handler::connect`] is ever invoked and nothing the user
+    /// could write is in flight yet.
     ///
     /// It returns once the format is settled *and* the reply confirming it has
     /// been flushed, so the very next thing on the wire can safely use it.
@@ -2282,7 +2422,10 @@ where
             let result = {
                 let inner = Select::<S::Socket, H> {
                     pinned: self.pinned.as_mut(),
-                    wants_socket_recv: self.socket_recv,
+                    // NB: Only one negotiation is ever read, so the hook runs
+                    // exactly once and anything the client sent after it is
+                    // left for `run`.
+                    wants_socket_recv: self.socket_recv && !negotiated && failure.is_none(),
                     wants_socket_send: !self.socket_send,
                     wants_socket_flush: self.socket_flush,
                     set: &mut self.set,
@@ -2308,28 +2451,29 @@ where
                         Err(error) => return Err(failure.unwrap_or_else(|| Error::from(error))),
                     };
 
-                    match message {
-                        // NB: The frame type is the mode, so the negotiation is
-                        // what tells the server which envelope the rest of the
-                        // connection is spelled in.
-                        Message::Text(bytes) => match self.handle_negotiate(Mode::Text, bytes) {
-                            Ok(()) => negotiated = true,
-                            Err(error) => failure = Some(error),
-                        },
-                        Message::Binary(bytes) => {
-                            match self.handle_negotiate(Mode::Binary, bytes) {
-                                Ok(()) => negotiated = true,
-                                Err(error) => failure = Some(error),
-                            }
-                        }
+                    // NB: The frame type is the mode, so the negotiation is what
+                    // tells the server which envelope the rest of the
+                    // connection is spelled in.
+                    let negotiation = match message {
+                        Message::Text(bytes) => Some((Mode::Text, bytes)),
+                        Message::Binary(bytes) => Some((Mode::Binary, bytes)),
                         Message::Ping(payload) => {
                             self.out.push_back(S::pong(payload));
+                            None
                         }
                         Message::Pong(data) => {
                             self.handle_pong(data)?;
+                            None
                         }
                         Message::Close => {
                             return Err(gone(failure));
+                        }
+                    };
+
+                    if let Some((mode, bytes)) = negotiation {
+                        match self.handle_negotiate(mode, bytes).await {
+                            Ok(()) => negotiated = true,
+                            Err(error) => failure = Some(error),
                         }
                     }
                 }
@@ -2359,7 +2503,10 @@ where
     ///
     /// Anything else closes the connection, since a peer which skips
     /// negotiation cannot be sent broadcasts safely.
-    fn handle_negotiate(&mut self, mode: Mode, bytes: Bytes) -> Result<(), Error> {
+    ///
+    /// The metadata is handed to [`Handler::connect`] once the versions have
+    /// been checked and before any reply is queued.
+    async fn handle_negotiate(&mut self, mode: Mode, bytes: Bytes) -> Result<(), Error> {
         let mut at = 0;
 
         let header: RequestHeader = match format::decode_envelope(mode, &bytes, &mut at) {
@@ -2414,6 +2561,39 @@ where
             return Err(Error::new(ErrorKind::Incompatible {
                 server: self.app,
                 client: header.app,
+            }));
+        }
+
+        // NB: The rest of the frame is the metadata block.
+        let metadata = match bytes
+            .get(at..)
+            .map(|rest| format::decode_metadata(mode, rest))
+        {
+            Some(Ok(metadata)) => metadata,
+            Some(Err(error)) => {
+                self.out
+                    .push_back(S::close(CLOSE_PROTOCOL_ERROR, "Invalid metadata"));
+                return Err(Error::new(ErrorKind::InvalidMetadata { error }));
+            }
+            None => {
+                return Err(Error::new(ErrorKind::OutOfBounds {
+                    offset: at,
+                    len: bytes.len(),
+                }));
+            }
+        };
+
+        if let Err(refuse) = self.handler.connect(&metadata).await {
+            tracing::debug!(
+                code = refuse.code,
+                reason = refuse.reason,
+                "Refused connection"
+            );
+            self.out.push_back(S::close(refuse.code, &refuse.reason));
+
+            return Err(Error::new(ErrorKind::Refused {
+                code: refuse.code,
+                reason: refuse.reason,
             }));
         }
 
@@ -3710,8 +3890,9 @@ impl fmt::Display for SupportedFormats {
 
 #[cfg(test)]
 mod tests {
-    use core::cell::Cell;
+    use core::cell::{Cell, RefCell};
 
+    use alloc::string::ToString;
     use std::thread_local;
 
     use super::*;
@@ -3737,6 +3918,13 @@ mod tests {
         /// The number of close frames [`TestServerImpl::close`] has handed out
         /// on this thread, which is one test.
         static CLOSE_FRAMES: Cell<usize> = const { Cell::new(0) };
+
+        /// The code and reason of every close frame handed out on this thread.
+        static CLOSE_REASONS: RefCell<Vec<(u16, String)>> = const { RefCell::new(Vec::new()) };
+
+        /// Every message any [`TestSocket`] on this thread has sent, which
+        /// outlives a socket dropped by a failed [`Connect::connect`].
+        static SENT: RefCell<Vec<TestMessage>> = const { RefCell::new(Vec::new()) };
     }
 
     #[derive(Debug)]
@@ -3749,7 +3937,7 @@ mod tests {
         }
     }
 
-    #[derive(Debug, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     enum TestMessage {
         Ping(Bytes),
         Pong(Bytes),
@@ -3817,6 +4005,7 @@ mod tests {
 
         fn start_send(self: Pin<&mut Self>, item: Self::Message) -> Result<(), Self::Error> {
             // SAFETY: Nothing in this socket is structurally pinned.
+            SENT.with(|sent| sent.borrow_mut().push(item.clone()));
             unsafe { Pin::get_unchecked_mut(self).sent.push(item) };
             Ok(())
         }
@@ -3856,7 +4045,9 @@ mod tests {
             TestMessage::Text(data.to_vec())
         }
 
-        fn close(code: u16, _: &str) -> Self::Message {
+        fn close(code: u16, reason: &str) -> Self::Message {
+            CLOSE_REASONS.with(|reasons| reasons.borrow_mut().push((code, reason.to_string())));
+
             let frames = CLOSE_FRAMES.with(|frames| {
                 let count = frames.get() + 1;
                 frames.set(count);
@@ -4322,5 +4513,327 @@ mod tests {
 
         drop(channels);
         assert_eq!(*broken.freed.lock().unwrap(), [one]);
+    }
+
+    /// A handler which takes its per-connection state from the metadata.
+    #[derive(Clone, Default)]
+    struct MetaHandler {
+        /// The user the connection acts as.
+        user: Option<String>,
+        /// What to refuse connections with.
+        refuse: Option<Refuse>,
+        /// The metadata every hook call received.
+        connects: Arc<Mutex<Vec<Metadata>>>,
+        /// The user every dispatched request saw.
+        seen: Arc<Mutex<Vec<Option<String>>>>,
+    }
+
+    impl Handler for MetaHandler {
+        type Id = TestId;
+        type Response = bool;
+
+        async fn connect(&mut self, metadata: &Metadata) -> Result<(), Refuse> {
+            self.connects.lock().unwrap().push(metadata.clone());
+
+            if let Some(refuse) = self.refuse.clone() {
+                return Err(refuse);
+            }
+
+            self.user = metadata.get("user").map(String::from);
+            Ok(())
+        }
+
+        async fn handle(&self, _: Self::Id, _: &mut Incoming<'_>, _: &mut Outgoing<'_>) -> bool {
+            self.seen.lock().unwrap().push(self.user.clone());
+            false
+        }
+    }
+
+    fn user(name: &str) -> Metadata {
+        let mut metadata = Metadata::new();
+        metadata.insert("user", name);
+        metadata
+    }
+
+    /// A negotiation as a peer would send it, with `body` as its metadata
+    /// block.
+    fn negotiation(mode: Mode, format: u8, body: &[u8]) -> Message {
+        let mut out = Vec::new();
+
+        let header = RequestHeader {
+            version: VERSION,
+            serial: 1,
+            id: MessageId::NEGOTIATE.get(),
+            format,
+            channel: ChannelId::NONE,
+            app: 0,
+        };
+
+        format::encode_envelope(mode, &mut out, &header).unwrap();
+        out.extend_from_slice(body);
+
+        match mode {
+            Mode::Binary => Message::Binary(Bytes::from(out)),
+            Mode::Text => Message::Text(Bytes::from(out)),
+        }
+    }
+
+    fn encoded(mode: Mode, metadata: &Metadata) -> Vec<u8> {
+        let mut out = Vec::new();
+        format::encode_metadata(mode, &mut out, metadata).unwrap();
+        out
+    }
+
+    async fn connect_with(
+        handler: MetaHandler,
+        incoming: impl IntoIterator<Item = Message>,
+    ) -> Result<Server<TestServerImpl, MetaHandler, Channels>, Error> {
+        let mut socket = TestSocket::default();
+        socket.incoming.extend(incoming);
+        let connect = Connect::<TestServerImpl, MetaHandler>::new(socket, handler);
+
+        tokio::time::timeout(Duration::from_secs(5), connect.connect())
+            .await
+            .expect("Negotiation should not hang")
+    }
+
+    fn sent() -> Vec<TestMessage> {
+        SENT.with(|sent| sent.borrow().clone())
+    }
+
+    fn close_reasons() -> Vec<(u16, String)> {
+        CLOSE_REASONS.with(|reasons| reasons.borrow().clone())
+    }
+
+    /// The hook receives the metadata in both modes.
+    #[tokio::test]
+    async fn connect_hook_receives_metadata() {
+        for (mode, format) in [(Mode::Binary, Format::DEFAULT), (Mode::Text, Format::Json)] {
+            let handler = MetaHandler::default();
+            let connects = handler.connects.clone();
+            let metadata = user("alice");
+
+            let message = negotiation(mode, format.to_u8(), &encoded(mode, &metadata));
+            let server = connect_with(handler, [message]).await.unwrap();
+
+            assert_eq!(server.mode(), mode);
+            assert_eq!(server.format(), format);
+            assert_eq!(*connects.lock().unwrap(), [metadata]);
+
+            // NB: No body states no metadata.
+            let handler = MetaHandler::default();
+            let connects = handler.connects.clone();
+            let message = negotiation(mode, format.to_u8(), &[]);
+            connect_with(handler, [message]).await.unwrap();
+            assert_eq!(*connects.lock().unwrap(), [Metadata::new()]);
+        }
+    }
+
+    /// The hook replaces handler state before any request is dispatched, even
+    /// one the client sent right behind the negotiation.
+    #[tokio::test]
+    async fn connect_hook_replaces_state_before_dispatch() {
+        let handler = MetaHandler {
+            user: Some(String::from("admin")),
+            ..MetaHandler::default()
+        };
+
+        let seen = handler.seen.clone();
+        let mode = Mode::Binary;
+
+        let incoming = [
+            negotiation(
+                mode,
+                Format::DEFAULT.to_u8(),
+                &encoded(mode, &user("alice")),
+            ),
+            request(mode, 2),
+        ];
+
+        let mut server = connect_with(handler, incoming).await.unwrap();
+        assert_eq!(server.handler().user.as_deref(), Some("alice"));
+        assert!(seen.lock().unwrap().is_empty());
+
+        let result = tokio::time::timeout(Duration::from_millis(100), server.run()).await;
+        assert!(result.is_err(), "The connection should still be up");
+        assert_eq!(*seen.lock().unwrap(), [Some(String::from("alice"))]);
+    }
+
+    /// The hook runs before the reply which settles on the default format,
+    /// so a refusal is all the client sees after the hello.
+    #[tokio::test]
+    async fn connect_hook_runs_before_format_fallback() {
+        let mode = Mode::Binary;
+        let body = encoded(mode, &user("alice"));
+
+        let handler = MetaHandler::default();
+        let connects = handler.connects.clone();
+        let server = connect_with(handler, [negotiation(mode, 200, &body)])
+            .await
+            .unwrap();
+
+        assert_eq!(server.format(), Format::DEFAULT);
+        assert_eq!(connects.lock().unwrap().len(), 1);
+        drop(server);
+
+        let before = sent().len();
+
+        let handler = MetaHandler {
+            refuse: Some(Refuse::new("No")),
+            ..MetaHandler::default()
+        };
+
+        let connects = handler.connects.clone();
+        let error = connect_with(handler, [negotiation(mode, 200, &body)])
+            .await
+            .err()
+            .expect("A refused connection yields no server");
+
+        assert!(error.is_refused());
+        assert_eq!(connects.lock().unwrap().len(), 1);
+
+        // NB: The negotiation is already waiting when the hello is queued, so
+        // the two frames may go out in either order here.
+        let mut sent = sent()[before..].to_vec();
+        sent.sort_by_key(|m| matches!(m, TestMessage::Close(..)));
+
+        let [TestMessage::Binary(..), TestMessage::Close(Refuse::CODE)] = &sent[..] else {
+            panic!("Expected only the hello and the close frame, got {sent:?}");
+        };
+    }
+
+    /// A refusal sends its close frame, fails `connect` and dispatches
+    /// nothing.
+    #[tokio::test]
+    async fn connect_hook_refusal_closes() {
+        let handler = MetaHandler {
+            refuse: Some(Refuse::with_code(4401, "Impersonation has ended")),
+            ..MetaHandler::default()
+        };
+
+        let seen = handler.seen.clone();
+        let mode = Mode::Binary;
+
+        let incoming = [
+            negotiation(
+                mode,
+                Format::DEFAULT.to_u8(),
+                &encoded(mode, &user("alice")),
+            ),
+            request(mode, 2),
+        ];
+
+        let error = connect_with(handler, incoming)
+            .await
+            .err()
+            .expect("A refused connection yields no server");
+
+        assert!(error.is_refused());
+        assert!(!error.is_incompatible());
+        assert_eq!(
+            close_reasons(),
+            [(4401, String::from("Impersonation has ended"))]
+        );
+        assert!(sent().contains(&TestMessage::Close(4401)));
+        assert!(seen.lock().unwrap().is_empty());
+    }
+
+    /// Invalid metadata closes with a protocol error and never reaches the
+    /// hook.
+    #[tokio::test]
+    async fn invalid_metadata_closes() {
+        for (mode, body) in [
+            (Mode::Binary, &b"\x03BAD\x01\x00v"[..]),
+            (Mode::Text, &b"BAD: v\n"[..]),
+        ] {
+            CLOSE_REASONS.with(|reasons| reasons.borrow_mut().clear());
+
+            let handler = MetaHandler::default();
+            let connects = handler.connects.clone();
+
+            let error = connect_with(handler, [negotiation(mode, Format::Json.to_u8(), body)])
+                .await
+                .err()
+                .expect("Invalid metadata yields no server");
+
+            assert!(!error.is_refused());
+            assert!(
+                error.to_string().contains("invalid connection metadata"),
+                "{error}"
+            );
+            assert_eq!(
+                close_reasons(),
+                [(CLOSE_PROTOCOL_ERROR, String::from("Invalid metadata"))]
+            );
+            assert!(connects.lock().unwrap().is_empty());
+        }
+    }
+
+    /// `Or` calls both hooks in order and the first refusal wins.
+    #[tokio::test]
+    async fn or_forwards_connect() {
+        let metadata = user("alice");
+
+        let mut or = Or::new(MetaHandler::default(), MetaHandler::default());
+        assert_eq!(or.connect(&metadata).await, Ok(()));
+        assert_eq!(or.first().user.as_deref(), Some("alice"));
+        assert_eq!(or.second().user.as_deref(), Some("alice"));
+
+        let first = MetaHandler {
+            refuse: Some(Refuse::with_code(4001, "first")),
+            ..MetaHandler::default()
+        };
+
+        let second = MetaHandler {
+            refuse: Some(Refuse::with_code(4002, "second")),
+            ..MetaHandler::default()
+        };
+
+        let mut or = Or::new(first.clone(), second.clone());
+        assert_eq!(
+            or.connect(&metadata).await,
+            Err(Refuse::with_code(4001, "first"))
+        );
+        assert_eq!(first.connects.lock().unwrap().len(), 1);
+        assert!(second.connects.lock().unwrap().is_empty());
+
+        let mut or = Or::new(MetaHandler::default(), second.clone());
+        assert_eq!(
+            or.connect(&metadata).await,
+            Err(Refuse::with_code(4002, "second"))
+        );
+        assert_eq!(or.first().user.as_deref(), Some("alice"));
+        assert_eq!(second.connects.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn refuse_codes() {
+        assert_eq!(Refuse::new("x").code(), 4000);
+        assert_eq!(Refuse::with_code(4000, "x").code(), 4000);
+        assert_eq!(Refuse::with_code(4999, "x").code(), 4999);
+    }
+
+    #[test]
+    #[should_panic = "outside of 4000..=4999"]
+    fn refuse_code_below_range() {
+        Refuse::with_code(3999, "x");
+    }
+
+    #[test]
+    #[should_panic = "outside of 4000..=4999"]
+    fn refuse_code_above_range() {
+        Refuse::with_code(5000, "x");
+    }
+
+    #[test]
+    fn refuse_reason_is_truncated() {
+        let reason = "a".repeat(200);
+        assert_eq!(Refuse::new(&reason).reason(), &reason[..123]);
+
+        // NB: Two byte characters, so 123 bytes falls inside one.
+        let reason = "é".repeat(100);
+        assert_eq!(Refuse::new(&reason).reason(), "é".repeat(61));
+
+        assert_eq!(Refuse::new("short").reason(), "short");
     }
 }

@@ -333,10 +333,8 @@ where
 /// [connection metadata].
 ///
 /// [connection metadata]: crate::api#connection-metadata
-#[cfg_attr(
-    not(any(feature = "ws", feature = "client", feature = "web03")),
-    allow(dead_code)
-)]
+// NB: The clients do not state metadata yet.
+#[allow(dead_code)]
 pub(crate) fn encode_metadata(
     mode: Mode,
     out: &mut Vec<u8>,
