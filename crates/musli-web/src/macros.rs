@@ -339,7 +339,9 @@ macro_rules! tungstenite_impl {
                 WsMessage::Text(data) => Message::Text(Bytes::from(data)),
                 WsMessage::Ping(..) => Message::Ping,
                 WsMessage::Pong(..) => Message::Pong,
-                WsMessage::Close(..) => Message::Close,
+                WsMessage::Close(frame) => Message::Close(
+                    frame.map(|frame| (u16::from(frame.code), String::from(frame.reason.as_str()))),
+                ),
                 // NB: Raw frames are never produced while reading, so this is a
                 // protocol violation which tears the connection down.
                 WsMessage::Frame(..) => Message::Unsupported,

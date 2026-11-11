@@ -46,7 +46,7 @@ use slab::Slab;
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::{Duration, Instant};
 
-use crate::api::{self, ChannelId, DecodeBody, Event, Format, MessageId, Mode};
+use crate::api::{self, ChannelId, DecodeBody, Event, Format, Metadata, MessageId, Mode};
 use crate::format;
 
 /// The initial reconnect timeout.
@@ -93,8 +93,9 @@ pub(crate) enum Message {
     Ping,
     /// A pong message was received.
     Pong,
-    /// A close message was received.
-    Close,
+    /// A close message was received, with the code and reason of its close
+    /// frame if it had one.
+    Close(Option<(u16, String)>),
     /// A message the protocol has no meaning for was received, which tears the
     /// connection down.
     Unsupported,
@@ -201,6 +202,7 @@ where
         connector: None,
         headers: T::Headers::default(),
         invalid_header: None,
+        metadata: None,
         on_error: EmptyCallback,
         reconnect: true,
         seed: DEFAULT_SEED,
@@ -236,7 +238,7 @@ where
 /// The state of the connection.
 ///
 /// A listener for state changes can be set up through [`Handle::state`].
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
 pub enum State {
     /// The connection is open.
@@ -255,6 +257,15 @@ pub enum State {
         /// The application version this client states.
         client: u32,
     },
+    /// The server refused the connection while it was being negotiated, such
+    /// as over the [metadata] this client stated.
+    ///
+    /// The connection is closed and [`Service::run`] returns an error for
+    /// which [`Error::is_refused`] holds, without reconnecting. This state is
+    /// kept once the service is gone.
+    ///
+    /// [metadata]: ServiceBuilder::metadata
+    Refused(Refused),
 }
 
 impl State {
@@ -287,6 +298,68 @@ impl State {
     #[inline]
     pub fn is_incompatible(&self) -> bool {
         matches!(self, Self::Incompatible { .. })
+    }
+
+    /// Check if the server refused the connection, see [`State::Refused`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::client::State;
+    ///
+    /// assert!(!State::Closed.is_refused());
+    /// ```
+    #[inline]
+    pub fn is_refused(&self) -> bool {
+        matches!(self, Self::Refused(..))
+    }
+
+    /// Test if the state is one the service stopped in for good.
+    #[inline]
+    fn is_terminal(&self) -> bool {
+        matches!(self, Self::Incompatible { .. } | Self::Refused(..))
+    }
+}
+
+/// A refusal of the connection by the server, see [`State::Refused`].
+///
+/// This is cheap to clone.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Refused {
+    code: u16,
+    reason: Arc<str>,
+}
+
+impl Refused {
+    /// The close codes a server refuses a connection with, the range RFC 6455
+    /// leaves to applications.
+    const CODES: core::ops::RangeInclusive<u16> = 4000..=4999;
+
+    /// Test if a close frame with `code` received during negotiation is a
+    /// refusal.
+    #[inline]
+    fn is_refusal(code: u16) -> bool {
+        Self::CODES.contains(&code)
+    }
+
+    /// The close code the server refused the connection with, in
+    /// `4000..=4999`.
+    #[inline]
+    pub fn code(&self) -> u16 {
+        self.code
+    }
+
+    /// The reason the server gave for refusing the connection.
+    #[inline]
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+}
+
+impl fmt::Display for Refused {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Connection refused by server ({}): {}", self.code, self.reason)
     }
 }
 
@@ -453,6 +526,39 @@ impl Error {
         matches!(self.kind, ErrorKind::Incompatible { .. })
     }
 
+    /// Check if the server refused the connection, see [`State::Refused`].
+    ///
+    /// This is what [`Service::run`] and [`Handle::wait_until_open`] fail with
+    /// once the server has refused the connection. The code and reason are
+    /// available through [`Error::as_refused`].
+    #[inline]
+    pub fn is_refused(&self) -> bool {
+        matches!(self.kind, ErrorKind::Refused(..))
+    }
+
+    /// Get the refusal if the server refused the connection, see
+    /// [`Error::is_refused`].
+    #[inline]
+    pub fn as_refused(&self) -> Option<&Refused> {
+        match &self.kind {
+            ErrorKind::Refused(refused) => Some(refused),
+            _ => None,
+        }
+    }
+
+    /// Check if the metadata stated through [`ServiceBuilder::metadata`] is
+    /// invalid, see [connection metadata].
+    ///
+    /// This is what [`Service::run`] fails with, since every attempt would
+    /// state the same metadata. The underlying error is available through
+    /// [`core::error::Error::source`].
+    ///
+    /// [connection metadata]: crate::api#connection-metadata
+    #[inline]
+    pub fn is_invalid_metadata(&self) -> bool {
+        matches!(self.kind, ErrorKind::InvalidMetadata(..))
+    }
+
     /// Check if the error is a server error, and if so return the message
     /// reported by the server.
     ///
@@ -528,6 +634,16 @@ impl Error {
         Self::new(ErrorKind::Incompatible { server, client })
     }
 
+    #[inline]
+    fn refused(refused: Refused) -> Self {
+        Self::new(ErrorKind::Refused(refused))
+    }
+
+    #[inline]
+    fn invalid_metadata(error: Arc<format::Error>) -> Self {
+        Self::new(ErrorKind::InvalidMetadata(error))
+    }
+
     /// Format a client error consisting of a message.
     ///
     /// None of the accessors on [`Error`] match an error constructed this way.
@@ -590,6 +706,8 @@ enum ErrorKind {
         server: u32,
         client: u32,
     },
+    Refused(Refused),
+    InvalidMetadata(Arc<format::Error>),
     Message(String),
     Server(ServerError),
     Transport(Box<dyn core::error::Error + Send + Sync>),
@@ -619,6 +737,8 @@ impl fmt::Display for Error {
                 f,
                 "Server states application version {server}, this client states {client}"
             ),
+            ErrorKind::Refused(refused) => refused.fmt(f),
+            ErrorKind::InvalidMetadata(..) => write!(f, "Invalid connection metadata"),
             ErrorKind::Message(message) => write!(f, "{message}"),
             ErrorKind::Server(error) => write!(f, "Server error: {}", error.message),
             ErrorKind::Transport(..) => write!(f, "Error in underlying transport"),
@@ -641,6 +761,7 @@ impl core::error::Error for Error {
         match &self.kind {
             ErrorKind::Transport(error) => Some(&**error),
             ErrorKind::InvalidHeader(header) => Some(&*header.error),
+            ErrorKind::InvalidMetadata(error) => Some(&**error),
             ErrorKind::DecodeResponseHeader(error) => Some(error),
             ErrorKind::DecodeErrorMessage(error) => Some(error),
             ErrorKind::DecodePacket(error) => Some(error),
@@ -799,7 +920,7 @@ impl Shared {
         // to wake up waiters even if the state itself did not change.
         self.state.send_modify(|state| {
             // NB: Kept, since it is what explains why the service is gone.
-            if !state.is_incompatible() {
+            if !state.is_terminal() {
                 *state = State::Closed;
             }
         });
@@ -830,6 +951,7 @@ where
     /// The first header which could not be added, see
     /// [`ServiceBuilder::header`].
     invalid_header: Option<InvalidHeader>,
+    metadata: Option<MetadataFn>,
     on_error: E,
     reconnect: bool,
     seed: u64,
@@ -859,6 +981,7 @@ where
             connector: self.connector,
             headers: self.headers,
             invalid_header: self.invalid_header,
+            metadata: self.metadata,
             on_error,
             reconnect: self.reconnect,
             seed: self.seed,
@@ -924,6 +1047,61 @@ where
             }
         }
 
+        self
+    }
+
+    /// State [connection metadata] to the server, which its
+    /// `ws::Handler::connect` hook reads to accept or refuse the connection.
+    ///
+    /// `metadata` is called every time the format is negotiated, so on every
+    /// connect and reconnect, and what it inserts is all that connection
+    /// states. Nothing is kept between attempts, so a value which is gone by
+    /// the time the service reconnects is no longer sent.
+    ///
+    /// A server which refuses the connection is reported through
+    /// [`State::Refused`], and [`Service::run`] returns an error for which
+    /// [`Error::is_refused`] holds rather than reconnecting.
+    ///
+    /// # Errors
+    ///
+    /// Metadata which cannot be sent, such as a name with an upper case letter
+    /// in it, is reported through [`ServiceBuilder::on_error`] and makes
+    /// [`Service::run`] return an error for which
+    /// [`Error::is_invalid_metadata`] holds, without reconnecting.
+    ///
+    /// [connection metadata]: crate::api#connection-metadata
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::sync::{Arc, Mutex};
+    ///
+    /// use musli_web::tungstenite030;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let session = Arc::new(Mutex::new(Some(String::from("4b0c2d"))));
+    ///
+    /// let mut service = tungstenite030::connect("ws://127.0.0.1:8080/ws")
+    ///     .metadata(move |metadata| {
+    ///         if let Some(session) = &*session.lock().unwrap() {
+    ///             metadata.insert("session", session);
+    ///         }
+    ///     })
+    ///     .build();
+    ///
+    /// if let Err(error) = service.run().await {
+    ///     if let Some(refused) = error.as_refused() {
+    ///         println!("Refused: {}", refused.reason());
+    ///     }
+    /// }
+    /// # Ok(()) }
+    /// ```
+    #[inline]
+    pub fn metadata<F>(mut self, metadata: F) -> Self
+    where
+        F: 'static + Send + Sync + Fn(&mut Metadata),
+    {
+        self.metadata = Some(Box::new(metadata));
         self
     }
 
@@ -1073,6 +1251,7 @@ where
             connector: self.connector,
             headers: self.headers,
             invalid_header: self.invalid_header,
+            metadata: self.metadata,
             on_error: Box::new(self.on_error),
             reconnect: self.reconnect,
             socket: None,
@@ -1081,7 +1260,8 @@ where
             next_attempt: Some(Instant::now()),
             rng: SmallRng::seed_from_u64(self.seed),
             closed: false,
-            incompatible: None,
+            negotiating: false,
+            stopped: None,
             requested: self.format,
             requested_mode: self.mode,
             app: self.app,
@@ -1107,6 +1287,8 @@ where
     /// A header which cannot be sent, which fails the service before it
     /// connects.
     invalid_header: Option<InvalidHeader>,
+    /// Builds the metadata stated with every negotiation.
+    metadata: Option<MetadataFn>,
     on_error: Box<dyn Callback<Error>>,
     reconnect: bool,
     socket: Option<T::Socket>,
@@ -1115,9 +1297,11 @@ where
     next_attempt: Option<Instant>,
     rng: SmallRng,
     closed: bool,
-    /// The application versions of the server and of this client, once the
-    /// server has been found to state another one than this client.
-    incompatible: Option<(u32, u32)>,
+    /// Set once a negotiation has been sent over the current socket and the
+    /// connection has not opened yet, which is when a server refuses.
+    negotiating: bool,
+    /// Why the service stopped for good, if it did.
+    stopped: Option<Stopped>,
     /// The format the user asked for, which is re-negotiated on every
     /// reconnect.
     requested: Format,
@@ -1126,6 +1310,27 @@ where
     requested_mode: Mode,
     /// The application version this client states, or zero for none.
     app: u32,
+}
+
+/// Builds the metadata stated with every negotiation.
+type MetadataFn = Box<dyn Fn(&mut Metadata) + Send + Sync>;
+
+/// Why a service stopped for good, which every later call to [`Service::run`]
+/// fails with.
+enum Stopped {
+    Incompatible { server: u32, client: u32 },
+    Refused(Refused),
+    InvalidMetadata(Arc<format::Error>),
+}
+
+impl Stopped {
+    fn error(&self) -> Error {
+        match self {
+            Stopped::Incompatible { server, client } => Error::incompatible(*server, *client),
+            Stopped::Refused(refused) => Error::refused(refused.clone()),
+            Stopped::InvalidMetadata(error) => Error::invalid_metadata(error.clone()),
+        }
+    }
 }
 
 /// The event produced by one iteration of the [`Service::run`] loop.
@@ -1166,8 +1371,13 @@ where
     /// # Errors
     ///
     /// Errors if the server states another application version, see
-    /// [`ServiceBuilder::app_version`]. The service has then stopped for good,
-    /// and calling this again returns immediately.
+    /// [`ServiceBuilder::app_version`], if it refuses the connection, see
+    /// [`Error::is_refused`], or if the [metadata] to state is invalid, see
+    /// [`Error::is_invalid_metadata`]. The service has then stopped for good
+    /// whatever [`ServiceBuilder::reconnect`] is set to, and calling this again
+    /// returns the same error immediately.
+    ///
+    /// [metadata]: ServiceBuilder::metadata
     ///
     /// Errors right away, without connecting, if a header was passed to
     /// [`ServiceBuilder::header`] which cannot be sent.
@@ -1176,8 +1386,8 @@ where
             return Err(Error::new(ErrorKind::InvalidHeader(header.clone())));
         }
 
-        if let Some((server, client)) = self.incompatible {
-            return Err(Error::incompatible(server, client));
+        if let Some(stopped) = &self.stopped {
+            return Err(stopped.error());
         }
 
         while !self.closed {
@@ -1248,9 +1458,8 @@ where
                             self.disconnect().await;
                         }
                         Message::Ping | Message::Pong => {}
-                        Message::Close => {
-                            tracing::debug!("Close message received");
-                            self.disconnect().await;
+                        Message::Close(frame) => {
+                            self.close_received(frame).await;
                         }
                     }
                 }
@@ -1259,8 +1468,8 @@ where
 
         self.shutdown().await;
 
-        match self.incompatible {
-            Some((server, client)) => Err(Error::incompatible(server, client)),
+        match &self.stopped {
+            Some(stopped) => Err(stopped.error()),
             None => Ok(()),
         }
     }
@@ -1275,9 +1484,30 @@ where
                 // NB: Negotiated anyway, so that the server hears which
                 // version this client states and can tell why it goes away.
                 self.send_negotiate().await;
-                self.incompatible(server).await;
+
+                if self.stopped.is_none() {
+                    self.incompatible(server).await;
+                }
             }
             Err(error) => self.on_error.call(error),
+        }
+    }
+
+    /// Handle a close frame from the server.
+    ///
+    /// A code in the application range while negotiating is a refusal, and
+    /// anything else a dropped connection.
+    async fn close_received(&mut self, frame: Option<(u16, String)>) {
+        tracing::debug!(?frame, "Close message received");
+
+        match frame {
+            Some((code, reason)) if self.negotiating && Refused::is_refusal(code) => {
+                let reason = Arc::from(reason);
+                self.refused(Refused { code, reason }).await;
+            }
+            _ => {
+                self.disconnect().await;
+            }
         }
     }
 
@@ -1285,16 +1515,29 @@ where
     async fn incompatible(&mut self, server: u32) {
         let client = self.app;
         tracing::debug!(server, client, "Incompatible server");
+        self.stop(Stopped::Incompatible { server, client }, State::Incompatible { server, client })
+            .await;
+    }
 
+    /// Give up on a server which refused the connection.
+    async fn refused(&mut self, refused: Refused) {
+        tracing::debug!(code = refused.code, reason = &*refused.reason, "Connection refused");
+        self.stop(Stopped::Refused(refused.clone()), State::Refused(refused))
+            .await;
+    }
+
+    /// Stop the service for good, emitting `state`.
+    async fn stop(&mut self, stopped: Stopped, state: State) {
         if let Some(mut socket) = self.socket.take() {
             _ = socket.close().await;
         }
 
-        self.close_pending(|| Error::incompatible(server, client));
-        self.emit_state(State::Incompatible { server, client });
+        self.negotiating = false;
+        self.close_pending(|| stopped.error());
+        self.emit_state(state);
         self.next_attempt = None;
         self.closed = true;
-        self.incompatible = Some((server, client));
+        self.stopped = Some(stopped);
     }
 
     /// Establish the connection now, returning a failure to the caller instead
@@ -1342,6 +1585,7 @@ where
     fn established(&mut self, socket: T::Socket) {
         tracing::debug!("Connection established");
         self.socket = Some(socket);
+        self.negotiating = false;
         self.next_attempt = None;
         self.timeout = INITIAL_TIMEOUT;
     }
@@ -1365,6 +1609,7 @@ where
             _ = socket.close().await;
         }
 
+        self.negotiating = false;
         self.emit_state(State::Closed);
         self.close_pending(|| Error::new(ErrorKind::ConnectionLost("Connection closed")));
         self.schedule_reconnect();
@@ -1377,7 +1622,7 @@ where
         }
 
         // NB: Kept, since it is what explains why the service stopped.
-        if !self.shared.state.borrow().is_incompatible() {
+        if !self.shared.state.borrow().is_terminal() {
             self.emit_state(State::Closed);
         }
 
@@ -1648,6 +1893,7 @@ where
                     // NB: The frame this arrived in is the mode the server
                     // settled on, so there is nothing to guess at.
                     self.shared.set_mode(mode);
+                    self.negotiating = false;
                     self.emit_state(State::Open);
                 }
                 pending => {
@@ -1667,6 +1913,7 @@ where
                 tracing::debug!(?accepted, ?mode, "Format negotiated");
                 self.shared.set_format(accepted);
                 self.shared.set_mode(mode);
+                self.negotiating = false;
                 self.emit_state(State::Open);
             }
             Pending::Channel { reply } => {
@@ -1702,7 +1949,6 @@ where
             serial,
             id: MessageId::NEGOTIATE.get(),
             format: format.to_u8(),
-            // NB: Carries no body.
             channel: ChannelId::NONE,
             app: self.app,
         };
@@ -1714,6 +1960,21 @@ where
         if let Err(error) = format::encode_envelope(mode, &mut data, &header) {
             self.on_error.call(Error::encoding_header(error));
             return;
+        }
+
+        // NB: Built anew for every negotiation, so that each connection states
+        // what is current.
+        if let Some(build) = &self.metadata {
+            let mut metadata = Metadata::new();
+            build(&mut metadata);
+
+            if let Err(error) = format::encode_metadata(mode, &mut data, &metadata) {
+                let error = Arc::new(error);
+                self.on_error.call(Error::invalid_metadata(error.clone()));
+                self.stop(Stopped::InvalidMetadata(error), State::Closed)
+                    .await;
+                return;
+            }
         }
 
         let Some(socket) = self.socket.as_mut() else {
@@ -1728,6 +1989,7 @@ where
             return;
         }
 
+        self.negotiating = true;
         self.pending
             .insert(serial, Pending::Negotiate { format, mode });
     }
@@ -1793,7 +2055,7 @@ impl Handle {
     /// Get the current state of the connection.
     #[inline]
     pub fn state(&self) -> State {
-        *self.shared.state.borrow()
+        self.shared.state.borrow().clone()
     }
 
     /// Check if the connection is currently open.
@@ -1831,7 +2093,8 @@ impl Handle {
     /// through [`State::Open`], or if it's closed and requests will be rejected
     /// through [`State::Closed`]. A server which states another application
     /// version is reported through [`State::Incompatible`], see
-    /// [`ServiceBuilder::app_version`].
+    /// [`ServiceBuilder::app_version`], and one which refuses the connection
+    /// through [`State::Refused`].
     #[inline]
     pub fn on_state_change(&self) -> StateListener {
         StateListener {
@@ -1849,15 +2112,19 @@ impl Handle {
     /// This errors if the [`Service`] driving the connection is gone, since the
     /// connection can then never be established, and with an error for which
     /// [`Error::is_incompatible`] holds if the server states another
-    /// application version, see [`ServiceBuilder::app_version`].
+    /// application version, see [`ServiceBuilder::app_version`], or one for
+    /// which [`Error::is_refused`] holds if the server refused the connection.
     pub async fn wait_until_open(&self) -> Result<()> {
         let mut rx = self.shared.state.subscribe();
 
         loop {
-            match *rx.borrow_and_update() {
+            match &*rx.borrow_and_update() {
                 State::Open => return Ok(()),
                 State::Incompatible { server, client } => {
-                    return Err(Error::incompatible(server, client));
+                    return Err(Error::incompatible(*server, *client));
+                }
+                State::Refused(refused) => {
+                    return Err(Error::refused(refused.clone()));
                 }
                 State::Closed => {}
             }
@@ -2356,7 +2623,7 @@ impl StateListener {
     /// Get the most recently observed state.
     #[inline]
     pub fn state(&self) -> State {
-        *self.rx.borrow()
+        self.rx.borrow().clone()
     }
 
     /// Wait for the state to change and return the new state.
@@ -2374,7 +2641,7 @@ impl StateListener {
             return None;
         }
 
-        Some(*self.rx.borrow_and_update())
+        Some(self.rx.borrow_and_update().clone())
     }
 
     /// Wait until the observed state is `state`.
