@@ -46,7 +46,7 @@ use slab::Slab;
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::{Duration, Instant};
 
-use crate::api::{self, ChannelId, DecodeBody, Event, Format, Metadata, MessageId, Mode};
+use crate::api::{self, ChannelId, DecodeBody, Event, Format, MessageId, Metadata, Mode};
 use crate::format;
 
 /// The initial reconnect timeout.
@@ -359,7 +359,11 @@ impl Refused {
 impl fmt::Display for Refused {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Connection refused by server ({}): {}", self.code, self.reason)
+        write!(
+            f,
+            "Connection refused by server ({}): {}",
+            self.code, self.reason
+        )
     }
 }
 
@@ -1515,13 +1519,20 @@ where
     async fn incompatible(&mut self, server: u32) {
         let client = self.app;
         tracing::debug!(server, client, "Incompatible server");
-        self.stop(Stopped::Incompatible { server, client }, State::Incompatible { server, client })
-            .await;
+        self.stop(
+            Stopped::Incompatible { server, client },
+            State::Incompatible { server, client },
+        )
+        .await;
     }
 
     /// Give up on a server which refused the connection.
     async fn refused(&mut self, refused: Refused) {
-        tracing::debug!(code = refused.code, reason = &*refused.reason, "Connection refused");
+        tracing::debug!(
+            code = refused.code,
+            reason = &*refused.reason,
+            "Connection refused"
+        );
         self.stop(Stopped::Refused(refused.clone()), State::Refused(refused))
             .await;
     }

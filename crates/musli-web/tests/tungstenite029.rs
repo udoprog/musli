@@ -4146,3 +4146,410 @@ mod headers {
         }
     }
 }
+
+/// Connection metadata stated by the client, read by the server's connect
+/// hook, which accepts or refuses the connection.
+mod metadata {
+    use super::*;
+
+    use musli_web::api::Metadata;
+
+    /// What the connect hook saw on one connection, in order.
+    type Seen = Vec<(String, String)>;
+
+    /// The principal a connection has before its connect hook ran, as if it
+    /// had been taken from the upgrade.
+    const UPGRADE: &str = "upgrade";
+
+    /// The close code the hook refuses with.
+    const REFUSED: u16 = 4403;
+
+    /// A handler whose state is replaced by its connect hook.
+    #[derive(Clone)]
+    struct MetaHandler {
+        seen: mpsc::UnboundedSender<Seen>,
+        principal: String,
+    }
+
+    impl ws::Handler for MetaHandler {
+        type Id = api::Request;
+        type Response = bool;
+
+        async fn connect(&mut self, metadata: &Metadata) -> Result<(), ws::Refuse> {
+            let seen = metadata
+                .iter()
+                .map(|(name, value)| (name.to_owned(), value.to_owned()))
+                .collect();
+
+            _ = self.seen.send(seen);
+
+            if let Some(reason) = metadata.get("refuse") {
+                return Err(ws::Refuse::with_code(REFUSED, reason));
+            }
+
+            if let Some(session) = metadata.get("session") {
+                self.principal = session.to_owned();
+            }
+
+            Ok(())
+        }
+
+        async fn handle(
+            &self,
+            id: api::Request,
+            incoming: &mut ws::Incoming<'_>,
+            outgoing: &mut ws::Outgoing<'_>,
+        ) -> bool {
+            let api::Request::Hello = id else {
+                return false;
+            };
+
+            let Some(request) = incoming.read::<api::HelloRequest<'_>>() else {
+                return false;
+            };
+
+            let message = format!("{}:{}", self.principal, request.message);
+
+            outgoing.write(api::HelloResponse {
+                message: &message,
+                channel: incoming.channel(),
+                format: incoming.format().to_u8(),
+            });
+
+            true
+        }
+    }
+
+    #[derive(Clone)]
+    struct MetaState {
+        handler: MetaHandler,
+        upgrades: Arc<AtomicUsize>,
+        kick: watch::Receiver<usize>,
+        errors: mpsc::UnboundedSender<String>,
+        shutdown: watch::Receiver<bool>,
+    }
+
+    async fn upgrade(ws: WebSocketUpgrade, State(state): State<MetaState>) -> Response {
+        state.upgrades.fetch_add(1, Ordering::SeqCst);
+
+        ws.on_upgrade(move |socket| async move {
+            let mut shutdown = state.shutdown.clone();
+            let mut kick = state.kick.clone();
+            _ = kick.borrow_and_update();
+
+            let mut server = match musli_web::axum08::server(socket, state.handler.clone())
+                .connect()
+                .await
+            {
+                Ok(server) => server,
+                Err(error) => {
+                    assert!(error.is_refused(), "{error}");
+                    _ = state.errors.send(error.to_string());
+                    return;
+                }
+            };
+
+            tokio::select! {
+                _ = shutdown.changed() => {}
+                _ = kick.changed() => {}
+                _ = server.run() => {}
+            }
+        })
+    }
+
+    /// A server whose handler reads connection metadata.
+    struct MetaServer {
+        addr: SocketAddr,
+        seen: mpsc::UnboundedReceiver<Seen>,
+        errors: mpsc::UnboundedReceiver<String>,
+        upgrades: Arc<AtomicUsize>,
+        kick: watch::Sender<usize>,
+        shutdown: watch::Sender<bool>,
+        task: JoinHandle<()>,
+    }
+
+    impl MetaServer {
+        async fn new() -> Self {
+            let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
+                .await
+                .expect("Failed to bind");
+            let addr = listener.local_addr().expect("Missing local address");
+
+            let (seen_tx, seen) = mpsc::unbounded_channel();
+            let (errors_tx, errors) = mpsc::unbounded_channel();
+            let (kick, kick_rx) = watch::channel(0);
+            let (shutdown, shutdown_rx) = watch::channel(false);
+            let upgrades = Arc::new(AtomicUsize::new(0));
+
+            let state = MetaState {
+                handler: MetaHandler {
+                    seen: seen_tx,
+                    principal: UPGRADE.to_owned(),
+                },
+                upgrades: upgrades.clone(),
+                kick: kick_rx,
+                errors: errors_tx,
+                shutdown: shutdown_rx.clone(),
+            };
+
+            let app = Router::new().route("/ws", any(upgrade).with_state(state));
+
+            let task = tokio::spawn(async move {
+                let mut shutdown_rx = shutdown_rx;
+
+                let result = axum::serve(listener, app)
+                    .with_graceful_shutdown(async move {
+                        while !*shutdown_rx.borrow_and_update() {
+                            if shutdown_rx.changed().await.is_err() {
+                                break;
+                            }
+                        }
+                    })
+                    .await;
+
+                if let Err(error) = result {
+                    tracing::error!("Serve error: {error}");
+                }
+            });
+
+            Self {
+                addr,
+                seen,
+                errors,
+                upgrades,
+                kick,
+                shutdown,
+                task,
+            }
+        }
+
+        fn url(&self) -> String {
+            format!("ws://{}/ws", self.addr)
+        }
+
+        /// The metadata the connect hook saw on the next connection.
+        async fn seen(&mut self) -> Seen {
+            timeout!(self.seen.recv()).expect("Server is gone")
+        }
+
+        /// The error the next refused connection failed with.
+        async fn error(&mut self) -> String {
+            timeout!(self.errors.recv()).expect("Server is gone")
+        }
+
+        fn upgrades(&self) -> usize {
+            self.upgrades.load(Ordering::SeqCst)
+        }
+
+        /// Drop every open connection.
+        fn kick(&self) {
+            self.kick.send_modify(|n| *n += 1);
+        }
+
+        async fn shutdown(self) {
+            _ = self.shutdown.send(true);
+            timeout!(self.task).expect("Server task panicked");
+        }
+    }
+
+    fn entries(entries: &[(&str, &str)]) -> Seen {
+        entries
+            .iter()
+            .map(|&(name, value)| (name.to_owned(), value.to_owned()))
+            .collect()
+    }
+
+    /// Spawn a client stating the metadata `build` inserts.
+    fn spawn_client<F>(
+        url: &str,
+        mode: Mode,
+        build: F,
+    ) -> (Handle, JoinHandle<Result<(), client::Error>>)
+    where
+        F: 'static + Send + Sync + Fn(&mut Metadata),
+    {
+        let format = match mode {
+            Mode::Text => Format::Json,
+            _ => Format::DEFAULT,
+        };
+
+        let mut service = tungstenite029::connect(url)
+            .format(format)
+            .mode(mode)
+            .metadata(build)
+            .build();
+
+        let handle = service.handle().clone();
+        let task = tokio::spawn(async move { service.run().await });
+        (handle, task)
+    }
+
+    async fn close(handle: Handle, task: JoinHandle<Result<(), client::Error>>) {
+        handle.close();
+        timeout!(task)
+            .expect("Client task panicked")
+            .expect("Client failed");
+    }
+
+    /// Metadata set by the closure reaches the connect hook, which replaces
+    /// the state of the handler before the first request sees it.
+    #[tokio::test]
+    async fn metadata_reaches_the_connect_hook() {
+        for mode in [Mode::Binary, Mode::Text] {
+            let mut server = MetaServer::new().await;
+
+            let (handle, task) = spawn_client(&server.url(), mode, |metadata| {
+                metadata.insert("session", "page-1");
+                metadata.insert("x.trace-id", "a: b");
+            });
+
+            timeout!(handle.wait_until_open()).expect("Failed to open connection");
+            assert_eq!(handle.mode(), mode);
+
+            assert_eq!(
+                server.seen().await,
+                entries(&[("session", "page-1"), ("x.trace-id", "a: b")]),
+                "{mode}"
+            );
+
+            let (message, _) = hello(&handle, "Hello").await;
+            assert_eq!(message, "page-1:Hello", "{mode}");
+
+            close(handle, task).await;
+            server.shutdown().await;
+        }
+    }
+
+    /// A client which states no metadata still connects, and the hook sees an
+    /// empty block.
+    #[tokio::test]
+    async fn no_metadata_still_connects() {
+        let mut server = MetaServer::new().await;
+
+        let client = TestClient::new(&server.url());
+        let (message, _) = hello(client.open().await, "Hello").await;
+        assert_eq!(message, format!("{UPGRADE}:Hello"));
+        assert_eq!(server.seen().await, Seen::new());
+        client.close().await;
+
+        // A closure which inserts nothing is the same.
+        let (handle, task) = client_empty(&server.url());
+        timeout!(handle.wait_until_open()).expect("Failed to open connection");
+        let (message, _) = hello(&handle, "Hello").await;
+        assert_eq!(message, format!("{UPGRADE}:Hello"));
+        assert_eq!(server.seen().await, Seen::new());
+        close(handle, task).await;
+
+        server.shutdown().await;
+    }
+
+    fn client_empty(url: &str) -> (Handle, JoinHandle<Result<(), client::Error>>) {
+        spawn_client(url, Mode::Binary, |_| {})
+    }
+
+    /// A refusal reaches the client with the code and reason of the server,
+    /// and the client gives up rather than connect again.
+    #[tokio::test]
+    async fn a_refusal_is_not_retried() {
+        for mode in [Mode::Binary, Mode::Text] {
+            let mut server = MetaServer::new().await;
+
+            let (handle, task) = spawn_client(&server.url(), mode, |metadata| {
+                metadata.insert("refuse", "Impersonation has ended");
+            });
+
+            let states = handle.on_state_change();
+
+            let error = timeout!(handle.wait_until_open()).expect_err("Must not open");
+            assert!(error.is_refused(), "{error}");
+
+            // NB: Reconnecting is enabled, and still the service stops.
+            let error = timeout!(task)
+                .expect("Client task panicked")
+                .expect_err("Client must fail");
+            assert!(error.is_refused(), "{error}");
+            assert!(!error.is_connection_lost());
+
+            let refused = error.as_refused().expect("Must be refused");
+            assert_eq!(refused.code(), REFUSED);
+            assert_eq!(refused.reason(), "Impersonation has ended");
+
+            let ClientState::Refused(state) = handle.state() else {
+                panic!("Expected a refusal, got {:?}", handle.state());
+            };
+
+            assert_eq!(&state, refused);
+            assert!(handle.state().is_refused());
+            assert!(states.state().is_refused());
+
+            assert_eq!(
+                server.seen().await,
+                entries(&[("refuse", "Impersonation has ended")])
+            );
+            assert!(server.error().await.contains("Impersonation has ended"));
+
+            // NB: Longer than the first reconnect would have waited.
+            tokio::time::sleep(Duration::from_millis(600)).await;
+            assert_eq!(server.upgrades(), 1, "{mode}");
+
+            server.shutdown().await;
+        }
+    }
+
+    /// A reconnect calls the closure again, so the server sees what is
+    /// current rather than what the first connection stated.
+    #[tokio::test]
+    async fn a_reconnect_calls_the_closure_again() {
+        let mut server = MetaServer::new().await;
+
+        let session = Arc::new(Mutex::new(String::from("page-1")));
+
+        let (handle, task) = spawn_client(&server.url(), Mode::Binary, {
+            let session = session.clone();
+            move |metadata| {
+                metadata.insert("session", &session.lock().unwrap());
+            }
+        });
+
+        timeout!(handle.wait_until_open()).expect("Failed to open connection");
+        assert_eq!(server.seen().await, entries(&[("session", "page-1")]));
+        let (message, _) = hello(&handle, "Before").await;
+        assert_eq!(message, "page-1:Before");
+
+        *session.lock().unwrap() = String::from("page-2");
+
+        let mut states = handle.on_state_change();
+        server.kick();
+        assert!(timeout!(states.wait_until(ClientState::Closed)));
+        assert!(timeout!(states.wait_until(ClientState::Open)));
+
+        assert_eq!(server.seen().await, entries(&[("session", "page-2")]));
+        let (message, _) = hello(&handle, "After").await;
+        assert_eq!(message, "page-2:After");
+        assert_eq!(server.upgrades(), 2);
+
+        close(handle, task).await;
+        server.shutdown().await;
+    }
+
+    /// Metadata which cannot be sent fails the service without retrying.
+    #[tokio::test]
+    async fn invalid_metadata_is_not_retried() {
+        let server = MetaServer::new().await;
+
+        let (handle, task) = spawn_client(&server.url(), Mode::Binary, |metadata| {
+            metadata.insert("Upper", "x");
+        });
+
+        let error = timeout!(task)
+            .expect("Client task panicked")
+            .expect_err("Client must fail");
+        assert!(error.is_invalid_metadata(), "{error}");
+        assert_eq!(handle.state(), ClientState::Closed);
+
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        assert_eq!(server.upgrades(), 1);
+
+        server.shutdown().await;
+    }
+}

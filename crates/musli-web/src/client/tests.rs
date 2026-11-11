@@ -182,9 +182,7 @@ fn accessors_are_exclusive() {
 
 /// A service with an established mock socket over which a negotiation has
 /// been sent, and a request pending.
-async fn negotiating(
-    service: &mut Service<MockImpl>,
-) -> oneshot::Receiver<Result<RawPacket>> {
+async fn negotiating(service: &mut Service<MockImpl>) -> oneshot::Receiver<Result<RawPacket>> {
     service.established(MockSocket);
     service.send_negotiate().await;
     assert!(service.negotiating);
@@ -199,7 +197,9 @@ fn negotiated(service: &mut Service<MockImpl>) {
     let serial = service
         .pending
         .iter()
-        .find_map(|(serial, pending)| matches!(pending, Pending::Negotiate { .. }).then_some(*serial))
+        .find_map(|(serial, pending)| {
+            matches!(pending, Pending::Negotiate { .. }).then_some(*serial)
+        })
         .expect("A negotiation must be pending");
 
     let header = api::ResponseHeader {
