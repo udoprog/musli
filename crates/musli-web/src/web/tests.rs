@@ -2544,3 +2544,236 @@ fn dropping_call_cancels_the_request() {
     deliver(&service, Mode::Binary, &response_header(serial), &body);
     assert!(!has_pending(&service));
 }
+
+/// A metadata closure which states how many times it has been called.
+fn counting_metadata() -> (Rc<Cell<u32>>, impl Fn(&mut api::Metadata) + 'static) {
+    let calls = Rc::new(Cell::new(0));
+
+    let f = {
+        let calls = calls.clone();
+
+        move |metadata: &mut api::Metadata| {
+            calls.set(calls.get() + 1);
+            metadata.insert("app-session", &format!("session-{}", calls.get()));
+        }
+    };
+
+    (calls, f)
+}
+
+/// Deliver a server hello and decode the negotiation sent in response,
+/// returning its envelope and metadata block.
+fn hello_metadata(service: &Service<MockImpl>) -> (api::RequestHeader, Vec<(String, String)>) {
+    deliver(
+        service,
+        Mode::Binary,
+        &broadcast_header(MessageId::SERVER_HELLO),
+        b"",
+    );
+
+    let ops = take_ops();
+
+    let [Op::Send(mode, bytes)] = &ops[..] else {
+        panic!("Expected a negotiation request, got {ops:?}");
+    };
+
+    let mut at = 0;
+    let request: api::RequestHeader = format::decode_envelope(*mode, bytes, &mut at).unwrap();
+    assert_eq!(request.id, MessageId::NEGOTIATE.get());
+
+    let metadata = format::decode_metadata(*mode, &bytes[at..]).unwrap();
+
+    let metadata = metadata
+        .iter()
+        .map(|(name, value)| (String::from(name), String::from(value)))
+        .collect();
+
+    (request, metadata)
+}
+
+fn session(n: u32) -> Vec<(String, String)> {
+    vec![(String::from("app-session"), format!("session-{n}"))]
+}
+
+/// Deliver a close event with the given code and reason.
+fn close_with(service: &Service<MockImpl>, code: u16, reason: &str) {
+    service.shared.socket_closed(code, reason).unwrap();
+}
+
+/// The metadata closure is called for every negotiation, in either mode, and
+/// what it states at the time is what goes on the wire.
+#[test]
+fn metadata_is_built_for_every_negotiation() {
+    for mode in [Mode::Binary, Mode::Text] {
+        let (calls, f) = counting_metadata();
+        let (builder, errors) = builder(Connect::url(String::from(URL)));
+        let service = builder.mode(mode).format(Format::Json).metadata(f).build();
+        take_ops();
+
+        // Nothing is built until there is a negotiation to send.
+        assert_eq!(calls.get(), 0);
+
+        let (request, metadata) = hello_metadata(&service);
+        assert_eq!(metadata, session(1), "{mode:?}");
+        accept_negotiation(&service, &request);
+        assert_eq!(state(&service), State::Open);
+
+        service.shared.close_and_reconnect().unwrap();
+        assert_eq!(fire_timers(), 1);
+        take_ops();
+
+        let (_, metadata) = hello_metadata(&service);
+        assert_eq!(metadata, session(2), "{mode:?}");
+        assert_eq!(calls.get(), 2);
+        assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+    }
+}
+
+/// Without a metadata closure the negotiation carries no body.
+#[test]
+fn no_metadata_sends_no_body() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    deliver(
+        &service,
+        Mode::Binary,
+        &broadcast_header(MessageId::SERVER_HELLO),
+        b"",
+    );
+
+    let Some(Op::Send(mode, bytes)) = take_ops().pop() else {
+        panic!("Expected a negotiation request");
+    };
+
+    let mut at = 0;
+    let _: api::RequestHeader = format::decode_envelope(mode, &bytes, &mut at).unwrap();
+    assert_eq!(at, bytes.len());
+}
+
+/// A close in the application range while negotiating is a refusal, which
+/// is reported with its code and reason and is not retried until the service
+/// is opened again, which builds the metadata again.
+#[test]
+fn refusal_while_negotiating_stops_reconnecting() {
+    let (calls, f) = counting_metadata();
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+    let service = builder.metadata(f).build();
+    take_ops();
+
+    let states = Rc::new(RefCell::new(Vec::new()));
+
+    let (_, _listener) = service.handle().on_state_change({
+        let states = states.clone();
+        move |state: State| states.borrow_mut().push(state)
+    });
+
+    let (_, metadata) = hello_metadata(&service);
+    assert_eq!(metadata, session(1));
+    assert!(has_pending(&service));
+
+    close_with(&service, 4001, "Impersonation has ended.");
+
+    let State::Refused(refused) = state(&service) else {
+        panic!("Expected a refusal, got {:?}", state(&service));
+    };
+
+    assert_eq!(refused.code(), 4001);
+    assert_eq!(refused.reason(), "Impersonation has ended.");
+    assert!(state(&service).is_refused());
+    assert_eq!(*states.borrow(), vec![State::Refused(refused)]);
+    assert!(!has_pending(&service));
+    assert_eq!(take_ops(), vec![Op::Close]);
+
+    // Connecting again would be refused again.
+    assert_eq!(pending_timers(), 0);
+    assert_eq!(fire_timers(), 0);
+    assert!(take_ops().is_empty());
+
+    // Opening on purpose tries again with fresh metadata.
+    service.open();
+    assert_eq!(take_ops(), vec![Op::Connect(String::from(URL))]);
+
+    let (request, metadata) = hello_metadata(&service);
+    assert_eq!(metadata, session(2));
+    assert_eq!(calls.get(), 2);
+    accept_negotiation(&service, &request);
+    assert_eq!(state(&service), State::Open);
+    assert!(errors.borrow().is_empty(), "{:?}", errors.borrow());
+}
+
+/// A close in the application range once the connection is open is an
+/// ordinary drop, which is retried.
+#[test]
+fn application_close_after_open_reconnects() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+    open_session(&service);
+
+    close_with(&service, 4000, "Going away");
+
+    assert_eq!(state(&service), State::Closed);
+    assert_eq!(take_ops(), vec![Op::Close]);
+    assert_eq!(fire_timers(), 1);
+    assert_eq!(take_ops(), vec![Op::Connect(String::from(URL))]);
+}
+
+/// Any other close while negotiating is an ordinary drop, as is an
+/// application close which arrives before the negotiation was sent.
+#[test]
+fn other_close_while_negotiating_reconnects() {
+    let (builder, _) = builder(Connect::url(String::from(URL)));
+    let service = builder.build();
+    take_ops();
+
+    hello_metadata(&service);
+    close_with(&service, 1006, "");
+
+    assert_eq!(state(&service), State::Closed);
+    assert_eq!(fire_timers(), 1);
+    assert_eq!(take_ops(), vec![Op::Close, Op::Connect(String::from(URL))]);
+
+    // A refusal over the old socket says nothing about the new one.
+    close_with(&service, 4000, "Refused");
+
+    assert_eq!(state(&service), State::Closed);
+    assert_eq!(fire_timers(), 1);
+    assert_eq!(take_ops(), vec![Op::Close, Op::Connect(String::from(URL))]);
+}
+
+/// Metadata which cannot be encoded fails the attempt through the error
+/// handler and stops reconnecting, since it would only fail again.
+#[test]
+fn invalid_metadata_stops_reconnecting() {
+    let (builder, errors) = builder(Connect::url(String::from(URL)));
+
+    let service = builder
+        .metadata(|metadata: &mut api::Metadata| metadata.insert("Not A Name", "value"))
+        .build();
+
+    take_ops();
+
+    deliver(
+        &service,
+        Mode::Binary,
+        &broadcast_header(MessageId::SERVER_HELLO),
+        b"",
+    );
+
+    assert_eq!(
+        *errors.borrow(),
+        vec![String::from("Invalid connection metadata")]
+    );
+    assert_eq!(take_ops(), vec![Op::Close]);
+    assert_eq!(state(&service), State::Closed);
+    assert!(!has_pending(&service));
+    assert_eq!(pending_timers(), 0);
+    assert_eq!(fire_timers(), 0);
+    assert!(take_ops().is_empty());
+
+    // Opening on purpose tries again.
+    service.open();
+    assert_eq!(take_ops(), vec![Op::Connect(String::from(URL))]);
+}

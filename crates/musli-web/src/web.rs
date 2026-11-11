@@ -337,6 +337,7 @@ where
         format: Format::DEFAULT,
         mode: Mode::DEFAULT,
         app: 0,
+        metadata: None,
         _marker: PhantomData,
     }
 }
@@ -345,7 +346,7 @@ where
 ///
 /// A listener for state changes can be set up through for example
 /// [`Handle::on_state_change`].
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[non_exhaustive]
 pub enum State {
     /// The connection is open.
@@ -366,6 +367,51 @@ pub enum State {
         /// The application version this client states.
         client: u32,
     },
+    /// The server refused the connection while it was being negotiated, by
+    /// closing it with a code in `4000..=4999`, such as when the
+    /// [metadata](ServiceBuilder::metadata) it was given is no longer valid.
+    ///
+    /// The service stops reconnecting, like for [`State::Incompatible`].
+    /// [`Service::open`] tries again, calling the metadata closure again.
+    Refused(Refused),
+}
+
+/// A connection refused by the server, see [`State::Refused`].
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::web::State;
+///
+/// fn describe(state: &State) -> Option<String> {
+///     let State::Refused(refused) = state else {
+///         return None;
+///     };
+///
+///     Some(format!("Refused ({}): {}", refused.code(), refused.reason()))
+/// }
+///
+/// assert_eq!(describe(&State::Closed), None);
+/// ```
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Refused {
+    code: u16,
+    reason: Rc<str>,
+}
+
+impl Refused {
+    /// The close code the server refused the connection with, in
+    /// `4000..=4999`.
+    #[inline]
+    pub fn code(&self) -> u16 {
+        self.code
+    }
+
+    /// The reason the server gave for refusing the connection.
+    #[inline]
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
 }
 
 impl State {
@@ -387,6 +433,19 @@ impl State {
     /// ```
     pub fn is_incompatible(&self) -> bool {
         matches!(self, Self::Incompatible { .. })
+    }
+
+    /// Check if the server refused the connection, see [`State::Refused`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use musli_web::web::State;
+    ///
+    /// assert!(!State::Closed.is_refused());
+    /// ```
+    pub fn is_refused(&self) -> bool {
+        matches!(self, Self::Refused(..))
     }
 }
 
@@ -668,6 +727,11 @@ impl Error {
     pub(crate) fn encoding_body(error: format::Error) -> Self {
         Self::new(ErrorKind::EncodingBody(error))
     }
+
+    #[inline]
+    fn encoding_metadata(error: format::Error) -> Self {
+        Self::new(ErrorKind::EncodingMetadata(error))
+    }
 }
 
 #[derive(Debug)]
@@ -687,6 +751,7 @@ enum ErrorKind {
     DecodePacket(format::Error),
     EncodingHeader(format::Error),
     EncodingBody(format::Error),
+    EncodingMetadata(format::Error),
 }
 
 impl fmt::Display for Error {
@@ -712,6 +777,7 @@ impl fmt::Display for Error {
             ErrorKind::DecodePacket(..) => write!(f, "Encoding error when decoding packet"),
             ErrorKind::EncodingHeader(..) => write!(f, "Encoding error when encoding header"),
             ErrorKind::EncodingBody(..) => write!(f, "Encoding error when encoding body"),
+            ErrorKind::EncodingMetadata(..) => write!(f, "Invalid connection metadata"),
         }
     }
 }
@@ -725,6 +791,7 @@ impl core::error::Error for Error {
             ErrorKind::DecodePacket(error) => Some(error),
             ErrorKind::EncodingHeader(error) => Some(error),
             ErrorKind::EncodingBody(error) => Some(error),
+            ErrorKind::EncodingMetadata(error) => Some(error),
             _ => None,
         }
     }
@@ -824,9 +891,15 @@ where
     H: WebImpl,
 {
     connect: Connect,
-    state: Cell<State>,
-    should_be: Cell<State>,
+    state: RefCell<State>,
+    /// Whether the connection should be open.
+    should_be_open: Cell<bool>,
     connecting: Cell<bool>,
+    /// Whether NEGOTIATE was sent over the current socket and the connection
+    /// has not opened yet, which is when a close is a refusal.
+    negotiating: Cell<bool>,
+    /// Called for the metadata of every negotiation.
+    metadata: Option<Box<dyn Fn(&mut api::Metadata)>>,
     /// The format in effect, as agreed by the [negotiation protocol].
     ///
     /// [negotiation protocol]: crate::api#negotiating-the-format
@@ -901,6 +974,7 @@ where
     format: Format,
     mode: Mode,
     app: u32,
+    metadata: Option<Box<dyn Fn(&mut api::Metadata)>>,
     _marker: PhantomData<H>,
 }
 
@@ -921,6 +995,7 @@ where
             format: self.format,
             mode: self.mode,
             app: self.app,
+            metadata: self.metadata,
             _marker: self._marker,
         }
     }
@@ -1028,6 +1103,49 @@ where
         self
     }
 
+    /// State [connection metadata] with every negotiation.
+    ///
+    /// The closure fills in the metadata to send, and is called again for
+    /// every connect and reconnect, so it should read the values it states
+    /// from wherever they currently live rather than capture them. Nothing is
+    /// cached between attempts.
+    ///
+    /// A server can refuse the connection based on what it is given, which is
+    /// reported as [`State::Refused`]. Metadata which is not valid fails the
+    /// attempt through [`ServiceBuilder::on_error`] and stops reconnecting
+    /// until [`Service::open`] is called.
+    ///
+    /// [connection metadata]: crate::api#connection-metadata
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::cell::RefCell;
+    /// use std::rc::Rc;
+    ///
+    /// use musli_web::web03::prelude::*;
+    ///
+    /// let session = Rc::new(RefCell::new(Some(String::from("credential"))));
+    ///
+    /// let service = ws::connect(ws::Connect::location("ws"))
+    ///     .metadata({
+    ///         let session = session.clone();
+    ///
+    ///         move |metadata: &mut ws::Metadata| {
+    ///             if let Some(session) = &*session.borrow() {
+    ///                 metadata.insert("app-session", session);
+    ///             }
+    ///         }
+    ///     })
+    ///     .build();
+    /// # drop(service);
+    /// ```
+    #[inline]
+    pub fn metadata(mut self, f: impl Fn(&mut api::Metadata) + 'static) -> Self {
+        self.metadata = Some(Box::new(f));
+        self
+    }
+
     /// Install an event handler which will try to close the WebSocket
     /// connection on page unload.
     ///
@@ -1078,9 +1196,11 @@ where
 
             Shared {
                 connect: self.connect,
-                state: Cell::new(State::Closed),
-                should_be: Cell::new(State::Closed),
+                state: RefCell::new(State::Closed),
+                should_be_open: Cell::new(false),
                 connecting: Cell::new(false),
+                negotiating: Cell::new(false),
+                metadata: self.metadata,
                 format: Cell::new(self.format),
                 requested: self.format,
                 mode: Cell::new(self.mode),
@@ -1269,6 +1389,15 @@ where
     fn send_negotiate(self: &Rc<Self>) -> Result<()> {
         let format = self.requested;
         let mode = self.requested_mode;
+
+        // NB: Called before anything is borrowed, since the closure is the
+        // user's and could touch the service.
+        let metadata = self.metadata.as_ref().map(|f| {
+            let mut metadata = api::Metadata::new();
+            f(&mut metadata);
+            metadata
+        });
+
         let serial = self.serial.get();
         self.serial.set(serial.wrapping_add(1));
 
@@ -1284,7 +1413,6 @@ where
                 serial,
                 id: MessageId::NEGOTIATE.get(),
                 format: format.to_u8(),
-                // NB: Carries no body.
                 channel: ChannelId::NONE,
                 app: self.app,
             };
@@ -1292,8 +1420,15 @@ where
             let out = &mut *self.output.borrow_mut();
 
             // NB: The frame this goes out in is what asks for the mode, so the
-            // envelope has to be spelled the same way.
+            // envelope and the metadata have to be spelled the same way.
             format::encode_envelope(mode, &mut *out, &header).map_err(Error::encoding_header)?;
+
+            if let Some(metadata) = &metadata {
+                if let Err(error) = format::encode_metadata(mode, &mut *out, metadata) {
+                    out.clear();
+                    return Err(Error::encoding_metadata(error));
+                }
+            }
 
             tracing::debug!(?format, ?mode, "Requesting format");
 
@@ -1302,6 +1437,8 @@ where
             out.clear();
             out.shrink_to(MAX_CAPACITY);
         }
+
+        self.negotiating.set(true);
 
         let pending = Pending {
             id: MessageId::NEGOTIATE,
@@ -1459,7 +1596,18 @@ where
                 // has been negotiated, so that server-initiated messages are
                 // never encoded with a format this client did not agree to.
                 tracing::debug!("Server hello, negotiating format");
-                self.send_negotiate()?;
+
+                match self.send_negotiate() {
+                    Ok(()) => {}
+                    // NB: The same closure would build the same metadata, so
+                    // reconnecting would only loop.
+                    Err(error) if matches!(error.kind, ErrorKind::EncodingMetadata(..)) => {
+                        self.on_error.call(error);
+                        self.give_up(State::Closed);
+                        return Ok(());
+                    }
+                    Err(error) => return Err(error),
+                }
 
                 // NB: Checked after negotiating, so that the server hears
                 // which version this client states and can tell why it goes
@@ -1629,7 +1777,7 @@ where
         // We need a weak reference back to shared state to handle the timeout.
         let shared = Rc::downgrade(self);
 
-        if self.state.get() == State::Closed {
+        if *self.state.borrow() == State::Closed {
             let current_timeout = self.current_timeout.get();
 
             if current_timeout < MAX_TIMEOUT {
@@ -1669,8 +1817,34 @@ where
     fn incompatible(self: &Rc<Self>, server: u32) {
         let client = self.app;
         tracing::debug!(server, client, "Incompatible server");
+        self.give_up(State::Incompatible { server, client });
+    }
 
-        self.should_be.set(State::Closed);
+    /// Handle the socket closing with the given close `code` and `reason`.
+    ///
+    /// A close in the range left to applications which arrives while the
+    /// connection is being negotiated is the server refusing it, anything
+    /// else is a dropped connection.
+    pub(crate) fn socket_closed(self: &Rc<Self>, code: u16, reason: &str) -> Result<(), Error> {
+        if self.negotiating.replace(false) && (4000..=4999).contains(&code) {
+            tracing::debug!(code, reason, "Connection refused");
+
+            self.give_up(State::Refused(Refused {
+                code,
+                reason: Rc::from(reason),
+            }));
+
+            return Ok(());
+        }
+
+        self.close_and_reconnect()
+    }
+
+    /// Close the connection and stop reconnecting until [`Service::open`] is
+    /// called again, reporting `state`.
+    fn give_up(self: &Rc<Self>, state: State) {
+        self.should_be_open.set(false);
+        self.negotiating.set(false);
 
         let timeout = self.reconnect_timeout.borrow_mut().take();
         drop(timeout);
@@ -1687,7 +1861,7 @@ where
         }
 
         self.close_pending();
-        self.emit_state_change(State::Incompatible { server, client });
+        self.emit_state_change(state);
     }
 
     /// Fail the pending request with the given serial, if it is still pending.
@@ -1723,13 +1897,15 @@ where
     }
 
     fn emit_state_change(&self, state: State) {
-        if self.state.get() == state {
+        if *self.state.borrow() == state {
             return;
         }
 
-        self.state.set(state);
+        *self.state.borrow_mut() = state.clone();
 
         if state == State::Open {
+            self.negotiating.set(false);
+
             // NB: Bumped before any listener runs, so that every listener sees
             // the generation of the connection that just opened.
             let generation = self.g.generation.get().wrapping_add(1);
@@ -1753,22 +1929,22 @@ where
 
         while let Some(callback) = self.defer_state_listeners.borrow_mut().pop_front() {
             if let Some(callback) = callback.upgrade() {
-                callback.call(state);
+                callback.call(state.clone());
             }
         }
     }
 
     #[inline]
     fn open(self: &Rc<Self>) {
-        self.should_be.set(State::Open);
+        self.should_be_open.set(true);
         self.try_once();
     }
 
     fn close(self: &Rc<Self>) {
-        self.should_be.set(State::Closed);
+        self.should_be_open.set(false);
 
         // NB: A pending reconnect would otherwise only be stopped by
-        // `should_be` once it fires, and would keep the timer alive until then.
+        // `should_be_open` once it fires, and would keep the timer alive until then.
         let timeout = self.reconnect_timeout.borrow_mut().take();
         drop(timeout);
 
@@ -1779,7 +1955,7 @@ where
     }
 
     fn try_once(self: &Rc<Self>) {
-        if self.should_be.get() == State::Open && !self.connecting.get() {
+        if self.should_be_open.get() && !self.connecting.get() {
             tracing::debug!("Trying to open connection");
             self.connect_once();
         }
@@ -1808,7 +1984,7 @@ where
         // try again.
         if let Err(error) = self.try_connect() {
             self.on_error.call(error);
-            self.should_be.set(State::Closed);
+            self.should_be_open.set(false);
             self.connecting.set(false);
         }
     }
@@ -1844,6 +2020,9 @@ where
             }
             ConnectKind::Url { url } => url.clone(),
         };
+
+        // NB: A negotiation over the old socket says nothing about the new one.
+        self.negotiating.set(false);
 
         // We explicitly want to close and dispose of the old socket first.
         if let Some(s) = self.socket.borrow_mut().take() {
@@ -2107,7 +2286,7 @@ where
         return Request::new();
     };
 
-    if shared.state.get() != State::Open {
+    if *shared.state.borrow() != State::Open {
         callback(Err(Error::new(ErrorKind::NotConnected(
             "WebSocket is not connected",
         ))));
@@ -2425,7 +2604,7 @@ where
             return Request::new();
         };
 
-        if shared.state.get() != State::Open {
+        if *shared.state.borrow() != State::Open {
             self.callback.call(Err(Error::new(ErrorKind::NotConnected(
                 "WebSocket is not connected",
             ))));
@@ -4462,7 +4641,7 @@ where
                 .state_listeners
                 .borrow_mut()
                 .insert(Rc::new(callback));
-            (shared.state.get(), index)
+            (shared.state.borrow().clone(), index)
         };
 
         let listener = StateListener {
@@ -4583,7 +4762,7 @@ where
 
         let generation = shared
             .state
-            .get()
+            .borrow()
             .is_open()
             .then(|| shared.g.generation.get());
 
@@ -4649,7 +4828,7 @@ where
 
         if let Some(shared) = self.shared.upgrade() {
             f.field("connect", &shared.connect);
-            f.field("state", &shared.state.get());
+            f.field("state", &*shared.state.borrow());
         }
 
         f.finish()
@@ -4733,7 +4912,7 @@ where
             return false;
         };
 
-        shared.state.get().is_open() && shared.g.generation.get() == self.generation.get()
+        shared.state.borrow().is_open() && shared.g.generation.get() == self.generation.get()
     }
 
     fn on_state(self: &Rc<Self>, state: State) {
@@ -4741,7 +4920,7 @@ where
             State::Open => {
                 self.connect();
             }
-            State::Closed | State::Incompatible { .. } => {
+            State::Closed | State::Incompatible { .. } | State::Refused(..) => {
                 // NB: Dropped outside of the borrow, since dropping a request
                 // touches the shared request table.
                 let connect = mem::take(&mut *self.connect.borrow_mut());
@@ -5035,7 +5214,7 @@ where
 
         if let Some(shared) = self.inner.handle.shared.upgrade() {
             f.field("connect", &shared.connect);
-            f.field("state", &shared.state.get());
+            f.field("state", &*shared.state.borrow());
         }
 
         f.field("id", &self.id());

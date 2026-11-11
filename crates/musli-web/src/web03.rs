@@ -86,10 +86,10 @@ pub mod prelude {
         //! Organization module prefixing all exported items with `ws` for
         //! convenient namespacing.
 
-        pub use crate::api::ChannelId;
+        pub use crate::api::{ChannelId, Metadata};
         pub use crate::web::{
             Call, ChannelEvent, Connect, EmptyCallback, Error, KeyedRequests, Listener, Packet,
-            RawPacket, Request, Requests, State, StateListener,
+            RawPacket, Refused, Request, Requests, State, StateListener,
         };
 
         use crate::web03::Web03Impl;
@@ -326,9 +326,11 @@ pub fn connect(connect: Connect) -> ServiceBuilder<Web03Impl, EmptyCallback> {
 
 impl Shared<Web03Impl> {
     fn web03_close(self: &Rc<Self>, e: CloseEvent) {
-        tracing::debug!(code = e.code(), reason = e.reason(), "Close event");
+        let code = e.code();
+        let reason = e.reason();
+        tracing::debug!(code, reason, "Close event");
 
-        if let Err(e) = self.close_and_reconnect() {
+        if let Err(e) = self.socket_closed(code, &reason) {
             self.on_error.call(e);
         }
     }
