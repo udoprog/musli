@@ -813,7 +813,10 @@ fn random_roundtrip() {
 
     let mut rng = Rng(0x9e3779b97f4a7c15);
 
-    for _ in 0..2000 {
+    // NB: Miri is too slow to go through every document.
+    let rounds = if cfg!(miri) { 20 } else { 2000 };
+
+    for _ in 0..rounds {
         let expected = Sample {
             string: rng.string(24),
             signed: rng.next() as i64,

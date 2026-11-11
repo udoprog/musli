@@ -21,10 +21,14 @@ const STACK_SIZE: usize = 2 * 1024 * 1024;
 const LARGE_STACK_SIZE: usize = 256 * 1024 * 1024;
 
 /// Deep enough that recursing once per level overflows `STACK_SIZE`.
-const DEEP: usize = 100_000;
+///
+/// Miri is too slow for that and has no stack to overflow, so there it is only
+/// well past `LIMIT`.
+const DEEP: usize = if cfg!(miri) { 500 } else { 100_000 };
 
-/// A nesting depth well above the default limit.
-const RAISED: usize = 1000;
+/// A nesting depth well above the default limit, which is kept close to it
+/// under miri since it is too slow for more.
+const RAISED: usize = if cfg!(miri) { 160 } else { 1000 };
 
 const LIMIT: usize = DEFAULT_NESTING_LIMIT;
 
@@ -99,6 +103,19 @@ impl Recursive for List {
             value: 7,
             next: Some(Box::new(self)),
         }
+    }
+}
+
+/// Dispose of a value without dropping it, since dropping a deeply nested
+/// value recurses.
+///
+/// Miri reports what is forgotten as leaked and has no stack to overflow, so
+/// there the value is dropped.
+fn discard<T>(value: T) {
+    if cfg!(miri) {
+        drop(value);
+    } else {
+        std::mem::forget(value);
     }
 }
 
@@ -334,7 +351,7 @@ macro_rules! byte_formats {
             {
                 with_stack(stack, move || {
                     format::from_slice::<T>(&input)
-                        .map(std::mem::forget)
+                        .map(discard)
                         .map_err(|e| e.to_string())
                 })
             }
@@ -355,7 +372,7 @@ macro_rules! byte_formats {
 
                     format::Encoding::new()
                         .from_slice_with::<_, T>(&cx, &input)
-                        .map(std::mem::forget)
+                        .map(discard)
                         .is_ok()
                 })
             }
@@ -509,11 +526,11 @@ mod value {
             };
 
             let result = value::decode_with::<_, Nest>(&cx, &input)
-                .map(std::mem::forget)
+                .map(discard)
                 .map_err(|_| cx.report().to_string());
 
             // Dropping deeply nested input recurses too.
-            std::mem::forget(input);
+            discard(input);
             result
         })
     }
@@ -592,7 +609,7 @@ mod serde_compat {
     fn decode(input: String) -> Result<(), String> {
         with_stack(STACK_SIZE, move || {
             json::from_str::<Wrapper>(&input)
-                .map(std::mem::forget)
+                .map(discard)
                 .map_err(|e| e.to_string())
         })
     }

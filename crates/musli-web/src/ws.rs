@@ -4361,6 +4361,10 @@ mod tests {
     /// Reading resumes once the queued output has been written, so a peer
     /// which keeps up is never stalled by the limits.
     #[tokio::test]
+    #[cfg_attr(
+        miri,
+        ignore = "does not finish within the deadline of `run_until_idle`"
+    )]
     async fn reading_resumes_once_drained() {
         let mut server = flooded_server(10);
         server.max_in_flight = 1;

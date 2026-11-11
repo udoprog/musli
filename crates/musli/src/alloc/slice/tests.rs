@@ -723,8 +723,11 @@ fn stress() {
         }
     }
 
+    // NB: Miri is too slow to go through every seed.
+    let seeds = if cfg!(miri) { 4u64 } else { 200 };
+
     for buf_size in [64usize, 96, 128, 192, 256, 1024] {
-        for seed in 1..200u64 {
+        for seed in 1..seeds {
             let mut buf = std::vec![core::mem::MaybeUninit::<u8>::uninit(); buf_size];
             run(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15), &mut buf);
         }

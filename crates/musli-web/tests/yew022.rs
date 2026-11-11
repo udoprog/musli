@@ -152,6 +152,7 @@ fn handle_only() -> Html {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "the renderer leaks when a component panics")]
 #[should_panic(
     expected = "no ws::Handle in context: wrap the component tree in musli_web::yew022::HandleProvider"
 )]
@@ -160,6 +161,7 @@ fn use_handle_without_provider() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore = "the renderer leaks when a component panics")]
 #[should_panic(
     expected = "no ws::Handle in context: wrap the component tree in musli_web::yew022::HandleProvider"
 )]

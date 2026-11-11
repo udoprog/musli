@@ -14,7 +14,10 @@ use musli::{Decode, descriptive, json, sqlite_jsonb};
 const STACK_SIZE: usize = 2 * 1024 * 1024;
 
 /// Deep enough that recursing once per level overflows `STACK_SIZE`.
-const DEEP: usize = 100_000;
+///
+/// Miri is too slow for that and has no stack to overflow, so there it is only
+/// well past `LIMIT`.
+const DEEP: usize = if cfg!(miri) { 500 } else { 100_000 };
 
 /// The nesting depth that the default context accepts.
 const LIMIT: usize = 128;

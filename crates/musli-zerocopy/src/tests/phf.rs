@@ -40,7 +40,10 @@ impl Rng {
 fn map_lookup_is_exhaustive() {
     let mut rng = Rng(0x1234_5678);
 
-    for round in 0..500u64 {
+    // NB: Miri is too slow for more than a few sizes.
+    let rounds = if cfg!(miri) { 8u64 } else { 500 };
+
+    for round in 0..rounds {
         let count = (round % 32) as usize;
         let mut keys = Vec::new();
 
@@ -78,7 +81,10 @@ fn map_lookup_with_string_keys() {
 
     let mut rng = Rng(0xFEED_FACE);
 
-    for round in 0..40u64 {
+    // NB: Miri is too slow for the larger maps.
+    let rounds = if cfg!(miri) { 3u64 } else { 40 };
+
+    for round in 0..rounds {
         let count = (round * 5 + 1) as usize;
         let mut keys = Vec::new();
 

@@ -159,10 +159,19 @@ mod tests {
         // Two positions at a time out of every pair of edge bytes, over a word
         // which is otherwise digits, which covers every way two of the ranges
         // can meet without the run taking all day.
+        //
+        // NB: Miri is too slow to go through every position, so it only
+        // covers the two ends of the word.
+        let positions: &[usize] = if cfg!(miri) {
+            &[0, 7]
+        } else {
+            &[0, 1, 2, 3, 4, 5, 6, 7]
+        };
+
         for a in EDGES {
             for b in EDGES {
-                for i in 0..8 {
-                    for j in 0..8 {
+                for &i in positions {
+                    for &j in positions {
                         let mut w = *b"0123abcd";
                         w[i] = *a;
                         w[j] = *b;
