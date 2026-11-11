@@ -2878,7 +2878,8 @@ async fn an_unsupported_version_is_refused() {
     let error = server.error().await;
 
     assert!(
-        error.contains("different protocol") && error.contains("2"),
+        error.contains("different protocol")
+            && error.contains(&(musli_web::api::VERSION + 1).to_string()),
         "The server has to say which version it was offered: {error}"
     );
 
