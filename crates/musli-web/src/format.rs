@@ -16,7 +16,8 @@ use alloc::vec::Vec;
 use musli::reader::SliceReader;
 
 use crate::api::{
-    ChannelId, DecodeBody, EncodeBody, Format, Mode, RequestHeader, ResponseHeader, VERSION,
+    ChannelId, DecodeBody, EncodeBody, Format, InvalidMetadata, METADATA_MAX_BYTES, Metadata, Mode,
+    RequestHeader, ResponseHeader, VERSION,
 };
 
 /// The tag byte which terminates a binary header block.
@@ -328,6 +329,107 @@ where
 /// A header which this build does not know about is stepped over and then
 /// reported, since a peer which speaks headers we do not is a peer we cannot
 /// safely act on.
+/// Encode a [`Metadata`] block, which is the body of a negotiation, see
+/// [connection metadata].
+///
+/// [connection metadata]: crate::api#connection-metadata
+#[cfg_attr(
+    not(any(feature = "ws", feature = "client", feature = "web03")),
+    allow(dead_code)
+)]
+pub(crate) fn encode_metadata(
+    mode: Mode,
+    out: &mut Vec<u8>,
+    metadata: &Metadata,
+) -> Result<(), Error> {
+    metadata.validate().map_err(Error::invalid_metadata)?;
+
+    for (name, value) in metadata.iter() {
+        match mode {
+            Mode::Binary => {
+                // NB: Lengths are bounded by `validate`.
+                out.push(name.len() as u8);
+                out.extend_from_slice(name.as_bytes());
+                out.extend_from_slice(&(value.len() as u16).to_le_bytes());
+                out.extend_from_slice(value.as_bytes());
+            }
+            Mode::Text => {
+                out.extend_from_slice(name.as_bytes());
+                out.extend_from_slice(b": ");
+                out.extend_from_slice(value.as_bytes());
+                out.push(b'\n');
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Decode a [`Metadata`] block, which is everything in `buf`.
+#[cfg_attr(
+    not(any(feature = "ws", feature = "client", feature = "web03")),
+    allow(dead_code)
+)]
+pub(crate) fn decode_metadata(mode: Mode, buf: &[u8]) -> Result<Metadata, Error> {
+    let mut metadata = Metadata::new();
+
+    if buf.len() > METADATA_MAX_BYTES {
+        return Err(Error::invalid_metadata(InvalidMetadata::TooLarge));
+    }
+
+    let mut rest = buf;
+
+    match mode {
+        Mode::Binary => {
+            while let Some((&name_len, next)) = rest.split_first() {
+                let Some((name, next)) = next.split_at_checked(usize::from(name_len)) else {
+                    return Err(Error::invalid_metadata(InvalidMetadata::Truncated));
+                };
+
+                let Some((value_len, next)) = next.split_first_chunk::<2>() else {
+                    return Err(Error::invalid_metadata(InvalidMetadata::Truncated));
+                };
+
+                let value_len = usize::from(u16::from_le_bytes(*value_len));
+
+                let Some((value, next)) = next.split_at_checked(value_len) else {
+                    return Err(Error::invalid_metadata(InvalidMetadata::Truncated));
+                };
+
+                rest = next;
+
+                metadata
+                    .push_decoded(name, value)
+                    .map_err(Error::invalid_metadata)?;
+            }
+        }
+        Mode::Text => {
+            while !rest.is_empty() {
+                let Some(end) = rest.iter().position(|&b| b == b'\n') else {
+                    return Err(Error::invalid_metadata(InvalidMetadata::Truncated));
+                };
+
+                let line = &rest[..end];
+                rest = &rest[end + 1..];
+
+                // NB: Tolerated like it is in the envelope. A value cannot
+                // contain a carriage return, so this never eats into one.
+                let line = line.strip_suffix(b"\r").unwrap_or(line);
+
+                let Some(split) = line.windows(2).position(|w| w == b": ") else {
+                    return Err(Error::invalid_metadata(InvalidMetadata::Separator));
+                };
+
+                metadata
+                    .push_decoded(&line[..split], &line[split + 2..])
+                    .map_err(Error::invalid_metadata)?;
+            }
+        }
+    }
+
+    Ok(metadata)
+}
+
 #[cfg_attr(
     not(any(feature = "ws", feature = "client", feature = "web03")),
     allow(dead_code)
@@ -628,6 +730,20 @@ impl Error {
         Self::new(ErrorKind::Unsupported(format))
     }
 
+    #[inline]
+    pub(crate) const fn invalid_metadata(invalid: InvalidMetadata) -> Self {
+        Self::new(ErrorKind::InvalidMetadata(invalid))
+    }
+
+    /// Test if the error is caused by an invalid [`Metadata`] block, see
+    /// [connection metadata].
+    ///
+    /// [connection metadata]: crate::api#connection-metadata
+    #[inline]
+    pub fn is_invalid_metadata(&self) -> bool {
+        matches!(self.kind, ErrorKind::InvalidMetadata(..))
+    }
+
     /// Test if the error is caused by a format which is not supported, and if
     /// so return it.
     #[inline]
@@ -680,6 +796,7 @@ macro_rules! error_kinds {
             HeaderRange { name: &'static str, value: u32 },
             UnknownHeader { id: u8, name: Option<String> },
             UnsupportedVersion { version: u32 },
+            InvalidMetadata(InvalidMetadata),
             $($(#[$meta])* $variant($ty),)*
         }
 
@@ -739,6 +856,9 @@ macro_rules! error_kinds {
                             "Peer speaks protocol version {version}, this build speaks {VERSION}"
                         )
                     }
+                    ErrorKind::InvalidMetadata(invalid) => {
+                        write!(f, "Invalid metadata: {invalid}")
+                    }
                     $($(#[$meta])* ErrorKind::$variant(..) => {
                         write!(f, concat!("Error in the `", stringify!($ctor), "` format"))
                     })*
@@ -775,6 +895,7 @@ error_kinds! {
 mod tests {
     use super::*;
 
+    use alloc::format;
     use alloc::vec::Vec;
 
     use musli::{Decode, Encode};
@@ -1068,7 +1189,7 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "version: 2\nserial: 7\nid: 11\nformat: 5\nchannel: 3\napp: 9\n\n"
+            "version: 3\nserial: 7\nid: 11\nformat: 5\nchannel: 3\napp: 9\n\n"
         );
 
         let mut buf = Vec::new();
@@ -1087,7 +1208,7 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "version: 2\nserial: 0\nbroadcast: 13\nerror: 0\nformat: 5\nchannel: 0\napp: 0\n\n"
+            "version: 3\nserial: 0\nbroadcast: 13\nerror: 0\nformat: 5\nchannel: 0\napp: 0\n\n"
         );
     }
 
@@ -1180,7 +1301,7 @@ mod tests {
 
         assert_eq!(
             core::str::from_utf8(&buf).unwrap(),
-            "version: 2\nserial: 1\nid: 2\nformat: 5\nchannel: 0\napp: 0\n\n{\"message\":\"hello\",\"tick\":42}"
+            "version: 3\nserial: 1\nid: 2\nformat: 5\nchannel: 0\napp: 0\n\n{\"message\":\"hello\",\"tick\":42}"
         );
 
         let mut at = 0;
@@ -1198,7 +1319,7 @@ mod tests {
     fn text_envelope_is_order_independent() {
         // Headers in a different order, one which is absent, and CRLF line
         // endings throughout.
-        let buf = b"channel: 3\r\nid: 11\r\nversion: 2\r\n\r\n";
+        let buf = b"channel: 3\r\nid: 11\r\nversion: 3\r\n\r\n";
 
         let mut at = 0;
         let header: RequestHeader = decode_envelope(Mode::Text, buf, &mut at).unwrap();
@@ -1289,7 +1410,7 @@ mod tests {
         );
         assert_eq!(at, 0, "a refused envelope must not advance the cursor");
 
-        let buf = b"version: 2\nserial: 7\nfuture: whatever\nid: 11\n\n";
+        let buf = b"version: 3\nserial: 7\nfuture: whatever\nid: 11\n\n";
 
         let mut at = 0;
         let error = decode_envelope::<RequestHeader>(Mode::Text, buf, &mut at).unwrap_err();
@@ -1342,12 +1463,12 @@ mod tests {
     fn text_envelope_rejects_malformed_input() {
         // No empty line, so the envelope never ends.
         let mut at = 0;
-        assert!(decode_envelope::<RequestHeader>(Mode::Text, b"version: 2\n", &mut at).is_err());
+        assert!(decode_envelope::<RequestHeader>(Mode::Text, b"version: 3\n", &mut at).is_err());
 
         // A value which does not fit the header it is written to.
         let mut at = 0;
         assert!(
-            decode_envelope::<RequestHeader>(Mode::Text, b"version: 2\nid: 65536\n\n", &mut at)
+            decode_envelope::<RequestHeader>(Mode::Text, b"version: 3\nid: 65536\n\n", &mut at)
                 .is_err()
         );
 
@@ -1358,7 +1479,7 @@ mod tests {
         // A field whose value is not a number.
         let mut at = 0;
         assert!(
-            decode_envelope::<RequestHeader>(Mode::Text, b"version: 2\nid: none\n\n", &mut at)
+            decode_envelope::<RequestHeader>(Mode::Text, b"version: 3\nid: none\n\n", &mut at)
                 .is_err()
         );
 
@@ -1458,5 +1579,217 @@ mod tests {
             let error = format.encode(&mut buf, &1u32).unwrap_err();
             assert_eq!(error.unsupported_format(), Some(format));
         }
+    }
+
+    fn sample_metadata() -> Metadata {
+        let mut metadata = Metadata::new();
+        metadata.insert("watchword-session", "abc: def");
+        metadata.insert("a.b_c-9", "");
+        metadata.insert("unicode", " ünïcödé ");
+        metadata
+    }
+
+    /// Metadata round-trips in both modes, after an envelope, and keeps its
+    /// order.
+    #[test]
+    fn metadata_round_trips() {
+        for &mode in Mode::ALL {
+            let metadata = sample_metadata();
+            let header = RequestHeader {
+                version: VERSION,
+                serial: 1,
+                id: 2,
+                format: Format::DEFAULT.to_u8(),
+                channel: ChannelId::NONE,
+                app: 0,
+            };
+
+            let mut buf = Vec::new();
+            encode_envelope(mode, &mut buf, &header).unwrap();
+            encode_metadata(mode, &mut buf, &metadata).unwrap();
+
+            let mut at = 0;
+            decode_envelope::<RequestHeader>(mode, &buf, &mut at).unwrap();
+            let decoded = decode_metadata(mode, &buf[at..]).unwrap();
+
+            assert_eq!(decoded, metadata, "{mode}");
+            assert_eq!(decoded.get("watchword-session"), Some("abc: def"));
+            assert_eq!(
+                decoded.iter().map(|(n, _)| n).collect::<Vec<_>>(),
+                ["watchword-session", "a.b_c-9", "unicode"]
+            );
+
+            // NB: No body is valid and states nothing.
+            assert!(decode_metadata(mode, &[]).unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn metadata_spelling() {
+        let mut metadata = Metadata::new();
+        metadata.insert("k", "v1");
+
+        let mut buf = Vec::new();
+        encode_metadata(Mode::Text, &mut buf, &metadata).unwrap();
+        assert_eq!(buf, b"k: v1\n");
+
+        let mut buf = Vec::new();
+        encode_metadata(Mode::Binary, &mut buf, &metadata).unwrap();
+        assert_eq!(buf, b"\x01k\x02\x00v1");
+
+        let decoded = decode_metadata(Mode::Text, b"k: v1\r\nother: x\n").unwrap();
+        assert_eq!(decoded.get("k"), Some("v1"));
+        assert_eq!(decoded.get("other"), Some("x"));
+    }
+
+    /// Invalid inserts are remembered and fail encoding.
+    #[test]
+    fn metadata_rejects_invalid_inserts() {
+        let cases: [(&str, &str, InvalidMetadata); 6] = [
+            ("", "v", InvalidMetadata::Name),
+            ("Upper", "v", InvalidMetadata::Name),
+            ("has space", "v", InvalidMetadata::Name),
+            ("k", "line\nbreak", InvalidMetadata::Value),
+            ("k", "tab\there", InvalidMetadata::Value),
+            ("k", "nul\0", InvalidMetadata::Value),
+        ];
+
+        for (name, value, expected) in cases {
+            let mut metadata = Metadata::new();
+            metadata.insert(name, value);
+            assert!(metadata.is_empty());
+            assert_eq!(metadata.validate(), Err(expected), "{name:?}");
+
+            for &mode in Mode::ALL {
+                let error = encode_metadata(mode, &mut Vec::new(), &metadata).unwrap_err();
+                assert!(error.is_invalid_metadata());
+            }
+        }
+
+        let long = "a".repeat(256);
+        let mut metadata = Metadata::new();
+        metadata.insert(&long, "v");
+        assert_eq!(metadata.validate(), Err(InvalidMetadata::Name));
+
+        let mut metadata = Metadata::new();
+        metadata.insert(&long[..255], "v");
+        assert_eq!(metadata.validate(), Ok(()));
+
+        let mut metadata = Metadata::new();
+        metadata.insert("k", &"v".repeat(65536));
+        assert_eq!(metadata.validate(), Err(InvalidMetadata::Value));
+
+        // NB: An invalid insert spoils the block even after valid ones.
+        let mut metadata = Metadata::new();
+        metadata.insert("ok", "v");
+        metadata.insert("NOT", "v");
+        assert_eq!(metadata.len(), 1);
+        assert_eq!(metadata.validate(), Err(InvalidMetadata::Name));
+    }
+
+    #[test]
+    fn metadata_limits_on_encode() {
+        let mut metadata = Metadata::new();
+
+        for n in 0..64 {
+            metadata.insert(&format!("k{n}"), "v");
+        }
+
+        assert_eq!(metadata.validate(), Ok(()));
+        metadata.insert("k64", "v");
+        assert_eq!(metadata.validate(), Err(InvalidMetadata::TooManyEntries));
+
+        let mut metadata = Metadata::new();
+        // NB: Exactly at the limit, counting three bytes per entry.
+        metadata.insert("k", &"v".repeat(METADATA_MAX_BYTES - 4));
+        assert_eq!(metadata.validate(), Ok(()));
+        metadata.insert("k", &"v".repeat(METADATA_MAX_BYTES - 3));
+        assert_eq!(metadata.validate(), Err(InvalidMetadata::TooLarge));
+    }
+
+    fn binary_entry(out: &mut Vec<u8>, name: &[u8], value: &[u8]) {
+        out.push(name.len() as u8);
+        out.extend_from_slice(name);
+        out.extend_from_slice(&(value.len() as u16).to_le_bytes());
+        out.extend_from_slice(value);
+    }
+
+    fn decode_error(mode: Mode, buf: &[u8]) -> String {
+        let error = decode_metadata(mode, buf).unwrap_err();
+        assert!(error.is_invalid_metadata(), "{error}");
+        error.to_string()
+    }
+
+    /// Every way a block read off the wire can be invalid.
+    #[test]
+    fn metadata_rejects_invalid_blocks() {
+        let name = InvalidMetadata::Name.to_string();
+        let value = InvalidMetadata::Value.to_string();
+        let duplicate = InvalidMetadata::Duplicate.to_string();
+        let too_many = InvalidMetadata::TooManyEntries.to_string();
+        let too_large = InvalidMetadata::TooLarge.to_string();
+        let truncated = InvalidMetadata::Truncated.to_string();
+
+        // Bad name.
+        assert!(decode_error(Mode::Text, b"Bad: v\n").contains(&name));
+        assert!(decode_error(Mode::Text, b": v\n").contains(&name));
+        let mut buf = Vec::new();
+        binary_entry(&mut buf, b"", b"v");
+        assert!(decode_error(Mode::Binary, &buf).contains(&name));
+        let mut buf = Vec::new();
+        binary_entry(&mut buf, b"a:b", b"v");
+        assert!(decode_error(Mode::Binary, &buf).contains(&name));
+
+        // Control character or invalid UTF-8 in a value.
+        assert!(decode_error(Mode::Text, b"k: a\x07b\n").contains(&value));
+        assert!(decode_error(Mode::Text, b"k: a\rb\n").contains(&value));
+        let mut buf = Vec::new();
+        binary_entry(&mut buf, b"k", b"a\nb");
+        assert!(decode_error(Mode::Binary, &buf).contains(&value));
+        let mut buf = Vec::new();
+        binary_entry(&mut buf, b"k", b"\xff");
+        assert!(decode_error(Mode::Binary, &buf).contains(&value));
+
+        // Duplicate name.
+        assert!(decode_error(Mode::Text, b"k: 1\nk: 2\n").contains(&duplicate));
+        let mut buf = Vec::new();
+        binary_entry(&mut buf, b"k", b"1");
+        binary_entry(&mut buf, b"k", b"2");
+        assert!(decode_error(Mode::Binary, &buf).contains(&duplicate));
+
+        // Too many entries.
+        let mut text = Vec::new();
+        let mut binary = Vec::new();
+
+        for n in 0..65 {
+            text.extend_from_slice(format!("k{n}: v\n").as_bytes());
+            binary_entry(&mut binary, format!("k{n}").as_bytes(), b"v");
+        }
+
+        assert!(decode_error(Mode::Text, &text).contains(&too_many));
+        assert!(decode_error(Mode::Binary, &binary).contains(&too_many));
+
+        // Oversized block.
+        let big = "v".repeat(METADATA_MAX_BYTES);
+        assert!(decode_error(Mode::Text, format!("k: {big}\n").as_bytes()).contains(&too_large));
+        let mut buf = Vec::new();
+        binary_entry(&mut buf, b"k", big.as_bytes());
+        assert!(decode_error(Mode::Binary, &buf).contains(&too_large));
+
+        // Truncated binary entry, at every point inside it.
+        let mut buf = Vec::new();
+        binary_entry(&mut buf, b"key", b"value");
+
+        for len in 1..buf.len() {
+            assert!(
+                decode_error(Mode::Binary, &buf[..len]).contains(&truncated),
+                "{len}"
+            );
+        }
+
+        // Unterminated or unseparated text line.
+        assert!(decode_error(Mode::Text, b"k: v").contains(&truncated));
+        assert!(decode_error(Mode::Text, b"k:v\n").contains("separator"));
+        assert!(decode_error(Mode::Text, b"\n").contains("separator"));
     }
 }

@@ -82,7 +82,7 @@
 //! terminated by an empty line, carried in a text frame:
 //!
 //! ```text
-//! version: 2
+//! version: 3
 //! serial: 1
 //! id: 1
 //! format: 5
@@ -127,11 +127,15 @@
 //! 1. The server sends [`MessageId::SERVER_HELLO`] as soon as the connection is
 //!    established. This carries no body.
 //! 2. The client responds with a [`MessageId::NEGOTIATE`] request whose
-//!    envelope carries the desired [`Format`]. This carries no body.
-//! 3. If the server supports that format it records it for the connection and
-//!    replies with an empty response whose envelope carries the format that was
-//!    accepted. If it does not, it replies with an error listing the formats it
-//!    does support, and the connection settles on [`Format::DEFAULT`].
+//!    envelope carries the desired [`Format`]. Its body is the client's
+//!    [connection metadata], which may be empty.
+//! 3. The server checks the protocol and [application versions], and passes
+//!    the metadata to [`ws::Handler::connect`], which may refuse the
+//!    connection. If it is accepted and the server supports the format it
+//!    records it for the connection and replies with an empty response whose
+//!    envelope carries the format that was accepted. If it does not support
+//!    it, it replies with an error listing the formats it does support, and
+//!    the connection settles on [`Format::DEFAULT`].
 //!
 //! Both peers are forced through this before anything else can happen:
 //!
@@ -193,6 +197,53 @@
 //! [`ws::Connect::app_version`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Connect.html#method.app_version>
 //! [`ws::Error::is_incompatible`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Error.html#method.is_incompatible>
 //!
+//! # Connection metadata
+//!
+//! The body of a [`MessageId::NEGOTIATE`] request is a block of named string
+//! values, the [`Metadata`] the client states for this connection, such as a
+//! credential. A request without a body states none. The block is not encoded
+//! with the negotiated [`Format`] but spelled by the [`Mode`] like the
+//! envelope, so the server can read it before any format has been agreed.
+//!
+//! In [`Mode::Binary`] the block is entries until the end of the frame, each a
+//! one byte name length, the name, a two byte little endian value length and
+//! the value:
+//!
+//! ```text
+//! +----------+------+-----------------+-------+
+//! | name_len | name | value_len (u16) | value | ...
+//! +----------+------+-----------------+-------+
+//! ```
+//!
+//! In [`Mode::Text`] it is one `<name>: <value>` line per entry after the
+//! envelope's empty line, each ended by `\n`. The value is everything after
+//! the first `": "`:
+//!
+//! ```text
+//! version: 3
+//! serial: 1
+//! id: 32772
+//! format: 5
+//! channel: 0
+//! app: 0
+//!
+//! session: abc
+//! ```
+//!
+//! A name is 1 to 255 bytes of `a-z`, `0-9`, `.`, `_` and `-`, and a value is
+//! UTF-8 without control characters of at most 65535 bytes. Names are unique,
+//! and a block holds at most 64 entries and 16 KiB, counting three bytes per
+//! entry on top of its name and value. A server which reads a block breaking
+//! any of this closes the connection with a protocol error.
+//!
+//! The server passes the metadata to [`ws::Handler::connect`] before it replies
+//! to the negotiation. The handler can set up its per-connection state from
+//! it, or refuse the connection, which closes it with a code in `4000..=4999`
+//! and a reason, see [`ws::Refuse`].
+//!
+//! [`ws::Handler::connect`]: <https://docs.rs/musli-web/latest/musli_web/ws/trait.Handler.html#method.connect>
+//! [`ws::Refuse`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Refuse.html>
+//!
 //! # Error responses
 //!
 //! A request which fails is answered with a response whose `error` header is
@@ -218,6 +269,8 @@
 //! `web::Error::server_error` or `client::Error::server_error`.
 //!
 //! [features]: <https://docs.rs/musli-web/latest/musli_web/#features>
+//! [connection metadata]: #connection-metadata
+//! [application versions]: #application-versions
 //! [`ws::Connect::connect`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Connect.html#method.connect>
 //! [`ws::TypedError`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.TypedError.html>
 //! [`ws::Server`]: <https://docs.rs/musli-web/latest/musli_web/ws/struct.Server.html>
@@ -244,21 +297,23 @@ pub use musli_web_macros::define;
 ///
 /// # History
 ///
+/// * `3` - a [`MessageId::NEGOTIATE`] request may carry [connection metadata].
 /// * `2` - a request may fail with a typed error, see [error responses], and
 ///   the handshake carries an [application version].
 /// * `1` - the first versioned protocol.
 ///
 /// [error responses]: crate::api#error-responses
 /// [application version]: crate::api#application-versions
+/// [connection metadata]: crate::api#connection-metadata
 ///
 /// # Examples
 ///
 /// ```
 /// use musli_web::api::VERSION;
 ///
-/// assert_eq!(VERSION, 2);
+/// assert_eq!(VERSION, 3);
 /// ```
-pub const VERSION: u32 = 2;
+pub const VERSION: u32 = 3;
 
 /// The serialization format used for message bodies.
 ///
@@ -1596,6 +1651,230 @@ pub struct ResponseHeader {
 pub struct ErrorMessage<'de> {
     /// The error message.
     pub message: &'de str,
+}
+
+/// The longest name a [`Metadata`] entry may have, in bytes.
+pub(crate) const METADATA_MAX_NAME: usize = 255;
+
+/// The longest value a [`Metadata`] entry may have, in bytes.
+pub(crate) const METADATA_MAX_VALUE: usize = u16::MAX as usize;
+
+/// The most entries a [`Metadata`] block may hold.
+pub(crate) const METADATA_MAX_ENTRIES: usize = 64;
+
+/// The most bytes an encoded [`Metadata`] block may take.
+pub(crate) const METADATA_MAX_BYTES: usize = 16 * 1024;
+
+/// The bytes an entry costs on top of its name and value, which is the same in
+/// both modes: `u8` + `u16` lengths in binary, `": "` + `"\n"` in text.
+pub(crate) const METADATA_ENTRY_OVERHEAD: usize = 3;
+
+/// Why a [`Metadata`] block is invalid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum InvalidMetadata {
+    Name,
+    Value,
+    Duplicate,
+    TooManyEntries,
+    TooLarge,
+    Truncated,
+    Separator,
+}
+
+impl fmt::Display for InvalidMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Name => write!(
+                f,
+                "a name is not 1 to {METADATA_MAX_NAME} bytes of `a-z`, `0-9`, `.`, `_` or `-`"
+            ),
+            Self::Value => write!(
+                f,
+                "a value is not UTF-8 without control characters of at most {METADATA_MAX_VALUE} bytes"
+            ),
+            Self::Duplicate => write!(f, "a name appears more than once"),
+            Self::TooManyEntries => write!(f, "more than {METADATA_MAX_ENTRIES} entries"),
+            Self::TooLarge => write!(f, "the block is larger than {METADATA_MAX_BYTES} bytes"),
+            Self::Truncated => write!(f, "an entry is truncated"),
+            Self::Separator => write!(f, "a line has no `: ` separator"),
+        }
+    }
+}
+
+/// Connection metadata, the named values a client states when it negotiates,
+/// see [connection metadata].
+///
+/// Entries keep the order they were first inserted in. Names are 1 to 255
+/// bytes of `a-z`, `0-9`, `.`, `_` and `-`; values are UTF-8 without control
+/// characters. A block holds at most 64 entries and 16 KiB.
+///
+/// Values may be credentials, so the [`Debug`] implementation only shows
+/// names.
+///
+/// [connection metadata]: crate::api#connection-metadata
+///
+/// # Examples
+///
+/// ```
+/// use musli_web::api::Metadata;
+///
+/// let mut metadata = Metadata::new();
+/// metadata.insert("session", "abc");
+/// metadata.insert("session", "def");
+///
+/// assert_eq!(metadata.get("session"), Some("def"));
+/// assert_eq!(metadata.len(), 1);
+/// ```
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct Metadata {
+    entries: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>,
+    /// The first invalid insert, which makes the whole block invalid.
+    invalid: Option<InvalidMetadata>,
+}
+
+impl Metadata {
+    /// Construct empty metadata.
+    #[inline]
+    pub const fn new() -> Self {
+        Self {
+            entries: alloc::vec::Vec::new(),
+            invalid: None,
+        }
+    }
+
+    /// Insert an entry, replacing any entry with the same name.
+    ///
+    /// An invalid name or value is not inserted. It instead makes the block
+    /// invalid, so that sending it fails rather than silently dropping the
+    /// entry.
+    pub fn insert(&mut self, name: &str, value: &str) {
+        if !is_metadata_name(name.as_bytes()) {
+            self.invalid.get_or_insert(InvalidMetadata::Name);
+            return;
+        }
+
+        if !is_metadata_value(value) {
+            self.invalid.get_or_insert(InvalidMetadata::Value);
+            return;
+        }
+
+        if let Some((_, existing)) = self.entries.iter_mut().find(|(n, _)| n == name) {
+            existing.clear();
+            existing.push_str(value);
+            return;
+        }
+
+        self.entries.push((name.into(), value.into()));
+    }
+
+    /// Get the value of the entry named `name`.
+    #[inline]
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.entries
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Iterate over the entries as `(name, value)` pairs, in insertion order.
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> + '_ {
+        self.entries.iter().map(|(n, v)| (n.as_str(), v.as_str()))
+    }
+
+    /// The number of entries.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Test if there are no entries.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Check that the block can be sent.
+    pub(crate) fn validate(&self) -> Result<(), InvalidMetadata> {
+        if let Some(invalid) = self.invalid {
+            return Err(invalid);
+        }
+
+        if self.entries.len() > METADATA_MAX_ENTRIES {
+            return Err(InvalidMetadata::TooManyEntries);
+        }
+
+        let bytes = self
+            .entries
+            .iter()
+            .map(|(n, v)| n.len() + v.len() + METADATA_ENTRY_OVERHEAD)
+            .sum::<usize>();
+
+        if bytes > METADATA_MAX_BYTES {
+            return Err(InvalidMetadata::TooLarge);
+        }
+
+        Ok(())
+    }
+
+    /// Add an entry read off the wire, refusing anything a valid block cannot
+    /// contain.
+    pub(crate) fn push_decoded(
+        &mut self,
+        name: &[u8],
+        value: &[u8],
+    ) -> Result<(), InvalidMetadata> {
+        if !is_metadata_name(name) {
+            return Err(InvalidMetadata::Name);
+        }
+
+        let Ok(value) = core::str::from_utf8(value) else {
+            return Err(InvalidMetadata::Value);
+        };
+
+        if !is_metadata_value(value) {
+            return Err(InvalidMetadata::Value);
+        }
+
+        // NB: Checked by the caller to be ASCII.
+        let Ok(name) = core::str::from_utf8(name) else {
+            return Err(InvalidMetadata::Name);
+        };
+
+        if self.get(name).is_some() {
+            return Err(InvalidMetadata::Duplicate);
+        }
+
+        if self.entries.len() == METADATA_MAX_ENTRIES {
+            return Err(InvalidMetadata::TooManyEntries);
+        }
+
+        self.entries.push((name.into(), value.into()));
+        Ok(())
+    }
+}
+
+impl fmt::Debug for Metadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut list = f.debug_list();
+
+        for (name, _) in &self.entries {
+            list.entry(name);
+        }
+
+        list.finish()
+    }
+}
+
+fn is_metadata_name(name: &[u8]) -> bool {
+    (1..=METADATA_MAX_NAME).contains(&name.len())
+        && name
+            .iter()
+            .all(|&b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'_' | b'-'))
+}
+
+fn is_metadata_value(value: &str) -> bool {
+    value.len() <= METADATA_MAX_VALUE && !value.chars().any(char::is_control)
 }
 
 /// A request header.
