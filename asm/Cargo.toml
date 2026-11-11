@@ -18,7 +18,7 @@ no-nonunit-variant = []
 no-empty = []
 
 [dependencies]
-tests = { path = "../tests", default-features = false, features = ["alloc", "std"] }
+tests = { path = "../tests", optional = true, default-features = false, features = ["alloc", "std"] }
 
 musli-zerocopy = { path = "../crates/musli-zerocopy", optional = true }
 musli = { path = "../crates/musli", optional = true, features = ["storage"] }

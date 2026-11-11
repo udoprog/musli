@@ -1149,7 +1149,7 @@ impl<M> EncodeBytes<M> for VecDeque<u8> {
         E: Encoder<Mode = M>,
     {
         let (first, second) = self.as_slices();
-        encoder.encode_bytes_vectored(self.len(), &[first, second])
+        encoder.encode_bytes_vectored(self.len(), [first, second])
     }
 
     #[inline]
