@@ -2,7 +2,7 @@
 crates = ["musli-zerocopy", "musli-zerocopy-macros"]
 
 [[version_group]]
-crates = ["musli", "musli-macros"]
+crates = ["musli-core", "musli-macros"]
 
 [[version_group]]
 crates = ["musli-web", "musli-web-macros"]
